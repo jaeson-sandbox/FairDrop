@@ -1,0 +1,4 @@
+# Go files are gofmt-normalized with LF. Without this, core.autocrlf checks them
+# out as CRLF on Windows and `gofmt -l .` reports every one as unformatted even
+# though the stored content is clean.
+*.go text eol=lf
