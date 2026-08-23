@@ -30,3 +30,20 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Node / frontend dependencies
+node_modules/
+frontend/node_modules/
+
+# Wails build output
+build/bin/
+
+# Vite build output. The directory itself must stay tracked via .gitkeep so
+# the //go:embed all:frontend/dist in main.go resolves on a fresh clone
+# (the `all:` prefix matches dotfiles). Vite empties dist/ on every build, so
+# frontend/package.json has a `postbuild` script that restores the placeholder.
+frontend/dist/*
+!frontend/dist/.gitkeep
+
+# Wails frontend build stamp
+frontend/package.json.md5

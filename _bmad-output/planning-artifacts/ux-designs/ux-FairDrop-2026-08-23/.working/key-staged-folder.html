@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FairDrop key screen — Staged folder</title>
+  <style>
+    /*
+      GOVERNING SPINES — DESIGN.md wins on visual conflict; EXPERIENCE.md wins on behavior/copy.
+      DESIGN.md: Brand & Style; Colors (including fixed QR substrate); Typography; Layout & Spacing;
+      Elevation & Depth; Shapes; Components rows App Shell, StagedView, Item Summary, QR Panel,
+      Direct URL Row, Copy Feedback, Trusted-LAN Note, Warning Banner, Cancel Action,
+      Status Announcer; Do's and Don'ts.
+      EXPERIENCE.md: Information Architecture row FairDrop desktop window — Staged;
+      Voice and Tone rows Staged heading, QR instruction, Folder note, Direct-link action/helper,
+      First-opener warning, Network disclosure, Local/no-extra-copy disclosure, Discovery warning,
+      Different-LAN help; stable public error row beacon_warning;
+      Component Patterns rows StagedView, Item Summary, QR Panel, Direct URL Row, Copy Feedback,
+      Trusted-LAN Note, Warning Banner, Cancel Action, Status Announcer;
+      State Patterns rows Staged/ready, Staged/beacon_warning, Staged/copy success;
+      Interaction Primitives + Announcement ownership; Trusted-LAN & Privacy;
+      Responsive & Platform; Accessibility Floor; Key Flow 1 steps 3–5 and Flow 2 steps 3–4.
+    */
+    :root {
+      color-scheme:light dark;
+      --canvas:#F7F0E7; --surface:#FFFAF4; --elevated:#EFE2D4;
+      --text:#2C2723; --muted:#70645B; --border:#CDBDAE; --control:#8B7462;
+      --primary:#A94724; --primary-ink:#FFFFFF; --hover:#873719;
+      --focus:#7E4B92; --warning:#946000; --error:#AB3932;
+      --qr-surface:#FFFFFF; --qr-ink:#221F1C;
+      --r-xs:3px; --r-sm:5px; --r-md:8px; --r-lg:10px;
+      --body:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      --serif:Georgia,Cambria,"Times New Roman",serif;
+      --mono:ui-monospace,"Cascadia Mono","Segoe UI Mono",monospace;
+    }
+    @media (prefers-color-scheme:dark) {
+      :root {
+        --canvas:#1C1916; --surface:#25211D; --elevated:#312A24;
+        --text:#F7EFE5; --muted:#BCAF9F; --border:#55493F; --control:#89796A;
+        --primary:#FF986D; --primary-ink:#2B1309; --hover:#FFB18F;
+        --focus:#C5A1D3; --warning:#F2BD62; --error:#FF8B83;
+      }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#d8d2cc; color:#2C2723; font:14px/1.5 var(--body); }
+    .board { width:min(1280px,calc(100% - 24px)); margin:24px auto 48px; }
+    .board-head h1 { margin:0; font:600 24px/1.2 var(--serif); letter-spacing:-.015em; }
+    .board-head p,.frame-label { margin:5px 0 0; color:#5f5751; font-size:12px; }
+    .gallery { display:grid; grid-template-columns:minmax(0,1.32fr) minmax(430px,.68fr); gap:20px; align-items:start; margin-top:16px; }
+    .frame-label { margin:0 0 7px 2px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .window { min-width:0; overflow:hidden; border:1px solid #82776d; border-radius:10px; background:var(--canvas); color:var(--text); box-shadow:0 16px 38px #2c272329; }
+    .chrome { height:38px; display:grid; grid-template-columns:1fr auto; align-items:center; padding-left:12px; background:var(--surface); border-bottom:1px solid var(--control); }
+    .chrome-title { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:650; }
+    .mark { width:18px; height:18px; display:grid; place-items:center; border-radius:var(--r-sm); background:var(--primary); color:var(--primary-ink); font-size:10px; font-weight:800; }
+    .window-controls { height:100%; display:flex; }
+    .window-controls span { width:42px; display:grid; place-items:center; color:var(--muted); font-size:13px; }
+    .window-controls span:last-child { font-size:16px; }
+    .app { min-height:656px; padding:20px; overflow:auto; }
+    .state-heading { margin:0; font:600 24px/1.2 var(--serif); letter-spacing:-.015em; }
+    .instruction { margin:7px 0 0; color:var(--muted); }
+    .packet { position:relative; margin-top:27px; padding:24px 20px 18px; border:1px solid var(--border); border-radius:var(--r-sm) var(--r-lg) var(--r-lg); background:var(--elevated); box-shadow:3px 3px 0 var(--border); }
+    .packet::before { content:"FOLDER"; position:absolute; left:-1px; top:-15px; padding:5px 14px; border:1px solid var(--border); border-bottom:0; border-radius:var(--r-sm) var(--r-sm) 0 0; background:var(--elevated); color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; }
+    .hero { display:grid; grid-template-columns:minmax(0,1fr) 224px; gap:28px; align-items:start; }
+    .item-name { min-inline-size:0; margin:0; font:600 20px/1.25 var(--serif); letter-spacing:-.01em; overflow-wrap:anywhere; }
+    .item-meta,.folder-note { margin:4px 0 0; color:var(--muted); font-size:12px; }
+    .folder-note { color:var(--text); font-weight:650; }
+    .qr-panel { width:224px; aspect-ratio:1; display:grid; place-items:center; padding:22px; border:1px solid var(--control); border-radius:var(--r-xs); background:var(--qr-surface); color:var(--qr-ink); }
+    .qr-placeholder { width:100%; height:100%; position:relative; border:2px solid var(--qr-ink); background:var(--qr-surface); }
+    .finder { position:absolute; width:36px; height:36px; border:7px solid var(--qr-ink); background:var(--qr-surface); }
+    .finder::after { content:""; position:absolute; inset:6px; background:var(--qr-ink); }
+    .finder.a { left:10px; top:10px; } .finder.b { right:10px; top:10px; } .finder.c { left:10px; bottom:10px; }
+    .qr-placeholder span { position:absolute; right:9px; bottom:11px; width:74px; color:var(--qr-ink); font:700 10px/1.2 var(--body); text-align:center; }
+    .handoff { margin-top:18px; }
+    .handoff h3,.trust h3,.help h3 { margin:0 0 7px; font-size:14px; }
+    .direct-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+    .url { min-width:0; min-height:44px; padding:10px 12px; border:1px solid var(--control); border-radius:var(--r-sm); background:var(--surface); color:var(--text); font:500 12px/1.4 var(--mono); overflow-wrap:anywhere; user-select:all; }
+    button { min-height:44px; padding:0 14px; border:1px solid var(--control); border-radius:var(--r-md); background:var(--surface); color:var(--text); font:650 13px/1.2 var(--body); }
+    button.primary { border-color:var(--primary); background:var(--primary); color:var(--primary-ink); }
+    button.primary:hover { background:var(--hover); }
+    button:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+    .helper { margin:7px 0 0; color:var(--muted); font-size:12px; }
+    .first-opener { margin:14px 0 0; padding:12px; border:1px solid var(--warning); border-radius:var(--r-md); background:var(--surface); color:var(--warning); }
+    .trust { display:grid; gap:8px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+    .trust p,.help p { margin:0; }
+    .trust p::before { content:"!"; display:inline-grid; width:18px; height:18px; margin-right:7px; place-items:center; border:1px solid var(--warning); border-radius:50%; color:var(--warning); font-size:11px; font-weight:800; vertical-align:1px; }
+    .help { margin-top:14px; padding:12px; border-left:3px solid var(--control); background:var(--surface); }
+    .cancel { width:100%; margin-top:14px; background:transparent; color:var(--muted); }
+    .cancel:hover,.cancel:focus-visible { color:var(--error); }
+    .warning-banner { margin-bottom:16px; padding:12px; border:1px solid var(--warning); border-radius:var(--r-md); background:var(--surface); color:var(--warning); }
+    .warning-banner strong { display:block; }
+    .compact .app { min-height:760px; }
+    .compact .hero { grid-template-columns:1fr; }
+    .compact .qr-panel { width:min(224px,100%); margin-inline:auto; order:-1; }
+    .compact .direct-row { grid-template-columns:1fr; }
+    .compact .primary { width:100%; }
+    .status-announcer { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
+    @media (max-width:980px) { .gallery { grid-template-columns:1fr; } }
+    @media (max-width:640px) {
+      .board { width:100%; margin:0; }
+      .board-head,.frame-label { padding-inline:12px; }
+      .window { border-radius:0; }
+      .app { padding:20px; }
+      .hero { grid-template-columns:1fr; }
+      .qr-panel { width:min(224px,100%); margin-inline:auto; order:-1; }
+      .direct-row { grid-template-columns:1fr; }
+      .primary { width:100%; }
+    }
+    @media (forced-colors:active) {
+      body,.window,.chrome,.packet,.url,.first-opener,.trust,.help,.warning-banner,button { background:Canvas; color:CanvasText; }
+      .window,.chrome,.packet,.url,.first-opener,.warning-banner,button { border-color:CanvasText; }
+      .first-opener,.warning-banner { color:CanvasText; }
+      button:focus-visible { outline-color:Highlight; }
+      .qr-panel { forced-color-adjust:none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-head">
+      <h1>Jaeson’s Dad’s PDFs folder</h1>
+      <p>Staged is built only from successful metadata. The QR is primary; the direct URL is a receiver-browser fallback.</p>
+    </header>
+    <div class="gallery">
+      <section>
+        <p class="frame-label">Default composition · Staged / ready</p>
+        <article class="window" aria-label="FairDrop Staged folder desktop window">
+          <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+          <div class="app">
+            <h2 class="state-heading" tabindex="-1">Ready to pass along</h2>
+            <p class="instruction">Scan this code on the receiving device to start the download.</p>
+            <section class="packet">
+              <div class="hero">
+                <div>
+                  <h3 class="item-name"><bdi dir="auto">Dad's PDFs</bdi></h3>
+                  <p class="item-meta">Folder · 36.8 MB logical size</p>
+                  <p class="folder-note">This folder downloads as a ZIP.</p>
+                  <div class="handoff">
+                    <h3>Direct download link</h3>
+                    <div class="direct-row"><div class="url" role="textbox" aria-readonly="true" tabindex="0">http://192.168.1.42:53918/d/7fK2pQ9m</div><button class="primary" type="button">Copy download link</button></div>
+                    <p class="helper">Open this link directly in the receiving device’s browser.</p>
+                  </div>
+                </div>
+                <div class="qr-panel" role="img" aria-label="Download QR code for Dad's PDFs">
+                  <div class="qr-placeholder" aria-hidden="true"><i class="finder a"></i><i class="finder b"></i><i class="finder c"></i><span>Production QR bitmap</span></div>
+                </div>
+              </div>
+              <p class="first-opener">Anyone on this local network with the link can start the one available download. One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.</p>
+              <div class="trust">
+                <p>Both devices must be on the same local network. FairDrop uses plain HTTP. Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.</p>
+                <p>Sent directly over your local network. FairDrop does not upload or store an extra copy. The receiving device keeps the downloaded file.</p>
+              </div>
+              <aside class="help"><h3>Not downloading?</h3><p>Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.</p></aside>
+              <button class="cancel" type="button">Cancel</button>
+            </section>
+            <div class="status-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
+          </div>
+        </article>
+      </section>
+      <section>
+        <p class="frame-label">Minimum-width composition · beacon_warning alternate</p>
+        <article class="window compact" aria-label="FairDrop Staged folder with discovery warning desktop window">
+          <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+          <div class="app">
+            <h2 class="state-heading" tabindex="-1">Ready to pass along</h2>
+            <p class="instruction">Scan this code on the receiving device to start the download.</p>
+            <section class="packet">
+              <aside class="warning-banner"><strong>Discovery unavailable</strong>Device discovery isn’t available. The QR code and download link still work.</aside>
+              <div class="hero">
+                <div>
+                  <h3 class="item-name"><bdi dir="auto">Dad's PDFs</bdi></h3>
+                  <p class="item-meta">Folder · 36.8 MB logical size</p>
+                  <p class="folder-note">This folder downloads as a ZIP.</p>
+                  <div class="handoff"><h3>Direct download link</h3><div class="direct-row"><div class="url" role="textbox" aria-readonly="true" tabindex="0">http://192.168.1.42:53918/d/7fK2pQ9m</div><button class="primary" type="button">Copy download link</button></div><p class="helper">Open this link directly in the receiving device’s browser.</p></div>
+                </div>
+                <div class="qr-panel" role="img" aria-label="Download QR code for Dad's PDFs"><div class="qr-placeholder" aria-hidden="true"><i class="finder a"></i><i class="finder b"></i><i class="finder c"></i><span>Production QR bitmap</span></div></div>
+              </div>
+              <p class="first-opener">Anyone on this local network with the link can start the one available download. One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.</p>
+              <div class="trust"><p>Both devices must be on the same local network. FairDrop uses plain HTTP. Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.</p><p>Sent directly over your local network. FairDrop does not upload or store an extra copy. The receiving device keeps the downloaded file.</p></div>
+              <button class="cancel" type="button">Cancel</button>
+            </section>
+            <div class="status-announcer" role="status" aria-live="polite" aria-atomic="true">Device discovery isn’t available. The QR code and download link still work.</div>
+          </div>
+        </article>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

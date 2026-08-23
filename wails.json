@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "fairdrop",
+  "outputfilename": "fairdrop",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Jaeson Martin",
+    "email": "mail2jaeson@gmail.com"
+  },
+  "info": {
+    "companyName": "FairDrop",
+    "productName": "FairDrop",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright © 2026 Jaeson Martin",
+    "comments": "Ephemeral local P2P file transfer"
+  }
+}

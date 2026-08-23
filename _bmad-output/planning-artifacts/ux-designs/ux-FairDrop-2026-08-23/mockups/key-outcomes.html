@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FairDrop key screen — Outcomes and retained Idle status</title>
+  <style>
+    /*
+      GOVERNING SPINES — DESIGN.md wins on visual conflict; EXPERIENCE.md wins on behavior/copy.
+      DESIGN.md: Brand & Style; Colors; Typography; Layout & Spacing; Elevation & Depth; Shapes;
+      Components rows App Shell, DropZone, Selection Controls, Done Panel, Error Panel,
+      Status Announcer; Do's and Don'ts.
+      EXPERIENCE.md: Information Architecture rows FairDrop desktop window — Done / Error and
+      Idle with retained outcome; Voice and Tone rows Done heading/body and stable public error
+      row transfer_failed; Component Patterns rows App Shell, Selection Controls, Done Panel,
+      Error Panel, Status Announcer; State Patterns rows Done, Error, Reset after Done/Error,
+      Idle/retained Done or Error, Dismiss retained outcome;
+      Interaction Primitives + Announcement ownership (Complete or terminal Error, Reset after
+      terminal, Dismiss retained outcome); Backend-Authoritative Lifecycle; Accessibility Floor;
+      Responsive & Platform; Key Flow 1 steps 9–10, Flow 2 steps 6–7, Flow 3 steps 4–6,
+      and Flow 4 step 6.
+    */
+    :root {
+      color-scheme:light dark;
+      --canvas:#F7F0E7; --surface:#FFFAF4; --elevated:#EFE2D4;
+      --text:#2C2723; --muted:#70645B; --border:#CDBDAE; --control:#8B7462;
+      --primary:#A94724; --primary-ink:#FFFFFF; --hover:#873719; --drop:#F1D0BD;
+      --focus:#7E4B92; --success:#2F7658; --warning:#946000; --error:#AB3932;
+      --r-sm:5px; --r-md:8px; --r-lg:10px;
+      --body:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      --serif:Georgia,Cambria,"Times New Roman",serif;
+    }
+    @media (prefers-color-scheme:dark) {
+      :root {
+        --canvas:#1C1916; --surface:#25211D; --elevated:#312A24;
+        --text:#F7EFE5; --muted:#BCAF9F; --border:#55493F; --control:#89796A;
+        --primary:#FF986D; --primary-ink:#2B1309; --hover:#FFB18F; --drop:#4A2D23;
+        --focus:#C5A1D3; --success:#79D5AA; --warning:#F2BD62; --error:#FF8B83;
+      }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#d8d2cc; color:#2C2723; font:14px/1.5 var(--body); }
+    .board { width:min(1320px,calc(100% - 24px)); margin:24px auto 48px; }
+    .board-head h1 { margin:0; font:600 24px/1.2 var(--serif); letter-spacing:-.015em; }
+    .board-head p,.frame-label,.transition-note { margin:5px 0 0; color:#5f5751; font-size:12px; }
+    .sequences { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:16px; }
+    .sequence { display:grid; gap:16px; }
+    .frame-label { margin:0 0 7px 2px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .transition-note { margin:0; padding:9px 12px; border-left:3px solid #70645B; background:#eee9e4; }
+    .window { min-width:0; overflow:hidden; border:1px solid #82776d; border-radius:10px; background:var(--canvas); color:var(--text); box-shadow:0 16px 38px #2c272329; }
+    .chrome { height:38px; display:grid; grid-template-columns:1fr auto; align-items:center; padding-left:12px; background:var(--surface); border-bottom:1px solid var(--control); }
+    .chrome-title { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:650; }
+    .mark { width:18px; height:18px; display:grid; place-items:center; border-radius:var(--r-sm); background:var(--primary); color:var(--primary-ink); font-size:10px; font-weight:800; }
+    .window-controls { height:100%; display:flex; }
+    .window-controls span { width:42px; display:grid; place-items:center; color:var(--muted); font-size:13px; }
+    .window-controls span:last-child { font-size:16px; }
+    .app { min-height:398px; padding:20px; display:grid; align-content:center; overflow:auto; }
+    .outcome { position:relative; padding:22px 20px 18px; border:1px solid currentColor; border-radius:var(--r-lg); background:var(--surface); }
+    .outcome.done { color:var(--success); }
+    .outcome.error { color:var(--error); }
+    .outcome-icon { width:30px; height:30px; display:grid; place-items:center; margin-bottom:12px; border:2px solid currentColor; border-radius:50%; font-size:18px; font-weight:800; }
+    .outcome h2 { margin:0; font:600 24px/1.2 var(--serif); letter-spacing:-.015em; }
+    .outcome p { margin:8px 0 0; color:var(--text); }
+    .outcome small { display:block; margin-top:12px; color:var(--muted); }
+    .outcome.focused { outline:3px solid var(--focus); outline-offset:3px; }
+    .retained .app { min-height:510px; display:block; }
+    .retained .outcome { padding:16px; }
+    .retained .outcome-icon { float:left; width:24px; height:24px; margin:0 10px 0 0; font-size:14px; }
+    .retained .outcome h2 { font-size:20px; }
+    .retained .outcome p { clear:both; padding-top:8px; }
+    .dismiss { min-height:44px; margin-top:12px; padding:0 14px; border:1px solid var(--control); border-radius:var(--r-md); background:transparent; color:var(--text); font:650 13px/1.2 var(--body); }
+    .dismiss:focus-visible,.selection button:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+    .idle { margin-top:18px; padding-top:18px; border-top:1px solid var(--border); }
+    .idle h3 { margin:0; font:600 20px/1.25 var(--serif); }
+    .preflight { margin:10px 0 0; padding:10px 12px; border-left:3px solid var(--warning); background:var(--surface); }
+    .preflight strong { display:block; color:var(--warning); }
+    .drop-zone { min-height:82px; margin-top:12px; display:grid; place-items:center; padding:12px; border:2px dashed var(--control); border-radius:var(--r-lg); background:var(--surface); text-align:center; font-weight:650; }
+    .selection { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    .selection button { min-height:44px; border:1px solid var(--control); border-radius:var(--r-md); background:var(--surface); color:var(--text); font:650 13px/1.2 var(--body); }
+    .status-announcer { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
+    @media (max-width:940px) { .sequences { grid-template-columns:1fr; } }
+    @media (max-width:640px) {
+      .board { width:100%; margin:0; }
+      .board-head,.frame-label,.transition-note { margin-inline:12px; }
+      .window { border-radius:0; }
+      .app { padding:20px; }
+      .selection { grid-template-columns:1fr; }
+    }
+    @media (forced-colors:active) {
+      body,.window,.chrome,.outcome,.preflight,.drop-zone,.dismiss,.selection button { background:Canvas; color:CanvasText; }
+      .window,.chrome,.outcome,.drop-zone,.dismiss,.selection button { border-color:CanvasText; }
+      .outcome.focused,.dismiss:focus-visible,.selection button:focus-visible { outline-color:Highlight; }
+      .preflight { border-left-color:Highlight; }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-head"><h1>Terminal outcomes and backend reset</h1><p>Done reports only sender-observed sending completion. Reset exposes Idle while preserving the same visible outcome node.</p></header>
+    <div class="sequences">
+      <section class="sequence" aria-label="Done outcome sequence">
+        <div>
+          <p class="frame-label">Default composition · Done</p>
+          <article class="window" aria-label="FairDrop Done desktop window">
+            <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+            <div class="app"><section class="outcome done focused" tabindex="-1"><span class="outcome-icon" aria-hidden="true">✓</span><h2>Transfer finished</h2><p>FairDrop finished sending the item.</p><small>Dad's PDFs</small></section><div class="status-announcer" role="status" aria-live="polite" aria-atomic="true"></div></div>
+          </article>
+        </div>
+        <p class="transition-note"><strong>Matching backend reset accepted:</strong> no announcement and no second focus move; the outcome remains mounted.</p>
+        <div>
+          <p class="frame-label">Minimum-width composition · Idle with retained Done</p>
+          <article class="window retained" aria-label="FairDrop Idle with retained Done outcome desktop window">
+            <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+            <div class="app">
+              <section class="outcome done focused" tabindex="-1"><span class="outcome-icon" aria-hidden="true">✓</span><h2>Transfer finished</h2><p>FairDrop finished sending the item.</p><button class="dismiss" type="button">Dismiss</button></section>
+              <section class="idle"><h3>Drop one file or folder.</h3><div class="preflight"><strong>Local network access</strong>Your first transfer may ask to allow FairDrop on this local network.</div><div class="drop-zone">Drop one file or folder.</div><div class="selection"><button type="button">Select File</button><button type="button">Select Directory</button></div></section>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section class="sequence" aria-label="Error outcome sequence">
+        <div>
+          <p class="frame-label">Default composition · Safe Error</p>
+          <article class="window" aria-label="FairDrop safe transfer Error desktop window">
+            <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+            <div class="app"><section class="outcome error focused" tabindex="-1"><span class="outcome-icon" aria-hidden="true">!</span><h2>Transfer stopped</h2><p>The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.</p><small>No path, token, or adapter detail is shown.</small></section><div class="status-announcer" role="status" aria-live="polite" aria-atomic="true"></div></div>
+          </article>
+        </div>
+        <p class="transition-note"><strong>Matching backend reset accepted:</strong> session clears, Idle returns, and focus stays in the same visible outcome.</p>
+        <div>
+          <p class="frame-label">Minimum-width composition · Idle with retained Error</p>
+          <article class="window retained" aria-label="FairDrop Idle with retained Error outcome desktop window">
+            <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+            <div class="app">
+              <section class="outcome error focused" tabindex="-1"><span class="outcome-icon" aria-hidden="true">!</span><h2>Transfer stopped</h2><p>The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.</p><button class="dismiss" type="button">Dismiss</button></section>
+              <section class="idle"><h3>Drop one file or folder.</h3><div class="preflight"><strong>Local network access</strong>Your first transfer may ask to allow FairDrop on this local network.</div><div class="drop-zone">Drop one file or folder.</div><div class="selection"><button type="button">Select File</button><button type="button">Select Directory</button></div></section>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

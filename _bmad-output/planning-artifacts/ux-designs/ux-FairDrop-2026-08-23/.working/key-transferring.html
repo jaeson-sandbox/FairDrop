@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FairDrop key screen — Transferring</title>
+  <style>
+    /*
+      GOVERNING SPINES — DESIGN.md wins on visual conflict; EXPERIENCE.md wins on behavior/copy.
+      DESIGN.md: Brand & Style; Colors; Typography; Layout & Spacing; Elevation & Depth; Shapes;
+      Components rows App Shell, Item Summary, TransferView, Progress Meter, Transfer Metrics,
+      Cancel Action, Status Announcer; Do's and Don'ts.
+      EXPERIENCE.md: Information Architecture row FairDrop desktop window — Transferring;
+      Voice and Tone row Known-empty transfer; Component Patterns rows Item Summary, TransferView,
+      Progress Meter, Transfer Metrics, Cancel Action, Status Announcer; Cancel race;
+      State Patterns rows Transferring/known positive file, Transferring/directory or unknown total,
+      Transferring/known-empty file, Staged or Transferring/cancel pending;
+      Interaction Primitives (static unknown progress, reduced motion, announcement throttle)
+      + Announcement ownership; Backend-Authoritative Lifecycle; Accessibility Floor;
+      Responsive & Platform; Key Flow 1 steps 6–8, Flow 2 steps 4–6, and Flow 3 steps 3–5.
+    */
+    :root {
+      color-scheme:light dark;
+      --canvas:#F7F0E7; --surface:#FFFAF4; --elevated:#EFE2D4;
+      --text:#2C2723; --muted:#70645B; --border:#CDBDAE; --control:#8B7462;
+      --primary:#A94724; --primary-ink:#FFFFFF; --hover:#873719;
+      --drop:#F1D0BD; --progress:#B64B23; --focus:#7E4B92; --error:#AB3932;
+      --r-sm:5px; --r-md:8px; --r-lg:10px; --r-full:9999px;
+      --body:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      --serif:Georgia,Cambria,"Times New Roman",serif;
+    }
+    @media (prefers-color-scheme:dark) {
+      :root {
+        --canvas:#1C1916; --surface:#25211D; --elevated:#312A24;
+        --text:#F7EFE5; --muted:#BCAF9F; --border:#55493F; --control:#89796A;
+        --primary:#FF986D; --primary-ink:#2B1309; --hover:#FFB18F;
+        --drop:#4A2D23; --progress:#FF8858; --focus:#C5A1D3; --error:#FF8B83;
+      }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#d8d2cc; color:#2C2723; font:14px/1.5 var(--body); }
+    .board { width:min(1280px,calc(100% - 24px)); margin:24px auto 48px; }
+    .board-head h1 { margin:0; font:600 24px/1.2 var(--serif); letter-spacing:-.015em; }
+    .board-head p,.frame-label { margin:5px 0 0; color:#5f5751; font-size:12px; }
+    .hero-grid { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(420px,.75fr); gap:20px; align-items:start; margin-top:16px; }
+    .variants { display:grid; gap:20px; }
+    .frame-label { margin:0 0 7px 2px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .window { min-width:0; overflow:hidden; border:1px solid #82776d; border-radius:10px; background:var(--canvas); color:var(--text); box-shadow:0 16px 38px #2c272329; }
+    .chrome { height:38px; display:grid; grid-template-columns:1fr auto; align-items:center; padding-left:12px; background:var(--surface); border-bottom:1px solid var(--control); }
+    .chrome-title { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:650; }
+    .mark { width:18px; height:18px; display:grid; place-items:center; border-radius:var(--r-sm); background:var(--primary); color:var(--primary-ink); font-size:10px; font-weight:800; }
+    .window-controls { height:100%; display:flex; }
+    .window-controls span { width:42px; display:grid; place-items:center; color:var(--muted); font-size:13px; }
+    .window-controls span:last-child { font-size:16px; }
+    .app { min-height:490px; padding:20px; display:grid; align-content:center; overflow:auto; }
+    .compact .app { min-height:360px; }
+    .state-heading { margin:0 0 5px; font:600 24px/1.2 var(--serif); letter-spacing:-.015em; }
+    .state-copy { margin:0; color:var(--muted); }
+    .transfer-view { position:relative; margin-top:28px; padding:24px 20px 18px; border-radius:var(--r-lg); background:var(--elevated); }
+    .packet-tab { position:absolute; left:20px; top:-14px; padding:5px 12px; border:1px solid var(--control); border-bottom:0; border-radius:var(--r-sm) var(--r-sm) 0 0; background:var(--elevated); color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .item-row { display:flex; align-items:end; justify-content:space-between; gap:16px; }
+    .item-name { min-inline-size:0; margin:0; font:600 20px/1.25 var(--serif); overflow-wrap:anywhere; }
+    .item-note { margin:4px 0 0; color:var(--muted); font-size:12px; }
+    .mode-label { flex:0 0 auto; color:var(--muted); font-size:12px; }
+    .meter-wrap { margin-top:24px; }
+    .meter-label { display:flex; justify-content:space-between; gap:12px; margin-bottom:8px; font-weight:650; }
+    .meter-label span:last-child { color:var(--muted); font-size:12px; font-weight:400; }
+    .meter { position:relative; height:10px; overflow:hidden; border:1px solid var(--control); border-radius:var(--r-full); background:var(--drop); }
+    .meter.unknown { background-color:var(--drop); background-image:repeating-linear-gradient(135deg,transparent 0 8px,var(--progress) 8px 12px,transparent 12px 20px); }
+    .meter .fill { display:block; height:100%; width:68%; background:var(--progress); }
+    .meter.empty { background:var(--drop); }
+    .metrics { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+    .metric { padding:12px; border:1px solid var(--border); border-radius:var(--r-sm); background:var(--surface); }
+    .metric strong { display:block; font-variant-numeric:tabular-nums; }
+    .metric span { color:var(--muted); font-size:12px; }
+    .cancel { width:100%; min-height:44px; margin-top:18px; border:1px solid var(--control); border-radius:var(--r-md); background:transparent; color:var(--muted); font:650 13px/1.2 var(--body); }
+    .cancel:hover,.cancel:focus-visible { color:var(--error); }
+    .cancel:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+    .empty-status { margin:20px 0 0; padding:14px; border:1px solid var(--control); border-radius:var(--r-md); background:var(--surface); font-weight:650; }
+    .status-announcer { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
+    @media (max-width:980px) { .hero-grid { grid-template-columns:1fr; } }
+    @media (max-width:640px) {
+      .board { width:100%; margin:0; }
+      .board-head,.frame-label { padding-inline:12px; }
+      .window { border-radius:0; }
+      .app { padding:20px; }
+      .item-row { display:block; }
+      .mode-label { display:block; margin-top:5px; }
+      .metrics { grid-template-columns:1fr; }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+      .meter.unknown { background-image:repeating-linear-gradient(135deg,transparent 0 8px,var(--progress) 8px 12px,transparent 12px 20px); background-position:0 0; }
+    }
+    @media (forced-colors:active) {
+      body,.window,.chrome,.transfer-view,.metric,.empty-status,.cancel { background:Canvas; color:CanvasText; }
+      .window,.chrome,.metric,.empty-status,.cancel,.meter { border-color:CanvasText; }
+      .meter { background:Canvas; }
+      .meter.unknown { background-image:repeating-linear-gradient(135deg,Canvas 0 8px,CanvasText 8px 12px,Canvas 12px 20px); }
+      .meter .fill { background:Highlight; }
+      .cancel:focus-visible { outline-color:Highlight; }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-head">
+      <h1>Transferring</h1>
+      <p>Three honest progress modes. Unknown ZIP progress is static and remains legible with reduced motion.</p>
+    </header>
+    <div class="hero-grid">
+      <section>
+        <p class="frame-label">Default composition · Folder / unknown wire total</p>
+        <article class="window" aria-label="FairDrop folder transfer desktop window">
+          <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+          <div class="app">
+            <div><h2 class="state-heading" tabindex="-1">Sending</h2><p class="state-copy">The receiving browser has started the download.</p></div>
+            <section class="transfer-view">
+              <span class="packet-tab">Folder</span>
+              <div class="item-row"><div><h3 class="item-name"><bdi dir="auto">Dad's PDFs</bdi></h3><p class="item-note">This folder downloads as a ZIP.</p></div><span class="mode-label">Wire total unknown</span></div>
+              <div class="meter-wrap">
+                <div class="meter-label"><span>Sending — total size unknown</span><span>ZIP stream</span></div>
+                <div class="meter unknown" role="progressbar" aria-label="Sending — total size unknown"></div>
+              </div>
+              <div class="metrics"><div class="metric"><strong>48.2 MB sent</strong><span>Wire bytes</span></div><div class="metric"><strong>12.4 MB/s</strong><span>Throughput</span></div></div>
+              <button class="cancel" type="button">Cancel</button>
+            </section>
+            <div class="status-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
+          </div>
+        </article>
+      </section>
+      <div class="variants">
+        <section>
+          <p class="frame-label">Minimum-width composition · Known-positive file</p>
+          <article class="window compact" aria-label="FairDrop known-size file transfer desktop window">
+            <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+            <div class="app">
+              <div><h2 class="state-heading" tabindex="-1">Sending</h2><p class="state-copy">The receiving browser has started the download.</p></div>
+              <section class="transfer-view">
+                <span class="packet-tab">File</span>
+                <div class="item-row"><div><h3 class="item-name"><bdi dir="auto">Travel Notes.pdf</bdi></h3><p class="item-note">8.4 MB</p></div><span class="mode-label">Known total</span></div>
+                <div class="meter-wrap"><div class="meter-label"><span>5.8 MB of 8.4 MB</span><span>68%</span></div><div class="meter" role="progressbar" aria-label="Sending Travel Notes.pdf" aria-valuemin="0" aria-valuemax="100" aria-valuenow="68"><i class="fill"></i></div></div>
+                <div class="metrics"><div class="metric"><strong>5.8 MB sent</strong><span>Wire bytes</span></div><div class="metric"><strong>4.7 MB/s</strong><span>Throughput</span></div></div>
+                <button class="cancel" type="button">Cancel</button>
+              </section>
+            </div>
+          </article>
+        </section>
+        <section>
+          <p class="frame-label">Minimum-width composition · Known-empty file</p>
+          <article class="window compact" aria-label="FairDrop empty file transfer desktop window">
+            <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+            <div class="app">
+              <div><h2 class="state-heading" tabindex="-1">Sending</h2><p class="state-copy">Waiting for FairDrop to finish sending.</p></div>
+              <section class="transfer-view">
+                <span class="packet-tab">File</span>
+                <div class="item-row"><div><h3 class="item-name"><bdi dir="auto">Empty Notes.txt</bdi></h3><p class="item-note">0 bytes</p></div><span class="mode-label">Known empty</span></div>
+                <p class="empty-status">Empty file — 0 bytes to transfer</p>
+                <div class="meter empty" aria-hidden="true"></div>
+                <div class="metrics"><div class="metric"><strong>0 bytes sent</strong><span>Wire bytes</span></div></div>
+                <button class="cancel" type="button">Cancel</button>
+              </section>
+            </div>
+          </article>
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
