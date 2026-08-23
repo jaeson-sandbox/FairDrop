@@ -5,6 +5,8 @@ inputDocuments:
   - "{project-root}/_bmad-output/planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md"
   - "{project-root}/docs/fairdrop-contracts.md"
   - "{project-root}/docs/fairdrop-architecture.md"
+  - "{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-2026-08-23/DESIGN.md"
+  - "{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-2026-08-23/EXPERIENCE.md"
   - "{project-root}/docs/fairdrop-spec.md"
   - "{project-root}/_bmad-output/implementation-artifacts/spec-phase-1-wails-scaffold.md"
   - "{project-root}/_bmad-output/implementation-artifacts/deferred-work.md"
@@ -17,6 +19,8 @@ inputDocuments:
 This document provides the complete epic and story breakdown for FairDrop, decomposing the canonical SPEC, its binding architecture companions, the implemented Phase 1 foundation, and preserved review findings into implementable stories.
 
 > **Authority note.** `_bmad-output/specs/spec-fairdrop/SPEC.md` and its `companions:` are the canonical contract. The original product and Phase 1 documents are traceability sources only where they do not conflict with that contract.
+
+> **UX reconciliation (2026-08-23).** The finalized UX contract — `ux-designs/ux-FairDrop-2026-08-23/DESIGN.md` (Paper Relay / Terracotta Linen visual system) and `EXPERIENCE.md` (interaction, copy, and accessibility contract) — was authored *after* this breakdown and consumed it as a source. Where the two disagree, the UX contract wins on presentation, copy, focus, and announcement questions; `SPEC.md` and the architecture companions still win on lifecycle, protocol, and backend authority. This document has been reconciled forward: UX-DR5 was corrected, UX-DR9–UX-DR16 and FR23–FR24 were added, Story 1.9 was rewritten and split into 1.9/1.10, and Story 3.3 absorbed the UX release-evidence gates. `EXPERIENCE.md`'s requirement-to-flow table cites `UX-DR1`–`UX-DR8` because those were the only ones that existed when it was written; UX-DR9–UX-DR16 are derived *from* it and need no separate coverage claim there.
 
 ## Requirements Inventory
 
@@ -66,6 +70,10 @@ FR21: Expose stable typed public errors and warnings through the Wails command a
 
 FR22: Enforce a single FairDrop process and restore/show the existing window when a second launch is attempted.
 
+FR23: Always present local-network firewall preflight guidance in Idle ahead of the selection controls, and keep platform-specific allow/deny recovery guidance reachable from Idle and Staged without predicting, restyling, or duplicating the OS prompt.
+
+FR24: After a terminal outcome, preserve the same visible Done or Error content in Idle as dismissible, sessionless current status until the next Stage attempt or explicit Dismiss, while `transfer-reset` still clears the backend session.
+
 ### NonFunctional Requirements
 
 NFR1: Transfer memory remains O(buffer) in payload size; no whole-file read, payload-sized index, or staged ZIP is permitted.
@@ -96,6 +104,8 @@ NFR13: Dependency and toolchain installation is reproducible from locked Go and 
 
 NFR14: Tests cover boundary behavior, teardown and claim races, path classes, ZIP integrity, bounded-memory evidence, HTTP protocol behavior, reducer correlation, accessibility, and native Wails configuration.
 
+NFR15: The desktop UI targets WCAG 2.2 AA as a release gate, not an aspiration: measured token contrast from unrounded calculations, 320 CSS-pixel one-dimensional reflow, 200% text with WCAG text-spacing overrides, forced-colors support, activation targets at or above 44px, one announcement owner per transition, and a focus destination proven to exist before `.focus()` is called.
+
 ### Additional Requirements
 
 - The Phase 1 Wails v2 and React/TypeScript/Tailwind scaffold already exists; preserve its proven native file-drop, standard-frame, lifecycle-hook, and clean-clone embed contracts instead of regenerating the project.
@@ -113,10 +123,12 @@ NFR14: Tests cover boundary behavior, teardown and claim races, path classes, ZI
 - Add Wails single-instance locking and pin its stable identifier and second-launch window restoration behavior in `main_test.go` alongside existing option assertions.
 - Run Go tests and vet, frontend tests and build, and `wails build`; run `go test -race ./...` on a native CI runner with a C toolchain, and smoke-test releases on native Windows and macOS runners.
 - Treat buffer size and per-entry ZIP compression as Phase 3 benchmark choices that may change only while bounded memory, prompt cancellation, and archive compatibility remain proven.
+- `ux-designs/ux-FairDrop-2026-08-23/DESIGN.md` and `EXPERIENCE.md` are binding for visual tokens, component visual and behavioral specs, information architecture, the literal copy registry, state treatments, announcement ownership, focus routing, and the accessibility floor. The promoted mockups and the primary-transfer wireframe illustrate the contract; on any conflict the two spines win over a mockup, wireframe, or import.
+- Frontend lifecycle timers are banned. The three-second terminal reset belongs to the backend application-lifetime lease (Story 1.6); the frontend renders the outcome and reacts to `transfer-reset`, and it never runs its own reset, dismissal, or lifecycle timer.
 
 ### UX Design Requirements
 
-> No dedicated BMAD UX contract exists. These actionable requirements come from the canonical SPEC and architecture companions.
+> **Binding UX contract.** `ux-designs/ux-FairDrop-2026-08-23/DESIGN.md` and `EXPERIENCE.md` are the binding UX companions, both `status: final` after a three-lens reviewer gate (rubric, accessibility, trust/cross-device; 33 findings, all resolved). `DESIGN.md` owns the visual token set, component visual specs, and contrast evidence. `EXPERIENCE.md` owns information architecture, the single copy registry, component behavior, state treatments, announcement ownership, and the accessibility floor. The requirements below restate the load-bearing obligations for story traceability; the companions remain authoritative on any detail they specify.
 
 UX-DR1: The Idle view provides one clearly marked native drop target plus semantic, keyboard-reachable Select File and Select Directory actions with visible focus.
 
@@ -126,13 +138,31 @@ UX-DR3: The Staged view shows the sanitized item name, human-readable logical si
 
 UX-DR4: The Transferring view shows wire bytes and throughput, a determinate progress bar only for known positive totals, an indeterminate treatment for directory and unknown totals, and a Cancel action.
 
-UX-DR5: Done and Error presentations use backend-authoritative events, show safe outcome text, announce changes through `aria-live`, and visibly reset to Idle after the backend `transfer-reset` event.
+UX-DR5: Done and Error presentations use backend-authoritative events and show only fixed safe outcome text. `transfer-reset` clears the backend session and exposes Idle controls while the same visible outcome node is preserved as dismissible sessionless status; reset itself moves no focus and makes no announcement.
+
+> **Corrected 2026-08-23.** UX-DR5 previously required the view to visibly return to Idle on `transfer-reset`. `EXPERIENCE.md` retired that behavior when resolving A11Y-01, the sole **critical** finding of the UX review: timed removal of terminal information is a WCAG information timeout that can strip the outcome before a slow reader or assistive-technology user has consumed it. The backend three-second reset is unchanged (see FR19 and Story 1.6); only the presentation obligation changed. See FR24.
 
 UX-DR6: State changes use restrained CSS or Framer Motion transitions without making animation callbacks authoritative for backend lifecycle state; reduced-motion preferences remain usable.
 
 UX-DR7: The React reducer initializes a session only from successful Stage metadata, ignores stale session IDs and non-increasing sequence values, and ignores obsolete Stage promises after unmount or local request cancellation.
 
 UX-DR8: The Wails file-drop listener registers with `OnFileDrop(callback, true)`, cleans up with `OnFileDropOff()`, and targets the inherited `--wails-drop-target: drop` property rather than a DOM drop handler or class-only gate.
+
+UX-DR9: Implement the Paper Relay visual system from the `DESIGN.md` token set (Terracotta Linen colors, typography, spacing, radii, and per-component specs), following the OS light/dark preference with no theme control and no opposite-theme flash. Forced-colors mode supersedes the palette; only the tested QR substrate may opt out.
+
+UX-DR10: All literal product strings come from the `EXPERIENCE.md` copy registry by stable key, including the fixed error-code table whose exact `PublicError.message` values the frontend must render. Banned vocabulary (`secure`, `private`, `pair`, `sync`, AirDrop naming, universal-compatibility claims) never appears in product or release copy.
+
+UX-DR11: Present a local Stage Pending surface while `StageTransfer` is outstanding, with a semantic `copy.cancel.preparation` control that keeps focus, suppresses repeat activation, and swaps to `copy.cancel.preparation_pending`. It never claims backend STAGED, and an obsolete promise from a superseded request generation can never commit state.
+
+UX-DR12: Every lifecycle transition has exactly one announcement owner per the `EXPERIENCE.md` routing table. A single pre-mounted `role="status" aria-live="polite" aria-atomic="true"` announcer replaces its text rather than appending; focused content is never simultaneously announced through a live or alert region.
+
+UX-DR13: Throttle assistive progress speech independently of visual refresh: announce once at start, then no more often than every five seconds *and* only after meaningful change (at least 10 percentage points for known totals, or at least 10 MiB of new wire bytes for unknown totals). Terminal outcomes cancel queued progress speech, and throughput is never spoken.
+
+UX-DR14: Meet WCAG 2.2 AA: one-dimensional vertical reflow at 320 CSS pixels effective width; no loss, overlap, clipping, or page-level horizontal scroll at 200% text with WCAG text-spacing overrides; activation targets at or above 44px; visible focus using the `{colors.focus}` tokens in authored modes and system focus colors under forced colors; color never the sole state or action cue.
+
+UX-DR15: `prefers-reduced-motion: reduce` removes all spatial lifecycle motion and every continuous unknown-progress animation while preserving text, pattern, wire bytes, and state. Unknown progress stays understandable without motion through a static non-directional pattern plus `copy.progress.unknown` and live byte counts.
+
+UX-DR16: Render three distinct progress modes: known positive totals use `role="progressbar"` with min 0, max 100, and a finite `aria-valuenow`; directory and unknown totals omit `aria-valuenow` and use the static-pattern treatment; known-empty files expose `copy.progress.known_empty` as literal text with no percentage-bearing progressbar. Sanitized item names use bidi isolation with persistent full-value access.
 
 ### FR Coverage Map
 
@@ -158,6 +188,8 @@ FR19: Epic 1 - Complete terminal teardown and timed reset behavior.
 FR20: Epic 1 - Present the complete animated and accessible transfer experience.
 FR21: Epic 1 - Expose stable safe command and event errors.
 FR22: Epic 3 - Enforce one process and restore the existing window.
+FR23: Epic 1 - Present firewall preflight and platform recovery guidance.
+FR24: Epic 1 - Retain the dismissible terminal outcome in Idle after reset.
 
 ## Epic List
 
@@ -165,7 +197,7 @@ FR22: Epic 3 - Enforce one process and restore the existing window.
 
 A sender can select one file through native drop or keyboard-accessible browse controls, receive a QR code and direct URL, and let exactly one nearby browser download it through a complete, clear lifecycle experience with honest status and cancellation.
 
-**FRs covered:** FR1-FR11, FR13-FR21
+**FRs covered:** FR1-FR11, FR13-FR21, FR23-FR24
 
 ### Epic 2: Share One Folder with a Nearby Device
 
@@ -644,6 +676,11 @@ So that stale promises or events cannot show the wrong transfer state.
 **Then** it validates `{code,message}` from rejected `Error.message` or event payload and falls back safely to `transfer_failed` for malformed data
 **And** it never renders arbitrary object text, source paths, or capability tokens.
 
+**Given** an accepted `transfer-reset` that follows Done or Error
+**When** the reducer applies it
+**Then** it clears the backend session while exposing the terminal outcome as sessionless retained status that survives until an explicit dismiss action or the next Stage attempt
+**And** the retained status carries no session ID, participates in no event correlation, is never persisted, and is cleared by no frontend timer.
+
 **Given** component mount, unmount, and remount
 **When** Wails lifecycle listeners are managed
 **Then** each `transfer-*` listener is registered once and cleaned up exactly once and no duplicate subscription survives
@@ -659,52 +696,135 @@ So that stale promises or events cannot show the wrong transfer state.
 **Then** they cover pending and failed Stage, session initialization, every valid event grammar, malformed payloads, stale correlation, sequence ordering, progress modes, safe-error fallback, terminal suppression, reset, unmount, and listener cleanup
 **And** the module has no Wails-independent visual component requirement beyond the typed state it exposes.
 
-### Story 1.9: Present the Accessible Transfer Experience
+### Story 1.9: Render the Paper Relay Transfer Views
 
 As a sender,
-I want a clear and accessible view of each transfer stage,
-So that I can select, share, monitor, cancel, and understand the outcome without guessing what the backend is doing.
+I want every transfer stage presented in one warm, compact, honest interface,
+So that I always know what FairDrop is holding, what to do next, and what is actually happening.
 
 **Acceptance Criteria:**
 
+**Given** the frontend visual layer
+**When** styles and components are authored
+**Then** they consume the `DESIGN.md` Terracotta Linen token set for color, typography, spacing, radii, elevation, and per-component specs through Tailwind v4 CSS variables rather than ad hoc values
+**And** light and dark follow the OS preference with no theme control, no persisted preference, and no opposite-theme flash on first paint.
+
 **Given** the Idle view
 **When** it renders
-**Then** it presents one clearly marked native drop target plus semantic keyboard-reachable Select File and Select Directory controls with visible focus
-**And** it keeps the inherited `--wails-drop-target: drop` property and does not add a DOM drop handler or class-only gate.
+**Then** it presents, in document order, the firewall preflight guidance, one clearly marked native drop target carrying `copy.idle.instruction`, semantic keyboard-reachable Select File and Select Directory controls, and the optional retained terminal outcome
+**And** it keeps the inherited `--wails-drop-target: drop` property, adds no DOM drop handler or class-only gate, and shows no transfer history.
 
-**Given** a native drop callback containing zero or multiple paths
-**When** the frontend validates the array
-**Then** it shows a safe validation error and never selects the first item silently or calls Stage
-**And** exactly one path is passed as a value to `StageTransfer`.
+**Given** a native drop callback or dialog result
+**When** the frontend validates it
+**Then** zero or multiple dropped paths render the fixed `invalid_selection` Error Panel and never stage the first item silently, a non-empty dialog result stages immediately, and an empty dialog result stays quiet with no message
+**And** exactly one path is passed as a value to `StageTransfer`, and starting Stage dismisses any retained outcome.
+
+**Given** an outstanding `StageTransfer` command
+**When** the Stage Pending Card renders
+**Then** it identifies the item kind with `copy.stage.pending.file` or `copy.stage.pending.folder` and offers the semantic `copy.cancel.preparation` control, showing no QR, session controls, or authoritative-state badge
+**And** it never claims backend STAGED, and an obsolete promise from a superseded generation cannot commit state.
 
 **Given** successful Stage metadata
 **When** the Staged view renders
-**Then** it shows the sanitized item name, human-readable size, QR image, copyable direct URL, non-fatal warnings, trusted-LAN guidance, and Cancel action
-**And** it prepends `data:image/png;base64,` only when rendering the padded `qrBase64` value.
+**Then** it shows `copy.stage.heading`, the bidi-isolated sanitized full name with logical size, `copy.folder.note` for directories, the QR Panel as the primary handoff with `copy.qr.instruction` and the `copy.qr.alt` accessible name, the readonly Direct URL Row with `copy.direct_link.action`/`copy.direct_link.helper`/`copy.first_opener.warning`, the `copy.network.disclosure` and `copy.local_copy.disclosure` trust notes, and Cancel
+**And** it prepends `data:image/png;base64,` only at render time, never spells or exposes the token, and never implies receiver identity or a claim.
 
-**Given** the reducer enters Transferring
-**When** the view renders progress
-**Then** known positive file totals use a determinate bar while known-empty or unknown totals use the binding treatment, and wire bytes plus human-readable throughput remain visible
-**And** Cancel remains available while the command/state contract permits it.
+**Given** a `beacon_warning` or a successful link copy
+**When** the corresponding feedback renders
+**Then** the Warning Banner shows `copy.discovery.warning` non-terminally with QR and link still usable, and the Copy Feedback label becomes `copy.copy.confirmation`
+**And** neither produces a toast, a focus move, a lifecycle change, or automatic clipboard clearing.
 
-**Given** Done, Error, warning, cancellation, or backend reset state
-**When** the corresponding presentation changes
-**Then** safe outcome text is visible, changes are announced through an `aria-live` region, and only the reducer's accepted reset returns the view to Idle
-**And** focus moves predictably without trapping keyboard or screen-reader users.
+**Given** an accepted `transfer-started`
+**When** the Transferring view renders
+**Then** known positive file totals show a determinate meter, directory and unknown totals show the static non-directional pattern with `copy.progress.unknown`, and known-empty files show `copy.progress.known_empty` with no percentage bar and a decorative track only for layout
+**And** Transfer Metrics show actual wire `bytesSent` with visually-only throughput, omitting meaningless speed and percentage for known-empty transfers.
 
-**Given** animated state transitions
-**When** CSS or Framer Motion is used
-**Then** animation callbacks never own backend lifecycle state and reduced-motion preferences remain usable
-**And** standard OS window chrome and responsive minimum dimensions remain intact.
+**Given** Done, Error, and the reset that follows
+**When** the terminal presentation renders
+**Then** Done shows `copy.done.heading`/`copy.done.body` as sender-observed transport completion only, Error shows only the fixed heading and exact `PublicError.message` from the copy registry, and `transfer-reset` preserves the same visible node in Idle as dismissible sessionless status offering `copy.outcome.dismiss`
+**And** no frontend timer removes it, `cancelled` is never rendered as Error, and no arbitrary adapter text, source path, or capability token reaches the view.
 
-**Given** component unmount and remount
-**When** the Wails native file-drop listener is managed
-**Then** `OnFileDrop(callback, true)` is paired with exactly one `OnFileDropOff()` cleanup and no duplicate callback survives
-**And** tests retain the Phase 1 proof for inherited CSS targeting and drops outside the target.
+**Given** window sizes from the 640x480 native minimum through wide layouts
+**When** the views reflow
+**Then** widths at or above 760px may place details beside the QR, 640-759px stacks the QR above the URL and actions while retaining Cancel, disclosures, outcome, and help, and the 640x480 minimum keeps the QR scan-ready with activation targets at or above 44px
+**And** vertical scrolling is the only permitted overflow direction.
 
-**Given** the complete Epic 1 experience
-**When** component tests, accessibility checks, TypeScript build, Go integration tests, and `wails build` run
-**Then** they cover native browse and drop shape, QR rendering, warnings, all visible states, progress modes, cancellation, safe errors, focus, live announcements, reduced motion, and cleanup
+**Given** state transitions
+**When** CSS or Framer Motion animates them
+**Then** transitions are short opacity and position changes only, with no celebratory animation, sweep, shimmer, or blink
+**And** animation callbacks never own backend lifecycle, cancellation, completion, or reset state.
+
+**Given** the rendered view layer
+**When** component tests, the TypeScript build, and `wails build` run
+**Then** they cover every Idle, Stage Pending, Staged, Transferring, terminal, and retained-outcome composition, all three progress modes, warning and copy feedback, QR rendering, invalid drop, quiet dialog cancel, the responsive breakpoints, and exact copy-registry values
+**And** tests retain the Phase 1 proof for inherited CSS drop targeting and drops outside the target.
+
+### Story 1.10: Meet the Accessibility and Recovery Contract
+
+As a sender who may rely on a keyboard, a screen reader, or a high-contrast display,
+I want one predictable owner for every announcement and focus move, plus honest recovery guidance when the network or firewall gets in the way,
+So that I can complete a transfer without losing my place or being told something untrue.
+
+**Acceptance Criteria:**
+
+**Given** any lifecycle or interaction transition
+**When** it is presented
+**Then** exactly one owner announces it per the `EXPERIENCE.md` routing table, using either a focus move to a `tabindex="-1"` state heading or the single pre-mounted `role="status" aria-live="polite" aria-atomic="true"` announcer
+**And** focused content is never simultaneously announced through a live or alert region, the announcer replaces its text instead of appending a log, and `role="alert"` is used only on an exceptional path that does not move focus.
+
+**Given** dialog cancel, Stage pending, Stage success, `beacon_warning`, copy success, `transfer-started`, throttled progress, cancel requested, cancel-winning reset, terminal outcome, reset after terminal, and dismiss
+**When** each occurs
+**Then** the focus destination and announcement owner match the routing table exactly, including no second focus move on reset after a terminal outcome and focus to the Idle instruction on dismiss
+**And** every `.focus()` target is proven to exist before the call, and no focus trap exists outside OS dialogs.
+
+**Given** accepted progress snapshots
+**When** assistive output is produced
+**Then** speech is announced once at start and thereafter no more often than every five seconds and only after meaningful change of at least 10 percentage points for known totals or at least 10 MiB of new wire bytes for unknown totals, while visual refresh stays unthrottled
+**And** a terminal or error outcome cancels queued progress speech, and throughput is never spoken.
+
+**Given** the three progress modes
+**When** ARIA semantics are applied
+**Then** known positive totals use `role="progressbar"` with min 0, max 100, and a finite `aria-valuenow`, unknown totals omit `aria-valuenow`, and known-empty exposes its literal text status with no percentage-bearing progressbar
+**And** no selector can emit `NaN`, `Infinity`, or an out-of-range value into an ARIA attribute.
+
+**Given** `prefers-reduced-motion: reduce`
+**When** the UI responds
+**Then** all spatial lifecycle motion and every continuous unknown-progress animation are removed while text, static pattern, wire bytes, and state remain fully legible
+**And** state swaps become immediate or near-immediate rather than being skipped.
+
+**Given** forced-colors mode and the authored light and dark modes
+**When** contrast is evaluated
+**Then** system colors and patterns supersede Terracotta Linen with only the tested production QR substrate opting out, authored focus indicators use `{colors.focus}`/`{colors.focus-dark}` and system focus colors under forced colors, and every token pair meets its WCAG 2.2 AA ratio using unrounded calculations
+**And** color is never the sole cue for a state or an available action.
+
+**Given** an effective content width of 320 CSS pixels, 200% text, and WCAG text-spacing overrides
+**When** the UI reflows
+**Then** all information and actions remain visible and reachable through one-dimensional vertical scrolling with no overlap, clipping, or page-level horizontal scroll, and fixed-height content grows
+**And** activation targets remain at or above 44px.
+
+**Given** sanitized item names containing mixed LTR and RTL text, emoji or combining graphemes, bidi control characters, long unbroken segments, or significant extensions
+**When** they are displayed
+**Then** they are bidi-isolated with persistent access to the full value through `copy.name.show_full`
+**And** the accessible name matches the visible name.
+
+**Given** the Idle and Staged surfaces
+**When** firewall guidance renders
+**Then** Idle always shows `copy.firewall.preflight`, `copy.firewall.windows`, and `copy.firewall.macos` in document order ahead of the selection controls, and platform recovery through `copy.firewall.windows_recovery` and `copy.firewall.macos_recovery` stays reachable from Idle and Staged
+**And** FairDrop never predicts, restyles, or duplicates the OS prompt; when the prompt closes focus moves to Stage Pending or the next state heading, and an observable denial focuses the applicable Error Panel.
+
+**Given** a receiver-side 404, 423, or 410 that the sender cannot diagnose
+**When** the user seeks help
+**Then** `copy.help.receiver_http` and `copy.help.different_lan` explain wrong or expired links, a competing opener, a changed source, guest or client isolation, and the need to Cancel and prepare a fresh link
+**And** no branded receiver page, protocol change, cloud fallback, or queue is introduced.
+
+**Given** a pending cancellation from Stage Pending, Staged, or Transferring
+**When** the user activates Cancel
+**Then** the control retains focus, suppresses repeat activation with `aria-disabled="true"`, and swaps its visible and accessible label to `copy.cancel.preparation_pending` or `copy.cancel.pending` while metrics stay readable
+**And** if a terminal event linearizes first only that authoritative outcome is announced, if `transfer-reset` arrives with no terminal event the focused Idle summary shows `copy.cancel.won` and never renders Error, and command resolution is never announced separately from the winning outcome.
+
+**Given** the completed Epic 1 experience
+**When** accessibility tests, component tests, the TypeScript build, Go integration tests, and `wails build` run
+**Then** they prove the pre-mounted atomic status region, one owner per transition, focus-destination existence, no duplicate subscriptions after remount, stale and post-terminal suppression, all three progress modes with their ARIA semantics, the speech throttle, cancel-race outcomes, reduced motion, forced colors, unrounded token contrast, name handling, and QR scan success in light, dark, and tested forced-colors at 640x480 and 200% text
 **And** a native smoke check proves one regular file can be selected and downloaded exactly once by a nearby browser.
 
 ## Epic 2: Share One Folder with a Nearby Device
@@ -897,8 +1017,18 @@ So that users receive a desktop application whose actual transfer journey has be
 
 **Given** the native smoke matrix
 **When** a release candidate is exercised
-**Then** it covers first launch and firewall guidance, native drop and browse, single-instance restoration, one exact file download, one valid directory ZIP download, progress, cancellation, terminal reset, and clean shutdown
+**Then** it covers first launch and firewall guidance, native drop and browse, single-instance restoration, one exact file download, one valid directory ZIP download, progress, cancellation, terminal reset, retained terminal outcome with Dismiss and next-Stage clearing, and clean shutdown
 **And** Windows path classes and macOS filesystem behavior are checked where the runner supports them.
+
+**Given** the sender-to-receiver compatibility matrix in `EXPERIENCE.md`
+**When** a supported-browser claim is evaluated
+**Then** each combination — Windows sender to current iPhone Safari, Mac sender to current Windows Edge, Windows sender to current Mac Safari, and Mac sender to current iPhone Safari — records sender OS and version, receiver OS and version, browser and version, artifact version or checksum, date, reviewer, and pass/fail, covering QR scan, exact file bytes and name, a valid folder ZIP the receiver can open, first-opener behavior, and observed 404/423/410 responses
+**And** "supported modern browser" is claimed only for combinations whose row passes, while link-preview consumption of a V1 link is recorded as the disclosed accepted limitation rather than reinterpreted as a protected link.
+
+**Given** the native accessibility evidence gate in `EXPERIENCE.md`
+**When** a release candidate is exercised on each platform
+**Then** Windows records keyboard, Narrator, and NVDA results and macOS records Full Keyboard Access and VoiceOver results across both browse actions, dialog cancel, invalid drop, the Stage/Start/progress/Cancel/Done/Error/reset order, retained outcome, the five-second progress-speech throttle, firewall allow and deny, forced colors or Increase Contrast, Reduce Motion, 320 CSS pixels at 200% text with text-spacing overrides, second-instance restoration, and the absence of duplicate listeners or duplicated speech
+**And** the OS firewall prompt's accessible name, buttons, and focus-return order are recorded rather than assumed.
 
 **Given** each required native smoke scenario
 **When** release evidence is collected
