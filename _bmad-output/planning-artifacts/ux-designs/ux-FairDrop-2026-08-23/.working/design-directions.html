@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FairDrop — Design directions</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --board: #e8eaed;
+      --ink: #15171a;
+      --muted: #626873;
+      --line: #c7cbd1;
+      --paper: #f7f8fa;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--board); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input { font: inherit; }
+    .board { width: min(1480px, calc(100% - 32px)); margin: 28px auto 64px; }
+    .exploration-warning { margin: 0 0 20px; padding: 14px 16px; border: 3px solid #7a1f16; border-radius: 10px; background: #fff1c7; color: #38130f; font-size: 14px; font-weight: 760; line-height: 1.45; box-shadow: 0 4px 0 #7a1f16; }
+    .exploration-warning strong { display: block; margin-bottom: 3px; font-size: 16px; letter-spacing: .01em; text-transform: uppercase; }
+    .board-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 16px 4px 28px; border-bottom: 1px solid #b9bec6; }
+    .eyebrow { margin: 0 0 8px; color: #5a606a; font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(26px, 4vw, 46px); letter-spacing: -.045em; }
+    .board-head p:last-child { max-width: 520px; margin: 0; color: #555b65; line-height: 1.55; }
+    .direction { margin-top: 32px; padding: 26px; background: var(--paper); border: 1px solid var(--line); border-radius: 28px; box-shadow: 0 18px 54px #2d333b18; }
+    .direction-head { display: grid; grid-template-columns: minmax(220px, .7fr) 1.3fr; gap: 28px; margin-bottom: 22px; }
+    .direction h2 { margin: 0 0 4px; font-size: 26px; letter-spacing: -.035em; }
+    .personality { color: #626873; font-size: 12px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+    .rationale { margin: 0; max-width: 760px; color: #4e545e; line-height: 1.55; }
+    .modes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 220px; gap: 18px; align-items: start; }
+    .mode-label { margin: 0 0 7px 4px; color: #666d78; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .window { overflow: hidden; border: 1px solid var(--frame-line); border-radius: 12px; background: var(--app); color: var(--fg); box-shadow: 0 15px 34px #10141a24; }
+    .chrome { height: 34px; display: grid; grid-template-columns: 60px 1fr 60px; align-items: center; padding: 0 10px; background: var(--chrome); border-bottom: 1px solid var(--frame-line); user-select: none; }
+    .app-name { text-align: center; font-size: 11px; font-weight: 650; letter-spacing: .01em; }
+    .win-controls { justify-self: end; color: var(--subtle); font-size: 11px; letter-spacing: 5px; white-space: nowrap; }
+    .app-icon { display: grid; width: 18px; height: 18px; place-items: center; border-radius: 5px; color: var(--accent-ink); background: var(--accent); font-size: 10px; font-weight: 900; }
+    .content { min-height: 392px; }
+    .micro { color: var(--subtle); font-size: 10px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; width: max-content; padding: 5px 8px; border: 1px solid var(--soft-line); border-radius: 999px; color: var(--subtle); background: var(--soft); font-size: 9px; font-weight: 650; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-halo); }
+    .qr { position: relative; width: 118px; aspect-ratio: 1; padding: 9px; border-radius: 13px; background: #ffffff; box-shadow: 0 8px 24px #0d11172a; }
+    .qr::before { content: ""; display: block; width: 100%; height: 100%; border-radius: 4px; background: repeating-conic-gradient(#101216 0 25%, transparent 0 50%) 0 / 18px 18px, linear-gradient(135deg, transparent 35%, #101216 36% 49%, transparent 50% 65%, #101216 66% 74%, transparent 75%); }
+    .qr::after { content: "F"; position: absolute; inset: 41px; display: grid; place-items: center; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-size: 17px; font-weight: 900; }
+    .link-row { display: flex; gap: 6px; align-items: center; min-width: 0; }
+    .link { min-width: 0; overflow: hidden; color: var(--link); font-size: 10px; text-decoration: underline; text-overflow: ellipsis; white-space: nowrap; }
+    .copy { flex: 0 0 auto; border: 0; border-radius: 6px; padding: 5px 7px; background: var(--soft); color: var(--fg); font-size: 9px; font-weight: 700; }
+    .cancel { border: 0; padding: 5px; background: transparent; color: var(--subtle); font-size: 10px; text-decoration: underline; text-underline-offset: 3px; }
+    .idle-window .content { min-height: 392px; }
+    .idle-core { height: 100%; min-height: 358px; display: grid; place-items: center; padding: 18px; text-align: center; }
+    .idle-core strong { display: block; margin-bottom: 5px; font-size: 15px; }
+    .idle-core span { display: block; color: var(--subtle); font-size: 10px; line-height: 1.45; }
+    .drop-mark { width: 52px; height: 52px; margin: 0 auto 16px; display: grid; place-items: center; border: 1px dashed var(--accent); border-radius: 16px; color: var(--accent); font-size: 24px; }
+
+    /* Quiet Orbit — light #F7FAFC/#122033, blue #3B82F6; dark #111721/#EEF6FF. */
+    .orbit.light { --app:#f7fafc; --chrome:#edf2f7; --fg:#122033; --subtle:#647388; --frame-line:#cfd8e3; --soft-line:#d8e2ec; --soft:#eaf1f8; --accent:#3b82f6; --accent-ink:#ffffff; --ok:#35a36f; --ok-halo:#35a36f20; --link:#2563b8; }
+    .orbit.dark { --app:#111721; --chrome:#171f2b; --fg:#eef6ff; --subtle:#93a5b9; --frame-line:#2d3b4d; --soft-line:#314155; --soft:#1b2634; --accent:#62a5ff; --accent-ink:#07111f; --ok:#57d79a; --ok-halo:#57d79a22; --link:#8bbcff; }
+    .orbit .content { position: relative; padding: 20px; background: radial-gradient(circle at 50% 47%, var(--soft) 0 88px, transparent 89px); }
+    .orbit .topline { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+    .orbit .folder-name { margin: 4px 0 2px; font-size: 17px; font-weight: 720; letter-spacing: -.025em; }
+    .orbit .files { color: var(--subtle); font-size: 10px; }
+    .orbit .orbit-hero { display: grid; place-items: center; gap: 8px; margin-top: 14px; text-align: center; }
+    .orbit .instruction { font-size: 12px; font-weight: 680; }
+    .orbit .link-row { justify-content: center; max-width: 250px; }
+    .orbit .trust { margin-top: 3px; }
+    .orbit .cancel { display: block; margin: 12px auto 0; }
+    .orbit .file-peek { position: absolute; left: 20px; bottom: 18px; display: flex; gap: 5px; }
+    .orbit .file-peek span { width: 21px; height: 28px; border: 1px solid var(--soft-line); border-radius: 4px; background: var(--soft); color: var(--subtle); font-size: 6px; display: grid; place-items: end center; padding-bottom: 3px; }
+
+    /* Signal Rail — light #F4F5F2/#1C211E, green #20A66A; dark #101511/#E7F0EA. */
+    .rail.light { --app:#f4f5f2; --chrome:#e8ebe7; --fg:#1c211e; --subtle:#69716c; --frame-line:#ccd2cd; --soft-line:#d6ddd7; --soft:#e7ece8; --accent:#20a66a; --accent-ink:#ffffff; --ok:#20a66a; --ok-halo:#20a66a22; --link:#14714a; }
+    .rail.dark { --app:#101511; --chrome:#171d18; --fg:#e7f0ea; --subtle:#91a096; --frame-line:#2c3930; --soft-line:#324039; --soft:#1b251f; --accent:#47d990; --accent-ink:#07150d; --ok:#47d990; --ok-halo:#47d99022; --link:#69e1a7; }
+    .rail .content { display: grid; grid-template-columns: 76px 1fr; }
+    .rail .signal { padding: 20px 12px; background: var(--soft); border-right: 1px solid var(--frame-line); }
+    .rail .signal b { display: block; margin-bottom: 24px; color: var(--accent); font-size: 9px; letter-spacing: .12em; writing-mode: vertical-rl; transform: rotate(180deg); }
+    .rail .steps { display: grid; justify-items: center; gap: 0; }
+    .rail .step { width: 23px; height: 23px; display: grid; place-items: center; border: 1px solid var(--soft-line); border-radius: 50%; color: var(--subtle); font-size: 8px; font-weight: 800; }
+    .rail .step.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+    .rail .stem { width: 1px; height: 37px; background: var(--soft-line); }
+    .rail .main { padding: 20px 22px; }
+    .rail .stage-label { color: var(--accent); font-size: 9px; font-weight: 850; letter-spacing: .14em; text-transform: uppercase; }
+    .rail h3 { margin: 5px 0 3px; font-size: 22px; letter-spacing: -.04em; }
+    .rail .folder-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--soft-line); }
+    .rail .transfer-grid { display: grid; grid-template-columns: 132px 1fr; align-items: center; gap: 18px; padding-top: 18px; }
+    .rail .qr { width: 126px; border-radius: 4px; }
+    .rail .action-copy { display: grid; gap: 10px; }
+    .rail .action-copy strong { font-size: 13px; }
+    .rail .file-list { display: grid; gap: 4px; color: var(--subtle); font-size: 9px; }
+    .rail .file-list span::before { content: "PDF  "; color: var(--accent); font-weight: 800; }
+    .rail .cancel { justify-self: start; }
+    .rail .idle-core { align-content: center; justify-items: start; text-align: left; }
+    .rail .idle-core .drop-mark { margin: 0 0 16px; border-radius: 50%; }
+
+    /* Paper Relay — light #F7F1E7/#2B2926, orange #E86F3D; dark #1C1916/#F7EFE5. */
+    .paper.light { --app:#f7f1e7; --chrome:#e9e0d3; --fg:#2b2926; --subtle:#756e66; --frame-line:#d1c5b6; --soft-line:#ddd0c0; --soft:#efe5d8; --accent:#e86f3d; --accent-ink:#ffffff; --ok:#3d9b72; --ok-halo:#3d9b7222; --link:#ad4924; }
+    .paper.dark { --app:#1c1916; --chrome:#25211d; --fg:#f7efe5; --subtle:#b6a89a; --frame-line:#453c34; --soft-line:#4a4037; --soft:#2a241f; --accent:#ff8a58; --accent-ink:#291006; --ok:#66d3a1; --ok-halo:#66d3a122; --link:#ffa078; }
+    .paper .content { padding: 17px 18px 20px; }
+    .paper .desk-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .paper .desk-title strong { font-family: Georgia, "Times New Roman", serif; font-size: 18px; font-weight: 600; }
+    .paper .folder-sheet { position: relative; padding: 20px 17px 16px; border: 1px solid var(--soft-line); border-radius: 5px 10px 10px 10px; background: var(--soft); box-shadow: 3px 4px 0 var(--frame-line); }
+    .paper .folder-sheet::before { content: "DAD'S PDFs"; position: absolute; left: -1px; top: -14px; padding: 4px 14px 5px; border: 1px solid var(--soft-line); border-bottom: 0; border-radius: 6px 6px 0 0; background: var(--soft); color: var(--subtle); font-size: 7px; font-weight: 850; letter-spacing: .09em; }
+    .paper .relay-grid { display: grid; grid-template-columns: 1fr 120px; gap: 18px; align-items: center; }
+    .paper .relay-copy h3 { margin: 0 0 5px; font-family: Georgia, "Times New Roman", serif; font-size: 22px; font-weight: 500; letter-spacing: -.025em; }
+    .paper .relay-copy > p { margin: 0 0 13px; color: var(--subtle); font-size: 10px; line-height: 1.45; }
+    .paper .qr { width: 116px; border-radius: 2px; transform: rotate(1.2deg); }
+    .paper .paper-files { display: grid; gap: 5px; margin-top: 13px; }
+    .paper .paper-files span { padding: 6px 8px; border-left: 3px solid var(--accent); background: var(--app); color: var(--subtle); font-size: 8px; }
+    .paper .footer-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 13px; }
+    .paper .idle-core .drop-mark { border-radius: 3px; transform: rotate(-2deg); box-shadow: 4px 4px 0 var(--soft); }
+    .paper .idle-core strong { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+
+    /* Neon Current — light #F1F5FF/#10152A, electric #6B5CFF; dark #090B18/#F4F4FF. */
+    .current.light { --app:#f1f5ff; --chrome:#e5eafa; --fg:#10152a; --subtle:#65708e; --frame-line:#c9d1e8; --soft-line:#d3d9ee; --soft:#e4e9fa; --accent:#6b5cff; --accent-ink:#ffffff; --ok:#09a777; --ok-halo:#09a77722; --link:#4d42c9; }
+    .current.dark { --app:#090b18; --chrome:#101326; --fg:#f4f4ff; --subtle:#939bbd; --frame-line:#292e52; --soft-line:#32375e; --soft:#151931; --accent:#8f84ff; --accent-ink:#0b0922; --ok:#36e0a5; --ok-halo:#36e0a522; --link:#aaa2ff; }
+    .current .content { position: relative; overflow: hidden; padding: 18px 20px; background: linear-gradient(145deg, transparent 55%, var(--soft) 55% 56%, transparent 56%); }
+    .current .content::after { content: ""; position: absolute; width: 150px; height: 150px; right: -90px; top: -90px; border: 28px solid var(--accent); border-radius: 50%; opacity: .18; }
+    .current .current-head { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 12px; }
+    .current .current-head strong { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+    .current h3 { margin: 15px 0 3px; font-size: 23px; letter-spacing: -.05em; }
+    .current .sub { color: var(--subtle); font-size: 10px; }
+    .current .beam { position: relative; display: grid; grid-template-columns: 1fr 130px; align-items: center; gap: 16px; margin-top: 16px; padding: 15px; border: 1px solid var(--soft-line); border-radius: 16px 5px 16px 5px; background: color-mix(in srgb, var(--app) 74%, transparent); }
+    .current .beam::before { content: ""; position: absolute; left: 23px; right: 144px; top: 49%; height: 2px; background: linear-gradient(90deg, transparent, var(--accent)); box-shadow: 0 0 12px var(--accent); }
+    .current .device-pair { position: relative; min-height: 124px; display: flex; align-items: center; justify-content: space-between; }
+    .current .device { z-index: 1; width: 47px; height: 66px; display: grid; place-items: center; border: 1px solid var(--soft-line); border-radius: 7px; background: var(--app); color: var(--subtle); font-size: 8px; font-weight: 750; }
+    .current .device.phone { width: 35px; height: 61px; border-radius: 9px; }
+    .current .qr { width: 120px; border-radius: 16px 3px 16px 3px; }
+    .current .current-actions { display: grid; gap: 9px; margin-top: 13px; }
+    .current .current-actions .bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .current .idle-core .drop-mark { border-style: solid; border-radius: 16px 3px 16px 3px; box-shadow: 0 0 24px var(--ok-halo); }
+
+    @media (max-width: 1120px) {
+      .modes { grid-template-columns: 1fr 1fr; }
+      .idle-mode { grid-column: 1 / -1; width: min(360px, 100%); }
+    }
+    @media (max-width: 760px) {
+      .board { width: min(100% - 18px, 1480px); margin-top: 10px; }
+      .board-head, .direction-head { display: block; }
+      .board-head p:last-child, .rationale { margin-top: 12px; }
+      .direction { padding: 16px; border-radius: 18px; }
+      .modes { grid-template-columns: 1fr; }
+      .idle-mode { grid-column: auto; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <aside class="exploration-warning" role="note"><strong>Exploration only — non-normative</strong>Sample copy, security language, links, progress, and QR treatments on this board are not approved for production. Some are intentionally unsafe explorations. <code>DESIGN.md</code> and <code>EXPERIENCE.md</code> are the binding source and win on every conflict.</aside>
+    <header class="board-head">
+      <div><p class="eyebrow">FairDrop · Visual direction board</p><h1>One handoff, four personalities.</h1></div>
+      <p>The same Windows-to-iPhone moment in every frame: Jaeson stages <strong>Dad's PDFs</strong>, then scans or copies a direct link. Standard OS chrome stays constant; hierarchy, rhythm, and voice do not.</p>
+    </header>
+
+    <section class="direction">
+      <header class="direction-head"><div><h2>01 · Quiet Orbit</h2><div class="personality">Calm · ambient · effortless</div></div><p class="rationale">The QR code becomes a quiet center of gravity, with everything else receding into soft orbit. It feels closest to a familiar, nearly invisible system utility: reassuring for a handoff that should need no explanation.</p></header>
+      <div class="modes">
+        <div><p class="mode-label">Staged · Light</p><article class="window orbit light"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><div class="topline"><div><div class="folder-name">Dad's PDFs</div><div class="files">3 PDFs · sends as ZIP</div></div><span class="pill"><i class="dot"></i>Trusted LAN</span></div><div class="orbit-hero"><div class="qr" aria-label="QR code placeholder"></div><div class="instruction">Scan with your iPhone</div><div class="link-row"><a class="link" href="#">fairdrop.local/dads-pdfs</a><button class="copy">Copy link</button></div><span class="micro trust">Private to devices on this network</span></div><button class="cancel">Cancel transfer</button><div class="file-peek"><span>PDF</span><span>PDF</span><span>PDF</span></div></div></article></div>
+        <div><p class="mode-label">Staged · Dark</p><article class="window orbit dark"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><div class="topline"><div><div class="folder-name">Dad's PDFs</div><div class="files">3 PDFs · sends as ZIP</div></div><span class="pill"><i class="dot"></i>Trusted LAN</span></div><div class="orbit-hero"><div class="qr" aria-label="QR code placeholder"></div><div class="instruction">Scan with your iPhone</div><div class="link-row"><a class="link" href="#">fairdrop.local/dads-pdfs</a><button class="copy">Copy link</button></div><span class="micro trust">Private to devices on this network</span></div><button class="cancel">Cancel transfer</button><div class="file-peek"><span>PDF</span><span>PDF</span><span>PDF</span></div></div></article></div>
+        <div class="idle-mode"><p class="mode-label">Idle · Light</p><article class="window orbit light idle-window"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content idle-core"><div><div class="drop-mark">↓</div><strong>Drop something here</strong><span>One file or folder.<br>Nothing stays behind.</span></div></div></article></div>
+      </div>
+    </section>
+
+    <section class="direction">
+      <header class="direction-head"><div><h2>02 · Signal Rail</h2><div class="personality">Direct · procedural · dependable</div></div><p class="rationale">A persistent rail makes the three-beat flow legible at a glance: choose, share, done. Dense but orderly details suit people who want proof of what is moving and where without turning FairDrop into a dashboard.</p></header>
+      <div class="modes">
+        <div><p class="mode-label">Staged · Light</p><article class="window rail light"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><aside class="signal"><b>READY</b><div class="steps"><span class="step">1</span><i class="stem"></i><span class="step on">2</span><i class="stem"></i><span class="step">3</span></div></aside><div class="main"><span class="stage-label">Share</span><div class="folder-line"><div><h3>Dad's PDFs</h3><span class="micro">3 PDFs · ZIP package</span></div><span class="pill"><i class="dot"></i>Trusted LAN</span></div><div class="transfer-grid"><div class="qr"></div><div class="action-copy"><strong>Scan to begin download</strong><div class="file-list"><span>Insurance Guide.pdf</span><span>Family Notes.pdf</span><span>Travel Records.pdf</span></div><div class="link-row"><a class="link" href="#">fairdrop.local/dads-pdfs</a><button class="copy">Copy</button></div><button class="cancel">Cancel transfer</button></div></div></div></div></article></div>
+        <div><p class="mode-label">Staged · Dark</p><article class="window rail dark"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><aside class="signal"><b>READY</b><div class="steps"><span class="step">1</span><i class="stem"></i><span class="step on">2</span><i class="stem"></i><span class="step">3</span></div></aside><div class="main"><span class="stage-label">Share</span><div class="folder-line"><div><h3>Dad's PDFs</h3><span class="micro">3 PDFs · ZIP package</span></div><span class="pill"><i class="dot"></i>Trusted LAN</span></div><div class="transfer-grid"><div class="qr"></div><div class="action-copy"><strong>Scan to begin download</strong><div class="file-list"><span>Insurance Guide.pdf</span><span>Family Notes.pdf</span><span>Travel Records.pdf</span></div><div class="link-row"><a class="link" href="#">fairdrop.local/dads-pdfs</a><button class="copy">Copy</button></div><button class="cancel">Cancel transfer</button></div></div></div></div></article></div>
+        <div class="idle-mode"><p class="mode-label">Idle · Dark</p><article class="window rail dark idle-window"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><aside class="signal"><b>START</b><div class="steps"><span class="step on">1</span><i class="stem"></i><span class="step">2</span><i class="stem"></i><span class="step">3</span></div></aside><div class="idle-core"><div><div class="drop-mark">＋</div><strong>Choose what to send</strong><span>Drop a file or folder here.</span></div></div></div></article></div>
+      </div>
+    </section>
+
+    <section class="direction">
+      <header class="direction-head"><div><h2>03 · Paper Relay</h2><div class="personality">Tactile · warm · human</div></div><p class="rationale">The folder reads like a physical packet passed from one person to another, softening the technical act of browser transfer. A warm editorial register makes family documents feel recognizable and cared for without implying cloud storage.</p></header>
+      <div class="modes">
+        <div><p class="mode-label">Staged · Light</p><article class="window paper light"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><div class="desk-title"><strong>Ready to pass along</strong><span class="pill"><i class="dot"></i>Trusted LAN</span></div><div class="folder-sheet"><div class="relay-grid"><div class="relay-copy"><h3>Dad's PDFs</h3><p>Scan on your iPhone and the folder arrives as a ZIP.</p><div class="link-row"><a class="link" href="#">fairdrop.local/dads-pdfs</a><button class="copy">Copy link</button></div><div class="paper-files"><span>Insurance Guide.pdf</span><span>Family Notes.pdf</span><span>Travel Records.pdf</span></div></div><div class="qr"></div></div><div class="footer-note"><span class="micro">3 PDFs · nothing is stored</span><button class="cancel">Cancel</button></div></div></div></article></div>
+        <div><p class="mode-label">Staged · Dark</p><article class="window paper dark"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><div class="desk-title"><strong>Ready to pass along</strong><span class="pill"><i class="dot"></i>Trusted LAN</span></div><div class="folder-sheet"><div class="relay-grid"><div class="relay-copy"><h3>Dad's PDFs</h3><p>Scan on your iPhone and the folder arrives as a ZIP.</p><div class="link-row"><a class="link" href="#">fairdrop.local/dads-pdfs</a><button class="copy">Copy link</button></div><div class="paper-files"><span>Insurance Guide.pdf</span><span>Family Notes.pdf</span><span>Travel Records.pdf</span></div></div><div class="qr"></div></div><div class="footer-note"><span class="micro">3 PDFs · nothing is stored</span><button class="cancel">Cancel</button></div></div></div></article></div>
+        <div class="idle-mode"><p class="mode-label">Idle · Light</p><article class="window paper light idle-window"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content idle-core"><div><div class="drop-mark">↘</div><strong>Set down a file or folder</strong><span>We'll make it ready to pick up.</span></div></div></article></div>
+      </div>
+    </section>
+
+    <section class="direction">
+      <header class="direction-head"><div><h2>04 · Neon Current</h2><div class="personality">Kinetic · confident · modern</div></div><p class="rationale">A visible device-to-device current makes the handoff feel immediate and cross-platform by design. Sharper geometry and electric accents add energy while the compact information stack keeps the core action unambiguous.</p></header>
+      <div class="modes">
+        <div><p class="mode-label">Staged · Light</p><article class="window current light"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><div class="current-head"><strong>Transfer channel open</strong><span class="pill"><i class="dot"></i>Trusted LAN</span></div><h3>Dad's PDFs</h3><div class="sub">3 PDFs · packaged as ZIP</div><div class="beam"><div class="device-pair"><span class="device">WINDOWS</span><span class="device phone">iPHONE</span></div><div class="qr"></div></div><div class="current-actions"><div class="link-row"><a class="link" href="#">fairdrop.local/dads-pdfs</a><button class="copy">Copy direct link</button></div><div class="bottom"><span class="micro">Scan to start · nothing stored</span><button class="cancel">Cancel</button></div></div></div></article></div>
+        <div><p class="mode-label">Staged · Dark</p><article class="window current dark"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content"><div class="current-head"><strong>Transfer channel open</strong><span class="pill"><i class="dot"></i>Trusted LAN</span></div><h3>Dad's PDFs</h3><div class="sub">3 PDFs · packaged as ZIP</div><div class="beam"><div class="device-pair"><span class="device">WINDOWS</span><span class="device phone">iPHONE</span></div><div class="qr"></div></div><div class="current-actions"><div class="link-row"><a class="link" href="#">fairdrop.local/dads-pdfs</a><button class="copy">Copy direct link</button></div><div class="bottom"><span class="micro">Scan to start · nothing stored</span><button class="cancel">Cancel</button></div></div></div></article></div>
+        <div class="idle-mode"><p class="mode-label">Idle · Dark</p><article class="window current dark idle-window"><div class="chrome"><span class="app-icon">F</span><span class="app-name">FairDrop</span><span class="win-controls">− □ ×</span></div><div class="content idle-core"><div><div class="drop-mark">↗</div><strong>Start a new current</strong><span>Drop a file or folder to send.</span></div></div></article></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

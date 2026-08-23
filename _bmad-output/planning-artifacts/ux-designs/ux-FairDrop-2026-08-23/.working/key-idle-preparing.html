@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FairDrop key screen — Idle and preparing</title>
+  <style>
+    /*
+      GOVERNING SPINES — DESIGN.md wins on visual conflict; EXPERIENCE.md wins on behavior/copy.
+      DESIGN.md: Brand & Style; Colors; Typography; Layout & Spacing; Elevation & Depth;
+      Shapes; Components rows App Shell, DropZone, Selection Controls, Stage Pending Card,
+      Cancel Action, Warning Banner, Status Announcer; Do's and Don'ts.
+      EXPERIENCE.md: Information Architecture rows FairDrop desktop window — Idle,
+      Local staging-pending presentation, Product firewall guidance, OS firewall prompt;
+      Voice and Tone rows Idle instruction, Firewall preflight, Stage pending;
+      Component Patterns rows App Shell, DropZone, Selection Controls, Stage Pending Card,
+      Cancel Action, Status Announcer; Stage-preparation cancellation;
+      State Patterns rows Idle/rest, Staging pending, Staging/cancel pending;
+      Interaction Primitives + Announcement ownership; Firewall Preflight and Recovery;
+      Responsive & Platform; Accessibility Floor; Key Flows 1 steps 1–2, 2 steps 1–2,
+      3 steps 1–2, and 4 steps 1–2.
+    */
+    :root {
+      color-scheme: light dark;
+      --canvas:#F7F0E7; --surface:#FFFAF4; --elevated:#EFE2D4;
+      --text:#2C2723; --muted:#70645B; --border:#CDBDAE; --control:#8B7462;
+      --primary:#A94724; --primary-ink:#FFFFFF; --hover:#873719; --drop:#F1D0BD;
+      --focus:#7E4B92; --warning:#946000; --error:#AB3932;
+      --r-xs:3px; --r-sm:5px; --r-md:8px; --r-lg:10px;
+      --body:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      --serif:Georgia,Cambria,"Times New Roman",serif;
+      --mono:ui-monospace,"Cascadia Mono","Segoe UI Mono",monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas:#1C1916; --surface:#25211D; --elevated:#312A24;
+        --text:#F7EFE5; --muted:#BCAF9F; --border:#55493F; --control:#89796A;
+        --primary:#FF986D; --primary-ink:#2B1309; --hover:#FFB18F; --drop:#4A2D23;
+        --focus:#C5A1D3; --warning:#F2BD62; --error:#FF8B83;
+      }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#d8d2cc; color:#2C2723; font:14px/1.5 var(--body); }
+    .board { width:min(1240px,calc(100% - 24px)); margin:24px auto 48px; }
+    .board-head { margin:0 0 16px; }
+    .board-head h1 { margin:0; font:600 24px/1.2 var(--serif); letter-spacing:-.015em; }
+    .board-head p,.frame-label { margin:5px 0 0; color:#5f5751; font-size:12px; }
+    .gallery { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(420px,.65fr); gap:20px; align-items:start; }
+    .frame-label { margin:0 0 7px 2px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .window { min-width:0; overflow:hidden; border:1px solid #82776d; border-radius:10px; background:var(--canvas); color:var(--text); box-shadow:0 16px 38px #2c272329; }
+    .chrome { height:38px; display:grid; grid-template-columns:1fr auto; align-items:center; padding-left:12px; background:var(--surface); border-bottom:1px solid var(--control); }
+    .chrome-title { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:650; }
+    .mark { width:18px; height:18px; display:grid; place-items:center; border-radius:var(--r-sm); background:var(--primary); color:var(--primary-ink); font-size:10px; font-weight:800; }
+    .window-controls { height:100%; display:flex; }
+    .window-controls span { width:42px; display:grid; place-items:center; color:var(--muted); font-size:13px; }
+    .window-controls span:last-child { font-size:16px; }
+    .app { min-height:558px; padding:20px; overflow:auto; }
+    .idle-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(260px,.68fr); gap:24px; align-items:start; }
+    .state-heading { margin:0 0 4px; font:600 24px/1.2 var(--serif); letter-spacing:-.015em; }
+    .subcopy { margin:0; color:var(--muted); }
+    .drop-zone { min-height:278px; margin-top:20px; display:grid; place-items:center; padding:24px; text-align:center; background:var(--surface); border:2px dashed var(--control); border-radius:var(--r-lg); }
+    .drop-symbol { width:56px; height:56px; margin:0 auto 12px; display:grid; place-items:center; border:2px solid var(--primary); border-radius:var(--r-xs); color:var(--primary); font-size:26px; transform:rotate(-2deg); box-shadow:4px 4px 0 var(--drop); }
+    .drop-zone strong { display:block; font:600 20px/1.25 var(--serif); }
+    .selection { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+    button { min-height:44px; border:1px solid var(--control); border-radius:var(--r-md); background:var(--surface); color:var(--text); font:650 13px/1.2 var(--body); }
+    button:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+    .guidance { padding:16px; border-left:4px solid var(--warning); border-radius:var(--r-md); background:var(--surface); }
+    .guidance h2 { margin:0 0 8px; color:var(--warning); font-size:14px; }
+    .guidance p { margin:0 0 12px; }
+    .guidance dl { margin:0; display:grid; gap:10px; }
+    .guidance dt { font-weight:700; }
+    .guidance dd { margin:2px 0 0; color:var(--muted); }
+    .preparing .app { min-height:442px; }
+    .pending-wrap { max-width:520px; margin:0 auto; }
+    .pending-card { margin-top:18px; padding:20px; background:var(--elevated); border-radius:var(--r-lg); }
+    .packet-tab { width:max-content; margin:-31px 0 14px; padding:5px 12px; border:1px solid var(--control); border-bottom:0; border-radius:var(--r-sm) var(--r-sm) 0 0; background:var(--elevated); color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .pending-card h2 { margin:0; font:600 20px/1.25 var(--serif); }
+    .pending-card p { margin:7px 0 0; color:var(--muted); }
+    .item-line { margin-top:18px; padding:12px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .item-line bdi { display:block; min-inline-size:0; overflow-wrap:anywhere; font-weight:650; }
+    .kind { color:var(--muted); font-size:12px; }
+    .cancel-prep { width:100%; margin-top:16px; background:transparent; color:var(--muted); }
+    .cancel-prep:hover,.cancel-prep:focus-visible { color:var(--error); }
+    .status-announcer { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
+    @media (max-width:900px) {
+      .gallery { grid-template-columns:1fr; }
+      .idle-layout { grid-template-columns:1fr; }
+    }
+    @media (max-width:640px) {
+      .board { width:100%; margin:0; }
+      .board-head,.frame-label { padding-inline:12px; }
+      .window { border-radius:0; }
+      .app { padding:20px; }
+      .selection { grid-template-columns:1fr; }
+    }
+    @media (forced-colors:active) {
+      body,.window,.chrome,.drop-zone,.guidance,.pending-card,button { background:Canvas; color:CanvasText; }
+      .window,.chrome,.drop-zone,.guidance,.pending-card,button,.packet-tab { border-color:CanvasText; }
+      .guidance { border-left-color:Highlight; }
+      button:focus-visible { outline-color:Highlight; }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-head">
+      <h1>Idle and local preparation</h1>
+      <p>Paper Relay / Terracotta Linen. Standard desktop chrome; the authoritative state begins only after staging succeeds.</p>
+    </header>
+    <div class="gallery">
+      <section>
+        <p class="frame-label">Default composition · Idle</p>
+        <article class="window" aria-label="FairDrop Idle desktop window">
+          <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+          <div class="app idle-layout">
+            <section>
+              <h2 class="state-heading" tabindex="-1">Drop one file or folder.</h2>
+              <p class="subcopy">Choose one item to prepare for a nearby device.</p>
+              <div class="drop-zone">
+                <div><div class="drop-symbol" aria-hidden="true">↓</div><strong>Drop one file or folder.</strong><span class="subcopy">Drop it anywhere inside this marked area.</span></div>
+              </div>
+              <div class="selection"><button type="button">Select File</button><button type="button">Select Directory</button></div>
+            </section>
+            <aside class="guidance" aria-labelledby="network-access-heading">
+              <h2 id="network-access-heading">Local network access</h2>
+              <p>Your first transfer may ask to allow FairDrop on this local network.</p>
+              <dl>
+                <div><dt>Windows</dt><dd>Allow FairDrop on Private networks only. Leave Public networks off.</dd></div>
+                <div><dt>macOS</dt><dd>Allow incoming connections for FairDrop.</dd></div>
+              </dl>
+            </aside>
+          </div>
+        </article>
+      </section>
+      <section>
+        <p class="frame-label">Minimum-width composition · Stage Pending alternate</p>
+        <article class="window preparing" aria-label="FairDrop preparing a folder desktop window">
+          <header class="chrome"><div class="chrome-title"><span class="mark">F</span>FairDrop</div><div class="window-controls" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></header>
+          <div class="app">
+            <div class="pending-wrap">
+              <h1 class="state-heading" tabindex="-1">Preparing your folder…</h1>
+              <p class="subcopy">FairDrop is getting the item ready on this device.</p>
+              <section class="pending-card">
+                <div class="packet-tab">Folder</div>
+                <h2>Preparing your folder…</h2>
+                <p>No download link is available until preparation finishes.</p>
+                <div class="item-line"><bdi dir="auto">Dad's PDFs</bdi><span class="kind">Folder</span></div>
+                <button class="cancel-prep" type="button">Cancel preparation</button>
+              </section>
+            </div>
+            <div class="status-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
+          </div>
+        </article>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

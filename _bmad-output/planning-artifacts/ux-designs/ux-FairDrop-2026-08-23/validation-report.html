@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UX Design Validation: FairDrop</title>
+<style>
+:root{--bg:#fafaf9;--surface:#fff;--border:#e7e5e4;--text:#1c1917;--muted:#78716c;--strong:#16a34a;--adequate:#65a30d;--thin:#d97706;--broken:#dc2626;--low:#64748b;--medium:#ca8a04;--high:#ea580c;--critical:#dc2626}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}.container{max-width:960px;margin:auto;padding:32px 24px 64px}.report-header{padding-bottom:16px;border-bottom:1px solid var(--border);margin-bottom:24px}.report-header h1{margin:0;font-size:22px}.subtitle,.source,footer{color:var(--muted);font:12px/1.5 ui-monospace,"Cascadia Mono",monospace}.synthesis,.mechanical{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 22px;margin:0 0 24px}.synthesis{border-left:3px solid var(--critical)}.synthesis p{margin:0 0 10px}.synthesis p:last-child{margin:0}.dimension-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:24px}.dim-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px}.dim-name{font-size:13px;color:var(--muted)}.dim-verdict{font-weight:700}.strong{color:var(--strong)}.adequate{color:var(--adequate)}.thin{color:var(--thin)}section{margin-bottom:14px}details{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}summary{padding:14px 20px;cursor:pointer;display:flex;align-items:center;gap:12px}summary h2{font-size:16px;margin:0;flex:1}.pill,.badge{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:999px;padding:3px 9px;color:#fff}.pill.strong{background:var(--strong)}.pill.adequate{background:var(--adequate)}.pill.thin{background:var(--thin)}.body{padding:0 20px 18px}.finding{border-top:1px solid var(--border);padding:13px 0}.finding h3{font-size:14.5px;margin:0 0 4px}.finding p{margin:4px 0}.badge{display:inline-block;border-radius:4px;margin-right:8px}.critical{background:rgba(220,38,38,.13);color:var(--critical)}.high{background:rgba(234,88,12,.13);color:var(--high)}.medium{background:rgba(202,138,4,.14);color:var(--medium)}.low{background:rgba(100,116,139,.13);color:var(--low)}.location{color:var(--muted);font:12px ui-monospace,"Cascadia Mono",monospace}.mechanical h3{font-size:13px;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.mechanical ul{margin:0;padding-left:20px}footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body><div class="container">
+<header class="report-header"><h1>FairDrop — UX Design Validation Report</h1><div class="subtitle">DESIGN.md + EXPERIENCE.md · 2026-08-23T14:03:22-04:00</div></header>
+
+<div class="mechanical"><h3>Resolution update — 2026-08-23</h3><p>All 33 raw reviewer findings were resolved before finalization: 31 became binding contract or document corrections, and the two findings that require native/browser testing became explicit release evidence gates in <code>EXPERIENCE.md</code>. The findings below remain as the pre-correction review record; they are not open UX decisions.</p></div>
+
+<div class="synthesis">
+<p>The rubric finds the pair mechanically coherent and adequate as a draft: flow, component, reference, and document-shape coverage are strong. It is not final-ready because state decisions remain open, several assumptions read as approved requirements, and one component token embeds unresolved references inside a CSS string.</p>
+<p>The accessibility and trust lenses materially strengthen that warning. The three-second terminal presentation is an inaccessible information timeout, several light-mode non-text combinations fail the stated 3:1 floor, and the copy does not yet explain bearer-link ownership, plain-HTTP consequences, firewall recovery, or sender-side completion boundaries.</p>
+<p>Raw findings: <strong>1 critical, 13 high, 17 medium, 2 low</strong>. Repeated findings are retained where different lenses establish different consequences.</p>
+</div>
+
+<div class="dimension-summary">
+<div class="dim-card"><div class="dim-name">Flow coverage</div><div class="dim-verdict strong">strong</div></div>
+<div class="dim-card"><div class="dim-name">Token completeness</div><div class="dim-verdict adequate">adequate</div></div>
+<div class="dim-card"><div class="dim-name">Component coverage</div><div class="dim-verdict strong">strong</div></div>
+<div class="dim-card"><div class="dim-name">State coverage</div><div class="dim-verdict thin">thin</div></div>
+<div class="dim-card"><div class="dim-name">Visual references</div><div class="dim-verdict strong">strong</div></div>
+<div class="dim-card"><div class="dim-name">Bloat / overspecification</div><div class="dim-verdict strong">strong</div></div>
+<div class="dim-card"><div class="dim-name">Inheritance discipline</div><div class="dim-verdict thin">thin</div></div>
+<div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict strong">strong</div></div>
+</div>
+
+<section><details><summary><h2>1. Flow coverage</h2><span class="pill strong">strong</span></summary><div class="body"><p>All capability, functional, UX, epic, story, and release journey families map to four named-protagonist flows or explicit cross-cutting contracts. Every flow has numbered steps, a climax, and a failure path.</p></div></details></section>
+
+<section><details><summary><h2>2. Token completeness</h2><span class="pill adequate">adequate</span></summary><div class="body"><p>Named paths and light/dark color pairs resolve. Accessibility found separate contrast defects below.</p><article class="finding"><h3><span class="badge medium">medium</span>Composite shadow token is not resolver-safe</h3><div class="location">DESIGN.md · staged-view.shadow</div><p><strong>Fix:</strong> Use concrete shadow values or split geometry and color into standalone tokens.</p></article></div></details></section>
+
+<section><details><summary><h2>3. Component coverage</h2><span class="pill strong">strong</span></summary><div class="body"><p>All 18 component names match across frontmatter, visual specifications, and behavioral patterns.</p></div></details></section>
+
+<section><details open><summary><h2>4. State coverage</h2><span class="pill thin">thin</span></summary><div class="body"><p>All nine IA surfaces have state rows, but three downstream decisions are unresolved.</p>
+<article class="finding"><h3><span class="badge high">high</span>Known-empty progress is undefined</h3><div class="location">EXPERIENCE.md · Progress Meter / known-empty</div><p><strong>Fix:</strong> Define visible text, metrics, and accessibility semantics for a zero-byte known total.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>Firewall guidance lacks placement and wording</h3><div class="location">EXPERIENCE.md · firewall IA/state/flow</div><p><strong>Fix:</strong> Commit pre-prompt guidance, denial recovery, platform meaning, and copy.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>Stable PublicError copy is missing</h3><div class="location">EXPERIENCE.md · Voice / Error Panel / states</div><p><strong>Fix:</strong> Add a safe code-to-copy and recovery table.</p></article>
+</div></details></section>
+
+<section><details><summary><h2>5. Visual reference coverage</h2><span class="pill strong">strong</span></summary><div class="body"><p>All working references resolve; there are no promoted-reference orphans. Unsafe exploratory content is addressed by the trust reviewer below.</p></div></details></section>
+
+<section><details><summary><h2>6. Bloat &amp; overspecification</h2><span class="pill strong">strong</span></summary><div class="body"><p>The pair remains decision-focused. Lifecycle, HTTP, and disclosure facts are repeated only where they constrain visible behavior.</p></div></details></section>
+
+<section><details open><summary><h2>7. Inheritance discipline</h2><span class="pill thin">thin</span></summary><div class="body">
+<article class="finding"><h3><span class="badge high">high</span>Assumptions appear as approved requirements</h3><div class="location">.memlog.md and both spines</div><p><strong>Fix:</strong> Confirm automatic theme, immediate staging, feedback, voice, accessibility routing, and utility-scope assumptions as decisions or visibly tag them.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>Source precedence is implicit</h3><div class="location">DESIGN.md / EXPERIENCE.md frontmatter</div><p><strong>Fix:</strong> State that canonical SPEC and binding companions win; legacy/phase documents are traceability-only when non-conflicting.</p></article>
+</div></details></section>
+
+<section><details><summary><h2>8. Shape fit</h2><span class="pill strong">strong</span></summary><div class="body"><p>DESIGN sections follow canonical order; EXPERIENCE contains every required and triggered section, with justified trust and lifecycle additions.</p></div></details></section>
+
+<section><details open><summary><h2>Accessibility review</h2><span class="source">review-accessibility.md</span></summary><div class="body"><p>Not ready to claim WCAG 2.2 AA. Thirteen contract defects and two implementation-verification needs were identified.</p>
+<article class="finding"><h3><span class="badge critical">critical</span>A11Y-01 · Three-second terminal reset is an inaccessible information timeout</h3><p><strong>Fix:</strong> Preserve a visible non-session outcome in Idle until next Stage or dismissal; do not force a second focus move.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>A11Y-02 · Light-mode non-text contrast fails</h3><p>Borders measure 1.62–1.76:1; progress is 2.933531:1. <strong>Fix:</strong> Add ≥3:1 functional boundaries and revise progress colors.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>A11Y-03 · Focus, status, and alert compete</h3><p><strong>Fix:</strong> Define exactly one announcement owner per transition.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>A11Y-04 · Known-empty progress has no valid accessible semantics</h3><p><strong>Fix:</strong> Show “Empty file — 0 bytes to transfer” without a percentage progressbar.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>A11Y-05 · Stage Pending has no operable Cancel</h3><p><strong>Fix:</strong> Add Cancel preparation and local pre-ack cancellation authority.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-06 · Assistive progress cadence is undefined</h3><p><strong>Fix:</strong> Decouple speech from visual updates; announce meaningful progress at most every five seconds.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-07 · Cancel-pending and completion races lack feedback</h3><p><strong>Fix:</strong> Retain focus, expose “Canceling…,” and announce only the authoritative winner.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-08 · Reflow/text-spacing floor is incomplete</h3><p><strong>Fix:</strong> Require vertical-only reflow at 320 CSS px, 200% text, and WCAG spacing overrides.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-09 · Exact palette conflicts with forced colors</h3><p><strong>Fix:</strong> Make forced colors authoritative; exempt only tested QR rendering.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-10 · Reduced motion omits indeterminate progress</h3><p><strong>Fix:</strong> Use a static pattern plus text and remove repeating movement.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-11 · Unicode/bidi handling is underspecified</h3><p><strong>Fix:</strong> Use bidi isolation, grapheme-safe wrapping, and persistent full-name access.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-12 · Firewall timing and focus return are undefined</h3><p><strong>Fix:</strong> Put guidance before Stage and restore focus after the OS prompt.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-13 · Safe errors may be unusably generic</h3><p><strong>Fix:</strong> Make each safe message literal and actionable without color dependence.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>A11Y-14 · Native accessibility evidence matrix is missing</h3><p><strong>Fix:</strong> Record Narrator/NVDA and VoiceOver evidence for the full lifecycle and native prompts.</p></article>
+<article class="finding"><h3><span class="badge low">low</span>A11Y-15 · QR alternative needs exact semantics</h3><p><strong>Fix:</strong> Use concise non-token alt text, readonly URL text, and one semantic copy announcement.</p></article>
+</div></details></section>
+
+<section><details open><summary><h2>Trust &amp; cross-device handoff review</h2><span class="source">review-trust-cross-device.md</span></summary><div class="body"><p>Revise before finalization. V1 scope is disciplined, but the consumer meaning of its bearer-link, network, receiver, and completion boundaries is incomplete.</p>
+<article class="finding"><h3><span class="badge high">high</span>TCH-01 · Plain HTTP lacks a plain-language consequence</h3><p><strong>Fix:</strong> Explain that transfer traffic is not encrypted and may be observable on the network.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>TCH-02 · Single-use omits first-requester and preview risk</h3><p><strong>Fix:</strong> Explain first-opener ownership, require direct browser opening, and decide preview tolerance.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>TCH-03 · Firewall recovery is unresolved</h3><p><strong>Fix:</strong> Define platform-specific preflight, denial, focus, and help behavior.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>TCH-04 · Done overclaims iPhone Files state</h3><p><strong>Fix:</strong> Claim only sender-observable transport completion.</p></article>
+<article class="finding"><h3><span class="badge high">high</span>TCH-05 · Receiver support lacks a validation matrix</h3><p><strong>Fix:</strong> Define and test supported browser/OS combinations before broad claims.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>TCH-06 · Copied URL lacks cross-device instruction</h3><p><strong>Fix:</strong> Say “Copy download link” and explain opening it in the receiving browser.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>TCH-07 · Different-network failure lacks recovery</h3><p><strong>Fix:</strong> Explain same Wi-Fi, guest isolation, cancellation, and fresh-link retry.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>TCH-08 · No-cloud/no-extra-copy benefit is ambiguous</h3><p><strong>Fix:</strong> State local sending and no extra FairDrop copy while acknowledging the receiver keeps the download.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>TCH-09 · AirDrop analogy overpromises parity</h3><p><strong>Fix:</strong> Keep it internal; external copy must name desktop sender, one browser receiver, same LAN, no account/app.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>TCH-10 · Generic receiver errors lack guided recovery</h3><p><strong>Fix:</strong> Accept the V1 limitation and add sender-side troubleshooting unless architecture changes.</p></article>
+<article class="finding"><h3><span class="badge medium">medium</span>TCH-11 · Platform arrows imply symmetric native support</h3><p><strong>Fix:</strong> Spell out sender and browser-receiver roles; iPhone is receiver-only in V1.</p></article>
+<article class="finding"><h3><span class="badge low">low</span>TCH-12 · Working boards retain unsafe exploratory copy/QR visuals</h3><p><strong>Fix:</strong> Add exploration-only warnings or annotations and keep them non-normative.</p></article>
+</div></details></section>
+
+<div class="mechanical"><h3>Mechanical notes</h3><ul><li>Four named flows and all 18 paired component contracts are structurally covered.</li><li>All standalone token references resolve; the composite shadow string requires normalization.</li><li>Working references resolve; no promoted mockups, wireframes, or imports are orphaned.</li><li>Both spines remain draft and have not yet absorbed these findings.</li></ul></div>
+<footer>Rubric: review-rubric.md · Additional lenses: review-accessibility.md, review-trust-cross-device.md · Generated: 2026-08-23T14:03:22-04:00</footer>
+</div></body></html>
