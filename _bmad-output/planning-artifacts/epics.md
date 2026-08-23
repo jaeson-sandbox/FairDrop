@@ -39,7 +39,11 @@ FR18 `[deferred]`: Define behavior for a multi-file drop — the frontend accept
 
 ### NonFunctional Requirements
 
-NFR1: Hold memory under 20 MB regardless of payload size — chunked copying only, never `io.ReadAll`, `os.ReadFile`, or any whole-file buffering in the transfer path.
+NFR1: Keep transfer memory **constant in payload size** — O(buffer), not O(file). Chunked copying only; never `io.ReadAll`, `os.ReadFile`, or any whole-file buffering in the transfer path. A 100 GB directory must cost the same as a 100 MB one.
+
+> **Correction to spec §11's "<20 MB" figure.** Measured on the Phase 1 binary at idle: 29.3 MB for `fairdrop.exe` plus 328.5 MB across six WebView2 processes, ~358 MB total. WebView2 is ~92% of it and is the floor for any Wails app on Windows — no Go-side discipline reaches 20 MB. The number was a proxy for the streaming rule, not a budget. Treat the O(1) property as the requirement and ignore the absolute figure.
+>
+> The copy buffer is therefore a **tuning knob, not a constraint**. Spec §11's 32 KB is conservative (~32,768 syscalls per GB); 256 KB–1 MB is a deliberate trade of ~1 MB of RAM for materially fewer syscalls. Use `zip.Store` rather than `zip.Deflate` for already-compressed payloads (jpg, mp4, zip) — faster and cheaper than compressing incompressible bytes.
 NFR2: Persist nothing — no database, no logs, no config files.
 NFR3: Run the HTTP server and mDNS beacon only while a transfer is staged or active.
 NFR4: Serve `Access-Control-Allow-Origin: *` so mobile browsers can download without preflight blocking.
@@ -62,6 +66,7 @@ NFR11 `[deferred]`: Handle Windows path edge cases — spaces, non-ASCII, paths 
 - `[deferred]` `TransferStats.Percent` needs defined behavior when `TotalBytes` is 0, the normal case for a streamed zip — naive division yields NaN, which `encoding/json` refuses to marshal.
 - `[deferred]` `Streamer` needs a way to signal failure after headers are written, or receivers save truncated files that look complete.
 - `[deferred]` `TransferServer.Stop` needs a documented idempotency contract; it is reachable twice or before `Start`.
+- **Progress tracking and zero-copy are mutually exclusive — decide deliberately in Phase 4.** Go can hand a file to a socket without copying through userspace (`TransmitFile` on Windows, `sendfile` on Linux) via the `ReadFrom` fast path, but only when nothing wraps the writer. Spec §6's `ProgressWriter` wrapping `http.ResponseWriter` intercepts every `Write` and disables it. FR9's 4 Hz progress is almost certainly worth the cost for a UI-driven app; the point is that it is a choice, not an accident.
 - `[deferred]` No CI runs the verification commands, so verified state decays from the next commit.
 - `[deferred]` `frontend/tsconfig.json` uses legacy `moduleResolution: "Node"`; `"bundler"` matches the shipped toolchain.
 - `[deferred]` `npm ci --omit=dev` would break `tsc`, since test files sit inside the build's type-check scope.
