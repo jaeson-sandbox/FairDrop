@@ -1,5 +1,19 @@
 # Comprehensive Project Specification: DeadDrop
 
+## Phase 1 Corrections (verified against Wails v2.15.0)
+
+Phase 1 implementation proved four instructions in this document wrong. **Follow the corrections below, not the original text.** Each is also flagged inline at the spot it affects. Everything else in this document stands as written.
+
+1. **File drop is not a top-level option.** `options.App` has no `EnableFileDrop` field. The real form is the nested struct `DragAndDrop: &options.DragAndDrop{EnableFileDrop: true}` (evidence: `pkg/options/options.go:201-216`). *Affects §6 Module D, §10 Phase 1.*
+2. **There is no `wails_file_drop` event.** The runtime event is `wails:file-drop`, and the supported API is the helper pair `OnFileDrop(callback, useDropTarget)` / `OnFileDropOff()` imported from `../wailsjs/runtime/runtime`. Drops are gated on the inherited CSS custom property `--wails-drop-target: drop` -- not a class, not a DOM handler (evidence: `internal/frontend/runtime/desktop/draganddrop.js`). *Affects §6 Module D, §10 Phase 6.*
+3. **The product is FairDrop, not DeadDrop.** "DeadDrop" throughout this document is a stale working title. The mDNS service is `_fairdrop._tcp`; the Go module, `outputfilename`, and window title are all FairDrop. *Affects §9 and every naming reference.*
+4. **Three §9 signatures take a leading `context.Context`** (human-approved deviation). §7 requires cancellation through a `context.CancelFunc` tied to the HTTP server, which the ctx-free §9 signatures make impossible -- the two sections contradict each other. The corrected contracts are:
+   - `TransferServer.Start(ctx context.Context, filePath string, onProgress func(stats TransferStats)) (int, error)`
+   - `Streamer.StreamFile(ctx context.Context, w http.ResponseWriter, filePath string) error`
+   - `Streamer.StreamZip(ctx context.Context, w http.ResponseWriter, dirPath string) error`
+
+   `NetworkManager` is unchanged. *Affects §9, and Phases 3-4 which implement these.*
+
 ## 1. Product Overview & Philosophy
 DeadDrop is an ephemeral, cross-platform local P2P file transfer desktop application.
 *   **Zero-State:** No database, no persistent logs, no config files.
@@ -81,6 +95,8 @@ Use `runtime.EventsEmit(a.ctx, eventName, payload)` to drive the React UI reacti
 
 ### Module D: Frontend (React) Specifications
 *   **Drag & Drop Overlay:** Use Wails `EnableFileDrop: true` in the application options to allow capturing absolute file paths natively from the OS. In React, configure the `wails_file_drop` runtime event listener.
+
+    > **Corrected:** both API names in this bullet are wrong. The option is `DragAndDrop: &options.DragAndDrop{EnableFileDrop: true}`, and the frontend uses the `OnFileDrop`/`OnFileDropOff` runtime helpers (underlying event `wails:file-drop`). See "Phase 1 Corrections" at the top.
 *   **Components needed:**
     *   `DropZone.tsx`: An empty state prompting the user to drag a file.
     *   `StagedView.tsx`: Displays the filename, size, and the QR code.
@@ -122,6 +138,8 @@ deaddrop/
 ## 9. Core Go Interfaces (Implementation Guide)
 To prevent the agent from writing monolithic code in `app.go`, enforce these interfaces in the `internal/` packages:
 
+> **Corrected:** the beacon service is `_fairdrop._tcp`, not `_deaddrop._tcp`. And `TransferServer.Start`, `Streamer.StreamFile`, and `Streamer.StreamZip` each take a leading `ctx context.Context` that the signatures below omit -- without it the cancellation §7 requires cannot be plumbed through. See "Phase 1 Corrections" at the top.
+
 ```go
 // internal/network/network.go
 type NetworkManager interface {
@@ -154,11 +172,15 @@ type TransferServer interface {
 Instruct the coding agent to complete the project strictly in these phases. Do not allow it to move to the next phase until the current one compiles successfully.
 
 *   **Phase 1: Foundation & Wails Config.** Set up `main.go` with `wails.Options`. Enable `EnableFileDrop: true`, set `WindowStartState` to normal, and remove window frames if desired for a modern look.
+
+    > **Corrected:** `EnableFileDrop` is not a top-level option -- use `DragAndDrop: &options.DragAndDrop{EnableFileDrop: true}`. The frame question is settled: standard OS chrome, `Frameless: false`. See "Phase 1 Corrections" at the top.
 *   **Phase 2: Network Utilities.** Implement `internal/network`. Write the logic to filter out loopback/docker interfaces. This is historically tricky; ensure it explicitly looks for `net.FlagUp` and `net.FlagBroadcast`.
 *   **Phase 3: The Streaming Engine.** Implement `internal/stream`. Write the `io.Pipe` and `archive/zip` logic. **Crucial:** The agent must run `zipWriter.Close()` *before* `pipeWriter.Close()`, otherwise the zip file will be corrupt (missing the central directory).
 *   **Phase 4: The Ephemeral Server.** Implement `internal/server`. Bind to `0.0.0.0:0`. Hook up the `Streamer` and wrap the `http.ResponseWriter` with the progress tracker. 
 *   **Phase 5: Wails IPC Binding.** Wire the `internal` packages into `app.go`. Implement `StageTransfer` and `CancelTransfer`. Ensure Wails `context.Context` is passed down so `runtime.EventsEmit` works.
 *   **Phase 6: Frontend React.** Build the UI. Listen for the `wails_file_drop` event. Use `framer-motion` for smooth transitions between the Idle, Staged, and Transferring views.
+
+    > **Corrected:** there is no `wails_file_drop` event -- register `OnFileDrop(callback, useDropTarget)` and clean up with `OnFileDropOff()`. See "Phase 1 Corrections" at the top.
 
 ## 11. AI Hallucination Guardrails & "Gotchas"
 *   **Memory Leaks:** Do NOT use `ioutil.ReadAll` or `os.ReadFile` anywhere in the transfer pipeline. Files must be read in chunks (e.g., `io.Copy` with a standard 32KB buffer) to maintain the $<20\text{ MB}$ memory footprint regardless of file size.

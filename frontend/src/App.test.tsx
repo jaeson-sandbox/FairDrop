@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {act} from 'react'
+import {StrictMode, act} from 'react'
 import {cleanup, render, screen} from '@testing-library/react'
 import App from './App'
 
@@ -9,7 +9,7 @@ import App from './App'
 // The native half of the drop (OS -> webview -> absolute paths) belongs to the
 // Wails runtime and cannot run under jsdom. These tests stand in for it by
 // mocking the runtime module, then driving the exact callback the app
-// registered — so what is asserted is our contract with Wails and what the app
+// registered -- so what is asserted is our contract with Wails and what the app
 // does with the paths it is handed.
 
 const onFileDrop = vi.fn()
@@ -23,10 +23,43 @@ vi.mock('../wailsjs/runtime/runtime', () => ({
     OnFileDropOff: () => onFileDropOff(),
 }))
 
-/** Replays a native drop through the callback the app registered with Wails. */
-function drop(paths: string[]) {
-    const callback = onFileDrop.mock.calls[0][0]
+/** The drop zone element -- the one carrying the --wails-drop-target property. */
+function zone() {
+    return screen.getByText('Drop a file or folder here').parentElement
+}
+
+/**
+ * Resolves --wails-drop-target the way a browser would. The property inherits,
+ * so the value is whatever the nearest ancestor that sets it says. jsdom does
+ * not compute custom-property inheritance, so it is resolved here from inline
+ * styles. Mirrors checkStyleDropTarget() in Wails' draganddrop.js.
+ */
+function isDropTarget(element: Element | null): boolean {
+    for (let node = element as HTMLElement | null; node; node = node.parentElement) {
+        const value = node.style?.getPropertyValue('--wails-drop-target').trim()
+        if (value) return value === 'drop'
+    }
+    return false
+}
+
+/**
+ * Replays a native drop landing on `target`, applying the same gate Wails
+ * applies before it invokes our callback: it looks up the element under the
+ * drop point and requires --wails-drop-target: drop. A drop that fails the gate
+ * never reaches the app, which is exactly the "drop outside the zone" row of
+ * the matrix.
+ */
+function dropOn(target: Element | null, paths: string[]) {
+    expect(onFileDrop).toHaveBeenCalled()
+    // Wails holds the most recent registration.
+    const callback = onFileDrop.mock.calls.at(-1)![0]
+    if (!isDropTarget(target)) return
     act(() => callback(0, 0, paths))
+}
+
+/** Replays a native drop landing inside the drop zone. */
+function drop(paths: string[]) {
+    dropOn(zone(), paths)
 }
 
 beforeEach(() => {
@@ -64,21 +97,41 @@ describe('drop zone', () => {
         }
     })
 
-    // Matrix row: a drop landing outside the zone must not fire the callback.
-    // The gate itself is Wails' code (it walks up from elementFromPoint looking
-    // for the CSS custom property), so what we own — and assert here — is that
-    // we opt into that gate and that the zone actually carries the property.
+    it('renders a repeated path once per occurrence without a key collision', () => {
+        render(<App/>)
+
+        drop(['C:\\x\\a.txt', 'C:\\x\\a.txt'])
+
+        expect(screen.getAllByText('C:\\x\\a.txt')).toHaveLength(2)
+    })
+
     it('opts into the drop-target gate and marks the zone with the property', () => {
         render(<App/>)
 
         expect(onFileDrop).toHaveBeenCalledTimes(1)
         expect(onFileDrop.mock.calls[0][1]).toBe(true)
-
-        const zone = screen.getByText('Drop a file or folder here').parentElement
-        expect(zone?.style.getPropertyValue('--wails-drop-target')).toBe('drop')
+        expect(zone()?.style.getPropertyValue('--wails-drop-target')).toBe('drop')
     })
 
-    it('starts empty so an ignored drop leaves the UI unchanged', () => {
+    // Matrix row: a drop landing outside the zone must not fire the callback and
+    // must leave the UI untouched. Asserted from a non-empty state so it cannot
+    // pass trivially the way an initial-render assertion would.
+    it('ignores a drop that lands outside the zone, leaving the UI unchanged', () => {
+        render(<App/>)
+        drop(['C:\\x\\a.txt'])
+        expect(screen.getAllByRole('listitem')).toHaveLength(1)
+
+        // The heading sits outside the zone and inherits no drop-target property.
+        const outside = screen.getByRole('heading', {name: 'FairDrop'})
+        expect(isDropTarget(outside)).toBe(false)
+        dropOn(outside, ['C:\\x\\ignored.txt'])
+
+        expect(screen.queryByText('C:\\x\\ignored.txt')).toBeNull()
+        expect(screen.getAllByRole('listitem')).toHaveLength(1)
+        expect(screen.getByText('C:\\x\\a.txt')).toBeTruthy()
+    })
+
+    it('renders no list before anything has been dropped', () => {
         render(<App/>)
 
         expect(screen.queryByRole('list')).toBeNull()
@@ -93,5 +146,21 @@ describe('drop zone', () => {
 
         render(<App/>)
         expect(onFileDrop).toHaveBeenCalledTimes(2)
+    })
+
+    // main.tsx renders under StrictMode, which double-invokes effects
+    // (effect -> cleanup -> effect). Wails guards re-registration with
+    // `if (flags.registered) return` and OnFileDropOff clears that flag, so the
+    // cleanup is what lets the second registration take effect. Asserted rather
+    // than assumed, since a missing cleanup would silently leave the app deaf.
+    it('keeps exactly one live listener under StrictMode double-invoked effects', () => {
+        render(<StrictMode><App/></StrictMode>)
+
+        expect(onFileDropOff).toHaveBeenCalledTimes(1)
+        expect(onFileDrop).toHaveBeenCalledTimes(2)
+
+        drop(['C:\\x\\a.txt'])
+
+        expect(screen.getAllByRole('listitem')).toHaveLength(1)
     })
 })

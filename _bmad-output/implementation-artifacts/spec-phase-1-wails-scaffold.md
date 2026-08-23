@@ -82,9 +82,19 @@ Verified against a scratchpad probe of `wails init -n fairdrop -t react-ts` (CLI
 - Given the frontend, when `npm run build` runs in `frontend/`, then `tsc` type-checks clean and Vite emits `frontend/dist/`.
 - Given the full project, when `wails build` runs, then `build/bin/fairdrop.exe` is produced.
 - Given the repo root after scaffolding, when listing files, then `docs/`, `_bmad/`, `_bmad-output/`, `README.md` and git history are all intact and no `fairdrop/` subdirectory exists.
-- Given the interfaces, when inspected, then their method signatures match spec §9 exactly.
+- Given the interfaces, when inspected, then their method signatures match spec §9 exactly, except for the human-approved `context.Context` additions to `TransferServer.Start`, `Streamer.StreamFile`, and `Streamer.StreamZip` (see Spec Change Log).
 
 ## Spec Change Log
+
+Deliberate divergences from `docs/fairdrop-spec.md`, verified against Wails v2.15.0. The API corrections are mirrored in a "Phase 1 Corrections" section at the top of the source spec so later phases do not reinstate them.
+
+- **Wails file-drop option (spec §4, §10).** The spec calls for a top-level `EnableFileDrop: true` on `options.App`. No such field exists in Wails v2; the real form is `DragAndDrop: &options.DragAndDrop{EnableFileDrop: true}` (`pkg/options/options.go:201-216`).
+- **Frontend drop event (spec §6 Module D).** The spec names a `wails_file_drop` event. The actual runtime event is `wails:file-drop`, and the supported API is the helper pair `OnFileDrop(callback, useDropTarget)` / `OnFileDropOff()` (`internal/frontend/runtime/desktop/draganddrop.js`).
+- **mDNS service name (spec §6 Module A).** `_deaddrop._tcp` becomes `_fairdrop._tcp`, following the rename.
+- **Product name (spec, throughout).** "DeadDrop" is a stale working title. Everything ships as **FairDrop**: Go module `fairdrop`, `outputfilename` `fairdrop`, window title `FairDrop`.
+- **React version (spec §2).** The spec pins React 18; the `react-ts` template ships React 19.1 on Vite 7. Used what ships rather than downgrading a freshly generated template.
+- **`context.Context` added to three §9 signatures (human-approved).** Spec §7 requires cancellation to "trigger a `context.CancelFunc` tied to the HTTP server to forcefully drop the connection", but the §9 signatures accept no ctx -- §7 and §9 contradict each other in the source document. Since these interfaces have no implementations yet, the contract is nearly free to correct now and expensive to correct in Phase 4, so `TransferServer.Start`, `Streamer.StreamFile`, and `Streamer.StreamZip` each take a leading `ctx context.Context`. `NetworkManager` is unchanged -- `StartBeacon`/`StopBeacon` are lifecycle calls and §9 stays authoritative there. This deliberately supersedes the "signatures match §9 exactly" acceptance criterion for those three methods.
+- **Test dependencies (Ask First gate, human-approved).** `vitest`, `@testing-library/react`, and `jsdom` were added beyond the Wails/Tailwind/framer-motion allowance so the I/O matrix rows are covered by tests that actually run.
 
 ## Design Notes
 
@@ -105,18 +115,19 @@ Wails gates drops on a CSS custom property, not a class. The zone must compute `
 
 ## Verification
 
-**Toolchain (required — neither binary is on this shell's default PATH):** Go 1.26.7 and Wails CLI v2.15.0 are installed, but the MSI updated the machine PATH after this session's environment was captured. Prefix every Go/Wails command with:
-`export PATH="/c/Program Files/Go/bin:/c/Users/jaeso/go/bin:$PATH"`
+**Toolchain (required — neither binary is on this shell's default PATH):** Go 1.26.7 and Wails CLI v2.15.0 are installed, but the MSI updated the machine PATH after this session's environment was captured. Prefix every Go/Wails command with (bash syntax; `$HOME/go/bin` is the default `GOPATH/bin` -- confirm with `go env GOPATH`):
+`export PATH="/c/Program Files/Go/bin:$HOME/go/bin:$PATH"`
 
 **Commands:**
 - `wails doctor` -- expected: "Your system is ready for Wails development!"
 - `go build ./...` -- expected: exit 0, no output
 - `go vet ./...` -- expected: exit 0
-- `cd frontend && npm test` -- expected: 6 passed, covering all 5 matrix rows
+- `go test ./...` -- expected: exit 0; asserts the Wails options contract that no other check covers (`main_test.go`)
+- `cd frontend && npm test` -- expected: 9 passed, covering all 5 matrix rows
 - `cd frontend && npm run build` -- expected: tsc clean, `dist/` emitted
 - `wails build` -- expected: exit 0, `build/bin/fairdrop.exe` exists
 
-**Matrix coverage note:** the native half of a drop (OS -> webview -> absolute paths) is Wails runtime code and cannot execute under jsdom. `App.test.tsx` mocks `../wailsjs/runtime/runtime`, then invokes the exact callback the app registered — so it verifies our contract with Wails and what the app does with the paths handed to it. Row 4 ("drop outside the zone") is covered on our side only: the gate itself lives in Wails' `draganddrop.js`, so the test asserts we pass `useDropTarget=true` and that the zone carries `--wails-drop-target: drop`. Suite validated by mutation: flipping `useDropTarget` to `false`, removing the CSS custom property, and dropping the `OnFileDropOff` cleanup each fail exactly one test.
+**Matrix coverage note:** the native half of a drop (OS -> webview -> absolute paths) is Wails runtime code and cannot execute under jsdom. `App.test.tsx` mocks `../wailsjs/runtime/runtime`, then invokes the exact callback the app registered — so it verifies our contract with Wails and what the app does with the paths handed to it. Row 4 ("drop outside the zone") is exercised rather than assumed: the test mirrors `checkStyleDropTarget()` from `draganddrop.js`, resolving `--wails-drop-target` up the ancestor chain the way inheritance would, and asserts that a drop aimed at the heading never reaches the app while an already-rendered path stays put. Suite validated by mutation: setting the custom property to a non-matching value fails 7 of the 9 tests, and flipping `EnableFileDrop` to `false` in `main.go` fails `go test ./...` while leaving `go build`, `go vet`, `npm test`, `npm run build`, and `wails build` all green.
 
 **Manual checks (if no CLI):**
 - Run `build/bin/fairdrop.exe`: window titled "FairDrop" opens with native Windows chrome and a visible drop zone. Dragging a file onto the zone renders its absolute path; dragging onto the background does nothing and does not navigate the webview.

@@ -8,6 +8,6 @@ export default defineConfig({
   plugins: [tailwindcss(), react()],
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.tsx'],
+    include: ['src/**/*.test.{ts,tsx}'],
   }
 })

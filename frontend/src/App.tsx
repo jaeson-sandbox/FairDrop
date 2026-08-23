@@ -27,9 +27,12 @@ function App() {
 
                 {paths.length > 0 && (
                     <ul className="w-full max-w-2xl space-y-1 text-left">
-                        {paths.map((path) => (
+                        {/* A single payload can repeat the same absolute path,
+                            so the index disambiguates what would otherwise be
+                            a duplicate key. */}
+                        {paths.map((path, index) => (
                             <li
-                                key={path}
+                                key={`${index}:${path}`}
                                 className="truncate rounded-md bg-slate-800 px-3 py-2 font-mono text-sm text-sky-300"
                                 title={path}
                             >
