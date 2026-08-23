@@ -18,9 +18,20 @@ import (
 
 // Inspector is the file-only source adapter.
 //
-// It is stateless, so the zero value is usable and one instance is safe for
-// concurrent use by any number of callers.
-type Inspector struct{}
+// Its only field is a test seam that is set at construction and never mutated,
+// so the zero value is usable and one instance is safe for concurrent use by
+// any number of callers.
+type Inspector struct {
+	// lstat stands in for os.Lstat so tests can drive the classification
+	// decision with a synthetic fs.FileInfo -- a symlink mode, for instance,
+	// which an unprivileged runner cannot create on disk.
+	//
+	// It is an unexported, nil-defaulted field rather than a package-level
+	// variable on purpose: a package var would be shared mutable state that
+	// two parallel tests could stomp on each other. Nil means os.Lstat, so
+	// the zero Inspector and New() behave identically in production.
+	lstat func(string) (fs.FileInfo, error)
+}
 
 // Compile-time proof that this is the module's single SourcePort
 // implementation; the port lives in internal/transfer and is never mirrored
@@ -86,7 +97,12 @@ func (i *Inspector) Inspect(ctx context.Context, absolutePath string) (transfer.
 		)
 	}
 
-	info, err := os.Lstat(absolutePath)
+	lstat := i.lstat
+	if lstat == nil {
+		lstat = os.Lstat
+	}
+
+	info, err := lstat(absolutePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return transfer.StagedItem{}, transfer.WrapError(
