@@ -38,3 +38,7 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-phase-1-wails-scaffold.md`
   summary: `npm ci --omit=dev` would break `tsc` because test files are inside the build's type-check scope.
   evidence: `tsconfig.json` includes all of `src`, which now contains `App.test.tsx` importing `vitest` and `@testing-library/react` (both devDependencies). Not currently reachable — `wails.json` runs plain `npm install` — but a production-flavored CI install would fail the build.
+
+- source_spec: `spec-1-1-validate-and-describe-one-file-selection.md`
+  summary: Claim-time source revalidation and payload opening should pin filesystem identities so an ancestor replacement cannot exploit the metadata snapshot's TOCTOU window.
+  evidence: Story 1.1 now `Lstat`s every syntactic ancestor, rejects native Windows reparse attributes, and rechecks cancellation, but separate path-based metadata calls cannot atomically prevent a local rename between checks. The binding contract already assigns later defenses to claim-time re-`Lstat` and descriptor-first payload opening; their stories must preserve and verify that layering.
