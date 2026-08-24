@@ -92,7 +92,7 @@ v1.0.7 `Shutdown` closes sockets but exposes no receive-goroutine join or TTL=0 
 - `go mod tidy && go mod verify` — dependency graph is valid and pinned.
 - `go build ./... && go vet ./... && go test -count=1 ./...` — module and deterministic tests pass.
 - `CGO_ENABLED=1 go test -race -count=1 ./...` — lifecycle seams are race-clean using the installed MinGW toolchain.
-- `gofmt -l $(rg --files -g '*.go')` and `git diff --check` — no formatting/whitespace defects. (`gofmt -l .` does not recurse and is not a valid directory invocation.)
+- `gofmt -l .` and `git diff --check` — no formatting/whitespace defects. (An earlier note here claimed `gofmt -l .` does not recurse; that is incorrect — verified 2026-08-23 on go1.26.7 by planting a malformed file two directories down and seeing it reported.)
 - `rg -n 'type NetworkManager interface' internal` — no output.
 - `rg -n 'type NetworkPort interface|func \([^)]*\) (GetLocalIP|StartBeacon|StopBeacon)\(' internal --glob '*.go' --glob '!**/*_test.go'` — one port and one concrete implementation set.
 

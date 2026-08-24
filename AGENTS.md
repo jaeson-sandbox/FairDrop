@@ -20,8 +20,10 @@ live in `_bmad-output/implementation-artifacts/`.
   instructions in the original text are wrong and the corrections supersede them.
 - `_bmad-output/implementation-artifacts/` — one spec per phase (intent, boundaries, Code
   Map) plus `deferred-work.md`, review findings that belong to phases not yet built.
-- `internal/{network,stream,server}` — Phase 2/3/4 contracts; interfaces only, no
-  implementations yet.
+- `internal/{transfer,source,network}` — implemented (Stories 1.1-1.2): domain contracts,
+  the file-only source adapter, and LAN selection plus the mDNS beacon.
+- `internal/{stream,server}` — still Phase 1 placeholder interfaces. Each is *replaced* by
+  its consumer-owned port as its story lands; never leave a duplicate shadow type.
 
 ## Running and verifying
 
@@ -29,6 +31,10 @@ live in `_bmad-output/implementation-artifacts/`.
   is on the default PATH here, so bare `go`/`wails` fail with command-not-found.
 - Run `wails build` before a standalone `npm run build` in a fresh tree: it regenerates
   `frontend/wailsjs/`, and the committed copy can lack exports the frontend imports.
+- `go test -race` needs cgo, and the C toolchain is not on the default PATH. Prepend
+  `.../WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_*/mingw64/bin` and set
+  `CGO_ENABLED=1`; without both, the race detector fails with "requires cgo" rather than
+  reporting a clean run, so an unset PATH silently skips the check instead of failing it.
 
 ## Conventions that differ from defaults
 
