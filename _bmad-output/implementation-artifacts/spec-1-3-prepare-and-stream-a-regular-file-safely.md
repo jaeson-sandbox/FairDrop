@@ -2,8 +2,9 @@
 title: 'Story 1.3 — Prepare and Stream a Regular File Safely'
 type: 'feature'
 created: '2026-08-23'
-status: 'ready-for-dev'
+status: 'in-progress'
 review_loop_iteration: 0
+baseline_commit: '1e55e0c24e5fc18b54e4f25872f286756efbec9e'
 context:
   - '{project-root}/docs/fairdrop-contracts.md'
   - '{project-root}/_bmad-output/implementation-artifacts/epic-1-context.md'
@@ -60,10 +61,10 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/server/server.go` — add the two interfaces verbatim from the contract, documenting the `Close` ownership rule.
-- [ ] `internal/stream/archiver.go` — delete `Streamer`; implement `Prepare` (re-validate, open, stat the descriptor, compare against staged metadata) and `DownloadName`/`Size`/`WriteTo`/`Close`.
-- [ ] `internal/stream/*_test.go` — cover every matrix row with injected seams; prove exact bytes, prompt cancellation, single Close, and goroutine exit.
-- [ ] `internal/stream/*_test.go` — bounded-memory evidence that payload memory does not grow with file size across two sizes an order of magnitude apart.
+- [x] `internal/server/server.go` — add the two interfaces verbatim from the contract, documenting the `Close` ownership rule.
+- [x] `internal/stream/archiver.go` — delete `Streamer`; implement `Prepare` (re-validate, open, stat the descriptor, compare against staged metadata) and `DownloadName`/`Size`/`WriteTo`/`Close`.
+- [x] `internal/stream/*_test.go` — cover every matrix row with injected seams; prove exact bytes, prompt cancellation, single Close, and goroutine exit.
+- [x] `internal/stream/*_test.go` — bounded-memory evidence that payload memory does not grow with file size across two sizes an order of magnitude apart.
 
 **Acceptance Criteria:**
 - Given a successful `Prepare`, when the wire length is read, then it derives from the opened descriptor's `Stat` rather than `StagedItem.LogicalSize`, proven by a test where the two would diverge.
