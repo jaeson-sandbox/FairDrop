@@ -20,10 +20,13 @@ live in `_bmad-output/implementation-artifacts/`.
   instructions in the original text are wrong and the corrections supersede them.
 - `_bmad-output/implementation-artifacts/` — one spec per phase (intent, boundaries, Code
   Map) plus `deferred-work.md`, review findings that belong to phases not yet built.
-- `internal/{transfer,source,network}` — implemented (Stories 1.1-1.2): domain contracts,
-  the file-only source adapter, and LAN selection plus the mDNS beacon.
-- `internal/{stream,server}` — still Phase 1 placeholder interfaces. Each is *replaced* by
-  its consumer-owned port as its story lands; never leave a duplicate shadow type.
+- `internal/{transfer,source,network,stream}` — implemented (Stories 1.1-1.3): domain
+  contracts, the file-only source adapter, LAN selection plus the mDNS beacon, and the
+  file payload adapter.
+- `internal/server` — owns the `PayloadPort`/`PreparedPayload` contracts (Story 1.3); its
+  `TransferServer`/`TransferStats` are still Phase 1 placeholders that Story 1.4 replaces.
+  Each placeholder is *replaced* by its consumer-owned port as its story lands; never
+  leave a duplicate shadow type.
 
 ## Running and verifying
 
