@@ -11,9 +11,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"fairdrop/internal/server"
 	"fairdrop/internal/transfer"
@@ -22,17 +24,23 @@ import (
 // defaultBufferSize is the reusable copy buffer used for every payload.
 //
 // It is a benchmark choice, not a value derived from the file.
-// BenchmarkWriteToBufferSizes over a 32 MiB payload (Ryzen 7 9800X3D, warm page
-// cache, 200x/count=3) measured 8.8 GB/s at 32 KiB, 11.4 at 64 KiB, 12.9 at
-// 128 KiB, and a 13.6-14.1 plateau from 256 KiB through 1 MiB. 128 KiB sits
-// within a few percent of that plateau at a quarter of 512 KiB's per-stream
-// memory, and is still two orders of magnitude faster than the gigabit LAN this
-// buffer actually feeds, so the remaining throughput is not worth the bytes.
+// BenchmarkWriteToBufferSizes times only WriteTo -- Prepare and Close are
+// stopped out of the timed region -- over a 32 MiB payload with a warm page
+// cache. Measured 2026-08-24 on a Ryzen 7 9800X3D: 9.5 GB/s at 32 KiB, 12.7 at
+// 64 KiB, 14.4 at 128 KiB, peaking at 15.5 around 256 KiB and falling back to
+// 14.8 by 1 MiB. 128 KiB reaches ~93% of that peak for half the per-stream
+// memory, and even the slowest arm is two orders of magnitude past the gigabit
+// LAN this buffer actually feeds, so the remaining throughput is not worth the
+// bytes. Re-measure before trusting these numbers on other hardware.
 //
 // What is load-bearing is not the number: the buffer is allocated once per
 // stream and its size never depends on the payload, so a 16 MiB file and a
 // 16 GiB file cost the same payload memory.
 const defaultBufferSize = 128 << 10
+
+// fallbackDownloadName is offered when a staged name sanitizes to nothing at
+// all, so the receiver is never handed an empty filename.
+const fallbackDownloadName = "download"
 
 // payloadFile is the descriptor behavior the adapter needs from an opened
 // source. *os.File satisfies it; tests inject fakes through the open seam.
@@ -42,7 +50,11 @@ type payloadFile interface {
 	Close() error
 }
 
-type openFunc func(string) (payloadFile, error)
+type (
+	openFunc     func(string) (payloadFile, error)
+	lstatFunc    func(string) (fs.FileInfo, error)
+	sameFileFunc func(fs.FileInfo, fs.FileInfo) bool
+)
 
 // Payloads is the file-only payload adapter. Its function fields are immutable
 // per-instance test seams; the zero value uses the operating system.
@@ -52,6 +64,8 @@ type openFunc func(string) (payloadFile, error)
 type Payloads struct {
 	source     transfer.SourcePort
 	open       openFunc
+	lstat      lstatFunc
+	sameFile   sameFileFunc
 	bufferSize int
 }
 
@@ -63,9 +77,10 @@ func New(source transfer.SourcePort) *Payloads {
 	return &Payloads{source: source}
 }
 
-// Prepare re-validates the staged root, opens it, and derives the wire length
-// from that same descriptor. It runs before any response header is written, so
-// every failure returns a coded error and retains no descriptor.
+// Prepare re-validates the staged root, pins its filesystem identity, opens it,
+// and derives the wire length from that same descriptor. It runs before any
+// response header is written, so every failure returns a coded error and
+// retains no descriptor.
 func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (server.PreparedPayload, error) {
 	if ctx == nil {
 		return nil, transfer.NewError(
@@ -104,14 +119,33 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 		return nil, sourceChangedError()
 	}
 
-	// Second layer: the path-based check above cannot close the window between
-	// itself and the open, so the descriptor is the authority from here on. The
-	// wire length comes from its Stat, never from staging metadata, and a swap
-	// inside that window fails source_changed instead of streaming unexpected
-	// bytes under the staged length.
+	// Second layer: kind, size, and modtime are forgeable together, because
+	// os.Chtimes restores a modification time onto a replacement. Pin the
+	// filesystem identity immediately before the open so it can be compared
+	// against the descriptor below: the object verified is then the object
+	// streamed, not merely one whose metadata matches.
+	identity, err := p.lstatPath(item.Path)
+	if err != nil {
+		return nil, classifyAccessError(err, "payload source metadata could not be read")
+	}
+	if identity == nil {
+		return nil, transfer.NewError(
+			transfer.ErrTransferFailed,
+			"payload source metadata is unavailable",
+		)
+	}
+	if err := contextError(ctx); err != nil {
+		return nil, err
+	}
+
+	// Third layer: the path-based checks above cannot close the window between
+	// themselves and the open, so the descriptor is the authority from here on.
+	// The wire length comes from its Stat, never from staging metadata, and a
+	// swap inside that window fails source_changed instead of streaming
+	// unexpected bytes under the staged length.
 	file, err := p.openPath(item.Path)
 	if err != nil {
-		return nil, classifyOpenError(err)
+		return nil, classifyAccessError(err, "payload source could not be opened")
 	}
 	if file == nil {
 		return nil, transfer.NewError(
@@ -143,6 +177,9 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 			"payload descriptor is not a regular file",
 		))
 	}
+	if !p.sameFileAs(identity, info) {
+		return nil, release(file, sourceChangedError())
+	}
 	if divergesFromStaged(item, transfer.ItemFile, info.Size(), info.ModTime()) {
 		return nil, release(file, sourceChangedError())
 	}
@@ -168,6 +205,20 @@ func (p *Payloads) openPath(path string) (payloadFile, error) {
 	return file, nil
 }
 
+func (p *Payloads) lstatPath(path string) (fs.FileInfo, error) {
+	if p != nil && p.lstat != nil {
+		return p.lstat(path)
+	}
+	return os.Lstat(path)
+}
+
+func (p *Payloads) sameFileAs(before, after fs.FileInfo) bool {
+	if p != nil && p.sameFile != nil {
+		return p.sameFile(before, after)
+	}
+	return os.SameFile(before, after)
+}
+
 func (p *Payloads) bufferLength() int {
 	if p != nil && p.bufferSize > 0 {
 		return p.bufferSize
@@ -182,6 +233,7 @@ type payload struct {
 	bufferSize int
 
 	file      payloadFile
+	streamed  atomic.Bool
 	closed    atomic.Bool
 	closeOnce sync.Once
 	closeErr  error
@@ -189,7 +241,7 @@ type payload struct {
 
 var _ server.PreparedPayload = (*payload)(nil)
 
-// DownloadName is the selected basename; it is never a source path.
+// DownloadName is the sanitized selected basename; it is never a source path.
 func (p *payload) DownloadName() string { return p.name }
 
 // Size reports the length taken from the opened descriptor. A regular file
@@ -211,31 +263,49 @@ func (p *payload) WriteTo(ctx context.Context, dst io.Writer) error {
 			"payload streaming requires a destination",
 		)
 	}
-	if err := contextError(ctx); err != nil {
-		return err
-	}
 	if p.closed.Load() {
 		return transfer.NewError(
 			transfer.ErrTransferFailed,
 			"payload was released before streaming",
 		)
 	}
+	// Exactly one copy per prepared payload. A second call would resume at the
+	// descriptor's current offset and report writing nothing as success.
+	if !p.streamed.CompareAndSwap(false, true) {
+		return transfer.NewError(
+			transfer.ErrTransferFailed,
+			"payload was already streamed",
+		)
+	}
+	if err := contextError(ctx); err != nil {
+		return err
+	}
 
+	// Size is the promise Content-Length is built from, which makes it a bound
+	// rather than a hint. Reads are capped at what remains, so a source that
+	// grew after Prepare is stopped at the advertised length; a source that
+	// shrank fails below instead of reporting a short body as success.
+	//
 	// One buffer for the whole stream keeps payload memory O(buffer): nothing
 	// here is sized from, or grows with, the file.
 	buffer := make([]byte, p.bufferSize)
-	for {
+	remaining := p.size
+	for remaining > 0 {
 		if err := contextError(ctx); err != nil {
 			return err
 		}
-		read, readErr := p.file.Read(buffer)
+		chunk := buffer
+		if int64(len(chunk)) > remaining {
+			chunk = buffer[:remaining]
+		}
+		read, readErr := p.file.Read(chunk)
 		if read > 0 {
 			// Re-check before writing: a cancellation that lands during the
 			// read must not put another chunk on the wire.
 			if err := contextError(ctx); err != nil {
 				return err
 			}
-			written, writeErr := dst.Write(buffer[:read])
+			written, writeErr := dst.Write(chunk[:read])
 			if writeErr != nil {
 				return transfer.WrapError(
 					transfer.ErrTransferFailed,
@@ -244,15 +314,17 @@ func (p *payload) WriteTo(ctx context.Context, dst io.Writer) error {
 				)
 			}
 			if written != read {
-				return transfer.NewError(
+				return transfer.WrapError(
 					transfer.ErrTransferFailed,
 					"payload destination accepted an incomplete write",
+					io.ErrShortWrite,
 				)
 			}
+			remaining -= int64(read)
 		}
 		if readErr != nil {
 			if errors.Is(readErr, io.EOF) {
-				return nil
+				break
 			}
 			return transfer.WrapError(
 				transfer.ErrTransferFailed,
@@ -261,6 +333,14 @@ func (p *payload) WriteTo(ctx context.Context, dst io.Writer) error {
 			)
 		}
 	}
+	if remaining > 0 {
+		return transfer.WrapError(
+			transfer.ErrTransferFailed,
+			"payload source delivered fewer bytes than its advertised length",
+			io.ErrUnexpectedEOF,
+		)
+	}
+	return nil
 }
 
 // Close releases the descriptor exactly once. Repeated calls are safe no-ops
@@ -297,11 +377,37 @@ func divergesFromStaged(staged transfer.StagedItem, kind transfer.ItemKind, size
 		!modTime.Equal(staged.ModTime)
 }
 
+// downloadName reduces a staged name to a bare basename safe to place in a
+// response header. StagedItem.Name is data, not a path: separators and ".."
+// are discarded rather than traversed, and control characters are removed
+// because CR/LF in a filename is a header-injection primitive for the
+// Content-Disposition the server writes.
 func downloadName(item transfer.StagedItem) string {
-	if item.Name != "" {
-		return item.Name
+	if name := sanitizeDownloadName(item.Name); name != "" {
+		return name
 	}
-	return filepath.Base(item.Path)
+	if name := sanitizeDownloadName(filepath.Base(item.Path)); name != "" {
+		return name
+	}
+	return fallbackDownloadName
+}
+
+func sanitizeDownloadName(raw string) string {
+	// Keep only the final component under either separator convention, so a
+	// name carrying a whole path contributes just its last element.
+	if index := strings.LastIndexAny(raw, `/\`); index >= 0 {
+		raw = raw[index+1:]
+	}
+	cleaned := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || r == '/' || r == '\\' {
+			return -1
+		}
+		return r
+	}, raw)
+	// Windows drops trailing dots and spaces from a filename anyway; trimming
+	// them here also reduces "." and ".." to nothing while leaving a leading
+	// dot, and therefore a legitimate dotfile, intact.
+	return strings.TrimRight(cleaned, ". ")
 }
 
 func sourceChangedError() error {
@@ -311,7 +417,7 @@ func sourceChangedError() error {
 	)
 }
 
-func classifyOpenError(err error) error {
+func classifyAccessError(err error, safeMessage string) error {
 	if errors.Is(err, fs.ErrNotExist) {
 		return transfer.WrapError(
 			transfer.ErrPathNotFound,
@@ -321,18 +427,29 @@ func classifyOpenError(err error) error {
 	}
 	return transfer.WrapError(
 		transfer.ErrTransferFailed,
-		"payload source could not be opened",
+		safeMessage,
 		err,
 	)
 }
 
 func contextError(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
+	err := ctx.Err()
+	if err == nil {
+		return nil
+	}
+	// A deadline is FairDrop's own timeout, not the user's cancel. Reporting it
+	// as cancelled would hide it in a UI that treats cancellation as a
+	// non-error outcome.
+	if errors.Is(err, context.DeadlineExceeded) {
 		return transfer.WrapError(
-			transfer.ErrCancelled,
-			"payload operation was cancelled",
+			transfer.ErrTransferFailed,
+			"payload operation exceeded its deadline",
 			err,
 		)
 	}
-	return nil
+	return transfer.WrapError(
+		transfer.ErrCancelled,
+		"payload operation was cancelled",
+		err,
+	)
 }

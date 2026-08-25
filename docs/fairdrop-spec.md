@@ -2,7 +2,7 @@
 
 ## Phase 1 Corrections (verified against Wails v2.15.0)
 
-Phase 1 implementation proved four instructions in this document wrong. **Follow the corrections below, not the original text.** Each is also flagged inline at the spot it affects. Everything else in this document stands as written.
+Phase 1 implementation proved four instructions in this document wrong, and Epic 1 has since superseded a fifth. **Follow the corrections below, not the original text.** Each is also flagged inline at the spot it affects. Everything else in this document stands as written.
 
 1. **File drop is not a top-level option.** `options.App` has no `EnableFileDrop` field. The real form is the nested struct `DragAndDrop: &options.DragAndDrop{EnableFileDrop: true}` (evidence: `pkg/options/options.go:201-216`). *Affects §6 Module D, §10 Phase 1.*
 2. **There is no `wails_file_drop` event.** The runtime event is `wails:file-drop`, and the supported API is the helper pair `OnFileDrop(callback, useDropTarget)` / `OnFileDropOff()` imported from `../wailsjs/runtime/runtime`. Drops are gated on the inherited CSS custom property `--wails-drop-target: drop` -- not a class, not a DOM handler (evidence: `internal/frontend/runtime/desktop/draganddrop.js`). *Affects §6 Module D, §10 Phase 6.*
@@ -12,7 +12,8 @@ Phase 1 implementation proved four instructions in this document wrong. **Follow
    - `Streamer.StreamFile(ctx context.Context, w http.ResponseWriter, filePath string) error`
    - `Streamer.StreamZip(ctx context.Context, w http.ResponseWriter, dirPath string) error`
 
-   `NetworkManager` is unchanged. *Affects §9, and Phases 3-4 which implement these.*
+   `NetworkManager` is unchanged. *Affects §9, and Phases 3-4 which implement these.* **Superseded for `Streamer` by correction 5.**
+5. **`Streamer` no longer exists; the payload contract is `PayloadPort`/`PreparedPayload`** (Story 1.3). A provider-owned interface taking a path string could not re-check the source at claim time or derive a wire length from a real descriptor, so `internal/server` now owns the contract and `internal/stream` implements it. `StreamZip` is gone with it -- Epic 2 reintroduces directories through the same port. `NetworkManager` was likewise replaced by the consumer-owned `NetworkPort` in Story 1.2. The binding shapes live in `docs/fairdrop-contracts.md`, which supersedes §9 wherever the two disagree. *Affects §9, §10 Phases 3-4.*
 
 ## 1. Product Overview & Philosophy
 DeadDrop is an ephemeral, cross-platform local P2P file transfer desktop application.
@@ -139,6 +140,8 @@ deaddrop/
 To prevent the agent from writing monolithic code in `app.go`, enforce these interfaces in the `internal/` packages:
 
 > **Corrected:** the beacon service is `_fairdrop._tcp`, not `_deaddrop._tcp`. And `TransferServer.Start`, `Streamer.StreamFile`, and `Streamer.StreamZip` each take a leading `ctx context.Context` that the signatures below omit -- without it the cancellation §7 requires cannot be plumbed through. See "Phase 1 Corrections" at the top.
+>
+> **Superseded:** `Streamer` was deleted in Story 1.3 and `NetworkManager` in Story 1.2, so only `TransferServer.Start` from the note above is still a live signature awaiting Story 1.4. See correction 5.
 
 ```go
 // internal/network/network.go
@@ -151,12 +154,17 @@ type NetworkManager interface {
     StopBeacon()
 }
 
-// internal/stream/archiver.go
-type Streamer interface {
-    // StreamFile writes a single file directly to the HTTP response
-    StreamFile(w http.ResponseWriter, filePath string) error
-    // StreamZip walks a directory and writes a zip archive to the response via io.Pipe
-    StreamZip(w http.ResponseWriter, dirPath string) error
+// SUPERSEDED by correction 5 -- Streamer was replaced in Story 1.3.
+// internal/server/server.go owns the contract; internal/stream implements it.
+type PreparedPayload interface {
+    DownloadName() string
+    Size() (bytes int64, known bool)
+    WriteTo(ctx context.Context, dst io.Writer) error
+    Close() error
+}
+
+type PayloadPort interface {
+    Prepare(ctx context.Context, item transfer.StagedItem) (PreparedPayload, error)
 }
 
 // internal/server/server.go
@@ -175,8 +183,8 @@ Instruct the coding agent to complete the project strictly in these phases. Do n
 
     > **Corrected:** `EnableFileDrop` is not a top-level option -- use `DragAndDrop: &options.DragAndDrop{EnableFileDrop: true}`. The frame question is settled: standard OS chrome, `Frameless: false`. See "Phase 1 Corrections" at the top.
 *   **Phase 2: Network Utilities.** Implement `internal/network`. Write the logic to filter out loopback/docker interfaces. This is historically tricky; ensure it explicitly looks for `net.FlagUp` and `net.FlagBroadcast`.
-*   **Phase 3: The Streaming Engine.** Implement `internal/stream`. Write the `io.Pipe` and `archive/zip` logic. **Crucial:** The agent must run `zipWriter.Close()` *before* `pipeWriter.Close()`, otherwise the zip file will be corrupt (missing the central directory).
-*   **Phase 4: The Ephemeral Server.** Implement `internal/server`. Bind to `0.0.0.0:0`. Hook up the `Streamer` and wrap the `http.ResponseWriter` with the progress tracker. 
+*   **Phase 3: The Streaming Engine.** Implement `internal/stream`. *Per correction 5, the file half of this landed in Story 1.3 as `PayloadPort`/`PreparedPayload`, not `Streamer`.* The `io.Pipe` and `archive/zip` logic belongs to Epic 2. **Crucial:** The agent must run `zipWriter.Close()` *before* `pipeWriter.Close()`, otherwise the zip file will be corrupt (missing the central directory).
+*   **Phase 4: The Ephemeral Server.** Implement `internal/server`. Bind to `0.0.0.0:0`. Hook up the `PayloadPort` (*not `Streamer`* -- see correction 5) and wrap the `http.ResponseWriter` with the progress tracker.
 *   **Phase 5: Wails IPC Binding.** Wire the `internal` packages into `app.go`. Implement `StageTransfer` and `CancelTransfer`. Ensure Wails `context.Context` is passed down so `runtime.EventsEmit` works.
 *   **Phase 6: Frontend React.** Build the UI. Listen for the `wails_file_drop` event. Use `framer-motion` for smooth transitions between the Idle, Staged, and Transferring views.
 

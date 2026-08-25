@@ -17,18 +17,21 @@ import (
 // larger must not allocate an order of magnitude more. Deliberately sequential:
 // ReadMemStats is process-wide.
 func TestWriteToAllocationsDoNotGrowWithPayloadSize(t *testing.T) {
+	// Both payloads sit well ABOVE the bound asserted below, which is what makes
+	// each arm able to discriminate on its own: an implementation that read the
+	// file into memory would exceed the bound at 2 MiB already, rather than
+	// slipping under it and leaving only the large arm to catch the fault.
 	const (
-		smallPayload = 1 << 20
-		largePayload = 16 << 20
+		smallPayload = 2 << 20
+		largePayload = 32 << 20
 	)
 
 	smallAllocated := measureWriteToAllocations(t, smallPayload)
 	largeAllocated := measureWriteToAllocations(t, largePayload)
 
-	// Generous absolute headroom around the one buffer: what would fail here is
-	// an implementation that reads the payload into memory, since 16 MiB is two
-	// orders of magnitude past this bound.
-	bound := uint64(8 * defaultBufferSize)
+	// Headroom around the single reusable buffer, but still far below the
+	// smaller payload, so reading either file into memory fails this bound.
+	bound := uint64(2 * defaultBufferSize)
 	if smallAllocated > bound {
 		t.Fatalf("streaming %d bytes allocated %d, want at most %d", smallPayload, smallAllocated, bound)
 	}
@@ -113,16 +116,27 @@ func BenchmarkWriteToBufferSizes(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
+				// Prepare walks every syntactic ancestor and opens the file, and
+				// WriteTo is once-only, so each iteration needs a fresh payload.
+				// Both it and Close stay outside the timed region: this benchmark
+				// exists to compare buffer sizes, and per-iteration open/validate
+				// overhead would compress exactly the differences being measured.
+				b.StopTimer()
 				prepared, err := adapter.Prepare(context.Background(), staged)
 				if err != nil {
 					b.Fatalf("Prepare() error = %v (code %q)", err, transfer.ErrorCodeOf(err))
 				}
+				b.StartTimer()
+
 				if err := prepared.WriteTo(context.Background(), io.Discard); err != nil {
 					b.Fatalf("WriteTo() error = %v", err)
 				}
+
+				b.StopTimer()
 				if err := prepared.Close(); err != nil {
 					b.Fatalf("Close() error = %v", err)
 				}
+				b.StartTimer()
 			}
 		})
 	}

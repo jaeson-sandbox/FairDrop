@@ -2,7 +2,7 @@
 title: 'Story 1.3 — Prepare and Stream a Regular File Safely'
 type: 'feature'
 created: '2026-08-23'
-status: 'in-progress'
+status: 'in-review'
 review_loop_iteration: 1
 baseline_commit: '1e55e0c24e5fc18b54e4f25872f286756efbec9e'
 context:
@@ -69,12 +69,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/server/server.go` — add the two interfaces verbatim from the contract, documenting the `Close` ownership rule.
-- [ ] `internal/stream/archiver.go` — delete `Streamer`; implement `Prepare` (re-validate, open, stat the descriptor, compare against staged metadata) and `DownloadName`/`Size`/`WriteTo`/`Close`.
-- [ ] `internal/stream/*_test.go` — cover every matrix row with injected seams; prove exact bytes, prompt cancellation, single Close, and goroutine exit.
-- [ ] `internal/stream/*_test.go` — bounded-memory evidence that payload memory does not grow with file size across two sizes an order of magnitude apart. The small arm must sit well under the asserted bound so it can actually discriminate, and the buffer-size benchmark must time only `WriteTo`.
-- [ ] `internal/stream/*_test.go` — assert the seam arguments: the same byte-identical path must reach both the source port and the open call, and a mid-stream read failure must be driven with bytes still pending.
-- [ ] `docs/fairdrop-spec.md` — replace the deleted `Streamer` contract text with `PayloadPort`/`PreparedPayload`.
+- [x] `internal/server/server.go` — add the two interfaces verbatim from the contract, documenting the `Close` ownership rule.
+- [x] `internal/stream/archiver.go` — delete `Streamer`; implement `Prepare` (re-validate, open, stat the descriptor, compare against staged metadata) and `DownloadName`/`Size`/`WriteTo`/`Close`.
+- [x] `internal/stream/*_test.go` — cover every matrix row with injected seams; prove exact bytes, prompt cancellation, single Close, and goroutine exit.
+- [x] `internal/stream/*_test.go` — bounded-memory evidence that payload memory does not grow with file size across two sizes an order of magnitude apart. The small arm must sit well under the asserted bound so it can actually discriminate, and the buffer-size benchmark must time only `WriteTo`.
+- [x] `internal/stream/*_test.go` — assert the seam arguments: the same byte-identical path must reach both the source port and the open call, and a mid-stream read failure must be driven with bytes still pending.
+- [x] `docs/fairdrop-spec.md` — replace the deleted `Streamer` contract text with `PayloadPort`/`PreparedPayload`.
 
 **Acceptance Criteria:**
 - Given a successful `Prepare`, when the wire length is read, then it derives from the opened descriptor's `Stat` rather than `StagedItem.LogicalSize`, proven by a test where the two would diverge.
@@ -106,6 +106,7 @@ Buffer size is a benchmark choice per the epic's Phase 3 note; record the size a
 - `go build ./... && go vet ./... && go test -count=1 ./...` — module and deterministic tests pass.
 - `CGO_ENABLED=1 go test -race -count=1 ./...` — streaming and Close seams are race-clean. Needs MinGW `bin` on PATH (see AGENTS.md); without it the detector errors instead of running.
 - `gofmt -l .` and `git diff --check` — no formatting or whitespace defects.
-- `rg -n 'Streamer|StreamFile|StreamZip' --glob '!_bmad-output/**'` — no output. Scope this to the whole repository, not `internal/`: documentation drift is invisible to an `internal/`-only grep.
+- `rg -n 'Streamer|StreamFile|StreamZip' -g '*.go'` — no output. No Go reference to the deleted type may survive anywhere, not just under `internal/`.
+- `rg -n 'Streamer|StreamFile|StreamZip' -g '*.md' -g '!_bmad-output/**'` — every remaining hit must be a supersession note that tells the reader the type is gone. Documentation drift is invisible to a Go-only grep, but a doc legitimately names a deleted type in order to retire it, so this check is read, not counted.
 - `rg -n 'io.ReadAll|os.ReadFile|mmap' internal/stream` — no output.
 - `rg -n 'type (PayloadPort|PreparedPayload) interface' internal --glob '!**/*_test.go'` — exactly one declaration each.
