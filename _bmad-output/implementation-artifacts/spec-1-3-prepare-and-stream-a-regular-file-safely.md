@@ -2,7 +2,7 @@
 title: 'Story 1.3 — Prepare and Stream a Regular File Safely'
 type: 'feature'
 created: '2026-08-23'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 1
 baseline_commit: '1e55e0c24e5fc18b54e4f25872f286756efbec9e'
 context:
@@ -110,3 +110,73 @@ Buffer size is a benchmark choice per the epic's Phase 3 note; record the size a
 - `rg -n 'Streamer|StreamFile|StreamZip' -g '*.md' -g '!_bmad-output/**'` — every remaining hit must be a supersession note that tells the reader the type is gone. Documentation drift is invisible to a Go-only grep, but a doc legitimately names a deleted type in order to retire it, so this check is read, not counted.
 - `rg -n 'io.ReadAll|os.ReadFile|mmap' -g '*.go'` — no output. The Never rule bans these for the story's code, not for one package; scoping the check to `internal/stream` is the same narrowing that hid the documentation drift in loop 1.
 - `rg -n 'type (PayloadPort|PreparedPayload) interface' internal --glob '!**/*_test.go'` — exactly one declaration each.
+
+## Suggested Review Order
+
+**Claim-time defense: what is validated is what is streamed**
+
+- The whole security boundary in one function; the order of its steps is the design.
+  [`archiver.go:94`](../../internal/stream/archiver.go#L94)
+
+- Identity is pinned here because kind, size, and modtime are forgeable together.
+  [`archiver.go:225`](../../internal/stream/archiver.go#L225)
+
+- The metadata comparison that `SameFile` backstops rather than replaces.
+  [`archiver.go:400`](../../internal/stream/archiver.go#L400)
+
+**Size as a bound, not a hint**
+
+- Caps each read at the outstanding remainder, so the body never exceeds Content-Length.
+  [`archiver.go:313`](../../internal/stream/archiver.go#L313)
+
+- A short body fails instead of returning nil, so Story 1.4's abort path can fire.
+  [`archiver.go:362`](../../internal/stream/archiver.go#L362)
+
+- Re-checked between read and write, so a cancelled chunk never reaches the wire.
+  [`archiver.go:329`](../../internal/stream/archiver.go#L329)
+
+- Refuses a second stream rather than reporting a no-op as success.
+  [`archiver.go:284`](../../internal/stream/archiver.go#L284)
+
+**Name safety at the header boundary**
+
+- Strips what breaks `filename="..."`: quotes, semicolons, colons, and format runes.
+  [`archiver.go:421`](../../internal/stream/archiver.go#L421)
+
+- The contract that makes sanitization the payload's job, not the server's.
+  [`server.go:30`](../../internal/server/server.go#L30)
+
+**Contracts and ownership**
+
+- The port pair the server owns and this package implements.
+  [`server.go:24`](../../internal/server/server.go#L24)
+
+- The three postconditions promoted from story spec into the binding contract.
+  [`fairdrop-contracts.md:241`](../../docs/fairdrop-contracts.md#L241)
+
+- Buffer size is a recorded benchmark choice, not a value derived from the file.
+  [`archiver.go:41`](../../internal/stream/archiver.go#L41)
+
+**Evidence that the defenses are not vacuous**
+
+- Buffer size deliberately does not divide the advertised length; deleting the cap fails this.
+  [`archiver_test.go:800`](../../internal/stream/archiver_test.go#L800)
+
+- Cancels during the read, the only way to exercise the pre-write re-check.
+  [`archiver_test.go:969`](../../internal/stream/archiver_test.go#L969)
+
+- A metadata-identical replacement, forged with `os.Chtimes`, must still be refused.
+  [`archiver_test.go:192`](../../internal/stream/archiver_test.go#L192)
+
+- Asserts the same byte-identical path reached both the source port and the open call.
+  [`archiver_test.go:492`](../../internal/stream/archiver_test.go#L492)
+
+- Adversarial staged names, including the U+202E extension spoof.
+  [`archiver_test.go:587`](../../internal/stream/archiver_test.go#L587)
+
+- Both arms sit above the bound, so either alone catches whole-file buffering.
+  [`memory_test.go:19`](../../internal/stream/memory_test.go#L19)
+
+- Times only `WriteTo`; Prepare and Close are stopped out of the timed region.
+  [`memory_test.go:96`](../../internal/stream/memory_test.go#L96)
+
