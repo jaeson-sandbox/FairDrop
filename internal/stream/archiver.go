@@ -29,9 +29,11 @@ import (
 // cache. Measured 2026-08-24 on a Ryzen 7 9800X3D: 9.5 GB/s at 32 KiB, 12.7 at
 // 64 KiB, 14.4 at 128 KiB, peaking at 15.5 around 256 KiB and falling back to
 // 14.8 by 1 MiB. 128 KiB reaches ~93% of that peak for half the per-stream
-// memory, and even the slowest arm is two orders of magnitude past the gigabit
-// LAN this buffer actually feeds, so the remaining throughput is not worth the
-// bytes. Re-measure before trusting these numbers on other hardware.
+// memory, and even the slowest arm is ~76x the ~0.125 GB/s of the gigabit LAN
+// this buffer actually feeds, so the remaining throughput is not worth the
+// bytes. These figures come from io.Discard against a warm page cache, so they
+// measure read-plus-copy rather than what an http.ResponseWriter will do.
+// Re-measure before trusting them on other hardware.
 //
 // What is load-bearing is not the number: the buffer is allocated once per
 // stream and its size never depends on the payload, so a 16 MiB file and a
@@ -41,6 +43,14 @@ const defaultBufferSize = 128 << 10
 // fallbackDownloadName is offered when a staged name sanitizes to nothing at
 // all, so the receiver is never handed an empty filename.
 const fallbackDownloadName = "download"
+
+// maxEmptyReads bounds consecutive zero-byte, nil-error reads before the stream
+// is abandoned. It mirrors the constant io.ReadAtLeast uses for the same guard.
+const maxEmptyReads = 100
+
+// maxDownloadNameRunes caps the sanitized name. Header values are not unbounded,
+// and a staged name is only ever a basename in practice.
+const maxDownloadNameRunes = 200
 
 // payloadFile is the descriptor behavior the adapter needs from an opened
 // source. *os.File satisfies it; tests inject fakes through the open seam.
@@ -290,6 +300,10 @@ func (p *payload) WriteTo(ctx context.Context, dst io.Writer) error {
 	// here is sized from, or grows with, the file.
 	buffer := make([]byte, p.bufferSize)
 	remaining := p.size
+	// io.Reader permits (0, nil) indefinitely. payloadFile is an injectable
+	// seam, so a source that never progresses must end the stream rather than
+	// spin a core until the context happens to be cancelled.
+	stalls := 0
 	for remaining > 0 {
 		if err := contextError(ctx); err != nil {
 			return err
@@ -299,6 +313,18 @@ func (p *payload) WriteTo(ctx context.Context, dst io.Writer) error {
 			chunk = buffer[:remaining]
 		}
 		read, readErr := p.file.Read(chunk)
+		if read == 0 && readErr == nil {
+			stalls++
+			if stalls > maxEmptyReads {
+				return transfer.WrapError(
+					transfer.ErrTransferFailed,
+					"payload source stopped making progress",
+					io.ErrNoProgress,
+				)
+			}
+			continue
+		}
+		stalls = 0
 		if read > 0 {
 			// Re-check before writing: a cancellation that lands during the
 			// read must not put another chunk on the wire.
@@ -399,15 +425,32 @@ func sanitizeDownloadName(raw string) string {
 		raw = raw[index+1:]
 	}
 	cleaned := strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || r == '/' || r == '\\' {
+		switch {
+		// Cc, plus the Cf class IsControl does not cover -- U+202E
+		// RIGHT-TO-LEFT OVERRIDE is the classic extension spoof.
+		case unicode.IsControl(r), unicode.Is(unicode.Cf, r):
+			return -1
+		// Content-Disposition carries the name inside filename="...", so the
+		// characters that terminate or extend that parameter cannot survive.
+		case strings.ContainsRune(`"';`, r):
+			return -1
+		// Stripped, not treated as a separator: on Windows a colon introduces
+		// a drive ("C:evil.exe") and an NTFS alternate data stream
+		// ("report.pdf:payload"). Splitting on it would keep the stream name
+		// and discard the real one, so remove it and keep the whole name.
+		case r == ':':
 			return -1
 		}
 		return r
 	}, raw)
+	if runes := []rune(cleaned); len(runes) > maxDownloadNameRunes {
+		cleaned = string(runes[:maxDownloadNameRunes])
+	}
 	// Windows drops trailing dots and spaces from a filename anyway; trimming
 	// them here also reduces "." and ".." to nothing while leaving a leading
-	// dot, and therefore a legitimate dotfile, intact.
-	return strings.TrimRight(cleaned, ". ")
+	// dot, and therefore a legitimate dotfile, intact. Trim the non-breaking
+	// space too: it survives the ASCII trim and reads as trailing whitespace.
+	return strings.TrimRight(cleaned, ".  ")
 }
 
 func sourceChangedError() error {

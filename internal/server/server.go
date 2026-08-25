@@ -22,8 +22,11 @@ import (
 // Stop-before-Write. Close is idempotent: it releases the descriptor exactly
 // once and reports a cleanup cause only on its first call.
 type PreparedPayload interface {
-	// DownloadName is the sanitizable basename offered to the receiver. It is
-	// never an absolute or relative source path.
+	// DownloadName is the already-sanitized basename offered to the receiver:
+	// never an absolute or relative source path, and free of separators,
+	// control and format characters, and the delimiters that would terminate
+	// or extend Content-Disposition's filename parameter. The payload owns
+	// this sanitization; callers place the value in the header as given.
 	DownloadName() string
 	// Size reports the wire length. known is false only when the payload's
 	// length cannot be established before streaming, as for a directory

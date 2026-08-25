@@ -592,10 +592,32 @@ func TestDownloadNameIsReducedToASafeBasename(t *testing.T) {
 		name string
 		want string
 	}{
-		"windows-traversal":  {name: `..\..\Windows\System32\evil.exe`, want: "evil.exe"},
-		"posix-traversal":    {name: "../../etc/passwd", want: "passwd"},
-		"header-injection":   {name: "report.pdf\r\nX-Injected: 1", want: "report.pdfX-Injected: 1"},
-		"embedded-null":      {name: "report\x00.pdf", want: "report.pdf"},
+		"windows-traversal": {name: `..\..\Windows\System32\evil.exe`, want: "evil.exe"},
+		"posix-traversal":   {name: "../../etc/passwd", want: "passwd"},
+		"header-injection":  {name: "report.pdf\r\nX-Injected: 1", want: "report.pdfX-Injected 1"},
+		"embedded-null":     {name: "report\x00.pdf", want: "report.pdf"},
+		// filename="..." ends at the first quote, so a surviving quote or
+		// semicolon lets a staged name close the parameter and add its own.
+		"closes-the-quoted-parameter": {
+			name: `x"; filename*=UTF-8''evil.exe`,
+			want: "x filename*=UTF-8evil.exe",
+		},
+		"bare-semicolon": {name: "a;filename=b.exe", want: "afilename=b.exe"},
+		"bare-quote":     {name: `re"port.pdf`, want: "report.pdf"},
+		// U+202E RIGHT-TO-LEFT OVERRIDE reverses the rendered tail so an
+		// executable reads as an image. unicode.IsControl does not catch it.
+		"rtl-override-spoof": {name: "evil‮gnp.exe", want: "evilgnp.exe"},
+		"zero-width-space":   {name: "evil​.exe", want: "evil.exe"},
+		"drive-relative":     {name: `C:evil.exe`, want: "Cevil.exe"},
+		"alternate-data-stream": {
+			name: "report.pdf:payload",
+			want: "report.pdfpayload",
+		},
+		"trailing-nbsp": {name: "report.pdf ", want: "report.pdf"},
+		"over-long": {
+			name: strings.Repeat("n", maxDownloadNameRunes+50),
+			want: strings.Repeat("n", maxDownloadNameRunes),
+		},
 		"dot-dot-only":       {name: "..", want: filepath.Base(sourcePath)},
 		"dot-only":           {name: ".", want: filepath.Base(sourcePath)},
 		"empty":              {name: "", want: filepath.Base(sourcePath)},
@@ -770,6 +792,54 @@ func TestWriteToStopsAtTheAdvertisedLengthWhenTheSourceGrew(t *testing.T) {
 	}
 }
 
+// The seam counterpart to the filesystem test above. It always runs, and its
+// buffer size deliberately does NOT divide the advertised length: when every
+// fixture picks a buffer that divides evenly, the loop's own remaining>0
+// condition stops at the right byte and the per-read cap is never the branch
+// that does the work -- so deleting the cap leaves the suite green.
+func TestWriteToCapsEachReadAtTheOutstandingRemainder(t *testing.T) {
+	t.Parallel()
+
+	const advertised = 16
+	staged := fabricatedItem(t, "grown.bin", advertised)
+	// 40 bytes behind a descriptor that advertised 16, read through a 5-byte
+	// buffer: 16 is not a multiple of 5, so the final read must be shortened.
+	opened := &fakeFile{
+		data: append(bytes.Repeat([]byte("S"), advertised), bytes.Repeat([]byte("A"), 24)...),
+		info: fakeFileInfo{name: staged.Name, size: advertised, modTime: staged.ModTime},
+	}
+	adapter := syntheticAdapter(staged, func(string) (payloadFile, error) { return opened, nil })
+	adapter.bufferSize = 5
+
+	prepared, err := adapter.Prepare(context.Background(), staged)
+	if err != nil {
+		t.Fatalf("Prepare() error = %v (code %q)", err, transfer.ErrorCodeOf(err))
+	}
+	t.Cleanup(func() { _ = prepared.Close() })
+
+	var destination bytes.Buffer
+	if err := prepared.WriteTo(context.Background(), &destination); err != nil {
+		t.Fatalf("WriteTo() error = %v", err)
+	}
+	if destination.Len() != advertised {
+		t.Fatalf("streamed %d bytes under an advertised length of %d", destination.Len(), advertised)
+	}
+	if bytes.ContainsRune(destination.Bytes(), 'A') {
+		t.Fatal("streamed bytes past the advertised length")
+	}
+	// The cap must shorten the read itself, not merely trim what was written:
+	// an over-long final read would have pulled bytes off the descriptor that
+	// the receiver never accounted for.
+	for index, buffered := range opened.readBuffers() {
+		if buffered.length > 5 {
+			t.Fatalf("read %d used a %d-byte buffer, want at most 5", index, buffered.length)
+		}
+	}
+	if total := opened.bytesRead(); total != advertised {
+		t.Fatalf("read %d bytes off the descriptor, want exactly the advertised %d", total, advertised)
+	}
+}
+
 // The mirror case: a short body must never be reported as success, because the
 // connection-abort defense Story 1.4 owns keys on a non-nil error.
 func TestWriteToFailsWhenTheSourceDeliversFewerBytesThanAdvertised(t *testing.T) {
@@ -888,6 +958,45 @@ func TestWriteToStopsPromptlyOnCancellation(t *testing.T) {
 	}
 	if destination.bytes != 512 {
 		t.Fatalf("destination received %d bytes, want one 512-byte chunk", destination.bytes)
+	}
+}
+
+// The test above cancels from inside the destination's Write, so cancellation
+// only becomes visible after a chunk is already on the wire and the loop-top
+// check is what returns. This one cancels while the READ is in flight, which is
+// the only way to exercise the re-check taken between reading and writing --
+// without it a full buffer reaches the receiver after the user cancelled.
+func TestWriteToDoesNotWriteAChunkReadAsCancellationLanded(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	staged := fabricatedItem(t, "cancelled-mid-read.bin", 64)
+	opened := &fakeFile{
+		data: bytes.Repeat([]byte("c"), 64),
+		info: fakeFileInfo{name: staged.Name, size: 64, modTime: staged.ModTime},
+		// Cancel as the read completes, so the bytes exist but must not ship.
+		onRead: cancel,
+	}
+	adapter := syntheticAdapter(staged, func(string) (payloadFile, error) { return opened, nil })
+	adapter.bufferSize = 8
+
+	prepared, err := adapter.Prepare(context.Background(), staged)
+	if err != nil {
+		t.Fatalf("Prepare() error = %v (code %q)", err, transfer.ErrorCodeOf(err))
+	}
+	t.Cleanup(func() { _ = prepared.Close() })
+
+	destination := &countingWriter{}
+	err = prepared.WriteTo(ctx, destination)
+
+	assertCode(t, err, transfer.ErrCancelled)
+	if destination.writes != 0 {
+		t.Fatalf("destination received %d writes, want 0 -- a chunk read as cancellation landed was still written", destination.writes)
+	}
+	if destination.bytes != 0 {
+		t.Fatalf("destination received %d bytes after cancellation, want 0", destination.bytes)
 	}
 }
 
@@ -1331,8 +1440,9 @@ type fakeFile struct {
 	statErr   error
 	readErr   error
 	closeErr  error
-	failAt    int  // byte offset at which readErr is returned
-	withBytes bool // deliver the pending chunk alongside readErr
+	failAt    int    // byte offset at which readErr is returned
+	withBytes bool   // deliver the pending chunk alongside readErr
+	onRead    func() // fires as a read completes, before its bytes are returned
 
 	mu      sync.Mutex
 	offset  int
@@ -1359,6 +1469,9 @@ func (f *fakeFile) Read(p []byte) (int, error) {
 	}
 	read := copy(p, f.data[f.offset:])
 	f.offset += read
+	if f.onRead != nil {
+		f.onRead()
+	}
 	return read, nil
 }
 
@@ -1386,6 +1499,15 @@ func (f *fakeFile) readBuffers() []readBuffer {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]readBuffer(nil), f.buffers...)
+}
+
+// bytesRead reports how much was pulled off the descriptor, which is not the
+// same as how much reached the destination: an over-long read consumes bytes
+// the receiver never accounts for even if they are trimmed before writing.
+func (f *fakeFile) bytesRead() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.offset
 }
 
 type fakeFileInfo struct {
@@ -1480,9 +1602,23 @@ func assertHeaderSafeName(t *testing.T, name string) {
 	if name == "." || name == ".." {
 		t.Fatalf("download name %q is a traversal element", name)
 	}
+	// The name lands inside Content-Disposition's filename="..." parameter, so
+	// assert the delimiter set that parameter is actually parsed with -- not
+	// merely the control characters.
+	if strings.ContainsAny(name, `"';:`) {
+		t.Fatalf("download name %q can terminate or extend a header parameter", name)
+	}
+	if runes := []rune(name); len(runes) > maxDownloadNameRunes {
+		t.Fatalf("download name is %d runes, want at most %d", len(runes), maxDownloadNameRunes)
+	}
 	for _, r := range name {
 		if unicode.IsControl(r) {
 			t.Fatalf("download name %q still carries control character %U", name, r)
+		}
+		// Cf renders as nothing while reordering or hiding what follows, which
+		// is what makes U+202E a filename spoof rather than a display quirk.
+		if unicode.Is(unicode.Cf, r) {
+			t.Fatalf("download name %q still carries format character %U", name, r)
 		}
 	}
 }

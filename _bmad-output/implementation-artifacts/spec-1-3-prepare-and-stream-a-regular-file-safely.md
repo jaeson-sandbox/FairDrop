@@ -108,5 +108,5 @@ Buffer size is a benchmark choice per the epic's Phase 3 note; record the size a
 - `gofmt -l .` and `git diff --check` — no formatting or whitespace defects.
 - `rg -n 'Streamer|StreamFile|StreamZip' -g '*.go'` — no output. No Go reference to the deleted type may survive anywhere, not just under `internal/`.
 - `rg -n 'Streamer|StreamFile|StreamZip' -g '*.md' -g '!_bmad-output/**'` — every remaining hit must be a supersession note that tells the reader the type is gone. Documentation drift is invisible to a Go-only grep, but a doc legitimately names a deleted type in order to retire it, so this check is read, not counted.
-- `rg -n 'io.ReadAll|os.ReadFile|mmap' internal/stream` — no output.
+- `rg -n 'io.ReadAll|os.ReadFile|mmap' -g '*.go'` — no output. The Never rule bans these for the story's code, not for one package; scoping the check to `internal/stream` is the same narrowing that hid the documentation drift in loop 1.
 - `rg -n 'type (PayloadPort|PreparedPayload) interface' internal --glob '!**/*_test.go'` — exactly one declaration each.

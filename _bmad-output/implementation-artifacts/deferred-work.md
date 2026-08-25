@@ -3,6 +3,11 @@
 Real findings surfaced during review that are not the current story's problem.
 Append-only. Each entry names the spec that surfaced it.
 
+> **Note (Story 1.3):** entries below that name `Streamer`, `StreamFile`, or `StreamZip`
+> describe a contract that no longer exists. It was replaced by the server-owned
+> `PayloadPort`/`PreparedPayload`. The findings still stand; read them against the new
+> contract in `docs/fairdrop-contracts.md`.
+
 - source_spec: `spec-phase-1-wails-scaffold.md`
   summary: Backend contracts assume a single staged path while the frontend accepts multi-file drops.
   evidence: `TransferServer.Start(filePath string, ...)` and `Streamer.StreamFile`/`StreamZip` each take one path, but the I/O matrix requires a three-file drop to be accepted and `App.tsx` stores `string[]`. Phase 5 (`StageTransfer`) must decide: zip a multi-selection, stage only the first, or reject.
@@ -46,3 +51,23 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
   summary: A post-header stream failure must break the receiver's connection, and only the HTTP handler can do that.
   evidence: `PreparedPayload.WriteTo` reports a mid-stream read, cancellation, or destination failure as a coded `transfer_failed`/`cancelled` error, but `Content-Length` is already on the wire by then, so a plain handler return leaves the receiver holding a truncated file that looks complete. The payload port owns no connection, so Story 1.4 must turn a non-nil `WriteTo` error into a killed connection (`panic(http.ErrAbortHandler)` or equivalent). This supersedes the Phase 1 entry that assigned the same finding to Phase 3.
+
+- source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
+  summary: `transfer_failed`'s fixed public copy misdescribes a deadline that expires during Prepare, before any byte is sent.
+  evidence: Story 1.3 deliberately separates a deadline from a user cancel, but both Prepare-time and stream-time deadlines map to `transfer_failed`, whose registry string is "The transfer stopped before FairDrop finished sending." Prepare runs before headers, so nothing was being sent. The copy registry is fixed by the UX contract, so changing this is a UX decision (EXPERIENCE.md), not an adapter one.
+
+- source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
+  summary: The claim-time re-`Lstat` does not re-apply Story 1.1's reparse-point check, so a junction created inside the validate-to-open window surfaces as `source_changed` rather than `path_unsupported`.
+  evidence: `Payloads.lstatPath` is a bare `os.Lstat`. A reparse point created between `Inspect` and that `Lstat` is caught only incidentally, by `os.SameFile` failing. The transfer is still refused and no wrong bytes stream, so this is a code-accuracy issue rather than a safety hole, but the frozen matrix's link-like row promises `path_unsupported`.
+
+- source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
+  summary: `WriteTo`'s once-only CAS is never exercised concurrently, so the race suite never visits the one place two callers can collide.
+  evidence: `TestCloseIsSafeWhenCalledConcurrently` fires eight goroutines at `Close`, but `streamed.CompareAndSwap` is only driven sequentially by `TestWriteToRefusesASecondCall`. The contract says the server never calls `WriteTo` twice, so this is defense-in-depth coverage rather than a live defect.
+
+- source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
+  summary: `Prepare` returns a `SourcePort` error verbatim, so the "every Prepare failure is coded" postcondition rests on the adapter rather than being enforced at the boundary.
+  evidence: `internal/source` complies today, but `SourcePort` is an interface and nothing checks. An uncoded error would only be flattened to `transfer_failed` at the UI boundary, losing the specific code. Enforcing it means wrapping unrecognized errors at the port call, which touches the error-code mapping the spec puts behind Ask First.
+
+- source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
+  summary: `internal/stream/archiver.go` no longer archives anything, and no linter backs the `//nolint:staticcheck` directives in its tests.
+  evidence: `StreamZip` and the zip logic are gone; the file now holds the single-file payload adapter, and Epic 2 will reintroduce directories behind the same port. Renaming to `payload.go` is a Code Map decision for whoever opens Epic 2. Separately, Verification runs build, vet, test, race, gofmt and greps but no staticcheck, so those directives are unenforced decoration.

@@ -39,7 +39,11 @@ func TestWriteToAllocationsDoNotGrowWithPayloadSize(t *testing.T) {
 		t.Fatalf("streaming %d bytes allocated %d, want at most %d", largePayload, largeAllocated, bound)
 	}
 
-	growth := uint64(4 * defaultBufferSize)
+	// This tolerance must stay well BELOW the bound above, or the assertion is
+	// arithmetically dead: if both arms are already capped at `bound`, a
+	// tolerance of `bound` or more can never be exceeded. A correct
+	// implementation reuses one buffer, so the real difference is near zero.
+	growth := uint64(defaultBufferSize / 2)
 	if largeAllocated > smallAllocated+growth {
 		t.Fatalf(
 			"streaming %d bytes allocated %d against %d for %d bytes: payload memory grew with the file",
