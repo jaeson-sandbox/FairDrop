@@ -2,8 +2,9 @@
 title: 'Story 1.4 — Serve a One-Shot Capability Download'
 type: 'feature'
 created: '2026-08-24'
-status: 'ready-for-dev'
+status: 'in-progress'
 review_loop_iteration: 0
+baseline_commit: '5f7017134a9403fb431d11fa33c1b9c85f8008d0'
 context:
   - '{project-root}/docs/fairdrop-contracts.md'
   - '{project-root}/_bmad-output/implementation-artifacts/epic-1-context.md'
@@ -88,6 +89,8 @@ context:
 ## Design Notes
 
 The routing rule is measured, not stylistic. On go1.26.7 the forbidden method-qualified pattern `GET /download/{token}` answers POST with **405 and `Allow: GET, HEAD`**, and routes **HEAD into the GET handler** — both of which tell an unauthorized caller the resource exists. The methodless pattern hands every method to the handler, so the handler's own `Method == http.MethodGet` check is what makes HEAD and everything else indistinguishable from a nonexistent path. Verified with `httptest`: `/download/a/b` is already 404 from `ServeMux`, because a `{token}` wildcard does not match across a `/`.
+
+A second measured finding: `ServeMux` answers a non-canonical path with **307 and a `Location` header echoing the full capability token** -- confirmed for `/download/../download/{token}`, `//download/{token}`, `/download//{token}`, and `/./download/{token}`. A pattern guard does not catch it, because `mux.Handler(request)` reports the *cleaned* path's pattern (`/download/{token}`) for every one of those. Only an explicit canonicality check refuses them, and refusing is required rather than rewriting: the redirect is unauthenticated, so the token would reach logs and proxies before any claim is made.
 
 Reservation must be atomic and must precede authorization, because two receivers can race the same URL. A compare-and-swap on reservation state is the linearization point; the loser sees 423 and never reaches `AuthorizeClaim`.
 

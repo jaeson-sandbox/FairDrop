@@ -35,3 +35,67 @@ type NetworkPort interface {
 	StartBeacon(ctx context.Context, request BeaconRequest) error
 	StopBeacon() error
 }
+
+// ServerStartRequest is the immutable description of the one transfer an
+// ephemeral server exists to serve. Token authorizes exactly one download;
+// SessionID only correlates events and is never put on the wire.
+type ServerStartRequest struct {
+	SessionID SessionID
+	Token     CapabilityToken
+	Item      StagedItem
+}
+
+// ClaimAuthorizer is the coordinator handshake a reserved claim must clear
+// before the server opens a payload or writes a response header.
+type ClaimAuthorizer interface {
+	// AuthorizeClaim runs synchronously on the serving goroutine and returns
+	// only after the coordinator has committed the transfer or refused it.
+	// A refusal is authoritative and final: the coordinator already owns that
+	// outcome, so the server reports no event for it.
+	AuthorizeClaim(ctx context.Context, sessionID SessionID) error
+}
+
+// ServerEventKind names the three things an ephemeral server reports.
+type ServerEventKind string
+
+const (
+	ServerProgress ServerEventKind = "progress"
+	ServerComplete ServerEventKind = "complete"
+	ServerFailed   ServerEventKind = "failed"
+)
+
+// ServerEvent is one observation from the serving lane.
+//
+// Progress carries the authoritative terminal snapshot on ServerComplete. On
+// ServerFailed it is present only when bytes reached the receiver, and nil
+// otherwise, so a failure before any byte cannot be mistaken for one that
+// stalled at zero. Err is set only on ServerFailed and preserves the coded
+// cause unchanged for the coordinator to classify.
+type ServerEvent struct {
+	SessionID SessionID
+	Kind      ServerEventKind
+	Progress  *ProgressSnapshot
+	Err       error
+}
+
+// ServerHandle is what a started server hands back: the port the receiver must
+// reach and the lane its events arrive on. Events is closed exactly once, when
+// the server is torn down, and never produces another event afterwards.
+type ServerHandle struct {
+	Port   int
+	Events <-chan ServerEvent
+}
+
+// ServerPort is the ephemeral one-shot HTTP server the coordinator owns.
+//
+// A successful Start means the listener is bound and its accept loop is ready
+// before return; a failed Start leaves no listener, goroutine, or channel
+// behind. Stop is idempotent and force-closing: on every return, including one
+// that reports a cleanup diagnostic, the listener, connections, handlers,
+// payload workers, and event producers have ended and the event channel is
+// closed for good. A cleanup diagnostic is a report, never a transfer of
+// ownership back to the caller.
+type ServerPort interface {
+	Start(ctx context.Context, request ServerStartRequest, authorizer ClaimAuthorizer) (ServerHandle, error)
+	Stop() error
+}
