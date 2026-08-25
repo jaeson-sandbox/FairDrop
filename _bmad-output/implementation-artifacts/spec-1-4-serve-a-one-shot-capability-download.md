@@ -2,7 +2,7 @@
 title: 'Story 1.4 — Serve a One-Shot Capability Download'
 type: 'feature'
 created: '2026-08-24'
-status: 'in-progress'
+status: 'in-review'
 review_loop_iteration: 0
 baseline_commit: '5f7017134a9403fb431d11fa33c1b9c85f8008d0'
 context:
@@ -70,12 +70,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/transfer/{ports,types}.go` — add the server contract and `ProgressSnapshot` verbatim from the contract.
-- [ ] `internal/server/server.go` — delete the Phase 1 interfaces; implement `Start`/`Stop` with transactional startup and force-closing, idempotent teardown.
-- [ ] `internal/server/*.go` — the router, the constant-time token check, atomic reservation, the synchronous authorization handshake, and response headers.
-- [ ] `internal/server/*.go` — the progress meter and the non-blocking event lane with reserved terminal capacity.
-- [ ] `internal/server/*_test.go` — cover every matrix row with `httptest` and injected seams; drive claim races concurrently, not sequentially.
-- [ ] `internal/server/*_test.go` — prove payload `Close` happens exactly once, after `WriteTo` returns, and never concurrently with it.
+- [x] `internal/transfer/{ports,types}.go` — add the server contract and `ProgressSnapshot` verbatim from the contract.
+- [x] `internal/server/server.go` — delete the Phase 1 interfaces; implement `Start`/`Stop` with transactional startup and force-closing, idempotent teardown.
+- [x] `internal/server/*.go` — the router, the constant-time token check, atomic reservation, the synchronous authorization handshake, and response headers.
+- [x] `internal/server/*.go` — the progress meter and the non-blocking event lane with reserved terminal capacity.
+- [x] `internal/server/*_test.go` — cover every matrix row with `httptest` and injected seams; drive claim races concurrently, not sequentially.
+- [x] `internal/server/*_test.go` — prove payload `Close` happens exactly once, after `WriteTo` returns, and never concurrently with it.
 
 **Acceptance Criteria:**
 - Given a competing pair of exact-token GETs issued concurrently, when both are served, then `AuthorizeClaim` ran exactly once and the loser received 423 — proven under `-race`, not by sequential calls.

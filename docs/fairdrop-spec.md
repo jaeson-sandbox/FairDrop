@@ -12,8 +12,8 @@ Phase 1 implementation proved four instructions in this document wrong, and Epic
    - `Streamer.StreamFile(ctx context.Context, w http.ResponseWriter, filePath string) error`
    - `Streamer.StreamZip(ctx context.Context, w http.ResponseWriter, dirPath string) error`
 
-   `NetworkManager` is unchanged. *Affects §9, and Phases 3-4 which implement these.* **Superseded for `Streamer` by correction 5.**
-5. **`Streamer` no longer exists; the payload contract is `PayloadPort`/`PreparedPayload`** (Story 1.3). A provider-owned interface taking a path string could not re-check the source at claim time or derive a wire length from a real descriptor, so `internal/server` now owns the contract and `internal/stream` implements it. `StreamZip` is gone with it -- Epic 2 reintroduces directories through the same port. `NetworkManager` was likewise replaced by the consumer-owned `NetworkPort` in Story 1.2. The binding shapes live in `docs/fairdrop-contracts.md`, which supersedes §9 wherever the two disagree. *Affects §9, §10 Phases 3-4.*
+   `NetworkManager` is unchanged. *Affects §9, and Phases 3-4 which implement these.* **Wholly superseded by correction 5: all three of these types have since been deleted, so the ctx-signature fix above is now historical only.**
+5. **Neither `Streamer` nor `TransferServer` exists; the payload contract is `PayloadPort`/`PreparedPayload` and the server contract is `transfer.ServerPort`** (Stories 1.3 and 1.4). A provider-owned interface taking a path string could not re-check the source at claim time or derive a wire length from a real descriptor, so `internal/server` now owns the contract and `internal/stream` implements it. `StreamZip` is gone with it -- Epic 2 reintroduces directories through the same port. `TransferServer`/`TransferStats` went the same way in Story 1.4: a path-string-plus-callback interface could not express a capability token, a claim handshake, an event channel, or teardown guarantees, so `transfer.ServerPort` replaced it and `ProgressSnapshot` replaced `TransferStats`. `NetworkManager` was likewise replaced by the consumer-owned `NetworkPort` in Story 1.2. The binding shapes live in `docs/fairdrop-contracts.md`, which supersedes §9 wherever the two disagree. *Affects §9, §10 Phases 3-4.*
 
 ## 1. Product Overview & Philosophy
 DeadDrop is an ephemeral, cross-platform local P2P file transfer desktop application.
@@ -141,7 +141,7 @@ To prevent the agent from writing monolithic code in `app.go`, enforce these int
 
 > **Corrected:** the beacon service is `_fairdrop._tcp`, not `_deaddrop._tcp`. And `TransferServer.Start`, `Streamer.StreamFile`, and `Streamer.StreamZip` each take a leading `ctx context.Context` that the signatures below omit -- without it the cancellation §7 requires cannot be plumbed through. See "Phase 1 Corrections" at the top.
 >
-> **Superseded:** `Streamer` was deleted in Story 1.3 and `NetworkManager` in Story 1.2, so only `TransferServer.Start` from the note above is still a live signature awaiting Story 1.4. See correction 5.
+> **Superseded:** every signature in the note above is gone -- `NetworkManager` in Story 1.2, `Streamer` in Story 1.3, `TransferServer` in Story 1.4. See correction 5.
 
 ```go
 // internal/network/network.go
@@ -167,11 +167,10 @@ type PayloadPort interface {
     Prepare(ctx context.Context, item transfer.StagedItem) (PreparedPayload, error)
 }
 
-// internal/server/server.go
-type TransferServer interface {
-    // Start boots the HTTP server on port 0 and returns the assigned port
-    Start(filePath string, onProgress func(stats TransferStats)) (int, error)
-    // Stop force-closes active connections and stops listening
+// SUPERSEDED by correction 5 -- TransferServer was replaced in Story 1.4.
+// internal/transfer owns the contract; internal/server implements it.
+type ServerPort interface {
+    Start(ctx context.Context, request ServerStartRequest, authorizer ClaimAuthorizer) (ServerHandle, error)
     Stop() error
 }
 ```

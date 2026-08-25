@@ -20,13 +20,15 @@ live in `_bmad-output/implementation-artifacts/`.
   instructions in the original text are wrong and the corrections supersede them.
 - `_bmad-output/implementation-artifacts/` — one spec per phase (intent, boundaries, Code
   Map) plus `deferred-work.md`, review findings that belong to phases not yet built.
-- `internal/{transfer,source,network,stream}` — implemented (Stories 1.1-1.3): domain
-  contracts, the file-only source adapter, LAN selection plus the mDNS beacon, and the
-  file payload adapter.
-- `internal/server` — owns the `PayloadPort`/`PreparedPayload` contracts (Story 1.3); its
-  `TransferServer`/`TransferStats` are still Phase 1 placeholders that Story 1.4 replaces.
-  Each placeholder is *replaced* by its consumer-owned port as its story lands; never
-  leave a duplicate shadow type.
+- `internal/{transfer,source,network,stream,server}` — implemented (Stories 1.1-1.4):
+  domain contracts, the file-only source adapter, LAN selection plus the mDNS beacon, the
+  file payload adapter, and the one-shot capability HTTP server.
+- Every Phase 1 provider-owned interface is now gone: `NetworkManager` (1.2), `Streamer`
+  (1.3), `TransferServer`/`TransferStats` (1.4). A placeholder is *replaced* by its
+  consumer-owned port as its story lands; never leave a duplicate shadow type.
+- When a story deletes a contract, grep the whole repo — `docs/` included — not just
+  `internal/`. `docs/fairdrop-spec.md` kept publishing deleted interfaces twice because
+  the check was package-scoped.
 
 ## Running and verifying
 
