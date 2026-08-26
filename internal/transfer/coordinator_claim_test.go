@@ -45,6 +45,12 @@ func TestAuthorizeClaimCommitsAndPublishesStarted(t *testing.T) {
 	if got := h.calls.snapshot()[before:]; !slices.Equal(got, want0) {
 		t.Errorf("the claim handshake ran %v, want %v", got, want0)
 	}
+
+	live := h.liveSession()
+	if !live.startedAt.Equal(h.clock.current) || !live.startedAt.After(live.stagedAt) {
+		t.Errorf("the transfer is stamped %v, want the injected clock's %v after the staging stamp %v",
+			live.startedAt, h.clock.current, live.stagedAt)
+	}
 }
 
 func TestAuthorizeClaimPublishesStartedBeforeACancellationCanFollow(t *testing.T) {
