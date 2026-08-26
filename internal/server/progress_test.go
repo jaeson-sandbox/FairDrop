@@ -155,6 +155,17 @@ func TestMeterCoalescesToFourPerSecond(t *testing.T) {
 		}
 	}
 	final := meter.snapshot()
+	// The only assertion in the package on a speed the meter itself produced:
+	// speedOf is unit-tested in isolation, so a snapshot that stopped
+	// populating the field, or populated it from the wrong interval, would go
+	// unnoticed everywhere else.
+	if final.SpeedBytesPerSec <= 0 {
+		t.Fatalf("SpeedBytesPerSec = %v, want a positive rate after %d bytes over a known interval",
+			final.SpeedBytesPerSec, final.BytesSent)
+	}
+	if math.IsInf(final.SpeedBytesPerSec, 0) || math.IsNaN(final.SpeedBytesPerSec) {
+		t.Fatalf("SpeedBytesPerSec = %v, want a finite rate", final.SpeedBytesPerSec)
+	}
 	if final.BytesSent != 900 || final.Percent != 90 {
 		t.Fatalf("final snapshot = %+v, want 900 bytes at 90%%", final)
 	}

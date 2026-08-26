@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -356,8 +357,13 @@ func TestServerConfigurationIsPinned(t *testing.T) {
 	if config.MaxHeaderBytes != maxHeaderBytes || config.MaxHeaderBytes >= http.DefaultMaxHeaderBytes {
 		t.Fatalf("MaxHeaderBytes = %d, want %d", config.MaxHeaderBytes, maxHeaderBytes)
 	}
+	// Presence is not the property: a logger pointed anywhere else still prints
+	// the diagnostics this asserts are silenced.
 	if config.ErrorLog == nil {
 		t.Fatal("ErrorLog is nil, so net/http would print request diagnostics carrying the token")
+	}
+	if config.ErrorLog.Writer() != io.Discard {
+		t.Fatal("ErrorLog does not write to io.Discard, so net/http request diagnostics reach an output again")
 	}
 
 	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
@@ -414,6 +420,129 @@ func TestOversizedRequestHeadersAreRefused(t *testing.T) {
 
 // TestServerImplementsThePort is the compile-time half of the contract; the
 // runtime half is every test above.
+// TestStartRequestsEveryInterface pins the one production value the rest of
+// this package cannot observe. Every other test replaces the listen seam with a
+// loopback binder that discards its argument -- necessary, or the fixture would
+// face the LAN and trip a firewall prompt -- so nothing else notices what
+// address Start actually asks for. Binding loopback in production would leave
+// the QR code and URL advertising a LAN address whose port is not listening,
+// with the suite fully green.
+func TestStartRequestsEveryInterface(t *testing.T) {
+	t.Parallel()
+
+	server := New(payloadsReturning(&stubPayload{name: "report.pdf", known: true}))
+	var requested []string
+	var mu sync.Mutex
+	server.listen = func(ctx context.Context, address string) (net.Listener, error) {
+		mu.Lock()
+		requested = append(requested, address)
+		mu.Unlock()
+		var config net.ListenConfig
+		return config.Listen(ctx, "tcp", "127.0.0.1:0")
+	}
+	server.now = newTestClock(0).now
+
+	handle, err := server.Start(context.Background(), startRequest(), &stubAuthorizer{})
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	t.Cleanup(func() { _ = server.Stop() })
+	_ = handle
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(requested) != 1 {
+		t.Fatalf("listen called %d times, want exactly 1", len(requested))
+	}
+	if requested[0] != listenAddress {
+		t.Fatalf("Start bound %q, want %q -- a loopback bind is unreachable from the receiver",
+			requested[0], listenAddress)
+	}
+}
+
+// TestEnterRefusesOnceTeardownHasBegun pins the gate directly, because the
+// integration test below cannot reach it reliably: the window between
+// beginStop and the listener closing is narrow enough that concurrent requests
+// almost always fail at connect instead. Driven at this level the gate is
+// deterministic, and it is what keeps handlers.Add from racing handlers.Wait --
+// which is either a WaitGroup misuse panic or a handler admitted after Stop
+// returned, still holding a payload descriptor.
+func TestEnterRefusesOnceTeardownHasBegun(t *testing.T) {
+	t.Parallel()
+
+	server := newTestServer(t, payloadsReturning(&stubPayload{name: "report.pdf", known: true}))
+	startTestServer(t, server, &stubAuthorizer{})
+	active := server.active
+
+	if !active.enter() {
+		t.Fatal("enter() refused before teardown began")
+	}
+	active.leave()
+
+	active.beginStop()
+
+	if active.enter() {
+		active.leave()
+		t.Fatal("enter() admitted a request after teardown began, so a handler can join the WaitGroup Stop is already waiting on")
+	}
+	// Still refused on a second attempt: the gate is a state, not a one-shot.
+	if active.enter() {
+		active.leave()
+		t.Fatal("enter() admitted a later request after teardown began")
+	}
+
+	if err := server.Stop(); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+	assertQuiescent(t, active)
+}
+
+// TestRequestArrivingDuringStopIsRefused drives the one contended path behind
+// the quiescence postcondition. The gate in enter() is what stops a request
+// from joining the WaitGroup that Stop is already waiting on; without it the
+// race is either a WaitGroup misuse panic or a handler admitted after Stop
+// returned, still holding a payload descriptor.
+func TestRequestArrivingDuringStopIsRefused(t *testing.T) {
+	t.Parallel()
+
+	server := newTestServer(t, payloadsReturning(&stubPayload{name: "report.pdf", known: true}))
+	handle := startTestServer(t, server, &stubAuthorizer{})
+	url := downloadURL(handle.Port, string(testToken))
+	// Stop clears active, so capture the run to inspect afterwards.
+	active := server.active
+
+	var requests sync.WaitGroup
+	for range 8 {
+		requests.Add(1)
+		go func() {
+			defer requests.Done()
+			request, err := http.NewRequest(http.MethodGet, url, nil)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			// Either answer is correct: a refusal, or a connection error once
+			// the listener is gone. Neither may hang or panic.
+			response, err := testClient().Do(request)
+			if err != nil {
+				return
+			}
+			_ = response.Body.Close()
+		}()
+	}
+
+	stopErr := server.Stop()
+	requests.Wait()
+
+	if stopErr != nil {
+		t.Fatalf("Stop() error = %v", stopErr)
+	}
+	assertQuiescent(t, active)
+	if err := server.Stop(); err != nil {
+		t.Fatalf("repeated Stop() error = %v", err)
+	}
+}
+
 func TestServerImplementsThePort(t *testing.T) {
 	t.Parallel()
 

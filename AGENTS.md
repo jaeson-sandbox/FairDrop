@@ -23,12 +23,12 @@ live in `_bmad-output/implementation-artifacts/`.
 - `internal/{transfer,source,network,stream,server}` — implemented (Stories 1.1-1.4):
   domain contracts, the file-only source adapter, LAN selection plus the mDNS beacon, the
   file payload adapter, and the one-shot capability HTTP server.
+- Ports are consumer-owned, so they do not all live in `internal/transfer`:
+  `SourcePort`, `NetworkPort` and `ServerPort` do, but `PayloadPort`/`PreparedPayload`
+  belong to `internal/server`, which consumes them, and `internal/stream` implements them.
 - Every Phase 1 provider-owned interface is now gone: `NetworkManager` (1.2), `Streamer`
   (1.3), `TransferServer`/`TransferStats` (1.4). A placeholder is *replaced* by its
   consumer-owned port as its story lands; never leave a duplicate shadow type.
-- When a story deletes a contract, grep the whole repo — `docs/` included — not just
-  `internal/`. `docs/fairdrop-spec.md` kept publishing deleted interfaces twice because
-  the check was package-scoped.
 
 ## Running and verifying
 
@@ -40,6 +40,11 @@ live in `_bmad-output/implementation-artifacts/`.
   `.../WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_*/mingw64/bin` and set
   `CGO_ENABLED=1`; without both, the race detector fails with "requires cgo" rather than
   reporting a clean run, so an unset PATH silently skips the check instead of failing it.
+
+- When a story deletes a contract, grep the whole repo — `docs/` included — not just
+  `internal/`. `docs/fairdrop-spec.md` kept publishing deleted interfaces twice because
+  the check was package-scoped, and a spec that still advertises a deleted type is what
+  the next agent reads first.
 
 ## Conventions that differ from defaults
 

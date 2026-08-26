@@ -1,7 +1,9 @@
 package server
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"fairdrop/internal/transfer"
 )
@@ -127,4 +129,77 @@ var errStub = transfer.NewError(transfer.ErrTransferFailed, "stub failure")
 
 func snapshotEvent(bytesSent int64) transfer.ServerEvent {
 	return progressEvent(testSession, transfer.ProgressSnapshot{BytesSent: bytesSent})
+}
+
+// TestTerminatedCommitsOnlyOnDelivery pins the flag's ordering. Setting it
+// before the sends would let a lane that failed to deliver any terminal event
+// refuse every later one, losing the outcome permanently rather than leaving it
+// retryable.
+func TestTerminatedCommitsOnlyOnDelivery(t *testing.T) {
+	t.Parallel()
+
+	lane := &eventLane{events: make(chan transfer.ServerEvent)}
+	// A zero-capacity lane with no consumer cannot accept anything, so both
+	// send attempts fail and the outcome was never delivered.
+	if lane.publishTerminal(completeEvent(testSession, transfer.ProgressSnapshot{})) {
+		t.Fatal("publishTerminal reported delivery on a lane that cannot accept")
+	}
+
+	// Because nothing was delivered, a later terminal event must still be
+	// accepted once a consumer exists.
+	delivered := make(chan transfer.ServerEvent, 1)
+	go func() {
+		for event := range lane.events {
+			delivered <- event
+			return
+		}
+	}()
+	if !awaitTrue(func() bool {
+		return lane.publishTerminal(completeEvent(testSession, transfer.ProgressSnapshot{}))
+	}, 2*time.Second) {
+		t.Fatal("the lane refused every later terminal event after one failed to deliver")
+	}
+	select {
+	case <-delivered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the accepted terminal event never arrived")
+	}
+}
+
+// TestLaneCloseRacesPublish drives the race the lane's mutex exists for. A send
+// on a closed channel panics, and Stop must never panic.
+func TestLaneCloseRacesPublish(t *testing.T) {
+	t.Parallel()
+
+	for range 50 {
+		lane := newEventLane()
+		var group sync.WaitGroup
+		group.Add(3)
+		go func() {
+			defer group.Done()
+			lane.publishProgress(progressEvent(testSession, transfer.ProgressSnapshot{}))
+		}()
+		go func() {
+			defer group.Done()
+			lane.publishTerminal(completeEvent(testSession, transfer.ProgressSnapshot{}))
+		}()
+		go func() {
+			defer group.Done()
+			lane.close()
+		}()
+		group.Wait()
+		// Idempotent even after racing publishes.
+		lane.close()
+	}
+}
+
+func awaitTrue(condition func() bool, within time.Duration) bool {
+	deadline := time.Now().Add(within)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return true
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return false
 }

@@ -73,10 +73,13 @@ func (l *eventLane) publishTerminal(event transfer.ServerEvent) bool {
 	if l.closed || l.terminated {
 		return false
 	}
-	l.terminated = true
+	// The flag commits only on a delivery that succeeded. Setting it before the
+	// sends would let a lane that failed to deliver any terminal event refuse
+	// every later one, losing the outcome permanently instead of retrying.
 
 	select {
 	case l.events <- event:
+		l.terminated = true
 		return true
 	default:
 	}
@@ -90,6 +93,7 @@ func (l *eventLane) publishTerminal(event transfer.ServerEvent) bool {
 	}
 	select {
 	case l.events <- event:
+		l.terminated = true
 		return true
 	default:
 		return false

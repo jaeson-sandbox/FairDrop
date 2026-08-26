@@ -3,10 +3,12 @@ package server
 import (
 	"crypto/subtle"
 	"fmt"
+	"io"
 	"net/http"
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"fairdrop/internal/transfer"
 )
@@ -124,10 +126,12 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	// From here the payload has exactly one owner and exactly one Close: this
-	// handler, on this goroutine, after WriteTo has returned. The deferred
-	// call also covers the abort path below, where it runs during the panic's
-	// unwind rather than being skipped.
-	defer func() { _ = payload.Close() }()
+	// handler, on this goroutine, after WriteTo has returned. The guard lets the
+	// success path release the descriptor before publishing Complete while the
+	// deferred call still covers every other exit, including the abort path
+	// below, where it runs during the panic's unwind rather than being skipped.
+	closePayload := sync.OnceFunc(func() { _ = payload.Close() })
+	defer closePayload()
 
 	total, totalKnown := payload.Size()
 	if !totalKnown || total < 0 {
@@ -152,7 +156,24 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 	writeErr := payload.WriteTo(r.ctx, &countingWriter{dst: writer, meter: progress})
 	snapshot := progress.snapshot()
 
+	// PayloadPort is an interface, so a nil return is a claim rather than a
+	// fact. Content-Length is already on the wire; publishing Complete for a
+	// body that never reached it would report a truncated download as a
+	// finished one -- the same hazard the payload guards internally, re-checked
+	// here because this layer is what the coordinator believes.
+	if writeErr == nil && totalKnown && snapshot.BytesSent != total {
+		writeErr = transfer.WrapError(
+			transfer.ErrTransferFailed,
+			"payload delivered a different length than it advertised",
+			io.ErrUnexpectedEOF,
+		)
+	}
+
 	if writeErr == nil {
+		// Release the descriptor before the coordinator hears Complete: it may
+		// begin a new Stage on that signal, and on Windows a still-open handle
+		// on the source blocks renaming or deleting it.
+		closePayload()
 		event := completeEvent(r.sessionID, snapshot)
 		r.finish(&event)
 		return
@@ -254,6 +275,12 @@ func asciiFilename(name string) string {
 			continue
 		case char == '"' || char == '\\' || char == ';' || char == '\'':
 			continue
+		// Separators and colons are dropped for the same reason as the quoting
+		// characters above: this layer exists to hold even when the payload's
+		// own sanitization does not, and a name reaching here as "a/b.pdf" or
+		// ".." would otherwise be offered to the receiver verbatim.
+		case char == '/' || char == ':':
+			continue
 		case char > 0x7f:
 			builder.WriteByte('_')
 		default:
@@ -261,7 +288,9 @@ func asciiFilename(name string) string {
 		}
 	}
 	cleaned := strings.TrimSpace(builder.String())
-	if cleaned == "" {
+	// Dropping separators can leave "." or ".." standing alone, which names a
+	// directory rather than a file on the receiving side.
+	if cleaned == "" || strings.Trim(cleaned, ".") == "" {
 		return fallbackDownloadName
 	}
 	return cleaned

@@ -12,7 +12,7 @@ Phase 1 implementation proved four instructions in this document wrong, and Epic
    - `Streamer.StreamFile(ctx context.Context, w http.ResponseWriter, filePath string) error`
    - `Streamer.StreamZip(ctx context.Context, w http.ResponseWriter, dirPath string) error`
 
-   `NetworkManager` is unchanged. *Affects §9, and Phases 3-4 which implement these.* **Wholly superseded by correction 5: all three of these types have since been deleted, so the ctx-signature fix above is now historical only.**
+   *Affects §9, and Phases 3-4 which implement these.* **Wholly superseded by correction 5.** Both types named above -- `TransferServer` and `Streamer` -- have since been deleted, so this ctx-signature fix is historical only. The sentence that once stood here, "`NetworkManager` is unchanged", was also overtaken: Story 1.2 replaced it with `NetworkPort`.
 5. **Neither `Streamer` nor `TransferServer` exists; the payload contract is `PayloadPort`/`PreparedPayload` and the server contract is `transfer.ServerPort`** (Stories 1.3 and 1.4). A provider-owned interface taking a path string could not re-check the source at claim time or derive a wire length from a real descriptor, so `internal/server` now owns the contract and `internal/stream` implements it. `StreamZip` is gone with it -- Epic 2 reintroduces directories through the same port. `TransferServer`/`TransferStats` went the same way in Story 1.4: a path-string-plus-callback interface could not express a capability token, a claim handshake, an event channel, or teardown guarantees, so `transfer.ServerPort` replaced it and `ProgressSnapshot` replaced `TransferStats`. `NetworkManager` was likewise replaced by the consumer-owned `NetworkPort` in Story 1.2. The binding shapes live in `docs/fairdrop-contracts.md`, which supersedes §9 wherever the two disagree. *Affects §9, §10 Phases 3-4.*
 
 ## 1. Product Overview & Philosophy
@@ -144,14 +144,13 @@ To prevent the agent from writing monolithic code in `app.go`, enforce these int
 > **Superseded:** every signature in the note above is gone -- `NetworkManager` in Story 1.2, `Streamer` in Story 1.3, `TransferServer` in Story 1.4. See correction 5.
 
 ```go
-// internal/network/network.go
-type NetworkManager interface {
-    // GetLocalIP returns the best IPv4 address for local P2P routing
-    GetLocalIP() (string, error)
-    // StartBeacon begins the mDNS broadcast for "_deaddrop._tcp"
-    StartBeacon(port int, metadata map[string]string) error
-    // StopBeacon gracefully shuts down mDNS
-    StopBeacon()
+// SUPERSEDED by correction 5 -- NetworkManager was replaced in Story 1.2, and
+// the service is _fairdrop._tcp (correction 3), never _deaddrop._tcp.
+// internal/transfer owns the contract; internal/network implements it.
+type NetworkPort interface {
+    GetLocalIP(ctx context.Context) (netip.Addr, error)
+    StartBeacon(ctx context.Context, request BeaconRequest) error
+    StopBeacon() error
 }
 
 // SUPERSEDED by correction 5 -- Streamer was replaced in Story 1.3.
@@ -169,6 +168,8 @@ type PayloadPort interface {
 
 // SUPERSEDED by correction 5 -- TransferServer was replaced in Story 1.4.
 // internal/transfer owns the contract; internal/server implements it.
+// ServerStartRequest, ClaimAuthorizer, ServerHandle and ServerEvent are defined
+// in docs/fairdrop-contracts.md, which is binding wherever it disagrees here.
 type ServerPort interface {
     Start(ctx context.Context, request ServerStartRequest, authorizer ClaimAuthorizer) (ServerHandle, error)
     Stop() error

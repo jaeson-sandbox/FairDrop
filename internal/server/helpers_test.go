@@ -37,6 +37,7 @@ type stubPayload struct {
 	writeReturned atomic.Bool
 
 	closes          atomic.Int64
+	onClose         func()
 	closedDuringRun atomic.Bool
 	closedTooEarly  atomic.Bool
 }
@@ -59,6 +60,9 @@ func (p *stubPayload) WriteTo(ctx context.Context, dst io.Writer) error {
 }
 
 func (p *stubPayload) Close() error {
+	if p.onClose != nil {
+		p.onClose()
+	}
 	p.closes.Add(1)
 	if p.writing.Load() {
 		p.closedDuringRun.Store(true)

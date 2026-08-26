@@ -3,6 +3,15 @@
 Real findings surfaced during review that are not the current story's problem.
 Append-only. Each entry names the spec that surfaced it.
 
+> **Discharged (Story 1.4):** three entries below are now closed and are kept only
+> for the trail. `TransferStats.Percent` with a zero total is resolved by
+> `ProgressSnapshot.TotalKnown` plus the clamped `percentOf`. `TransferServer.Stop`
+> idempotency is resolved by `ServerPort.Stop`, which is force-closing, repeatable,
+> and quiescent on every return. The Story 1.3 entry requiring a non-nil `WriteTo`
+> error to break the receiver's connection is resolved by `panic(http.ErrAbortHandler)`
+> in the download handler, and the server additionally re-checks a `nil` return
+> against the advertised length so a short body cannot reach that path as success.
+
 > **Note (Story 1.3):** entries below that name `Streamer`, `StreamFile`, or `StreamZip`
 > describe a contract that no longer exists. It was replaced by the server-owned
 > `PayloadPort`/`PreparedPayload`. The findings still stand; read them against the new
@@ -71,3 +80,28 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
   summary: `internal/stream/archiver.go` no longer archives anything, and no linter backs the `//nolint:staticcheck` directives in its tests.
   evidence: `StreamZip` and the zip logic are gone; the file now holds the single-file payload adapter, and Epic 2 will reintroduce directories behind the same port. Renaming to `payload.go` is a Code Map decision for whoever opens Epic 2. Separately, Verification runs build, vet, test, race, gofmt and greps but no staticcheck, so those directives are unenforced decoration.
+
+- source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
+  summary: `Stop` can block indefinitely while holding the server mutex, which also deadlocks a later `Start`.
+  evidence: `<-r.serveDone`, `r.handlers.Wait()`, and `r.awaitConnections()` have no deadline. A payload parked on the destination is covered, because `http.Server.Close` breaks it, but a `WriteTo` blocked on a slow source read that ignores its context hangs `Stop` forever, and `s.mu` is held throughout. A watchdog changes the force-closing semantics the contract states, so this needs a design decision rather than a patch.
+
+- source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
+  summary: CORS is configured for the 200 only, and the receiver page cannot read the filename it was encoded to carry.
+  evidence: `Access-Control-Allow-Origin: *` is set in `writeDownloadHeaders` but not by `writeStatus`, so a cross-origin receiver sees an opaque failure instead of 404/410/423. There is no `Access-Control-Expose-Headers: Content-Disposition`, so that page cannot read the name, and no `Accept-Ranges: none`, so a download manager may attempt a range retry against a consumed capability. The frozen matrix fixes the exact header set, so adding any of these is an Ask First change.
+
+- source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
+  summary: `AuthorizeClaim` is trusted to return, so a coordinator that blocks in it hangs `Stop` and loses quiescence.
+  evidence: The handler calls it synchronously with `r.ctx` and waits. The contract makes it the coordinator's own synchronous handshake, so bounding it here would duplicate a timeout the coordinator should own -- but nothing on the server side currently survives a coordinator that never returns. Worth settling when Story 1.5 implements the authorizer.
+
+- source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
+  summary: Repeated `Stop` discards the first call's cleanup diagnostic, and `teardownOnce`/`teardownDone` guard a path with one structurally unreachable entrant.
+  evidence: `teardown()` is called only after `Stop` takes `s.mu` and clears `s.active`, so a second entrant cannot occur; the `sync.Once` plus channel join therefore protects nothing, while causing later `Stop` calls to return `nil` rather than replaying the diagnostic the contract says they may report.
+
+- source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
+  summary: `ErrorLog` discards genuine handler panics along with the request diagnostics it is there to silence.
+  evidence: `log.New(io.Discard, "", 0)` blinds every `net/http` report from this server, including a real panic that is not `http.ErrAbortHandler`. A redacting writer that strips the request line would keep the disclosure property without making a production fault in this package invisible.
+
+- source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
+  summary: Restart after `Stop` is possible but unspecified and untested.
+  evidence: `Stop` clears `s.active`, so `Start` -> `Stop` -> `Start` succeeds and builds a fresh run. The type comment says "one listener, one capability token, one authorized download, then nothing", which reads as forbidding it. Whether a server instance is reusable belongs in the contract, since the coordinator will decide whether to construct one per session.
+

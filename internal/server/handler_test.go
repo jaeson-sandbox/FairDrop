@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,6 +48,14 @@ func TestRejectedRequestsNeverReachClaimLogic(t *testing.T) {
 		{"trailing slash", http.MethodGet, valid + "/"},
 		{"extra segment", http.MethodGet, valid + "/extra"},
 		{"doubled separator", http.MethodGet, baseURL(handle.Port) + "/download//" + string(testToken)},
+		{"leading doubled separator", http.MethodGet, baseURL(handle.Port) + "//download/" + string(testToken)},
+		{"single dot prefix", http.MethodGet, baseURL(handle.Port) + "/./download/" + string(testToken)},
+		{"single dot segment", http.MethodGet, baseURL(handle.Port) + "/download/./" + string(testToken)},
+		{"dot-dot rewind", http.MethodGet, baseURL(handle.Port) + "/download/x/../" + string(testToken)},
+		// Percent-encoded traversal is CANONICAL by isCanonicalPath -- the
+		// bytes are already the form ServeMux routes. Only the pattern guard
+		// stops it, so this row is that guard's only direct coverage.
+		{"percent-encoded traversal", http.MethodGet, baseURL(handle.Port) + "/download/%2e%2e/download/" + string(testToken)},
 		{"dot-dot traversal", http.MethodGet, baseURL(handle.Port) + "/download/../download/" + string(testToken)},
 		{"unrelated path", http.MethodGet, baseURL(handle.Port) + "/healthz"},
 		{"oversized token", http.MethodGet, downloadURL(handle.Port, strings.Repeat("a", 4096))},
@@ -243,10 +250,10 @@ func TestCompetingClaimsAuthorizeExactlyOnce(t *testing.T) {
 	// What does is that the loser is answered 423 WHILE the winner is still
 	// parked: that is what shows it met a live listener holding a consumed
 	// capability rather than a finished or torn-down transfer.
-	locked, ok := awaitStatusFor(t, statuses, http.StatusLocked, 30*time.Second)
+	drained, ok := awaitStatusFor(t, statuses, http.StatusLocked, 30*time.Second)
 	if !ok {
 		t.Fatalf("no losing claim was answered %d while the winner was parked mid-stream; saw %v",
-			http.StatusLocked, locked)
+			http.StatusLocked, drained)
 	}
 	if payload.writeReturned.Load() {
 		t.Fatal("the winner finished streaming before the loser was answered")
@@ -255,12 +262,12 @@ func TestCompetingClaimsAuthorizeExactlyOnce(t *testing.T) {
 
 	// Whatever did not arrive above must now arrive, and the two claims must
 	// between them be exactly one 423 and one 200.
-	seen := append([]int{http.StatusLocked}, locked...)
+	seen := append([]int{http.StatusLocked}, drained...)
 	for len(seen) < claims {
 		seen = append(seen, awaitStatus(t, statuses))
 	}
 	group.Wait()
-	sort.Ints(seen)
+	slices.Sort(seen)
 	if want := []int{http.StatusOK, http.StatusLocked}; !slices.Equal(seen, want) {
 		t.Fatalf("claim statuses = %v, want exactly one %d and one %d", seen, http.StatusOK, http.StatusLocked)
 	}
@@ -460,6 +467,99 @@ func TestSuccessfulDownloadServesHeadersBodyAndOneCompleteEvent(t *testing.T) {
 // TestUnknownLengthOmitsContentLength is the directory-shaped payload Epic 2
 // will bring: an unknown wire length reports no Content-Length and a zero
 // percentage rather than guessing one.
+// TestShortBodyIsNotReportedAsComplete re-checks at the server boundary what
+// the payload already guards internally. PayloadPort is an interface, so a nil
+// return is a claim rather than a fact; Content-Length is already on the wire
+// by then, and publishing Complete for a body that never matched it would tell
+// the sender a truncated download finished.
+func TestShortBodyIsNotReportedAsComplete(t *testing.T) {
+	t.Parallel()
+
+	const advertised = 4096
+	payload := &stubPayload{
+		name:  "short.bin",
+		size:  advertised,
+		known: true,
+		// Returns nil having written a fraction of what Size promised.
+		stream: bodyOf(bytes.Repeat([]byte("s"), 512), 256),
+	}
+	server := newTestServer(t, payloadsReturning(payload))
+	handle := startTestServer(t, server, &stubAuthorizer{})
+
+	response, err := testClient().Do(mustGet(t, downloadURL(handle.Port, string(testToken))))
+	if err == nil {
+		_, _ = io.Copy(io.Discard, response.Body)
+		_ = response.Body.Close()
+	}
+
+	terminal := awaitEvent(t, handle.Events, 5*time.Second)
+	if terminal.Kind != transfer.ServerFailed {
+		t.Fatalf("terminal event = %s, want %s for a body shorter than its advertised length",
+			terminal.Kind, transfer.ServerFailed)
+	}
+	if code := transfer.ErrorCodeOf(terminal.Err); code != transfer.ErrTransferFailed {
+		t.Fatalf("terminal code = %q, want %q", code, transfer.ErrTransferFailed)
+	}
+}
+
+// TestPayloadIsReleasedBeforeCompleteIsPublished pins the ordering the
+// coordinator depends on: it may begin a new Stage the moment it hears
+// Complete, and on Windows a still-open handle on the source blocks renaming
+// or deleting it.
+func TestPayloadIsReleasedBeforeCompleteIsPublished(t *testing.T) {
+	t.Parallel()
+
+	body := []byte("fairdrop")
+	payload := &stubPayload{
+		name:   "report.pdf",
+		size:   int64(len(body)),
+		known:  true,
+		stream: bodyOf(body, 4),
+	}
+	server := newTestServer(t, payloadsReturning(payload))
+	handle := startTestServer(t, server, &stubAuthorizer{})
+
+	// Close blocks until released. While it is blocked the terminal event must
+	// not be observable: that is the ordering, made deterministic. Reading a
+	// counter after the fact could not distinguish the two orders, because the
+	// deferred Close runs before the handler returns either way.
+	releaseClose := make(chan struct{})
+	closeEntered := make(chan struct{})
+	release := sync.OnceFunc(func() { close(releaseClose) })
+	var entered sync.Once
+	payload.onClose = func() {
+		entered.Do(func() { close(closeEntered) })
+		<-releaseClose
+	}
+	t.Cleanup(release)
+
+	go func() {
+		response, err := testClient().Do(mustGet(t, downloadURL(handle.Port, string(testToken))))
+		if err != nil {
+			return
+		}
+		_, _ = io.Copy(io.Discard, response.Body)
+		_ = response.Body.Close()
+	}()
+
+	select {
+	case <-closeEntered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close was never called")
+	}
+	select {
+	case event := <-handle.Events:
+		t.Fatalf("%s was published while the payload was still being released", event.Kind)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	release()
+	terminal := awaitEvent(t, handle.Events, 5*time.Second)
+	if terminal.Kind != transfer.ServerComplete {
+		t.Fatalf("terminal event = %s, want %s", terminal.Kind, transfer.ServerComplete)
+	}
+}
+
 func TestUnknownLengthOmitsContentLength(t *testing.T) {
 	t.Parallel()
 
@@ -771,8 +871,36 @@ func TestContentDispositionResistsHeaderInjection(t *testing.T) {
 		},
 		"newline": {
 			name:       "a\r\nX-Injected: 1.pdf",
-			wantASCII:  "aX-Injected: 1.pdf",
+			wantASCII:  "aX-Injected 1.pdf",
 			wantEncode: "a%0D%0AX-Injected%3A%201.pdf",
+		},
+		// The payload sanitizes its own name, but this layer exists for the
+		// implementation that does not, so separators, colons, and dot-dot must
+		// not reach the legacy filename form either.
+		"posix separator": {
+			name:       "a/b.pdf",
+			wantASCII:  "ab.pdf",
+			wantEncode: "a%2Fb.pdf",
+		},
+		"windows separator": {
+			name:       "a\\b.pdf",
+			wantASCII:  "ab.pdf",
+			wantEncode: "a%5Cb.pdf",
+		},
+		"traversal": {
+			name:       "../../etc/passwd",
+			wantASCII:  "....etcpasswd",
+			wantEncode: "..%2F..%2Fetc%2Fpasswd",
+		},
+		"dot-dot alone": {
+			name:       "..",
+			wantASCII:  fallbackDownloadName,
+			wantEncode: "..",
+		},
+		"drive relative": {
+			name:       "C:evil.exe",
+			wantASCII:  "Cevil.exe",
+			wantEncode: "C%3Aevil.exe",
 		},
 		"empty": {name: "", wantASCII: fallbackDownloadName, wantEncode: fallbackDownloadName},
 	}
@@ -791,6 +919,15 @@ func TestContentDispositionResistsHeaderInjection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustGet(t *testing.T, url string) *http.Request {
+	t.Helper()
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("NewRequest(%q) error = %v", url, err)
+	}
+	return request
 }
 
 func awaitStatus(t *testing.T, statuses <-chan int) int {
