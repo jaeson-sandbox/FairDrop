@@ -104,3 +104,8 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   summary: Restart after `Stop` is possible but unspecified and untested.
   evidence: `Stop` clears `s.active`, so `Start` -> `Stop` -> `Start` succeeds and builds a fresh run. The type comment says "one listener, one capability token, one authorized download, then nothing", which reads as forbidding it. Whether a server instance is reusable belongs in the contract, since the coordinator will decide whether to construct one per session.
+
+- source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
+  summary: Story 1.5 was split so the QR adapter lands first as Story 1.5a; nothing is deferred, only sequenced.
+  evidence: The epic puts QR encoding inside the Stage sequence, but `internal/qr` is independently mergeable and unrelated to the coordinator's concurrency work. Building it first lets the coordinator be specified and tested against a real `QRPort` rather than a stub. Both specs belong to sprint key `1-5-stage-and-authorize-a-transfer-transactionally`, which is done only when both are.
+
