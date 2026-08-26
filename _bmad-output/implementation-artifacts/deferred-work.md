@@ -104,4 +104,3 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   summary: Restart after `Stop` is possible but unspecified and untested.
   evidence: `Stop` clears `s.active`, so `Start` -> `Stop` -> `Start` succeeds and builds a fresh run. The type comment says "one listener, one capability token, one authorized download, then nothing", which reads as forbidding it. Whether a server instance is reusable belongs in the contract, since the coordinator will decide whether to construct one per session.
-
