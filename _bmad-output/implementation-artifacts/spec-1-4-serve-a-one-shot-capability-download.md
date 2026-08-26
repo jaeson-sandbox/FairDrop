@@ -2,7 +2,7 @@
 title: 'Story 1.4 — Serve a One-Shot Capability Download'
 type: 'feature'
 created: '2026-08-24'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '5f7017134a9403fb431d11fa33c1b9c85f8008d0'
 context:
@@ -86,6 +86,8 @@ context:
 
 ## Spec Change Log
 
+- **Review round 1 (2026-08-24, patches only — no loopback):** Three parallel layers found three code defects and two verification gaps, none of which required renegotiating the frozen block; the matrix already demanded what the code was missing. The defects: `WriteTo` returning `nil` was trusted as fact even though `PayloadPort` is an interface and `Content-Length` was already on the wire, so a short body could publish as `ServerComplete`; `publishTerminal` set `terminated` before either send attempt, so a lane that failed to deliver a terminal event would refuse every later one; and the terminal event escaped before the payload descriptor was released, which a coordinator acting on `Complete` can observe as a still-open source handle. The gaps, each demonstrated by mutation: binding `127.0.0.1` instead of `0.0.0.0` passed the whole suite, because every test replaces the listen seam with a loopback binder that discards its argument; and the teardown gate in `enter()` had no execution anywhere, with a concurrent test unable to reach it because the window between `beginStop` and the listener closing is too narrow. Non-frozen sections were not amended. **KEEP:** the six-step claim order and its measured routing rationale; the canonicality guard, which is the only thing preventing a 307 that echoes the capability token; the header flush before `WriteTo`, which keeps an unknown length unknown and lets the abort path be honest; the reserved-capacity event lane; and the mutation-tested evidence added for each fix.
+
 ## Design Notes
 
 The routing rule is measured, not stylistic. On go1.26.7 the forbidden method-qualified pattern `GET /download/{token}` answers POST with **405 and `Allow: GET, HEAD`**, and routes **HEAD into the GET handler** — both of which tell an unauthorized caller the resource exists. The methodless pattern hands every method to the handler, so the handler's own `Method == http.MethodGet` check is what makes HEAD and everything else indistinguishable from a nonexistent path. Verified with `httptest`: `/download/a/b` is already 404 from `ServeMux`, because a `{token}` wildcard does not match across a `/`.
@@ -107,3 +109,86 @@ Terminal events need reserved, non-blocking capacity. The coordinator's drainer 
 - `gofmt -l .` and `git diff --check` — no formatting or whitespace defects.
 - `rg -n 'TransferServer|TransferStats' -g '*.go'` — no output.
 - `rg -n 'ServerPort|ClaimAuthorizer' internal --glob '!**/*_test.go'` — the port declared once in `internal/transfer`, implemented once in `internal/server`.
+
+## Suggested Review Order
+
+**The claim sequence, in the order it must happen**
+
+- The six steps in one function; their order is the security property.
+  [`handler.go:76`](../../internal/server/handler.go#L76)
+
+- The reservation is the linearization point of the claim race.
+  [`handler.go:96`](../../internal/server/handler.go#L96)
+
+- Constant-time comparison, so a wrong token leaks no timing signal.
+  [`handler.go:214`](../../internal/server/handler.go#L214)
+
+**Refusing what ServeMux would otherwise answer**
+
+- Two of the mux's answers are wrong for a capability URL and are replaced.
+  [`handler.go:34`](../../internal/server/handler.go#L34)
+
+- Non-canonical paths are refused, never rewritten: rewriting is what leaks the token.
+  [`handler.go:60`](../../internal/server/handler.go#L60)
+
+**Size as a promise, and the honest failure**
+
+- The server re-checks the payload's nil against the length it advertised.
+  [`handler.go:164`](../../internal/server/handler.go#L164)
+
+- Once bytes are on the wire, breaking the connection is the only signal left.
+  [`handler.go:195`](../../internal/server/handler.go#L195)
+
+- Only bytes the destination accepted are counted.
+  [`progress.go:133`](../../internal/server/progress.go#L133)
+
+- Percent stays finite and clamped whatever the totals are.
+  [`progress.go:94`](../../internal/server/progress.go#L94)
+
+**Delivery that cannot block teardown**
+
+- The terminal event evicts a stale snapshot to make room for itself.
+  [`events.go:70`](../../internal/server/events.go#L70)
+
+- Progress is droppable by contract, so no publish ever blocks.
+  [`events.go:49`](../../internal/server/events.go#L49)
+
+**Lifecycle and ownership**
+
+- Startup is transactional: readiness before return, nothing retained on failure.
+  [`lifecycle.go:124`](../../internal/server/lifecycle.go#L124)
+
+- The gate that keeps a late request out of the WaitGroup Stop is awaiting.
+  [`lifecycle.go:302`](../../internal/server/lifecycle.go#L302)
+
+- Teardown drives every owned resource to quiescent before returning.
+  [`lifecycle.go:268`](../../internal/server/lifecycle.go#L268)
+
+- The consumer-owned port this package implements.
+  [`ports.go:98`](../../internal/transfer/ports.go#L98)
+
+**Evidence the defenses are not vacuous**
+
+- The claim race driven concurrently; ordering is not asserted, outcome is.
+  [`handler_test.go:187`](../../internal/server/handler_test.go#L187)
+
+- Binding loopback instead of every interface fails here and nowhere else.
+  [`lifecycle_test.go:430`](../../internal/server/lifecycle_test.go#L430)
+
+- The teardown gate, pinned deterministically where a concurrent test could not reach it.
+  [`lifecycle_test.go:470`](../../internal/server/lifecycle_test.go#L470)
+
+- A payload that under-delivers must not be published as Complete.
+  [`handler_test.go:475`](../../internal/server/handler_test.go#L475)
+
+- Close blocks, so the ordering against the terminal event is deterministic.
+  [`handler_test.go:509`](../../internal/server/handler_test.go#L509)
+
+- A failed terminal delivery must leave the outcome retryable.
+  [`events_test.go:138`](../../internal/server/events_test.go#L138)
+
+- Every rejection shape, including the traversal only the pattern guard stops.
+  [`handler_test.go:24`](../../internal/server/handler_test.go#L24)
+
+- Separators and dot-dot must not reach the legacy filename form.
+  [`handler_test.go:853`](../../internal/server/handler_test.go#L853)
