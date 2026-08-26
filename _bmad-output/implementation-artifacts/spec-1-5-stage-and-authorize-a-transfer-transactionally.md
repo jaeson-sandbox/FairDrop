@@ -2,8 +2,9 @@
 title: 'Story 1.5 — Stage and Authorize a Transfer Transactionally'
 type: 'feature'
 created: '2026-08-24'
-status: 'draft'
+status: 'in-progress'
 review_loop_iteration: 0
+baseline_commit: 'f634a0b'
 context:
   - '{project-root}/docs/fairdrop-contracts.md'
   - '{project-root}/_bmad-output/implementation-artifacts/epic-1-context.md'
