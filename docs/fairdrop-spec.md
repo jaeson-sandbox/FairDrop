@@ -53,12 +53,24 @@ func (a *App) StageTransfer(absolutePath string) (*FileMetadata, error)
 func (a *App) CancelTransfer() error
 ```
 
+> **Superseded:** this is not the shipped shape. `transfer.FileMetadata` also carries
+> `sessionId` and a non-null `warnings` array, and `StageTransfer` returns
+> `*transfer.FileMetadata`, which the coordinator builds. The binding shapes live in
+> `docs/fairdrop-contracts.md` ("Canonical domain values" and "Public Wails API"), which
+> governs wherever the two disagree. *(Story 1.5.)*
+
 ## 5. IPC Event System (Go -> React)
 Use `runtime.EventsEmit(a.ctx, eventName, payload)` to drive the React UI reactively:
 *   `event: transfer-started` - Triggered when the HTTP handler receives a request.
 *   `event: transfer-progress` - Payload: `{ bytesSent: int64, totalBytes: int64, percent: float64, speedBytesPerSec: float64 }`. Emitted every ~250ms during active transfer.
 *   `event: transfer-complete` - Triggered when the HTTP handler successfully finishes writing the response body.
 *   `event: transfer-error` - Payload: `{ message: string }`.
+
+> **Superseded:** the shipped events run on one synchronous FIFO lane. Every payload
+> carries `sessionId` and a `seq` that starts at 1 and increments by one, there is a
+> fifth `transfer-reset` kind, progress carries an explicit `totalKnown`, and error
+> carries a `{code,message}` `PublicError` rather than free text. See "Event ordering"
+> in `docs/fairdrop-contracts.md`, which governs. *(Story 1.5.)*
 
 ## 6. Detailed Implementation Modules
 

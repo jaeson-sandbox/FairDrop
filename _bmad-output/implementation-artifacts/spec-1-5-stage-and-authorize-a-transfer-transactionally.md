@@ -2,7 +2,7 @@
 title: 'Story 1.5 — Stage and Authorize a Transfer Transactionally'
 type: 'feature'
 created: '2026-08-24'
-status: 'in-progress'
+status: 'in-review'
 review_loop_iteration: 0
 baseline_commit: 'f634a0b'
 context:
@@ -69,12 +69,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/transfer/{types,ports}.go` — add `FileMetadata`, `Warning`, and `Observer` verbatim from the contract. `QRPort` already exists from Story 1.5a.
-- [ ] `internal/transfer/coordinator.go` — state machine, generation counter, operation lease, and injectable entropy/clock seams.
-- [ ] `internal/transfer/coordinator.go` — `Stage` with ordered acquisition, post-call revalidation, and reverse unwind.
-- [ ] `internal/transfer/coordinator.go` — `AuthorizeClaim` handshake through to the synchronous `transfer-started` publication.
-- [ ] `internal/transfer/*_test.go` — fake source, network, server, QR, observer, entropy, and clock; force cancellation after *each* external step and force *both* claim-race outcomes.
-- [ ] `internal/transfer/*_test.go` — every fake asserts on entry that the coordinator's state mutex is NOT held, so the no-lock-across-adapter-calls rule is executable rather than prose.
+- [x] `internal/transfer/{types,ports}.go` — add `FileMetadata`, `Warning`, and `Observer` verbatim from the contract. `QRPort` already exists from Story 1.5a.
+- [x] `internal/transfer/coordinator.go` — state machine, generation counter, operation lease, and injectable entropy/clock seams.
+- [x] `internal/transfer/coordinator.go` — `Stage` with ordered acquisition, post-call revalidation, and reverse unwind.
+- [x] `internal/transfer/coordinator.go` — `AuthorizeClaim` handshake through to the synchronous `transfer-started` publication.
+- [x] `internal/transfer/*_test.go` — fake source, network, server, QR, observer, entropy, and clock; force cancellation after *each* external step and force *both* claim-race outcomes.
+- [x] `internal/transfer/*_test.go` — every fake asserts on entry that the coordinator's state mutex is NOT held, so the no-lock-across-adapter-calls rule is executable rather than prose.
 
 **Acceptance Criteria:**
 - Given cancellation injected after each external setup step in turn, when Stage unwinds, then every acquired resource was released in reverse order, no lifecycle event was emitted, and no stale result was committed.

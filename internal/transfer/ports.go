@@ -106,3 +106,37 @@ type ServerPort interface {
 	Start(ctx context.Context, request ServerStartRequest, authorizer ClaimAuthorizer) (ServerHandle, error)
 	Stop() error
 }
+
+// EventKind names the five lifecycle events the coordinator publishes.
+type EventKind string
+
+const (
+	TransferStarted  EventKind = "transfer-started"
+	TransferProgress EventKind = "transfer-progress"
+	TransferComplete EventKind = "transfer-complete"
+	TransferError    EventKind = "transfer-error"
+	TransferReset    EventKind = "transfer-reset"
+)
+
+// Event is one lifecycle observation for one session.
+//
+// Seq starts at 1 for the first published event of a session and increases by
+// exactly one per published event; coalesced or dropped progress snapshots are
+// never assigned a sequence number, so a gap cannot occur. Kind is excluded
+// from JSON because the Wails adapter carries it as the event name rather than
+// as part of the payload.
+type Event struct {
+	SessionID SessionID         `json:"sessionId"`
+	Seq       uint64            `json:"seq"`
+	Kind      EventKind         `json:"-"`
+	Progress  *ProgressSnapshot `json:"progress,omitempty"`
+	Error     *PublicError      `json:"error,omitempty"`
+}
+
+// Observer receives lifecycle events on the coordinator's single emission
+// lane. Publish is a synchronous FIFO handoff: it is called from whichever
+// operation owns the sequence it was just assigned, and an implementation must
+// deliver in call order rather than reordering or buffering out of band.
+type Observer interface {
+	Publish(event Event)
+}

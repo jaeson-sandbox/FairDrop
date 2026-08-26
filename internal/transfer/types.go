@@ -42,3 +42,28 @@ type ProgressSnapshot struct {
 	Percent          float64 `json:"percent"`
 	SpeedBytesPerSec float64 `json:"speedBytesPerSec"`
 }
+
+// Warning is one non-fatal condition attached to an otherwise successful
+// command result. A warning never carries adapter text: its code selects fixed
+// public copy, so nothing a warning can say could contain a path or a token.
+type Warning struct {
+	Code    ErrorCode `json:"code"`
+	Message string    `json:"message"`
+}
+
+// FileMetadata is the acknowledgement of a staged transfer: everything the
+// sender's UI needs to show a session, and nothing more.
+//
+// URL and QR are the only two places the capability token is allowed to
+// appear. Path is deliberately absent -- Name is the basename the receiver is
+// offered -- and Warnings is always a non-nil slice so it serializes as an
+// empty JSON array rather than null.
+type FileMetadata struct {
+	SessionID SessionID `json:"sessionId"`
+	Name      string    `json:"name"`
+	Size      int64     `json:"size"`
+	IsDir     bool      `json:"isDir"`
+	URL       string    `json:"url"`
+	QR        string    `json:"qrBase64"`
+	Warnings  []Warning `json:"warnings"`
+}
