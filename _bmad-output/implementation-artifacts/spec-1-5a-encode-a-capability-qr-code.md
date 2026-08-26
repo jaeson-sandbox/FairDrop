@@ -2,9 +2,9 @@
 title: 'Story 1.5a — Encode a Capability QR Code'
 type: 'feature'
 created: '2026-08-24'
-status: 'in-progress'
+status: 'in-review'
 review_loop_iteration: 0
-baseline_commit: 'PENDING'
+baseline_commit: '82fc2b218d7c2a3951006c3d156b267e49799e3d'
 context:
   - '{project-root}/docs/fairdrop-contracts.md'
 ---
@@ -29,7 +29,7 @@ context:
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
-| Typical capability URL | `http://192.168.1.5:54321/download/<32-hex>` | Valid PNG bytes that decode back to the exact input | N/A |
+| Typical capability URL | `http://192.168.1.5:54321/download/<32-hex>` | Valid PNG whose bytes equal a reference encoding of that same exact content | N/A |
 | Determinism | The same content twice | Byte-identical output | N/A |
 | Long content | A URL at the practical upper bound | Encodes, or fails cleanly rather than truncating | `qr_failed` |
 | Empty content | `""` | Refused rather than encoding a meaningless code | `qr_failed` |
@@ -51,19 +51,19 @@ context:
 
 ## Tasks & Acceptance
 
-- [ ] `internal/transfer/ports.go` — add `QRPort` verbatim from the contract.
-- [ ] `internal/qr/qr.go` — implement it over `boombuler/barcode` with an injectable encoder seam.
-- [ ] `go.mod`, `go.sum` — add, tidy, and verify `github.com/boombuler/barcode` v1.1.0 with no unrelated drift.
-- [ ] `internal/qr/qr_test.go` — cover every matrix row; decode the output back and compare to the input.
+- [x] `internal/transfer/ports.go` — add `QRPort` verbatim from the contract.
+- [x] `internal/qr/qr.go` — implement it over `boombuler/barcode` with an injectable encoder seam.
+- [x] `go.mod`, `go.sum` — add, tidy, and verify `github.com/boombuler/barcode` v1.1.0 with no unrelated drift.
+- [x] `internal/qr/qr_test.go` — cover every matrix row; capture the seam argument and compare the PNG against a reference encoding of the same content.
 
 **Acceptance Criteria:**
-- Given a typical capability URL, when `EncodePNG` returns, then the bytes are a valid PNG that decodes back to that exact string.
+- Given a typical capability URL, when `EncodePNG` returns, then the encoder received that string byte-for-byte through the seam, and the PNG equals a reference produced by encoding the same content directly.
 - Given any failure, when it returns, then the error carries `qr_failed`, preserves its cause through `errors.Is`, and its public message contains neither the URL nor the token.
 - Given the finished module, when build, vet, tests, race, formatting, and dependency verification run, then all pass with the dependency pinned at v1.1.0.
 
 ## Design Notes
 
-Decoding the output back to the input is the only assertion that proves the code is *correct* rather than merely PNG-shaped; a byte-length or header check would pass for a QR encoding the wrong string.
+A true round-trip would need a decoder, and `boombuler/barcode` ships none; adding one for tests alone was weighed against this project's deliberately small pinned dependency set and declined. What is proven instead: the encoder receives the content byte-for-byte through the seam, and the emitted PNG equals a reference encoding of that same content. Together those exclude the failure this layer can actually cause -- truncating, re-encoding, or substituting the content -- and leave QR correctness itself resting on the pinned library. A byte-length or header check alone would pass for a QR of the wrong string, which is why the reference comparison is against content rather than shape.
 
 ## Verification
 

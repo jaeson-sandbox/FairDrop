@@ -86,6 +86,13 @@ type ServerHandle struct {
 	Events <-chan ServerEvent
 }
 
+// QRPort renders the capability URL as a scannable image. It returns PNG bytes;
+// the base64 the frontend consumes is produced at the coordinator boundary, not
+// here.
+type QRPort interface {
+	EncodePNG(ctx context.Context, content string) ([]byte, error)
+}
+
 // ServerPort is the ephemeral one-shot HTTP server the coordinator owns.
 //
 // A successful Start means the listener is bound and its accept loop is ready

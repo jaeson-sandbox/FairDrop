@@ -3,6 +3,7 @@ module fairdrop
 go 1.25.0
 
 require (
+	github.com/boombuler/barcode v1.1.0
 	github.com/hashicorp/mdns v1.0.7
 	github.com/wailsapp/wails/v2 v2.15.0
 )
