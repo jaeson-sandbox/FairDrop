@@ -2,7 +2,7 @@
 title: 'Story 1.5a — Encode a Capability QR Code'
 type: 'feature'
 created: '2026-08-24'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '82fc2b218d7c2a3951006c3d156b267e49799e3d'
 context:
@@ -61,6 +61,10 @@ context:
 - Given any failure, when it returns, then the error carries `qr_failed`, preserves its cause through `errors.Is`, and its public message contains neither the URL nor the token.
 - Given the finished module, when build, vet, tests, race, formatting, and dependency verification run, then all pass with the dependency pinned at v1.1.0.
 
+## Spec Change Log
+
+- **Frozen-row amendment before implementation (2026-08-24):** The matrix required the PNG to "decode back to the exact input", which `boombuler/barcode` cannot do -- it encodes only. Adding a decoder was weighed against this project's deliberately small pinned dependency set and declined by the human, so the row now states what is actually proven: the encoder receives the content byte-for-byte through the seam, and the PNG equals a reference encoding of that same content. Amended before any code was written rather than left overstating what the tests check.
+
 ## Design Notes
 
 A true round-trip would need a decoder, and `boombuler/barcode` ships none; adding one for tests alone was weighed against this project's deliberately small pinned dependency set and declined. What is proven instead: the encoder receives the content byte-for-byte through the seam, and the emitted PNG equals a reference encoding of that same content. Together those exclude the failure this layer can actually cause -- truncating, re-encoding, or substituting the content -- and leave QR correctness itself resting on the pinned library. A byte-length or header check alone would pass for a QR of the wrong string, which is why the reference comparison is against content rather than shape.
@@ -73,3 +77,17 @@ A true round-trip would need a decoder, and `boombuler/barcode` ships none; addi
 - `CGO_ENABLED=1 go test -race -count=1 ./...` — race clean (see AGENTS.md for the PATH requirement).
 - `gofmt -l .` and `git diff --check` — clean.
 - `rg -n 'os.Create|os.WriteFile|base64' internal/qr` — no output: nothing written to disk, no encoding done at this layer.
+
+## Suggested Review Order
+
+- The whole adapter: in-memory only, context honoured at both ends, coded failures.
+  [`qr.go:44`](../../internal/qr/qr.go#L44)
+
+- Recovery level and render size are the two choices that decide scannability.
+  [`qr.go:20`](../../internal/qr/qr.go#L20)
+
+- The port this implements; base64 belongs to the coordinator, not here.
+  [`ports.go:92`](../../internal/transfer/ports.go#L92)
+
+- The content pin: seam argument plus a reference encoding, including the default path.
+  [`qr_test.go:40`](../../internal/qr/qr_test.go#L40)

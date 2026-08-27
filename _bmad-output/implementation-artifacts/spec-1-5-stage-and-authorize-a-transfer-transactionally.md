@@ -2,7 +2,7 @@
 title: 'Story 1.5 — Stage and Authorize a Transfer Transactionally'
 type: 'feature'
 created: '2026-08-24'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: 'f634a0b2ffadf5ffa99fc2e52daf4ac40a7a7532'
 context:
@@ -85,6 +85,8 @@ context:
 
 ## Spec Change Log
 
+- **Review round 1 (2026-08-24, patches only — no loopback):** Three parallel layers found one authorization defect, one live race, and a class of five self-referential assertions; none required renegotiating the frozen block. `AuthorizeClaim(ctx, "")` authorized whichever session was staged, because `revalidateLocked`'s zero-value-means-skip convention for `generation` silently extended to identity — probed and confirmed before fixing, and not reachable through Story 1.4's server, which always passes its own id. Five tests compared a constant against itself and so pinned nothing: `testURL` was built FROM `downloadPathPrefix`, so the capability path could become `/dl/` with the suite green while every QR code pointed at a 404; the beacon instance and the beacon warning were each compared to the code that produces them. Writing the missing caller-context test then exposed a real race — `context.AfterFunc` runs its callback on a new goroutine, so between the caller cancelling and that goroutine running the derived context still read clean, and Stage committed a full session for an abandoned command. `afterStep` now checks the caller's context first. `failStage` also cleared `c.session` without checking it owned it, which the stale-result test drove and passed against. **KEEP:** the ten-adapter `enter()` gate that makes the no-lock-across-adapter-calls rule executable — mutation-tested and the reason that rule cannot silently regress; the reverse unwind driven by an append-ordered `acquired` list rather than remembered ordering; the non-blocking lease acquisition in `AuthorizeClaim` that stops a parked handler deadlocking the server's own `Stop`; and the deterministic cancellation coverage after each of the five external steps.
+
 ## Design Notes
 
 The mutex rule is proven by construction, not by inspection: every fake adapter tries the state mutex on entry and fails the test if it is held. A prose rule would survive a refactor that quietly moved a call inside the lock; this does not, and it costs nothing because every existing test then exercises it.
@@ -106,3 +108,66 @@ The beacon is acquired last and released first because it is the only non-fatal 
 - `go test -race -count=20 ./internal/transfer` — the claim race and cancellation races are concurrency tests; repeat them.
 - `gofmt -l .` and `git diff --check` — no formatting or whitespace defects.
 - `rg -n 'wails|net/http' internal/transfer --glob '!**/*_test.go'` — no output: the coordinator stays framework-independent.
+
+## Suggested Review Order
+
+**The transactional spine**
+
+- The whole Stage sequence; acquisition order and the commit point are the design.
+  [`coordinator.go:216`](../../internal/transfer/coordinator.go#L216)
+
+- Reverse release driven by the order resources were appended, not by memory.
+  [`coordinator.go:480`](../../internal/transfer/coordinator.go#L480)
+
+- Failure clears only a session this call still owns.
+  [`coordinator.go:457`](../../internal/transfer/coordinator.go#L457)
+
+**Why a stale result can never commit**
+
+- Both contexts are checked, the caller's first: the derived one lags a goroutine behind.
+  [`coordinator.go:526`](../../internal/transfer/coordinator.go#L526)
+
+- Identity, generation, cancellation, closing, state — an empty id is refused, not skipped.
+  [`coordinator.go:545`](../../internal/transfer/coordinator.go#L545)
+
+**The claim handshake**
+
+- CLAIMING, beacon stopped unlocked, revalidate, commit, publish under the lease.
+  [`coordinator.go:394`](../../internal/transfer/coordinator.go#L394)
+
+- Double release means two owners of one session; loud beats absorbed.
+  [`coordinator.go:622`](../../internal/transfer/coordinator.go#L622)
+
+**Contract surface**
+
+- Session fields split into immutable, mutex-owned, and lease-owned.
+  [`coordinator.go:102`](../../internal/transfer/coordinator.go#L102)
+
+- The identity floor lives on the types themselves.
+  [`types.go:65`](../../internal/transfer/types.go#L65)
+
+- The capability URL, and the route it must match in another package.
+  [`coordinator.go:685`](../../internal/transfer/coordinator.go#L685)
+
+**Evidence the rules are executable**
+
+- Every adapter passes this gate; it is what makes the mutex rule survive a refactor.
+  [`helpers_test.go:167`](../../internal/transfer/helpers_test.go#L167)
+
+- Cancellation forced after each of the five external steps, with the unwind asserted.
+  [`coordinator_stage_test.go:370`](../../internal/transfer/coordinator_stage_test.go#L370)
+
+- A committed session must outlive the command; its mirror must not commit at all.
+  [`coordinator_stage_test.go:715`](../../internal/transfer/coordinator_stage_test.go#L715)
+
+- The capability path named as a literal, separately from testURL.
+  [`coordinator_stage_test.go:788`](../../internal/transfer/coordinator_stage_test.go#L788)
+
+- A replacement session is not this call's to clear.
+  [`coordinator_stage_test.go:448`](../../internal/transfer/coordinator_stage_test.go#L448)
+
+- An unnamed claim is refused, and the real session stays claimable.
+  [`coordinator_claim_test.go:223`](../../internal/transfer/coordinator_claim_test.go#L223)
+
+- Both race outcomes, each forced deterministically rather than hoped for.
+  [`coordinator_claim_test.go:56`](../../internal/transfer/coordinator_claim_test.go#L56)
