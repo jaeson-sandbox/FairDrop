@@ -216,6 +216,30 @@ func TestAuthorizeClaimRefusesOutsideAMatchingStagedSession(t *testing.T) {
 	}
 }
 
+// An empty session id must be refused, not treated as a wildcard. ClaimAuthorizer
+// is a public interface: the coordinator cannot assume its caller passes the id
+// it was given, and "names no session" must never mean "matches whichever
+// session is staged".
+func TestAuthorizeClaimRefusesAnUnnamedSession(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	staged := h.stageSuccessfully()
+
+	err := h.coordinator.AuthorizeClaim(context.Background(), "")
+
+	if got := ErrorCodeOf(err); got != ErrCancelled {
+		t.Fatalf("code = %q, want %q", got, ErrCancelled)
+	}
+	if events := h.observer.published(); len(events) != 0 {
+		t.Fatalf("published %d events for an unnamed claim, want none", len(events))
+	}
+	// The real session is untouched and still claimable.
+	if err := h.coordinator.AuthorizeClaim(context.Background(), staged.SessionID); err != nil {
+		t.Fatalf("the named session was no longer claimable: %v", err)
+	}
+}
+
 func TestAuthorizeClaimTreatsABeaconStopDiagnosticAsSafe(t *testing.T) {
 	h := newHarness(t)
 	metadata := h.stageSuccessfully()

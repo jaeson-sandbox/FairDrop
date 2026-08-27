@@ -275,7 +275,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	if err != nil {
 		return c.failStage(live, err)
 	}
-	if err := c.afterStep(setupCtx, id, generation); err != nil {
+	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
 		return c.failStage(live, err)
 	}
 	live.item = item
@@ -285,7 +285,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	if err != nil {
 		return c.failStage(live, err)
 	}
-	if err := c.afterStep(setupCtx, id, generation); err != nil {
+	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
 		return c.failStage(live, err)
 	}
 	address = address.Unmap()
@@ -309,7 +309,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	live.drainerDone = make(chan struct{})
 	go c.drain(handle.Events, live.drainerDone)
 	live.hold(resourceServer)
-	if err := c.afterStep(setupCtx, id, generation); err != nil {
+	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
 		return c.failStage(live, err)
 	}
 
@@ -322,7 +322,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	if err != nil {
 		return c.failStage(live, err)
 	}
-	if err := c.afterStep(setupCtx, id, generation); err != nil {
+	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
 		return c.failStage(live, err)
 	}
 	if len(png) == 0 {
@@ -346,7 +346,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	if beaconErr == nil {
 		live.hold(resourceBeacon)
 	}
-	if err := c.afterStep(setupCtx, id, generation); err != nil {
+	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
 		return c.failStage(live, err)
 	}
 	if beaconErr != nil {
@@ -512,10 +512,24 @@ func (c *Coordinator) drain(events <-chan ServerEvent, done chan<- struct{}) {
 // unlocked adapter call. Every external call is followed by exactly one of
 // these, which is what makes committing a stale result impossible rather than
 // merely unlikely.
-func (c *Coordinator) afterStep(ctx context.Context, id SessionID, generation uint64) error {
+// afterStep revalidates against BOTH contexts, and the caller's is checked
+// first. context.AfterFunc runs stopSetup on a new goroutine, so between the
+// caller cancelling and that goroutine running, setupCtx.Err() is still nil --
+// a window in which a step could pass revalidation and the whole Stage could
+// commit for a command the user already abandoned. The caller's context is
+// immediate; the derived one is only eventually consistent with it.
+func (c *Coordinator) afterStep(
+	callerCtx context.Context,
+	setupCtx context.Context,
+	id SessionID,
+	generation uint64,
+) error {
+	if err := callerCtx.Err(); err != nil {
+		return WrapError(ErrCancelled, "the transfer was cancelled", err)
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.revalidateLocked(ctx, id, generation, stateStaging)
+	return c.revalidateLocked(setupCtx, id, generation, stateStaging)
 }
 
 // revalidateLocked answers one question: may this operation still use what it
@@ -530,7 +544,11 @@ func (c *Coordinator) revalidateLocked(ctx context.Context, id SessionID, genera
 	if c.session == nil {
 		return NewError(ErrCancelled, "the transfer is no longer active")
 	}
-	if id != "" && c.session.id != id {
+	// An empty id is refused rather than skipped. Every call site passes a real
+	// session id, so an empty one is a caller defect -- and ClaimAuthorizer is
+	// a public interface, so treating "no id given" as "matches whatever is
+	// staged" would let a wrong caller authorize a session it cannot name.
+	if id == "" || c.session.id != id {
 		return NewError(ErrCancelled, "the transfer is no longer active")
 	}
 	if generation != 0 && c.session.generation != generation {

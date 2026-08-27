@@ -24,7 +24,12 @@ const (
 	testSessionID = SessionID("0102030405060708090a0b0c0d0e0f10")
 	testToken     = CapabilityToken("1112131415161718191a1b1c1d1e1f20")
 
-	testURL = "http://" + testAddress + ":45678" + downloadPathPrefix + string(testToken)
+	// Spelled out rather than built from downloadPathPrefix. Deriving it from
+	// the constant under test made the URL assertion self-referential: the
+	// path could be changed to anything and both sides moved together, so a
+	// capability link pointing at a route the server answers with 404 would
+	// have shipped green.
+	testURL = "http://" + testAddress + ":45678" + "/download/" + string(testToken)
 
 	// mutexProbeTimeout bounds the entry check every fake performs. A state
 	// mutex held legitimately by another goroutine is released in
@@ -190,6 +195,20 @@ func (h *harness) stage() (FileMetadata, error) {
 	return h.coordinator.Stage(context.Background(), testPath)
 }
 
+// stageWithContext runs Stage with a caller-supplied context, which is the only
+// way to exercise the two deliberate context decisions Stage makes: the session
+// context is detached from the caller, and an abandoned caller aborts setup.
+func (h *harness) stageWithContext(ctx context.Context) (FileMetadata, error) {
+	return h.coordinator.Stage(ctx, testPath)
+}
+
+// serverStartContext returns the context the coordinator handed ServerPort.Start.
+func (f *fakeServer) serverStartContext() context.Context {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.startCtx
+}
+
 // stageSuccessfully runs Stage and fails the test unless it commits.
 func (h *harness) stageSuccessfully() FileMetadata {
 	h.t.Helper()
@@ -295,6 +314,10 @@ type fakeServer struct {
 	mu         sync.Mutex
 	requests   []ServerStartRequest
 	authorizer ClaimAuthorizer
+	// startCtx is the context the coordinator hands the server. It outlives
+	// Stage by design, so a test can assert it is NOT cancelled when the
+	// caller's command context ends.
+	startCtx context.Context
 }
 
 func (f *fakeServer) Start(
@@ -306,6 +329,7 @@ func (f *fakeServer) Start(
 	f.mu.Lock()
 	f.requests = append(f.requests, request)
 	f.authorizer = authorizer
+	f.startCtx = ctx
 	f.mu.Unlock()
 	if f.start != nil {
 		return f.start(ctx, request, authorizer)

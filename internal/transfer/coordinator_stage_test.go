@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -101,7 +102,7 @@ func TestStageAcquiresResourcesInContractOrder(t *testing.T) {
 	want0 := BeaconRequest{
 		SessionID: testSessionID,
 		Service:   BeaconService,
-		Instance:  beaconInstanceBase,
+		Instance:  "fairdrop",
 		Port:      testPort,
 		TXT:       []string{BeaconVersionTXT},
 	}
@@ -508,7 +509,14 @@ func TestStageCommitsWithAWarningWhenOnlyTheBeaconFails(t *testing.T) {
 	if len(metadata.Warnings) != 1 {
 		t.Fatalf("warnings are %+v, want exactly one", metadata.Warnings)
 	}
-	want := beaconWarning()
+	// A literal, not beaconWarning(): asserting the function against itself
+	// let the code drift to any other message. The user of a perfectly
+	// usable session -- HTTP and QR live, only discovery down -- must not be
+	// told a transfer failed that never started.
+	want := Warning{
+		Code:    ErrBeaconWarning,
+		Message: PublicErrorOf(NewError(ErrBeaconWarning, "")).Message,
+	}
 	if metadata.Warnings[0] != want {
 		t.Errorf("warning is %+v, want the fixed %+v", metadata.Warnings[0], want)
 	}
@@ -675,6 +683,103 @@ func TestStageErrorsNeverCarryTheTokenOrThePath(t *testing.T) {
 			assertSafe(t, "returned error", err.Error(), token)
 			assertSafe(t, "public error", fmt.Sprintf("%+v", PublicErrorOf(err)), token)
 		})
+	}
+}
+
+// A committed session must outlive the command that created it. Stage detaches
+// the session context from the caller's with context.WithoutCancel, because the
+// listener keeps serving long after StageTransfer returns -- without it, the
+// receiver's download dies the moment the Wails call completes.
+func TestStagedSessionOutlivesTheCallersContext(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	if _, err := h.stageWithContext(ctx); err != nil {
+		t.Fatalf("Stage() error = %v", err)
+	}
+	served := h.server.serverStartContext()
+	if served == nil {
+		t.Fatal("the server was started without a context")
+	}
+
+	cancel()
+
+	select {
+	case <-served.Done():
+		t.Fatal("cancelling the caller's context killed the committed session's server")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// The mirror: a caller that abandons Stage mid-setup must not end up with a
+// committed session anyway. Without the AfterFunc watch on the caller's
+// context, an abandoned command still leaves a live listener and a live
+// advertisement behind.
+func TestStageAbortsWhenTheCallerAbandonsIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	h.qr.encode = func(context.Context, string) ([]byte, error) {
+		cancel()
+		return testPNG, nil
+	}
+
+	metadata, err := h.stageWithContext(ctx)
+
+	if err == nil {
+		t.Fatalf("Stage() committed %+v after the caller abandoned it", metadata)
+	}
+	if got := ErrorCodeOf(err); got != ErrCancelled {
+		t.Fatalf("code = %q, want %q", got, ErrCancelled)
+	}
+	assertUnwoundToIdle(t, h)
+}
+
+// isDir is a mapping, and a mapping with only one input tested is a constant.
+func TestStagedDirectoryReportsIsDir(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	folder := testItem()
+	folder.Kind = ItemDirectory
+	folder.Name = "holiday-photos"
+	h.source.inspect = func(context.Context, string) (StagedItem, error) { return folder, nil }
+
+	metadata, err := h.stage()
+	if err != nil {
+		t.Fatalf("Stage() error = %v", err)
+	}
+	if !metadata.IsDir {
+		t.Fatal("a staged directory reported isDir false")
+	}
+	if metadata.Name != folder.Name {
+		t.Fatalf("Name = %q, want %q", metadata.Name, folder.Name)
+	}
+}
+
+// The capability path is asserted as a literal here on purpose, and separately
+// from testURL, so that this test names the exact string internal/server
+// registers. If the two ever diverge every QR code points at a bare 404.
+func TestCapabilityURLUsesTheRouteTheServerRegisters(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	metadata := h.stageSuccessfully()
+
+	const registeredPrefix = "/download/"
+	parsed, err := url.Parse(metadata.URL)
+	if err != nil {
+		t.Fatalf("capability URL does not parse: %v", err)
+	}
+	if !strings.HasPrefix(parsed.Path, registeredPrefix) {
+		t.Fatalf("capability path = %q, want the %q route internal/server registers",
+			parsed.Path, registeredPrefix)
+	}
+	if got := strings.TrimPrefix(parsed.Path, registeredPrefix); got != string(testToken) {
+		t.Fatalf("capability path carried %q after the route, want the token", got)
 	}
 }
 
