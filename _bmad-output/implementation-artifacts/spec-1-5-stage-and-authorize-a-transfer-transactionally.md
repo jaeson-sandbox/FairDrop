@@ -4,7 +4,7 @@ type: 'feature'
 created: '2026-08-24'
 status: 'in-review'
 review_loop_iteration: 0
-baseline_commit: 'f634a0b'
+baseline_commit: 'f634a0b2ffadf5ffa99fc2e52daf4ac40a7a7532'
 context:
   - '{project-root}/docs/fairdrop-contracts.md'
   - '{project-root}/_bmad-output/implementation-artifacts/epic-1-context.md'

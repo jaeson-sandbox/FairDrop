@@ -2,7 +2,7 @@
 
 ## Phase 1 Corrections (verified against Wails v2.15.0)
 
-Phase 1 implementation proved four instructions in this document wrong, and Epic 1 has since superseded a fifth. **Follow the corrections below, not the original text.** Each is also flagged inline at the spot it affects. Everything else in this document stands as written.
+Phase 1 implementation proved four instructions in this document wrong, and Epic 1 has since superseded three more. **Follow the corrections below, not the original text.** Each is also flagged inline at the spot it affects. Everything else in this document stands as written.
 
 1. **File drop is not a top-level option.** `options.App` has no `EnableFileDrop` field. The real form is the nested struct `DragAndDrop: &options.DragAndDrop{EnableFileDrop: true}` (evidence: `pkg/options/options.go:201-216`). *Affects §6 Module D, §10 Phase 1.*
 2. **There is no `wails_file_drop` event.** The runtime event is `wails:file-drop`, and the supported API is the helper pair `OnFileDrop(callback, useDropTarget)` / `OnFileDropOff()` imported from `../wailsjs/runtime/runtime`. Drops are gated on the inherited CSS custom property `--wails-drop-target: drop` -- not a class, not a DOM handler (evidence: `internal/frontend/runtime/desktop/draganddrop.js`). *Affects §6 Module D, §10 Phase 6.*
@@ -14,6 +14,9 @@ Phase 1 implementation proved four instructions in this document wrong, and Epic
 
    *Affects §9, and Phases 3-4 which implement these.* **Wholly superseded by correction 5.** Both types named above -- `TransferServer` and `Streamer` -- have since been deleted, so this ctx-signature fix is historical only. The sentence that once stood here, "`NetworkManager` is unchanged", was also overtaken: Story 1.2 replaced it with `NetworkPort`.
 5. **Neither `Streamer` nor `TransferServer` exists; the payload contract is `PayloadPort`/`PreparedPayload` and the server contract is `transfer.ServerPort`** (Stories 1.3 and 1.4). A provider-owned interface taking a path string could not re-check the source at claim time or derive a wire length from a real descriptor, so `internal/server` now owns the contract and `internal/stream` implements it. `StreamZip` is gone with it -- Epic 2 reintroduces directories through the same port. `TransferServer`/`TransferStats` went the same way in Story 1.4: a path-string-plus-callback interface could not express a capability token, a claim handshake, an event channel, or teardown guarantees, so `transfer.ServerPort` replaced it and `ProgressSnapshot` replaced `TransferStats`. `NetworkManager` was likewise replaced by the consumer-owned `NetworkPort` in Story 1.2. The binding shapes live in `docs/fairdrop-contracts.md`, which supersedes §9 wherever the two disagree. *Affects §9, §10 Phases 3-4.*
+
+6. **§4's `FileMetadata` is not the shipped shape** (Story 1.5). It also carries `sessionId` and a non-null `warnings` array. `Coordinator.Stage` returns a `FileMetadata` value; the `*transfer.FileMetadata` pointer belongs to the App layer in Story 1.7. `Size` is the item's logical size, not an estimate. *Affects §4.*
+7. **§5's event triggers and payloads are both wrong** (Story 1.5). The shipped events run on one synchronous FIFO lane: every payload carries `sessionId` and a `seq` starting at 1, there is a fifth `transfer-reset` kind, progress carries an explicit `totalKnown`, and error carries a `{code,message}` `PublicError` rather than free text. The triggers moved too -- `transfer-started` is published by the coordinator after the TRANSFERRING commit, not when the HTTP handler receives a request, and `transfer-complete` follows the server's authoritative terminal snapshot rather than the handler finishing its write. *Affects §5.*
 
 ## 1. Product Overview & Philosophy
 DeadDrop is an ephemeral, cross-platform local P2P file transfer desktop application.
@@ -53,11 +56,10 @@ func (a *App) StageTransfer(absolutePath string) (*FileMetadata, error)
 func (a *App) CancelTransfer() error
 ```
 
-> **Superseded:** this is not the shipped shape. `transfer.FileMetadata` also carries
-> `sessionId` and a non-null `warnings` array, and `StageTransfer` returns
-> `*transfer.FileMetadata`, which the coordinator builds. The binding shapes live in
-> `docs/fairdrop-contracts.md` ("Canonical domain values" and "Public Wails API"), which
-> governs wherever the two disagree. *(Story 1.5.)*
+> **Superseded by correction 6.** `transfer.FileMetadata` also carries `sessionId` and a
+> non-null `warnings` array; `Coordinator.Stage` returns a value, and the pointer belongs
+> to the App layer in Story 1.7. `Size` is the logical size, not "estimated if directory".
+> `docs/fairdrop-contracts.md` governs wherever the two disagree. *(Story 1.5.)*
 
 ## 5. IPC Event System (Go -> React)
 Use `runtime.EventsEmit(a.ctx, eventName, payload)` to drive the React UI reactively:
@@ -66,11 +68,13 @@ Use `runtime.EventsEmit(a.ctx, eventName, payload)` to drive the React UI reacti
 *   `event: transfer-complete` - Triggered when the HTTP handler successfully finishes writing the response body.
 *   `event: transfer-error` - Payload: `{ message: string }`.
 
-> **Superseded:** the shipped events run on one synchronous FIFO lane. Every payload
-> carries `sessionId` and a `seq` that starts at 1 and increments by one, there is a
-> fifth `transfer-reset` kind, progress carries an explicit `totalKnown`, and error
-> carries a `{code,message}` `PublicError` rather than free text. See "Event ordering"
-> in `docs/fairdrop-contracts.md`, which governs. *(Story 1.5.)*
+> **Superseded by correction 7.** Both the payloads AND the triggers above are wrong.
+> `transfer-started` is published by the coordinator after the TRANSFERRING commit, not
+> when the handler receives a request; `transfer-complete` follows the server's
+> authoritative terminal snapshot. Payloads carry `sessionId`, a `seq` starting at 1, an
+> explicit `totalKnown` on progress, and a `{code,message}` `PublicError` on error, and a
+> fifth `transfer-reset` kind exists. See "Event ordering" in
+> `docs/fairdrop-contracts.md`, which governs. *(Story 1.5.)*
 
 ## 6. Detailed Implementation Modules
 

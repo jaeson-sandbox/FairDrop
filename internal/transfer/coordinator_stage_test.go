@@ -447,8 +447,9 @@ func TestStageUnwindsWhenCancelledAfterEachStep(t *testing.T) {
 
 func TestStageDiscardsAStaleResult(t *testing.T) {
 	for _, testCase := range []struct {
-		name string
-		arm  func(h *harness)
+		name  string
+		arm   func(h *harness)
+		after func(t *testing.T, h *harness)
 	}{
 		{
 			name: "the generation moved on",
@@ -461,6 +462,9 @@ func TestStageDiscardsAStaleResult(t *testing.T) {
 					return append([]byte(nil), testPNG...), nil
 				}
 			},
+			// The session is still this call's own, so clearing it and
+			// returning to IDLE is correct.
+			after: assertUnwoundToIdle,
 		},
 		{
 			name: "the session was replaced",
@@ -471,6 +475,24 @@ func TestStageDiscardsAStaleResult(t *testing.T) {
 					c.session = &session{id: "a-different-session", generation: c.session.generation}
 					c.mu.Unlock()
 					return append([]byte(nil), testPNG...), nil
+				}
+			},
+			// A replacement is NOT this call's to clear. The stale Stage must
+			// release what it acquired and return cancelled while leaving the
+			// installed session alone -- clearing it would deregister a live
+			// session and force IDLE with its resources still running. This
+			// expectation previously asserted the clobber and so passed
+			// against the defect.
+			after: func(t *testing.T, h *harness) {
+				t.Helper()
+				c := h.coordinator
+				c.mu.Lock()
+				defer c.mu.Unlock()
+				if c.session == nil {
+					t.Fatal("the stale Stage cleared a session it did not own")
+				}
+				if c.session.id != "a-different-session" {
+					t.Fatalf("installed session is %q, want the replacement left untouched", c.session.id)
 				}
 			},
 		},
@@ -490,7 +512,7 @@ func TestStageDiscardsAStaleResult(t *testing.T) {
 			if got := h.calls.teardownCalls(); !slices.Equal(got, []string{"server.Stop"}) {
 				t.Errorf("unwind released %v, want [server.Stop]", got)
 			}
-			assertUnwoundToIdle(t, h)
+			testCase.after(t, h)
 		})
 	}
 }

@@ -4,10 +4,14 @@ package transfer
 
 import "time"
 
-// SessionID correlates one transfer session internally and with the UI.
+// SessionID correlates one transfer session internally and with the UI. It
+// carries at least 128 random bits from a CSPRNG, is independent of the
+// session's CapabilityToken, and is never persisted.
 type SessionID string
 
-// CapabilityToken authorizes access to one transfer over HTTP.
+// CapabilityToken authorizes access to one transfer over HTTP. It carries at
+// least 128 random bits from a CSPRNG, is independent of the session's
+// SessionID -- neither is derived from the other -- and is never persisted.
 type CapabilityToken string
 
 // ItemKind identifies the kind of staged source item.

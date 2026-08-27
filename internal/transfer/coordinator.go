@@ -460,9 +460,14 @@ func (c *Coordinator) failStage(live *session, cause error) (FileMetadata, error
 
 	c.mu.Lock()
 	// Only the lease owner installs or clears a session, and this call still
-	// owns the lease, so the live session is necessarily still ours.
-	c.session = nil
-	c.state = stateIdle
+	// owns the lease, so the live session should still be ours -- checked
+	// rather than assumed. Clearing a session this call does not own would
+	// deregister a replacement and force IDLE while its resources stay live,
+	// which is exactly the invariant an assumption in a comment cannot hold.
+	if c.session == live {
+		c.session = nil
+		c.state = stateIdle
+	}
 	c.releaseLease()
 	c.mu.Unlock()
 
@@ -609,10 +614,16 @@ func (c *Coordinator) acquireLease() bool {
 
 // releaseLease hands the operation lease back. The send cannot block: the
 // lease holds one token and only its owner returns it.
+// releaseLease hands the single token back. The send cannot block when the
+// caller genuinely owns the lease, so a full channel means two callers believe
+// they do -- a bug that must be loud rather than absorbed. Panicking here is
+// the honest response: continuing would let two operations drive one session's
+// adapters concurrently, which is the exact thing the lease exists to prevent.
 func (c *Coordinator) releaseLease() {
 	select {
 	case c.lease <- struct{}{}:
 	default:
+		panic("transfer: operation lease released twice; two callers own one session")
 	}
 }
 

@@ -116,3 +116,27 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
   summary: A CSPRNG failure during Stage has no stable code of its own, so it borrows `transfer_failed`, whose fixed copy describes an interrupted transfer that never began.
   evidence: `Coordinator.newIdentity` maps an exhausted entropy source to `transfer_failed` because the code table has no entry for it and the contract sends everything unrecognized to that fallback. The registry string is "The transfer stopped before FairDrop finished sending," but nothing was staged, advertised, or sent. Same shape as the Story 1.3 entry about a Prepare-time deadline: the copy registry is fixed by the UX contract, so a new code or new copy is a UX decision (EXPERIENCE.md), not a coordinator one. The failure is unreachable in practice on a healthy host.
+
+- source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
+  summary: A committed session has no production-reachable teardown until Story 1.6 lands.
+  evidence: After a successful Stage, the only code that cancels the session context, stops the server and beacon, or joins the drainer is `failStage`. `cancelSession` and `beginClosing` are unexported and called only from tests, so a staged listener, mDNS registration, session context, and drainer goroutine currently outlive the coordinator with nothing able to release them. Story 1.6's Cancel and Shutdown are the fix; recording it because the code alone reads as an omission rather than a sequencing decision.
+
+- source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
+  summary: `unwind` waits on the drainer unbounded while holding the operation lease.
+  evidence: `<-live.drainerDone` depends entirely on `ServerPort.Stop` closing the event lane. A Stop that returns without closing it wedges the coordinator in permanent `busy` with no timeout and no diagnostic. This is the second unbounded wait in the file -- the deferred entry about `StopBeacon` inside `AuthorizeClaim` names the first -- and no test drives a Stop that leaves the lane open, because the fake always closes it.
+
+- source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
+  summary: A claim that loses its post-`StopBeacon` revalidation leaves the state at CLAIMING with no public exit.
+  evidence: The contract gives Cancel-from-CLAIMING to Story 1.6, so this is the intended division of labour rather than a defect. Until 1.6 lands, though, a lost revalidation wedges the coordinator: every later Stage answers `busy` and every claim answers `cancelled`. Worth a deliberate test in 1.6 rather than being discovered there.
+
+- source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
+  summary: `AuthorizeClaim` can return `transfer_failed`, which the contract's claim-authorization row does not list.
+  evidence: `ready()` yields `ErrTransferFailed` when a port is missing, but `docs/fairdrop-contracts.md` says claim authorization returns `cancelled` or `shutting_down` only. A missing port is a wiring defect rather than a runtime outcome, so the honest fix may be to make it unrepresentable at construction instead of widening the contract. Related: `Stage(nil ctx)` is `transfer_failed` while `AuthorizeClaim(nil ctx)` is `cancelled`, for one class of programmer error.
+
+- source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
+  summary: `NetworkPort` does not document that `StartBeacon` requires a prior successful `GetLocalIP`.
+  evidence: `internal/network` enforces that ordering and answers `beacon_warning` without it, but the port doc states no such precondition and the coordinator's fake accepts `StartBeacon` at any time. Swapping the coordinator's address and beacon steps would keep every coordinator test green and fail in production. The ordering belongs on the port, and the fake should assert it.
+
+- source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
+  summary: `diagnosticSink` silently drops entries past 32 with no marker.
+  evidence: A truncated sink is indistinguishable from a complete one in a structure whose stated purpose is to be inspected, and the policy drops newest rather than oldest. Nothing outside the package reads it until Story 1.6 exposes it, which is the moment to settle both.
