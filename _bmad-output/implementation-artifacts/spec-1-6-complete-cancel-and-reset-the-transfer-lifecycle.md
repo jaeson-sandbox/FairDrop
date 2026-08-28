@@ -2,7 +2,7 @@
 title: 'Story 1.6 — Complete, Cancel, and Reset the Transfer Lifecycle'
 type: 'feature'
 created: '2026-08-27'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '2720bfbf30de9cb018713e2107bd0033bf9e3901'
 context:
@@ -117,3 +117,95 @@ context:
 - `go mod tidy && go mod verify` — this story adds no dependency.
 - `gofmt -l .` and `git diff --check` — no formatting or whitespace defects.
 - `rg -n 'wails|net/http' internal/transfer --glob '!**/*_test.go'` — no output: the coordinator stays framework-independent.
+
+## Suggested Review Order
+
+**The deadlock the design exists to avoid**
+
+- Start here: the two rules that make terminal handling on the drainer safe.
+  [`outcomes.go:25`](../../internal/transfer/outcomes.go#L25)
+
+- Non-blocking, always. A held lease means a teardown already owns this outcome.
+  [`outcomes.go:109`](../../internal/transfer/outcomes.go#L109)
+
+- Release without joining: this code *is* the drainer it would wait for.
+  [`coordinator.go:535`](../../internal/transfer/coordinator.go#L535)
+
+- The join every other path owes, and why it stays unbounded.
+  [`coordinator.go:559`](../../internal/transfer/coordinator.go#L559)
+
+**Emission order by construction**
+
+- Only the lease holder publishes, and the comment says what it really checks.
+  [`coordinator.go:712`](../../internal/transfer/coordinator.go#L712)
+
+- A dropped snapshot consumes no sequence number, so a gap cannot occur.
+  [`outcomes.go:66`](../../internal/transfer/outcomes.go#L66)
+
+- Sequence assignment sits next to the publication it belongs to.
+  [`outcomes.go:210`](../../internal/transfer/outcomes.go#L210)
+
+**Quiesce, then announce**
+
+- Resources go first; Shutdown is re-checked after, because it waits on this lease.
+  [`outcomes.go:109`](../../internal/transfer/outcomes.go#L109)
+
+- An allow-list: only codes describing a transfer that began and then failed.
+  [`outcomes.go:300`](../../internal/transfer/outcomes.go#L300)
+
+- The boundary that cannot afford to trust its adapter, now for every field.
+  [`outcomes.go:329`](../../internal/transfer/outcomes.go#L329)
+
+**Cancel joins; it never cleans up twice**
+
+- Waiting on the lease *is* the join, from IDLE as much as anywhere else.
+  [`lifecycle.go:23`](../../internal/transfer/lifecycle.go#L23)
+
+- One retire drives every marked session to IDLE; only Shutdown stays silent.
+  [`lifecycle.go:95`](../../internal/transfer/lifecycle.go#L95)
+
+- A timer cannot be un-fired, only outrun, so it revalidates on the far side.
+  [`lifecycle.go:144`](../../internal/transfer/lifecycle.go#L144)
+
+- The lease being free is Shutdown's proof that nothing is still running.
+  [`lifecycle.go:61`](../../internal/transfer/lifecycle.go#L61)
+
+**Contract surface**
+
+- The three-second lease, scheduled through a seam so it is deterministic.
+  [`lifecycle.go:10`](../../internal/transfer/lifecycle.go#L10)
+
+- The timer seam, and the one property the coordinator depends on.
+  [`coordinator.go:183`](../../internal/transfer/coordinator.go#L183)
+
+- Naming no state refuses everything; a zero-value skip is how an id became a wildcard.
+  [`coordinator.go:605`](../../internal/transfer/coordinator.go#L605)
+
+**Evidence the rules are executable**
+
+- Position as well as payload: started first, reset last, nothing after a terminal.
+  [`coordinator_outcomes_test.go:502`](../../internal/transfer/coordinator_outcomes_test.go#L502)
+
+- Ordering, not presence: Stop must precede the publication that announces it.
+  [`coordinator_outcomes_test.go:143`](../../internal/transfer/coordinator_outcomes_test.go#L143)
+
+- A held lease discards the outcome rather than waiting -- the deadlock, forced.
+  [`coordinator_outcomes_test.go:572`](../../internal/transfer/coordinator_outcomes_test.go#L572)
+
+- Both terminal states fire their reset; only DONE used to be driven.
+  [`coordinator_lifecycle_test.go:878`](../../internal/transfer/coordinator_lifecycle_test.go#L878)
+
+- Shutdown suppresses an outcome that already owns the lease it waits for.
+  [`coordinator_lifecycle_test.go:947`](../../internal/transfer/coordinator_lifecycle_test.go#L947)
+
+- The busy guard is all that holds the terminal lease, since the lease is free.
+  [`coordinator_stage_test.go:854`](../../internal/transfer/coordinator_stage_test.go#L854)
+
+- The production default nothing else executes, which Story 1.7 will wire.
+  [`coordinator_lifecycle_test.go:730`](../../internal/transfer/coordinator_lifecycle_test.go#L730)
+
+- Cancel walks all seven rows of the command table.
+  [`coordinator_lifecycle_test.go:16`](../../internal/transfer/coordinator_lifecycle_test.go#L16)
+
+- Every adapter passes this gate; it is what keeps the mutex rule from regressing.
+  [`helpers_test.go:188`](../../internal/transfer/helpers_test.go#L188)
