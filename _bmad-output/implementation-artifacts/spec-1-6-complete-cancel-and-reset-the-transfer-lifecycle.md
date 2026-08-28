@@ -2,7 +2,7 @@
 title: 'Story 1.6 — Complete, Cancel, and Reset the Transfer Lifecycle'
 type: 'feature'
 created: '2026-08-27'
-status: 'review'
+status: 'in-review'
 review_loop_iteration: 0
 baseline_commit: '2720bfbf30de9cb018713e2107bd0033bf9e3901'
 context:
@@ -92,6 +92,8 @@ context:
 - Given every event, warning, and diagnostic this story can produce, when each is searched for the staged path and the capability token, then neither appears.
 
 ## Spec Change Log
+
+- **Review round 1 (2026-08-27, patches only — no loopback):** The three step-04 review layers all terminated on an API rate limit before producing findings, so their exact child prompts were written to `review-layer-prompts-1-6.md` for an out-of-session run, and the review was carried by twenty-four independent mutations instead. Eighteen were caught, naming the test that failed. The six survivors split three ways. **Three were real verification gaps and are now closed:** the production `AfterFunc` default that `NewCoordinator` installs was never executed once — every test injected the seam, so a default that scheduled nothing would have parked every terminal session in DONE forever with the suite green; `Shutdown` with nothing staged never proved the operation lease was free, which matters because `retire` clears the session several lines before it hands the lease back, so a Shutdown in that window would report everything gone while a reset was still being published; and `Cancel` was never shown to cancel the data-plane *context* rather than only the generation marker, because every fake returns immediately and the two are indistinguishable without a step that will not finish until its context is cancelled. **Two were redundant guards** — `session.terminal`, already self-reported in `deferred-work.md`, and `retire`'s STAGING check, whose comment claimed to be the mechanism keeping Cancel-from-STAGING silent when the live mechanism is the `c.session != live` return above it; the comment was corrected rather than the guard removed. **One was a weak mutation** that added a redundant write without breaking a guarantee, and proves nothing either way. **KEEP:** the two non-blocking lease acquisitions in the drainer and the `releaseAcquired`/`joinDrainer` split — mutating any of the three deadlocks the suite outright, which is the evidence that the central design constraint is enforced rather than described; `publish` panicking without the lease; `assertEventGrammar`, which pins seq-from-one, no-gap, one-terminal and the contract's per-event payload table on every collected stream; and the 3-second reset asserted against a literal at the assertion site rather than against `resetDelay`. **One flaky test was found and fixed:** `TestASecondTerminalEventIsDiscarded` published both terminal events up front under a comment asserting "both are queued before the drainer can take either", which nothing synchronised -- roughly one suite run in forty, the drainer took the first, tore down, and closed the lane before the second was offered, failing with "the second terminal event was not queued". The second outcome is now queued from inside the first one's teardown, the one deterministic moment when an outcome has been accepted and the lane is still open, and `fakeServer.Stop` closes the lane last to match the real port's teardown order. Sixty consecutive suite runs are clean.
 
 ## Design Notes
 

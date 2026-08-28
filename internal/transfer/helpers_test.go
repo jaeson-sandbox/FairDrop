@@ -342,13 +342,16 @@ func (f *fakeServer) Start(
 
 func (f *fakeServer) Stop() error {
 	f.h.enter("server.Stop")
-	// The real port closes its event lane on every Stop return, which is what
-	// lets the coordinator's drainer finish.
-	f.closeEvents()
+	var err error
 	if f.stop != nil {
-		return f.stop()
+		err = f.stop()
 	}
-	return nil
+	// Closed last, which is the order the real port tears down in: handlers and
+	// producers end first and lane closure is the final step. The order is
+	// load-bearing for tests, because it leaves the stop hook as the one moment
+	// when an outcome has been accepted and the lane is still open.
+	f.closeEvents()
+	return err
 }
 
 // closeEvents closes the lane exactly once, under the same mutex publish uses,
@@ -741,4 +744,30 @@ func (f *fakeTimer) fireIfArmed() bool {
 
 	call.run()
 	return true
+}
+
+// blockUntilCancelled makes the QR seam hold its step open until the context it
+// was handed is cancelled, and reports which happened first.
+//
+// It is how a test distinguishes Cancel *interrupting* a setup step from Cancel
+// merely waiting for one to finish on its own. Every other fake returns
+// immediately, so without this the two are indistinguishable and the session
+// context cancellation in Cancel is unproven.
+func (h *harness) blockQRUntilCancelled() <-chan error {
+	released := make(chan error, 1)
+	abort := make(chan struct{})
+	h.t.Cleanup(func() { close(abort) })
+
+	h.qr.encode = func(ctx context.Context, content string) ([]byte, error) {
+		select {
+		case <-ctx.Done():
+			released <- ctx.Err()
+		case <-abort:
+			// The test is tearing down without the context ever being
+			// cancelled, which is the failure this helper exists to catch.
+			released <- nil
+		}
+		return nil, NewError(ErrCancelled, "the capability code encoder was cancelled")
+	}
+	return released
 }

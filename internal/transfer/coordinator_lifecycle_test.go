@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestCancelFromEveryState walks the command table's Cancel rows. Each case
@@ -711,5 +712,157 @@ func TestShutdownContendsWithEveryOtherActor(t *testing.T) {
 				t.Errorf("Stage after the contention returned %q, want %q", ErrorCodeOf(err), ErrShuttingDown)
 			}
 		})
+	}
+}
+
+// TestTheDefaultResetSchedulerIsARealTimer drives the AfterFunc that
+// NewCoordinator installs when a caller supplies none -- which is how main.go
+// will build the coordinator in Story 1.7.
+//
+// Every other test in this package injects the seam, so without this the
+// production default is never executed once: a default that returned a stop
+// function and scheduled nothing would leave every terminal session parked in
+// DONE forever, and the whole suite would still be green.
+func TestTheDefaultResetSchedulerIsARealTimer(t *testing.T) {
+	coordinator := NewCoordinator(Dependencies{})
+	if coordinator.afterFunc == nil {
+		t.Fatal("NewCoordinator installed no reset scheduler")
+	}
+
+	ran := make(chan struct{})
+	stop := coordinator.afterFunc(20*time.Millisecond, func() { close(ran) })
+	if stop == nil {
+		t.Fatal("the default scheduler returned no stop function")
+	}
+	select {
+	case <-ran:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the default scheduler never ran its callback")
+	}
+	if stop() {
+		t.Error("stopping an already-fired timer reported that it prevented the run")
+	}
+
+	// The same default must be able to prevent a run, which is what Cancel and
+	// Shutdown rely on to stop an armed reset.
+	unwanted := make(chan struct{})
+	stopEarly := coordinator.afterFunc(time.Hour, func() { close(unwanted) })
+	if !stopEarly() {
+		t.Error("stopping a pending timer reported that it did not prevent the run")
+	}
+	select {
+	case <-unwanted:
+		t.Error("a stopped timer ran its callback anyway")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+// TestShutdownWaitsForTheLeaseWithNothingStaged pins the claim Shutdown makes
+// with no session at all: the lease being free is the proof that no setup or
+// teardown is still running.
+//
+// It matters because retire clears the session several lines before it hands
+// the lease back. A Shutdown that skipped the wait would return during that
+// window -- reporting that everything is gone while a reset was still being
+// published.
+func TestShutdownWaitsForTheLeaseWithNothingStaged(t *testing.T) {
+	h := newHarness(t)
+
+	// Nothing staged, and somebody else owns the lease.
+	<-h.coordinator.lease
+	if h.liveSession() != nil {
+		t.Fatal("no session should exist")
+	}
+
+	returned := make(chan struct{})
+	go func() {
+		defer close(returned)
+		if err := h.coordinator.Shutdown(); err != nil {
+			t.Errorf("Shutdown returned %v, want nil", err)
+		}
+	}()
+
+	select {
+	case <-returned:
+		t.Fatal("Shutdown returned while the operation lease was still held")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	h.coordinator.lease <- struct{}{}
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown never returned after the lease was released")
+	}
+	if h.coordinator.leaseHeld() {
+		t.Error("the lease is still held after Shutdown returned")
+	}
+}
+
+// TestCancelInterruptsASetupStepRatherThanWaitingForIt proves Cancel cancels
+// the session's data-plane context, not merely its generation marker.
+//
+// The marker alone is enough for the fakes, which all return immediately, so
+// this is the one shape that tells the two apart: a setup step that will not
+// finish until its context is cancelled. In production that step is an mDNS
+// registration or a listener bind, and a Cancel that only marked the generation
+// would block until the adapter finished on its own.
+func TestCancelInterruptsASetupStepRatherThanWaitingForIt(t *testing.T) {
+	h := newHarness(t)
+	released := h.blockQRUntilCancelled()
+
+	staged := make(chan error, 1)
+	go func() {
+		_, err := h.stage()
+		staged <- err
+	}()
+
+	// Wait until Stage is parked inside the QR step, so Cancel cannot win by
+	// arriving before the step it has to interrupt.
+	deadline := time.Now().Add(mutexProbeTimeout)
+	for h.calls.count("qr.EncodePNG") == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("Stage never reached the capability code step")
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+
+	cancelled := make(chan error, 1)
+	go func() { cancelled <- h.coordinator.Cancel() }()
+
+	select {
+	case err := <-released:
+		if err == nil {
+			t.Fatal("the setup step was never cancelled; Cancel only marked the generation")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Cancel never cancelled the staging step's context")
+	}
+
+	select {
+	case err := <-cancelled:
+		if err != nil {
+			t.Errorf("Cancel returned %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Cancel never returned")
+	}
+	select {
+	case err := <-staged:
+		if got := ErrorCodeOf(err); got != ErrCancelled {
+			t.Errorf("Stage returned %q, want %q", got, ErrCancelled)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Stage never returned")
+	}
+
+	if got := h.state(); got != stateIdle {
+		t.Errorf("state is %q, want %q", got, stateIdle)
+	}
+	if h.coordinator.leaseHeld() {
+		t.Error("the lease is still held after Cancel returned")
+	}
+	if events := h.observer.published(); len(events) != 0 {
+		t.Errorf("published %+v, want no lifecycle event before a STAGED acknowledgement", events)
 	}
 }

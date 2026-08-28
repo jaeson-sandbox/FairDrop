@@ -283,15 +283,35 @@ func TestASecondTerminalEventIsDiscarded(t *testing.T) {
 	metadata := h.transferring()
 	final := testProgress(testSize, 100)
 
-	// Both are queued before the drainer can take either, so the second one is
-	// still waiting when the first is accepted.
+	// The second outcome is queued from inside the first one's teardown. That is
+	// the only moment it can be queued deterministically: the first has been
+	// accepted, the drainer is busy quiescing rather than reading, and the lane
+	// is still open because the fake closes it last. Publishing both up front
+	// instead raced the drainer, which took the first and closed the lane before
+	// the second was ever offered -- a flake about one run in forty.
+	queued := make(chan bool, 1)
+	h.server.stop = func() error {
+		select {
+		case queued <- h.server.publish(failedEvent(
+			metadata.SessionID, nil, NewError(ErrTransferFailed, "a second outcome"))):
+		default:
+		}
+		return nil
+	}
+
 	if !h.server.publish(completeEvent(metadata.SessionID, final)) {
 		t.Fatal("the complete event was not queued")
 	}
-	if !h.server.publish(failedEvent(metadata.SessionID, nil, NewError(ErrTransferFailed, "a second outcome"))) {
-		t.Fatal("the second terminal event was not queued")
-	}
 	h.awaitDrainer()
+
+	select {
+	case ok := <-queued:
+		if !ok {
+			t.Fatal("the second terminal event was not queued")
+		}
+	default:
+		t.Fatal("the first outcome never reached teardown, so no second outcome was offered")
+	}
 
 	events := h.observer.published()
 	if len(events) != 3 {

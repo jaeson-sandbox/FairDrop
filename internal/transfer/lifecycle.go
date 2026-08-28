@@ -66,10 +66,16 @@ func (c *Coordinator) Shutdown() error {
 // The caller owns the lease and must not hold the state mutex.
 //
 // announce asks for the reset event the UI needs to leave its terminal view.
-// Shutdown passes false, and a session that never reached its STAGED
-// acknowledgement publishes nothing either way: nothing was acknowledged, so
-// there is no UI session to terminate and the command's own error is the whole
-// outcome.
+// Shutdown passes false.
+//
+// A session that never reached its STAGED acknowledgement publishes nothing
+// either way, but the STAGING check below is not what carries that: STAGING
+// exists only while Stage holds the operation lease, and this runs after
+// awaiting it, so Stage has already reached failStage -- which cleared the
+// session -- or committed STAGED. The `c.session != live` return above is the
+// live mechanism. The state check is kept as the explicit statement of the
+// rule rather than as its enforcement, because nothing else in this file says
+// it out loud.
 func (c *Coordinator) retire(live *session, announce bool) {
 	c.mu.Lock()
 	if c.session != live {
