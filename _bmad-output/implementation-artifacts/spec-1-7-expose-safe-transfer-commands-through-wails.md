@@ -69,12 +69,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `app.go` — the four commands, the `Observer` implementation, and the two lifecycle hooks; nothing else.
-- [ ] `main.go` — compose the six adapters and the coordinator, resolve the App/coordinator cycle in one place, and register `ErrorFormatter`.
-- [ ] `app_test.go` — **new.** Drive every matrix row against a fake coordinator boundary and fake Wails seams.
-- [ ] `main_test.go` — pin `ErrorFormatter` beside the existing option assertions.
-- [ ] `frontend/src/transfer/errors.ts` and its test — **new.** `parseCommandError` with the fixed fallback.
-- [ ] `frontend/wailsjs/**` — regenerate through the Wails CLI; do not hand-edit.
+- [x] `app.go` — the four commands, the `Observer` implementation, and the two lifecycle hooks; nothing else.
+- [x] `main.go` — compose the six adapters and the coordinator, resolve the App/coordinator cycle in one place, and register `ErrorFormatter`.
+- [x] `app_test.go` — **new.** Drive every matrix row against a fake coordinator boundary and fake Wails seams.
+- [x] `main_test.go` — pin `ErrorFormatter` beside the existing option assertions.
+- [x] `frontend/src/transfer/errors.ts` and its test — **new.** `parseCommandError` with the fixed fallback.
+- [x] `frontend/wailsjs/**` — regenerate through the Wails CLI; do not hand-edit.
 
 **Acceptance Criteria:**
 - Given the composed application, when `app.go` is searched for `net/http`, `os`, `mdns`, and transfer-state vocabulary, then none appears — translation only.
