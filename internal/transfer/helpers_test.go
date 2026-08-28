@@ -114,6 +114,7 @@ type harness struct {
 	observer *fakeObserver
 	entropy  *fakeEntropy
 	clock    *fakeClock
+	timer    *fakeTimer
 }
 
 func newHarness(t *testing.T) *harness {
@@ -127,15 +128,17 @@ func newHarness(t *testing.T) *harness {
 	h.observer = &fakeObserver{h: h}
 	h.entropy = &fakeEntropy{h: h}
 	h.clock = &fakeClock{h: h, current: time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC), step: time.Second}
+	h.timer = &fakeTimer{h: h}
 
 	h.coordinator = NewCoordinator(Dependencies{
-		Source:   h.source,
-		Network:  h.network,
-		Server:   h.server,
-		QR:       h.qr,
-		Observer: h.observer,
-		Entropy:  h.entropy,
-		Now:      h.clock.Now,
+		Source:    h.source,
+		Network:   h.network,
+		Server:    h.server,
+		QR:        h.qr,
+		Observer:  h.observer,
+		Entropy:   h.entropy,
+		Now:       h.clock.Now,
+		AfterFunc: h.timer.afterFunc,
 	})
 
 	t.Cleanup(h.close)
@@ -308,10 +311,10 @@ type fakeServer struct {
 	start func(ctx context.Context, request ServerStartRequest, authorizer ClaimAuthorizer) (ServerHandle, error)
 	stop  func() error
 
-	events    chan ServerEvent
-	closeOnce sync.Once
+	events chan ServerEvent
 
 	mu         sync.Mutex
+	closed     bool
 	requests   []ServerStartRequest
 	authorizer ClaimAuthorizer
 	// startCtx is the context the coordinator hands the server. It outlives
@@ -348,8 +351,35 @@ func (f *fakeServer) Stop() error {
 	return nil
 }
 
+// closeEvents closes the lane exactly once, under the same mutex publish uses,
+// so a producer racing a Stop can never send on a closed channel -- which is
+// the property the real eventLane has and the reason it holds a mutex too.
 func (f *fakeServer) closeEvents() {
-	f.closeOnce.Do(func() { close(f.events) })
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.closed {
+		return
+	}
+	f.closed = true
+	close(f.events)
+}
+
+// publish is the non-blocking producer, modelled on the real event lane: it
+// never blocks and never sends after close, so a test may race it against a
+// Stop the way a live handler does. It needs a buffered lane to land anything,
+// so callers pair it with bufferLane; emit is the deterministic alternative.
+func (f *fakeServer) publish(event ServerEvent) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.closed {
+		return false
+	}
+	select {
+	case f.events <- event:
+		return true
+	default:
+		return false
+	}
 }
 
 func (f *fakeServer) startRequests() []ServerStartRequest {
@@ -491,4 +521,224 @@ func (f *fakeClock) reads() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.calls
+}
+
+// bufferLane replaces the server's event lane with a buffered one, the shape
+// the real lane has. Tests that need an event to sit queued while something
+// else happens -- a second terminal event, or a producer racing a Stop -- call
+// it before Stage, which is when the lane is handed over.
+func (h *harness) bufferLane(depth int) {
+	h.t.Helper()
+	if h.liveSession() != nil {
+		h.t.Fatal("bufferLane must be called before Stage hands the lane to the coordinator")
+	}
+	h.server.events = make(chan ServerEvent, depth)
+}
+
+// emit hands one event to the drainer and blocks until it is taken. On an
+// unbuffered lane that makes the drainer's processing observable: a second
+// emit can only be received once the first has been fully handled, which is
+// how a test proves a dropped or refused event really was processed.
+func (h *harness) emit(event ServerEvent) {
+	h.t.Helper()
+	// A lane closed underneath this send means a teardown ran that the test did
+	// not expect, which is a finding rather than a crash: report it by name.
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			h.t.Fatalf("the lane closed before %v could be delivered: %v", event.Kind, recovered)
+		}
+	}()
+	select {
+	case h.server.events <- event:
+	case <-time.After(mutexProbeTimeout):
+		h.t.Fatalf("the drainer never took %v", event.Kind)
+	}
+}
+
+// transferring stages and claims, leaving the coordinator in TRANSFERRING with
+// exactly the started event published.
+func (h *harness) transferring() FileMetadata {
+	h.t.Helper()
+	metadata := h.stageSuccessfully()
+	if err := h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID); err != nil {
+		h.t.Fatalf("AuthorizeClaim returned %v, want a committed transfer", err)
+	}
+	return metadata
+}
+
+// awaitEvents waits for at least want published events and returns them.
+// Publication happens on the drainer or a timer goroutine, so a test cannot
+// simply read the observer and expect the event to have arrived.
+func (h *harness) awaitEvents(want int) []Event {
+	h.t.Helper()
+	deadline := time.Now().Add(mutexProbeTimeout)
+	for {
+		events := h.observer.published()
+		if len(events) >= want {
+			return events
+		}
+		if time.Now().After(deadline) {
+			h.t.Fatalf("published %d events, want at least %d: %+v", len(events), want, events)
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+}
+
+// awaitCancelled blocks until the live session carries the cancellation
+// marker. It is what turns "Cancel probably got there first" into a forced
+// race outcome: a fake calls it mid-step, so the step that follows is
+// guaranteed to run against a cancelled generation.
+func (h *harness) awaitCancelled() {
+	h.t.Helper()
+	deadline := time.Now().Add(mutexProbeTimeout)
+	for {
+		h.coordinator.mu.Lock()
+		live := h.coordinator.session
+		marked := live != nil && live.cancelled
+		h.coordinator.mu.Unlock()
+		if marked {
+			return
+		}
+		if time.Now().After(deadline) {
+			h.t.Error("no cancellation was marked before the deadline")
+			return
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+}
+
+// awaitDrainer waits for the live session's drainer goroutine to end, which is
+// the join a terminal outcome deliberately cannot perform on itself.
+func (h *harness) awaitDrainer() {
+	h.t.Helper()
+	live := h.liveSession()
+	if live == nil || live.drainerDone == nil {
+		return
+	}
+	select {
+	case <-live.drainerDone:
+	case <-time.After(mutexProbeTimeout):
+		h.t.Fatal("the drainer did not finish")
+	}
+}
+
+// testProgress is the snapshot shape the fakes report. The percentages are
+// written out at each call site rather than computed here, so a test pins a
+// value instead of repeating the formula under test.
+func testProgress(sent int64, percent float64) ProgressSnapshot {
+	return ProgressSnapshot{
+		BytesSent:        sent,
+		TotalBytes:       testSize,
+		TotalKnown:       true,
+		Percent:          percent,
+		SpeedBytesPerSec: 1024,
+	}
+}
+
+func progressEvent(id SessionID, snapshot ProgressSnapshot) ServerEvent {
+	return ServerEvent{SessionID: id, Kind: ServerProgress, Progress: &snapshot}
+}
+
+func completeEvent(id SessionID, snapshot ProgressSnapshot) ServerEvent {
+	return ServerEvent{SessionID: id, Kind: ServerComplete, Progress: &snapshot}
+}
+
+func failedEvent(id SessionID, snapshot *ProgressSnapshot, cause error) ServerEvent {
+	return ServerEvent{SessionID: id, Kind: ServerFailed, Progress: snapshot, Err: cause}
+}
+
+// fakeTimer is the injected reset scheduler. It never runs a callback on its
+// own: a test fires it explicitly, which is what makes the timer-versus-Cancel
+// race forceable in both directions instead of merely likely.
+type fakeTimer struct {
+	h *harness
+
+	mu        sync.Mutex
+	scheduled []*scheduledCall
+}
+
+// scheduledCall is one armed reset.
+type scheduledCall struct {
+	delay time.Duration
+	run   func()
+
+	mu      sync.Mutex
+	stopped bool
+	fired   bool
+}
+
+func (f *fakeTimer) afterFunc(delay time.Duration, run func()) StopTimer {
+	f.h.enter("timer.AfterFunc")
+	call := &scheduledCall{delay: delay, run: run}
+	f.mu.Lock()
+	f.scheduled = append(f.scheduled, call)
+	f.mu.Unlock()
+	return call.stop
+}
+
+func (c *scheduledCall) stop() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.fired || c.stopped {
+		return false
+	}
+	c.stopped = true
+	return true
+}
+
+func (c *scheduledCall) wasStopped() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.stopped
+}
+
+func (f *fakeTimer) calls() []*scheduledCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]*scheduledCall, len(f.scheduled))
+	copy(out, f.scheduled)
+	return out
+}
+
+func (f *fakeTimer) armed() int {
+	return len(f.calls())
+}
+
+func (f *fakeTimer) stops() int {
+	total := 0
+	for _, call := range f.calls() {
+		if call.wasStopped() {
+			total++
+		}
+	}
+	return total
+}
+
+// fire runs the most recently armed callback, whether or not it was stopped.
+// A timer that has already fired cannot be un-fired, only outrun, so driving a
+// stopped one is exactly how the stale-reset guard has to be tested: the
+// callback must decide for itself that it lost.
+func (f *fakeTimer) fire() {
+	f.h.t.Helper()
+	if !f.fireIfArmed() {
+		f.h.t.Fatal("no reset was armed to fire")
+	}
+}
+
+func (f *fakeTimer) fireIfArmed() bool {
+	calls := f.calls()
+	if len(calls) == 0 {
+		return false
+	}
+	call := calls[len(calls)-1]
+	call.mu.Lock()
+	if call.fired {
+		call.mu.Unlock()
+		return false
+	}
+	call.fired = true
+	call.mu.Unlock()
+
+	call.run()
+	return true
 }

@@ -12,6 +12,17 @@ Append-only. Each entry names the spec that surfaced it.
 > in the download handler, and the server additionally re-checks a `nil` return
 > against the advertised length so a short body cannot reach that path as success.
 
+> **Discharged (Story 1.6):** the four Story 1.5 entries that named this story are
+> settled. A committed session now has a production-reachable teardown -- `Cancel` and
+> `Shutdown` mark the generation, cancel the data-plane context, join the teardown already
+> in flight through the operation lease, and return only once the listener, beacon, drainer
+> and session context are gone. The CLAIMING wedge is closed by Cancel-from-CLAIMING and
+> pinned by `TestCancelFromEveryState/CLAIMING`, which forces the lost revalidation
+> deliberately. The unbounded `unwind` wait is *restated* rather than closed, below: it is
+> now a deliberate design commitment rather than an oversight, and this story added two
+> more waits of the same kind. `diagnosticSink` is restated too -- Story 1.6 does not
+> expose it after all, so nothing outside the package reads it yet.
+
 > **Note (Story 1.3):** entries below that name `Streamer`, `StreamFile`, or `StreamZip`
 > describe a contract that no longer exists. It was replaced by the server-owned
 > `PayloadPort`/`PreparedPayload`. The findings still stand; read them against the new
@@ -140,3 +151,23 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
   summary: `diagnosticSink` silently drops entries past 32 with no marker.
   evidence: A truncated sink is indistinguishable from a complete one in a structure whose stated purpose is to be inspected, and the policy drops newest rather than oldest. Nothing outside the package reads it until Story 1.6 exposes it, which is the moment to settle both.
+
+- source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
+  summary: Every quiescence wait in the coordinator is unbounded, and this story added two more.
+  evidence: Restates the Story 1.5 entry about `unwind`. `Cancel` and `Shutdown` wait on the operation lease, then on `<-live.drainerDone`, then inside `releaseAcquired` on `ServerPort.Stop` and `NetworkPort.StopBeacon`. Each rests on a port postcondition -- Stop is quiescent on every return, StopBeacon guarantees no advertisement remains -- so an adapter that violates one wedges the command with no timeout and no diagnostic. The spec puts a watchdog behind Ask First deliberately: bounding these would let Cancel report success while a listener was still live. The decision belongs with the `internal/server` entry about `Stop` blocking on a source read that ignores its context, which is the one concrete way this can happen today.
+
+- source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
+  summary: `session.terminal` is redundant with the state check that follows it, and no mutation can distinguish them.
+  evidence: `drainerMayActLocked` refuses an event when `live.terminal` is set *and* when the state is no longer TRANSFERRING. Acceptance sets the flag and the settled state on the same goroutine with no other entry point in between -- `acceptTerminal` and `forwardProgress` are both called only from `drain` -- so deleting the flag leaves every test green (verified by mutation). It is kept because the spec names it and because it makes exactly-once acceptance independent of where the state transition lands, but it is defense in depth, not a tested guarantee. Either delete it or move the settled-state transition into the acceptance critical section and let the flag be the only record.
+
+- source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
+  summary: A blocking `Observer.Publish` now stalls every lifecycle command, not just the event lane.
+  evidence: Publication is lease-owned by design, so the coordinator calls `Publish` while holding the operation lease. A Wails observer that blocks -- an emit into a frontend that is not draining, say -- therefore blocks the next `Cancel` or `Shutdown` for as long as it blocks, because those wait for the lease. The contract already calls `Publish` a synchronous FIFO handoff, so this is a constraint on the Story 1.7 adapter rather than a coordinator defect: whatever implements `Observer` must return promptly and must never call back into the coordinator.
+
+- source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
+  summary: A `ServerComplete` carrying no snapshot publishes a zero-value one, and no contract row covers that shape.
+  evidence: The payload table makes `progress` required on `transfer-complete`, and the port says Complete always carries the authoritative snapshot, so a nil there is a port defect with no defined outcome. `acceptTerminal` reports the unknown-total zero snapshot rather than downgrading a success the receiver actually got, and publishes no separate final-progress event. The alternative -- treating it as `transfer_failed` -- would lie about a transfer that completed. Worth a contract sentence either way, since the current behaviour is a coordinator choice rather than a stated rule.
+
+- source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
+  summary: `Cancel` and `Shutdown` take no context, so a Wails command cannot abandon one.
+  evidence: Both return only when the resources they name are quiescent, which is the contract's requirement, so a caller-supplied context would be a parameter they must ignore. Story 1.7 wires `App.CancelTransfer` and the Wails shutdown hook to them: the hook must be prepared to block for as long as the adapters take, and `App.shutdown` is the only place that may call `Shutdown`.

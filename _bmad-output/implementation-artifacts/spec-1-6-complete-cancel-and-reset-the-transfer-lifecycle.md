@@ -2,7 +2,7 @@
 title: 'Story 1.6 — Complete, Cancel, and Reset the Transfer Lifecycle'
 type: 'feature'
 created: '2026-08-27'
-status: 'in-progress'
+status: 'review'
 review_loop_iteration: 0
 baseline_commit: '2720bfbf30de9cb018713e2107bd0033bf9e3901'
 context:
@@ -78,11 +78,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/transfer/coordinator.go` — add `stateDone`/`stateError`, the session's terminal and reset-timer fields, and the injectable `AfterFunc` timer seam; make publication lease-owned.
-- [ ] `internal/transfer/outcomes.go` — **new.** Drainer event handling: progress forwarding, terminal acceptance, unexpected-close synthesis, and the unwind variant that does not join the drainer.
-- [ ] `internal/transfer/lifecycle.go` — **new.** Public `Cancel` and `Shutdown`, and the generation-checked reset timer.
-- [ ] `internal/transfer/*_test.go` — a fake timer and a controllable server lane; drive every matrix row, force the timer/Cancel race both ways, and force Cancel at each state boundary.
-- [ ] `_bmad-output/implementation-artifacts/deferred-work.md` — close or restate the four Story 1.5 entries this story inherits.
+- [x] `internal/transfer/coordinator.go` — add `stateDone`/`stateError`, the session's terminal and reset-timer fields, and the injectable `AfterFunc` timer seam; make publication lease-owned.
+- [x] `internal/transfer/outcomes.go` — **new.** Drainer event handling: progress forwarding, terminal acceptance, unexpected-close synthesis, and the unwind variant that does not join the drainer.
+- [x] `internal/transfer/lifecycle.go` — **new.** Public `Cancel` and `Shutdown`, and the generation-checked reset timer.
+- [x] `internal/transfer/*_test.go` — a fake timer and a controllable server lane; drive every matrix row, force the timer/Cancel race both ways, and force Cancel at each state boundary.
+- [x] `_bmad-output/implementation-artifacts/deferred-work.md` — close or restate the four Story 1.5 entries this story inherits.
 
 **Acceptance Criteria:**
 - Given a claimed transfer driven to each terminal outcome under `-race` with repeats, when the drainer, a Cancel, a Shutdown and the reset timer contend, then no deadlock or race occurs and the lease is unheld once the coordinator reaches IDLE.

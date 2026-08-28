@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"io"
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 )
@@ -36,8 +37,9 @@ const (
 
 // sessionState is the coordinator's lifecycle state. STAGING and CLAIMING are
 // internal: they exist so a long setup or handshake stays interruptible, and
-// the UI never sees them. DONE and ERROR arrive with the terminal outcomes
-// Story 1.6 owns.
+// the UI never sees them. DONE and ERROR are terminal holding states: the
+// session's resources are already released there, and only the reset that
+// clears the session still has to happen.
 type sessionState string
 
 const (
@@ -46,6 +48,8 @@ const (
 	stateStaged       sessionState = "STAGED"
 	stateClaiming     sessionState = "CLAIMING"
 	stateTransferring sessionState = "TRANSFERRING"
+	stateDone         sessionState = "DONE"
+	stateError        sessionState = "ERROR"
 )
 
 // resource names one thing a session acquires from an adapter. Stage appends
@@ -93,9 +97,10 @@ func (s *diagnosticSink) snapshot() []diagnostic {
 // Field ownership splits three ways, and mixing them is what a race here would
 // look like:
 //
-//   - id, token, generation and cancel are set before the session is installed
-//     and never change, so any goroutine may read them.
-//   - cancelled, seq, stagedAt and startedAt are guarded by Coordinator.mu.
+//   - id, token, generation, ctx and cancel are set before the session is
+//     installed and never change, so any goroutine may read them.
+//   - cancelled, terminal, stopReset, seq, stagedAt and startedAt are guarded
+//     by Coordinator.mu.
 //   - everything else belongs to whichever operation holds the lease. The
 //     lease is a channel handoff, so it carries the happens-before edge that
 //     lets the claim path read what Stage wrote.
@@ -103,9 +108,18 @@ type session struct {
 	id         SessionID
 	token      CapabilityToken
 	generation uint64
+	ctx        context.Context
 	cancel     context.CancelFunc
 
 	cancelled bool
+	// terminal records that this session's one Complete or Failed outcome has
+	// been accepted. It is set the moment the outcome is taken, before the
+	// resources are released and the settled state is committed, so
+	// exactly-once acceptance does not depend on where that transition lands.
+	terminal bool
+	// stopReset cancels the armed three-second reset. It is nil whenever no
+	// reset is pending, so a Cancel that finds it nil has nothing to stop.
+	stopReset StopTimer
 	seq       uint64
 	stagedAt  time.Time
 	startedAt time.Time
@@ -124,6 +138,15 @@ func (s *session) hold(held resource) {
 	s.acquired = append(s.acquired, held)
 }
 
+// stop cancels the session's data-plane context. The caller must not hold the
+// state mutex: cancelling runs whatever is waiting on the context, and the
+// no-lock-across-a-call rule covers those continuations too.
+func (s *session) stop() {
+	if s.cancel != nil {
+		s.cancel()
+	}
+}
+
 // release forgets a resource the operation just gave up, so a later unwind
 // does not try to release it twice.
 func (s *session) release(freed resource) {
@@ -136,8 +159,13 @@ func (s *session) release(freed resource) {
 	s.acquired = kept
 }
 
-// Dependencies are the ports and test seams the coordinator composes. Entropy
-// and Now default to the process sources when omitted.
+// StopTimer cancels a scheduled callback. Like time.Timer.Stop it reports
+// whether it stopped the callback before it ran, and calling it after the
+// callback has already run is safe.
+type StopTimer func() bool
+
+// Dependencies are the ports and test seams the coordinator composes. Entropy,
+// Now and AfterFunc default to the process sources when omitted.
 type Dependencies struct {
 	Source   SourcePort
 	Network  NetworkPort
@@ -146,6 +174,13 @@ type Dependencies struct {
 	Observer Observer
 	Entropy  io.Reader
 	Now      func() time.Time
+
+	// AfterFunc schedules the terminal reset. It must behave like
+	// time.AfterFunc in the one way the coordinator depends on: run must not
+	// be invoked before AfterFunc returns. The reset is armed on the drainer
+	// goroutine, and the callback joins that drainer, so a seam that called
+	// back synchronously would make the drainer wait for itself.
+	AfterFunc func(delay time.Duration, run func()) StopTimer
 }
 
 // Coordinator owns FairDrop's transfer lifecycle. It is framework-independent:
@@ -159,13 +194,14 @@ type Dependencies struct {
 // lease serializes the long adapter work itself, so a cancellation joins the
 // teardown already in flight instead of racing a second one.
 type Coordinator struct {
-	source   SourcePort
-	network  NetworkPort
-	server   ServerPort
-	qr       QRPort
-	observer Observer
-	entropy  io.Reader
-	now      func() time.Time
+	source    SourcePort
+	network   NetworkPort
+	server    ServerPort
+	qr        QRPort
+	observer  Observer
+	entropy   io.Reader
+	now       func() time.Time
+	afterFunc func(delay time.Duration, run func()) StopTimer
 
 	// lease holds exactly one token. Whoever receives it may call adapter
 	// Start/Stop/unwind methods; nobody else may.
@@ -195,17 +231,24 @@ func NewCoordinator(deps Dependencies) *Coordinator {
 	if now == nil {
 		now = time.Now
 	}
+	afterFunc := deps.AfterFunc
+	if afterFunc == nil {
+		afterFunc = func(delay time.Duration, run func()) StopTimer {
+			return time.AfterFunc(delay, run).Stop
+		}
+	}
 
 	return &Coordinator{
-		source:   deps.Source,
-		network:  deps.Network,
-		server:   deps.Server,
-		qr:       deps.QR,
-		observer: deps.Observer,
-		entropy:  entropy,
-		now:      now,
-		lease:    lease,
-		state:    stateIdle,
+		source:    deps.Source,
+		network:   deps.Network,
+		server:    deps.Server,
+		qr:        deps.QR,
+		observer:  deps.Observer,
+		entropy:   entropy,
+		now:       now,
+		afterFunc: afterFunc,
+		lease:     lease,
+		state:     stateIdle,
 	}
 }
 
@@ -255,6 +298,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 		id:         id,
 		token:      token,
 		generation: generation,
+		ctx:        sessionCtx,
 		cancel:     sessionCancel,
 		warnings:   make([]Warning, 0, 1),
 	}
@@ -307,7 +351,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 		return c.failStage(live, NewError(ErrServerStartFailed, "the transfer server did not report a usable listener"))
 	}
 	live.drainerDone = make(chan struct{})
-	go c.drain(handle.Events, live.drainerDone)
+	go c.drain(live, handle.Events)
 	live.hold(resourceServer)
 	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
 		return c.failStage(live, err)
@@ -456,7 +500,7 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 // acknowledged, so there is nothing for the UI to terminate.
 func (c *Coordinator) failStage(live *session, cause error) (FileMetadata, error) {
 	c.unwind(live)
-	live.cancel()
+	live.stop()
 
 	c.mu.Lock()
 	// Only the lease owner installs or clears a session, and this call still
@@ -474,10 +518,21 @@ func (c *Coordinator) failStage(live *session, cause error) (FileMetadata, error
 	return FileMetadata{}, cause
 }
 
-// unwind releases every live resource in reverse acquisition order. The caller
-// owns the operation lease and must not hold the state mutex: Stop and
-// StopBeacon are adapter calls like any other.
+// unwind releases every live resource and then waits for the drainer to end.
+// The caller owns the operation lease and must not hold the state mutex: Stop
+// and StopBeacon are adapter calls like any other.
+//
+// Only an operation that is not itself the drainer may call this. Terminal
+// handling runs on the drainer goroutine and uses releaseAcquired directly,
+// because joining itself would be a guaranteed deadlock.
 func (c *Coordinator) unwind(live *session) {
+	c.releaseAcquired(live)
+	c.joinDrainer(live)
+}
+
+// releaseAcquired releases every live resource in reverse acquisition order.
+// The caller owns the operation lease and must not hold the state mutex.
+func (c *Coordinator) releaseAcquired(live *session) {
 	for index := len(live.acquired) - 1; index >= 0; index-- {
 		switch live.acquired[index] {
 		case resourceBeacon:
@@ -486,30 +541,30 @@ func (c *Coordinator) unwind(live *session) {
 			}
 		case resourceServer:
 			c.stopServer()
-			// Stop closed the event lane, so the drainer is on its way out.
-			// Waiting for it here is what keeps a session's goroutine from
-			// outliving the session.
-			if live.drainerDone != nil {
-				<-live.drainerDone
-			}
 		}
 	}
 	live.acquired = nil
 }
 
-func (c *Coordinator) stopServer() {
-	if err := c.server.Stop(); err != nil {
-		c.recordDiagnostic(err, "transfer server cleanup reported a problem")
+// joinDrainer waits for this session's drainer goroutine to end, which is what
+// keeps a session's goroutine from outliving the session. Calling it twice is
+// safe, and so is calling it after the drainer has already gone: Stop closed
+// the event lane, so the loop is on its way out, and a closed done channel
+// receives forever.
+//
+// The wait is deliberately unbounded. ServerPort.Stop is quiescent on every
+// return, so the lane is closed by the time this runs; a watchdog here would
+// let Cancel report success while a drainer -- and therefore a publication --
+// was still in flight.
+func (c *Coordinator) joinDrainer(live *session) {
+	if live.drainerDone != nil {
+		<-live.drainerDone
 	}
 }
 
-// drain consumes the server's event lane until it closes, so the lane can
-// never block a teardown. Story 1.6 attaches progress and terminal handling to
-// this loop; until then a server event carries no lifecycle meaning and is
-// deliberately discarded.
-func (c *Coordinator) drain(events <-chan ServerEvent, done chan<- struct{}) {
-	defer close(done)
-	for range events {
+func (c *Coordinator) stopServer() {
+	if err := c.server.Stop(); err != nil {
+		c.recordDiagnostic(err, "transfer server cleanup reported a problem")
 	}
 }
 
@@ -541,8 +596,13 @@ func (c *Coordinator) afterStep(
 // just got back? A zero generation skips the generation check, because the
 // first session is generation 1 and a claim arrives without one.
 //
+// One or more acceptable states may be named, because the reset timer is valid
+// from either terminal state. Naming none refuses everything rather than
+// meaning "any state will do": a zero-value "skip this check" convention is
+// exactly how an empty session id once became a wildcard.
+//
 // The caller holds c.mu.
-func (c *Coordinator) revalidateLocked(ctx context.Context, id SessionID, generation uint64, want sessionState) error {
+func (c *Coordinator) revalidateLocked(ctx context.Context, id SessionID, generation uint64, want ...sessionState) error {
 	if c.closing {
 		return NewError(ErrShuttingDown, "FairDrop is closing")
 	}
@@ -562,7 +622,7 @@ func (c *Coordinator) revalidateLocked(ctx context.Context, id SessionID, genera
 	if c.session.cancelled {
 		return NewError(ErrCancelled, "the transfer was cancelled")
 	}
-	if c.state != want {
+	if !slices.Contains(want, c.state) {
 		return NewError(ErrCancelled, "the transfer is no longer active")
 	}
 	if err := ctx.Err(); err != nil {
@@ -571,33 +631,50 @@ func (c *Coordinator) revalidateLocked(ctx context.Context, id SessionID, genera
 	return nil
 }
 
-// cancelSession marks the live session's generation cancelled and cancels its
-// data-plane context. It is the primitive the Cancel and Shutdown commands are
-// built from: this story implements the marker every setup and claim step
-// revalidates against, while Story 1.6 adds the teardown join, the reset event
-// and the terminal outcomes that follow it.
-func (c *Coordinator) cancelSession() {
-	c.mu.Lock()
+// markCancelledLocked flags the live session's generation as cancelled and
+// returns it, or nil when nothing is staged. It is the marker every setup and
+// claim step revalidates against, and it is deliberately only half of a
+// cancellation: the caller still has to cancel the returned session's context
+// (outside the mutex) and then join its teardown through the lease.
+//
+// The caller holds c.mu.
+func (c *Coordinator) markCancelledLocked() *session {
 	live := c.session
 	if live == nil {
-		c.mu.Unlock()
-		return
+		return nil
 	}
 	live.cancelled = true
-	cancel := live.cancel
-	c.mu.Unlock()
-
-	if cancel != nil {
-		cancel()
-	}
+	return live
 }
 
-// beginClosing raises the application-lifetime closing flag. Story 1.6's
-// Shutdown adds the quiescing and event suppression that must follow it.
-func (c *Coordinator) beginClosing() {
+// cancelSession marks the live session cancelled and cancels its data-plane
+// context, returning the session it marked. It is the interruption half of
+// Cancel without the join, which is what setup and claim races need: they have
+// to observe the marker, not wait for a teardown.
+func (c *Coordinator) cancelSession() *session {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	live := c.markCancelledLocked()
+	c.mu.Unlock()
+
+	if live != nil {
+		live.stop()
+	}
+	return live
+}
+
+// beginClosing raises the application-lifetime closing flag and marks any live
+// session cancelled. The flag is what refuses every later command; the marker
+// is what stops a setup or claim already in flight from committing.
+func (c *Coordinator) beginClosing() *session {
+	c.mu.Lock()
 	c.closing = true
+	live := c.markCancelledLocked()
+	c.mu.Unlock()
+
+	if live != nil {
+		live.stop()
+	}
+	return live
 }
 
 // acquireLease takes the operation lease without blocking. Callers hold c.mu,
@@ -632,7 +709,19 @@ func (c *Coordinator) leaseHeld() bool {
 	return len(c.lease) == 0
 }
 
+// publish delivers one event on the coordinator's single emission lane.
+//
+// Only the holder of the operation lease may publish, so emission order
+// follows causality rather than goroutine scheduling: a progress snapshot
+// cannot overtake the started event for the transfer it belongs to, and reset
+// cannot precede the outcome it terminates. Publishing without the lease is a
+// programming error of the same class as releasing the lease twice, and is
+// just as loud -- absorbing it would let the UI observe an order the contract
+// forbids.
 func (c *Coordinator) publish(event Event) {
+	if !c.leaseHeld() {
+		panic("transfer: an event was published without the operation lease")
+	}
 	if c.observer == nil {
 		return
 	}
