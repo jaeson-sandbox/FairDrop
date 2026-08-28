@@ -635,3 +635,81 @@ func portCalls(h *harness) []string {
 	}
 	return out
 }
+
+// TestShutdownContendsWithEveryOtherActor adds Shutdown to the contention: the
+// drainer, a Cancel, a Shutdown and the reset timer all reach for one session
+// at once. The invariants weaken by exactly one -- a suppressed reset is a
+// legitimate outcome once Shutdown wins -- and everything else must still hold.
+func TestShutdownContendsWithEveryOtherActor(t *testing.T) {
+	const iterations = 30
+
+	for iteration := range iterations {
+		t.Run(fmt.Sprintf("iteration-%d", iteration), func(t *testing.T) {
+			h := newHarness(t)
+			h.bufferLane(8)
+			metadata := h.transferring()
+
+			var running sync.WaitGroup
+			running.Add(4)
+			ready := make(chan struct{})
+			var cancelErr, shutdownErr error
+
+			go func() {
+				defer running.Done()
+				<-ready
+				h.server.publish(progressEvent(metadata.SessionID, testProgress(1024, 25)))
+				h.server.publish(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
+			}()
+			go func() {
+				defer running.Done()
+				<-ready
+				cancelErr = h.coordinator.Cancel()
+			}()
+			go func() {
+				defer running.Done()
+				<-ready
+				shutdownErr = h.coordinator.Shutdown()
+			}()
+			go func() {
+				defer running.Done()
+				<-ready
+				h.timer.fireIfArmed()
+			}()
+			close(ready)
+			running.Wait()
+
+			if shutdownErr != nil {
+				t.Fatalf("Shutdown returned %v", shutdownErr)
+			}
+			// Cancel either won its own race or was refused by the Shutdown
+			// that beat it. There is no third answer.
+			if code := ErrorCodeOf(cancelErr); cancelErr != nil && code != ErrShuttingDown {
+				t.Fatalf("Cancel returned %q, want success or %q", code, ErrShuttingDown)
+			}
+
+			events := h.observer.published()
+			assertEventGrammar(t, metadata.SessionID, events)
+			resets := 0
+			for _, event := range events {
+				if event.Kind == TransferReset {
+					resets++
+				}
+			}
+			if resets > 1 {
+				t.Errorf("%d resets published, want at most one: %+v", resets, events)
+			}
+			if got := h.state(); got != stateIdle {
+				t.Errorf("state is %q, want %q", got, stateIdle)
+			}
+			if h.liveSession() != nil {
+				t.Error("a session outlived the contention")
+			}
+			if h.coordinator.leaseHeld() {
+				t.Error("the operation lease outlived the contention")
+			}
+			if _, err := h.stage(); ErrorCodeOf(err) != ErrShuttingDown {
+				t.Errorf("Stage after the contention returned %q, want %q", ErrorCodeOf(err), ErrShuttingDown)
+			}
+		})
+	}
+}
