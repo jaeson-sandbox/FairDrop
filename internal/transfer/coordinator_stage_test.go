@@ -845,3 +845,61 @@ func assertSafe(t *testing.T, what, value, token string) {
 		t.Errorf("%s carries the source path: %s", what, value)
 	}
 }
+
+// The three-second terminal lease holds a session with the operation lease
+// free, so the busy guard is the only thing refusing a Stage during it. Nothing
+// covered that: widening the guard to admit DONE and ERROR left the suite green
+// while a replacement session displaced the one the UI was still displaying,
+// whose reset then failed its id check and never arrived.
+func TestStageIsRefusedDuringTheTerminalLease(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		outcome func(id SessionID) ServerEvent
+		want    sessionState
+	}{
+		{"DONE", func(id SessionID) ServerEvent {
+			return completeEvent(id, testProgress(testSize, 100))
+		}, stateDone},
+		{"ERROR", func(id SessionID) ServerEvent {
+			return failedEvent(id, nil, NewError(ErrTransferFailed, "the stream broke"))
+		}, stateError},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			metadata := h.transferring()
+			h.emit(testCase.outcome(metadata.SessionID))
+			h.awaitDrainer()
+
+			if got := h.state(); got != testCase.want {
+				t.Fatalf("state is %q, want %q", got, testCase.want)
+			}
+			before := h.calls.snapshot()
+			eventsBefore := len(h.observer.published())
+			session := h.liveSession()
+
+			second, err := h.stage()
+
+			if got := ErrorCodeOf(err); got != ErrBusy {
+				t.Errorf("Stage during the terminal lease returned %q, want %q", got, ErrBusy)
+			}
+			if second.SessionID != "" {
+				t.Errorf("a refused Stage returned metadata %+v", second)
+			}
+			if got := h.state(); got != testCase.want {
+				t.Errorf("state is %q, want the terminal session left in %q", got, testCase.want)
+			}
+			if h.liveSession() != session {
+				t.Error("a refused Stage replaced the session the UI is still displaying")
+			}
+			if got := len(h.observer.published()); got != eventsBefore {
+				t.Errorf("a refused Stage published %d extra events", got-eventsBefore)
+			}
+			// Two entropy draws and nothing else: no adapter is touched.
+			for _, call := range h.calls.snapshot()[len(before):] {
+				if call != "entropy.Read" {
+					t.Errorf("a refused Stage called %s", call)
+				}
+			}
+		})
+	}
+}

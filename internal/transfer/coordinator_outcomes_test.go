@@ -173,6 +173,36 @@ func TestServerCompleteDrivesTheSuccessGrammar(t *testing.T) {
 	if got := h.calls.teardownCalls()[teardownBefore:]; !slices.Equal(got, []string{"server.Stop"}) {
 		t.Errorf("the terminal path released %v, want exactly [server.Stop] -- the beacon went at the claim", got)
 	}
+	// Ordering, not just presence. teardownCalls filters the log down to the
+	// release calls, so on its own it can only show that Stop ran -- never that
+	// it ran before the UI was told. Moving the release after the publications
+	// leaves every other assertion in this test unchanged.
+	unfiltered := h.calls.snapshot()
+	stopAt := slices.Index(unfiltered, "server.Stop")
+	if stopAt < 0 {
+		t.Fatalf("server.Stop is missing from the call log %v", unfiltered)
+	}
+	publishes := 0
+	terminalPublishAt := -1
+	for index, call := range unfiltered {
+		if call != "observer.Publish" {
+			continue
+		}
+		publishes++
+		// Publication 1 is the started event, from the claim. The terminal
+		// path's own publications are the ones that must follow the release.
+		if publishes == 2 {
+			terminalPublishAt = index
+			break
+		}
+	}
+	if terminalPublishAt < 0 {
+		t.Fatalf("the terminal path published nothing: %v", unfiltered)
+	}
+	if stopAt > terminalPublishAt {
+		t.Errorf("server.Stop ran at %d, after the terminal publication at %d -- the UI was told "+
+			"the transfer finished while the listener was still accepting", stopAt, terminalPublishAt)
+	}
 	if got := h.state(); got != stateDone {
 		t.Errorf("state is %q, want %q", got, stateDone)
 	}
@@ -473,7 +503,27 @@ func assertEventGrammar(t *testing.T, id SessionID, events []Event) {
 	t.Helper()
 
 	terminals := 0
+	terminalAt := -1
 	for index, event := range events {
+		switch event.Kind {
+		case TransferStarted:
+			if index != 0 {
+				t.Errorf("started is at index %d, want 0 -- nothing precedes it", index)
+			}
+		case TransferReset:
+			if index != len(events)-1 {
+				t.Errorf("reset is at index %d of %d, want last -- it terminates the session",
+					index, len(events)-1)
+			}
+		case TransferProgress:
+			if terminalAt >= 0 {
+				t.Errorf("progress at index %d follows the terminal event at %d", index, terminalAt)
+			}
+		}
+		if terminalAt >= 0 && event.Kind != TransferReset {
+			t.Errorf("event %d (%s) follows the terminal event at %d; only reset may",
+				index, event.Kind, terminalAt)
+		}
 		if event.SessionID != id {
 			t.Errorf("event %d belongs to %q, want %q", index, event.SessionID, id)
 		}
@@ -491,11 +541,13 @@ func assertEventGrammar(t *testing.T, id SessionID, events []Event) {
 			}
 		case TransferComplete:
 			terminals++
+			terminalAt = index
 			if event.Progress == nil || event.Error != nil {
 				t.Errorf("%s must carry progress and no error: %+v", event.Kind, event)
 			}
 		case TransferError:
 			terminals++
+			terminalAt = index
 			if event.Error == nil {
 				t.Errorf("%s must carry a public error: %+v", event.Kind, event)
 			}
@@ -547,5 +599,174 @@ func TestATerminalOutcomeIsDiscardedWhileTheLeaseIsHeld(t *testing.T) {
 	}
 	if got := h.calls.count("server.Stop"); got != 0 {
 		t.Errorf("a discarded outcome tore the server down %d times, want none", got)
+	}
+}
+
+// A terminal snapshot goes through the same clamp as a progress one. The suite
+// used to feed out-of-range values only through ServerProgress, so replacing
+// terminalSnapshot's sanitize with a bare passthrough left everything green --
+// and a terminal event is not coalescable, so a snapshot that fails JSON
+// marshalling costs the UI the outcome permanently rather than one update.
+func TestTerminalSnapshotsAreForcedIntoTheirContractRange(t *testing.T) {
+	for _, testCase := range []struct {
+		name  string
+		build func(id SessionID, snapshot ProgressSnapshot) ServerEvent
+		// failedEvent attaches a snapshot only when bytes actually reached the
+		// receiver, so the failure case has to send a positive count for its
+		// snapshot to be published at all.
+		snapshot ProgressSnapshot
+	}{
+		{"complete", func(id SessionID, snapshot ProgressSnapshot) ServerEvent {
+			return completeEvent(id, snapshot)
+		}, ProgressSnapshot{
+			BytesSent:        -512,
+			TotalBytes:       -1,
+			TotalKnown:       false,
+			Percent:          math.NaN(),
+			SpeedBytesPerSec: math.Inf(1),
+		}},
+		// In-range values that only the unknown-total rule can zero. The case
+		// above cannot pin that rule: its total and percent are already driven
+		// to zero by the negative-count and NaN clamps, so dropping the rule
+		// would change nothing observable.
+		{"complete with an unknown total", func(id SessionID, snapshot ProgressSnapshot) ServerEvent {
+			return completeEvent(id, snapshot)
+		}, ProgressSnapshot{
+			BytesSent:        4096,
+			TotalBytes:       9000,
+			TotalKnown:       false,
+			Percent:          42,
+			SpeedBytesPerSec: 1024,
+		}},
+		{"failure", func(id SessionID, snapshot ProgressSnapshot) ServerEvent {
+			return failedEvent(id, &snapshot, NewError(ErrTransferFailed, "the stream broke"))
+		}, ProgressSnapshot{
+			BytesSent:        -512,
+			TotalBytes:       -1,
+			TotalKnown:       false,
+			Percent:          math.Inf(-1),
+			SpeedBytesPerSec: math.NaN(),
+		}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			metadata := h.transferring()
+
+			h.emit(testCase.build(metadata.SessionID, testCase.snapshot))
+			h.awaitDrainer()
+
+			events := h.observer.published()
+			assertEventGrammar(t, metadata.SessionID, events)
+			for index, event := range events {
+				if event.Progress == nil {
+					continue
+				}
+				got := *event.Progress
+				if got.BytesSent < 0 || got.TotalBytes < 0 {
+					t.Errorf("event %d reports %d/%d bytes, want no negative counts",
+						index, got.BytesSent, got.TotalBytes)
+				}
+				if !got.TotalKnown && (got.TotalBytes != 0 || got.Percent != 0) {
+					t.Errorf("event %d declares an unknown total but reports %d bytes at %v%%",
+						index, got.TotalBytes, got.Percent)
+				}
+				if math.IsNaN(got.Percent) || math.IsInf(got.SpeedBytesPerSec, 0) {
+					t.Errorf("event %d carries non-finite values: %+v", index, got)
+				}
+				if _, err := json.Marshal(event); err != nil {
+					t.Errorf("event %d does not marshal: %v", index, err)
+				}
+			}
+		})
+	}
+}
+
+// The public copy on a transfer-error has to describe a transfer that began and
+// then failed. Every other registered code describes something else, and the
+// registry's fixed copy would then contradict the event carrying it -- the
+// beacon warning literally says the link still works.
+func TestATerminalFailureOnlyPublishesCodesThatDescribeIt(t *testing.T) {
+	for _, testCase := range []struct {
+		name  string
+		cause error
+		want  ErrorCode
+	}{
+		{"a generic stream failure", NewError(ErrTransferFailed, "the stream broke"), ErrTransferFailed},
+		{"the source vanished", NewError(ErrPathNotFound, "gone"), ErrPathNotFound},
+		{"the source changed", NewError(ErrSourceChanged, "changed"), ErrSourceChanged},
+		{"the source became unsupported", NewError(ErrPathUnsupported, "a junction"), ErrPathUnsupported},
+		{"a beacon warning", NewError(ErrBeaconWarning, "discovery is down"), ErrTransferFailed},
+		{"busy", NewError(ErrBusy, "already running"), ErrTransferFailed},
+		{"shutting down", NewError(ErrShuttingDown, "closing"), ErrTransferFailed},
+		{"an invalid selection", NewError(ErrInvalidSelection, "no path"), ErrTransferFailed},
+		{"a QR failure", NewError(ErrQRFailed, "no image"), ErrTransferFailed},
+		{"a cancellation", NewError(ErrCancelled, "stopped"), ErrTransferFailed},
+		{"no cause at all", nil, ErrTransferFailed},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			metadata := h.transferring()
+
+			h.emit(failedEvent(metadata.SessionID, nil, testCase.cause))
+			h.awaitDrainer()
+
+			events := h.observer.published()
+			failure := events[len(events)-1]
+			if failure.Kind != TransferError {
+				t.Fatalf("the last event is %q, want %q", failure.Kind, TransferError)
+			}
+			if failure.Error == nil {
+				t.Fatal("the error event carries no public error")
+			}
+			if failure.Error.Code != testCase.want {
+				t.Errorf("published code %q, want %q", failure.Error.Code, testCase.want)
+			}
+			// The copy is the registry's, chosen by the code -- never the
+			// adapter's text, and never copy belonging to a different code.
+			if want := publicMessages[testCase.want]; failure.Error.Message != want {
+				t.Errorf("published copy %q, want %q", failure.Error.Message, want)
+			}
+		})
+	}
+}
+
+// An event kind this build does not know, and progress carrying no measurement,
+// are both adapter defects. Discarding them is the only safe action; discarding
+// them without a trace would hide the defect that produced them.
+func TestUnusableServerEventsAreDiscardedWithADiagnostic(t *testing.T) {
+	for _, testCase := range []struct {
+		name  string
+		event func(id SessionID) ServerEvent
+	}{
+		{"an unrecognized kind", func(id SessionID) ServerEvent {
+			return ServerEvent{SessionID: id, Kind: ServerEventKind("bogus")}
+		}},
+		{"progress with no snapshot", func(id SessionID) ServerEvent {
+			return ServerEvent{SessionID: id, Kind: ServerProgress}
+		}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			metadata := h.transferring()
+			before := len(h.coordinator.diagnostics.snapshot())
+
+			h.emit(testCase.event(metadata.SessionID))
+
+			// A second, well-formed snapshot proves the drainer survived the
+			// first and is still forwarding.
+			h.emit(progressEvent(metadata.SessionID, testProgress(1024, 25)))
+			events := h.awaitEvents(2)
+
+			assertEventGrammar(t, metadata.SessionID, events)
+			if len(events) != 2 || events[1].Kind != TransferProgress {
+				t.Fatalf("published %+v, want started then one progress event", events)
+			}
+			if got := h.state(); got != stateTransferring {
+				t.Errorf("state is %q, want %q", got, stateTransferring)
+			}
+			if got := len(h.coordinator.diagnostics.snapshot()); got != before+1 {
+				t.Errorf("%d diagnostics recorded, want one more than the %d before", got, before)
+			}
+		})
 	}
 }

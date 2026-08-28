@@ -31,6 +31,16 @@ func (c *Coordinator) drain(live *session, events <-chan ServerEvent) {
 			c.forwardProgress(live, event)
 		case ServerComplete, ServerFailed:
 			c.acceptTerminal(live, event)
+		default:
+			// The port defines three kinds and this coordinator does not own
+			// the adapter that produces them. Discarding an unrecognized one
+			// is the only safe action, but discarding it silently would hide
+			// the adapter defect that produced it -- the same reasoning that
+			// makes the drainer re-check the event's own session id.
+			c.recordDiagnostic(
+				NewError(ErrTransferFailed, "unrecognized server event"),
+				"the transfer server reported an event kind this build does not know",
+			)
 		}
 	}
 
@@ -55,6 +65,14 @@ func (c *Coordinator) drain(live *session, events <-chan ServerEvent) {
 // nothing.
 func (c *Coordinator) forwardProgress(live *session, event ServerEvent) {
 	if event.Progress == nil {
+		// ServerProgress carries a snapshot by the port's definition, so a nil
+		// one is an adapter defect. Returning here is what keeps it from
+		// panicking the drainer goroutine, where nothing recovers and the
+		// process dies; the diagnostic is what keeps it from vanishing.
+		c.recordDiagnostic(
+			NewError(ErrTransferFailed, "progress without a snapshot"),
+			"the transfer server reported progress carrying no measurement",
+		)
 		return
 	}
 
@@ -110,8 +128,17 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent) {
 	// because this code is the drainer.
 	c.releaseAcquired(live)
 
+	// Shutdown can raise the closing flag after this outcome took the lease,
+	// and it then waits for that lease before retiring the session. Without
+	// this re-check the outcome would publish into a UI Shutdown has already
+	// declared gone. The state still settles, so the retire that follows sees
+	// a session in its terminal state rather than one stuck TRANSFERRING.
+	c.mu.Lock()
+	closing := c.closing
+	c.mu.Unlock()
+
 	final, reported := terminalSnapshot(event)
-	if reported {
+	if reported && !closing {
 		// The authoritative final snapshot is published as its own progress
 		// event first, which is the grammar the contract fixes: a UI that
 		// renders progress and outcome separately still sees the last byte
@@ -121,8 +148,16 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent) {
 	}
 
 	var settled sessionState
-	switch event.Kind {
-	case ServerComplete:
+	switch {
+	case closing:
+		// Nothing is published, but the outcome is still accepted: which one
+		// arrived first stays decided, so a second event cannot be taken.
+		if event.Kind == ServerComplete {
+			settled = stateDone
+		} else {
+			settled = stateError
+		}
+	case event.Kind == ServerComplete:
 		// complete carries a progress payload by the contract's payload table.
 		// A Complete without a snapshot is a port defect rather than a
 		// transfer failure -- the bytes did arrive -- so it reports the
@@ -203,6 +238,17 @@ func (c *Coordinator) armReset(live *session) {
 	// Scheduled without the mutex, like every other injected seam.
 	stop := c.afterFunc(resetDelay, func() { c.fireReset(live) })
 
+	if stop == nil {
+		// A seam that schedules without handing back a way to stop leaves the
+		// reset uncancellable. Calling a nil StopTimer would panic on the
+		// drainer goroutine, where nothing recovers.
+		c.recordDiagnostic(
+			NewError(ErrTransferFailed, "reset scheduler returned no stop function"),
+			"the reset scheduler cannot be cancelled",
+		)
+		return
+	}
+
 	c.mu.Lock()
 	due = c.resetIsDueLocked(live)
 	if due {
@@ -241,19 +287,39 @@ func terminalSnapshot(event ServerEvent) (ProgressSnapshot, bool) {
 	return sanitizeProgress(*event.Progress), true
 }
 
-// terminalPublicError maps a server failure cause to fixed public copy.
+// terminalFailureCodes are the only codes a transfer failure may publish.
 //
-// Two causes are deliberately rewritten. A nil cause is a failure the server
-// could not classify, and the contract sends everything unrecognized to
-// transfer_failed. A cause coded cancelled reaching this point is a server-side
-// cancellation with no coordinator teardown behind it -- the coordinator's own
-// cancellations never get here, because a marked session is refused above --
-// and cancellation copy must never appear inside an error event.
+// It is an allow-list rather than a deny-list because the question is not
+// "which codes are wrong here" but "which codes describe a transfer that began
+// and then failed". The contract gives the payload path exactly these: the
+// applicable path or source code, or the generic failure. Every other
+// registered code describes something else entirely -- beacon_warning says
+// discovery is down but the link still works, busy says a transfer is already
+// running, cancelled says the user stopped it -- and each would put copy in
+// front of the sender that contradicts the event carrying it.
+var terminalFailureCodes = map[ErrorCode]struct{}{
+	ErrTransferFailed:  {},
+	ErrPathNotFound:    {},
+	ErrPathUnsupported: {},
+	ErrSourceChanged:   {},
+}
+
+// terminalPublicError maps a server failure cause to fixed public copy,
+// preserving a code that describes this failure and rewriting anything else to
+// the generic one. A nil cause is a failure the server could not classify, and
+// the contract sends everything unrecognized to transfer_failed.
 func terminalPublicError(cause error) PublicError {
-	if cause == nil || ErrorCodeOf(cause) == ErrCancelled {
-		return PublicErrorOf(NewError(ErrTransferFailed, "the transfer did not finish"))
+	if cause != nil {
+		if code := ErrorCodeOf(cause); ok(terminalFailureCodes, code) {
+			return PublicErrorOf(cause)
+		}
 	}
-	return PublicErrorOf(cause)
+	return PublicErrorOf(NewError(ErrTransferFailed, "the transfer did not finish"))
+}
+
+func ok(set map[ErrorCode]struct{}, code ErrorCode) bool {
+	_, found := set[code]
+	return found
 }
 
 // sanitizeProgress makes a snapshot safe to marshal at the UI boundary. The
@@ -261,6 +327,20 @@ func terminalPublicError(cause error) PublicError {
 // that cannot afford to trust that, because a single NaN would fail JSON
 // marshalling and silently cost the UI an event rather than a field.
 func sanitizeProgress(snapshot ProgressSnapshot) ProgressSnapshot {
+	if snapshot.BytesSent < 0 {
+		snapshot.BytesSent = 0
+	}
+	if snapshot.TotalBytes < 0 {
+		snapshot.TotalBytes = 0
+	}
+	// An unknown total has one representation, fixed by the contract: zero
+	// bytes and zero percent. Letting a percentage through beside
+	// TotalKnown=false would put a completion figure on a payload whose length
+	// the sender has explicitly said it does not know.
+	if !snapshot.TotalKnown {
+		snapshot.TotalBytes = 0
+		snapshot.Percent = 0
+	}
 	snapshot.Percent = clamp(snapshot.Percent, 0, 100)
 	snapshot.SpeedBytesPerSec = clamp(snapshot.SpeedBytesPerSec, 0, math.MaxFloat64)
 	return snapshot

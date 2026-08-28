@@ -81,6 +81,11 @@ type ServerEvent struct {
 // ServerHandle is what a started server hands back: the port the receiver must
 // reach and the lane its events arrive on. Events is closed exactly once, when
 // the server is torn down, and never produces another event afterwards.
+//
+// Publication onto Events must never block. The coordinator calls Stop from
+// inside the goroutine that drains this lane, so nothing is reading it while
+// Stop runs; a producer that blocked on a full lane would make Stop wait for a
+// consumer that is itself inside Stop.
 type ServerHandle struct {
 	Port   int
 	Events <-chan ServerEvent

@@ -21,6 +21,11 @@ const resetDelay = 3 * time.Second
 // every Stop is quiescent on return and a completed cancellation is not a
 // failed command.
 func (c *Coordinator) Cancel() error {
+	if c == nil {
+		// Stage and AuthorizeClaim answer a missing coordinator with a coded
+		// error rather than a panic; a command may not be the odd one out.
+		return NewError(ErrTransferFailed, "FairDrop is not ready to cancel a transfer")
+	}
 	c.mu.Lock()
 	if c.closing {
 		// A command after Shutdown changes nothing and touches nothing.
@@ -31,7 +36,13 @@ func (c *Coordinator) Cancel() error {
 	c.mu.Unlock()
 
 	if live == nil {
-		// IDLE: no session, no adapter call, no event, no state change.
+		// IDLE, but not necessarily quiet: retire and fireReset both clear the
+		// session several lines before they hand the lease back, so returning
+		// here without waiting would report IDLE while a reset was still being
+		// published. Waiting calls no adapter and changes no state, which is
+		// what the command table asks of Cancel from IDLE.
+		c.awaitLease()
+		c.releaseLease()
 		return nil
 	}
 	live.stop()
@@ -48,6 +59,12 @@ func (c *Coordinator) Cancel() error {
 // idempotent: the second call finds the session already retired, joins nothing,
 // and publishes nothing.
 func (c *Coordinator) Shutdown() error {
+	if c == nil {
+		// Unlike Cancel this reports success: Shutdown promises that nothing
+		// is left running, and for a coordinator that never existed that is
+		// already true.
+		return nil
+	}
 	live := c.beginClosing()
 
 	// Taken even with nothing staged: the lease being free is the proof that
@@ -69,13 +86,12 @@ func (c *Coordinator) Shutdown() error {
 // Shutdown passes false.
 //
 // A session that never reached its STAGED acknowledgement publishes nothing
-// either way, but the STAGING check below is not what carries that: STAGING
-// exists only while Stage holds the operation lease, and this runs after
-// awaiting it, so Stage has already reached failStage -- which cleared the
-// session -- or committed STAGED. The `c.session != live` return above is the
-// live mechanism. The state check is kept as the explicit statement of the
-// rule rather than as its enforcement, because nothing else in this file says
-// it out loud.
+// either way, and the `c.session != live` return below is the whole of what
+// carries that. STAGING exists only while Stage holds the operation lease, and
+// this runs after awaiting it, so by now Stage has either reached failStage --
+// which cleared the session -- or committed STAGED. An explicit STAGING check
+// here would be unreachable, and an unreachable guard reads to the next person
+// like a live one.
 func (c *Coordinator) retire(live *session, announce bool) {
 	c.mu.Lock()
 	if c.session != live {
@@ -86,7 +102,6 @@ func (c *Coordinator) retire(live *session, announce bool) {
 		c.releaseLease()
 		return
 	}
-	announce = announce && c.state != stateStaging
 	stopReset := live.stopReset
 	live.stopReset = nil
 	c.mu.Unlock()
@@ -149,15 +164,26 @@ func (c *Coordinator) fireReset(live *session) {
 	c.joinDrainer(live)
 
 	c.mu.Lock()
+	if c.closing {
+		// Shutdown raised the flag while this reset was joining the drainer,
+		// and is now waiting for the lease to retire the session itself.
+		c.mu.Unlock()
+		c.releaseLease()
+		return
+	}
 	live.seq++
 	reset := Event{SessionID: live.id, Seq: live.seq, Kind: TransferReset}
 	c.session = nil
 	c.state = stateIdle
 	c.mu.Unlock()
 
+	// Cancelled before the lease is handed back, exactly as retire does it. A
+	// Cancel or Shutdown parked in awaitLease is released by that hand-back,
+	// and it must not be able to return "everything is gone" while this
+	// session's context is still live.
+	live.stop()
 	c.publish(reset)
 	c.releaseLease()
-	live.stop()
 }
 
 // awaitLease blocks until the operation lease is free and then takes it.

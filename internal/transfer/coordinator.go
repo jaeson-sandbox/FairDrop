@@ -647,21 +647,6 @@ func (c *Coordinator) markCancelledLocked() *session {
 	return live
 }
 
-// cancelSession marks the live session cancelled and cancels its data-plane
-// context, returning the session it marked. It is the interruption half of
-// Cancel without the join, which is what setup and claim races need: they have
-// to observe the marker, not wait for a teardown.
-func (c *Coordinator) cancelSession() *session {
-	c.mu.Lock()
-	live := c.markCancelledLocked()
-	c.mu.Unlock()
-
-	if live != nil {
-		live.stop()
-	}
-	return live
-}
-
 // beginClosing raises the application-lifetime closing flag and marks any live
 // session cancelled. The flag is what refuses every later command; the marker
 // is what stops a setup or claim already in flight from committing.
@@ -718,6 +703,12 @@ func (c *Coordinator) leaseHeld() bool {
 // programming error of the same class as releasing the lease twice, and is
 // just as loud -- absorbing it would let the UI observe an order the contract
 // forbids.
+//
+// The check is deliberately the weaker of the two available: it proves some
+// operation holds the lease, not that this caller is the one holding it. Go
+// offers no cheap goroutine identity, and the failure it does catch -- a
+// publication from a path that never took the lease at all -- is the one that
+// actually happens.
 func (c *Coordinator) publish(event Event) {
 	if !c.leaseHeld() {
 		panic("transfer: an event was published without the operation lease")

@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -167,7 +168,10 @@ func TestCancelFromEveryState(t *testing.T) {
 				t.Errorf("%d resets published, want %d", resets, testCase.wantResets)
 			}
 			if len(events) > 0 {
-				assertEventGrammar(t, events[0].SessionID, events)
+				// The expected id comes from the staged metadata, never from the
+				// stream under test: taking it from events[0] would make the
+				// "every event belongs to this session" clause unable to fail.
+				assertEventGrammar(t, testSessionID, events)
 			}
 			if got := h.calls.count("server.Stop"); got != testCase.wantStops {
 				t.Errorf("server.Stop ran %d times, want %d -- every resource is released exactly once", got, testCase.wantStops)
@@ -864,5 +868,233 @@ func TestCancelInterruptsASetupStepRatherThanWaitingForIt(t *testing.T) {
 	}
 	if events := h.observer.published(); len(events) != 0 {
 		t.Errorf("published %+v, want no lifecycle event before a STAGED acknowledgement", events)
+	}
+}
+
+// The reset timer's contract row names DONE *and* ERROR. Every timer-firing
+// test in the suite reached DONE, so narrowing fireReset to stateDone alone
+// left the suite green while a failed transfer parked in ERROR forever and
+// every later Stage was refused as busy.
+func TestTheResetTimerFiresFromEitherTerminalState(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		outcome func(id SessionID) ServerEvent
+		want    EventKind
+	}{
+		{"after a completed transfer", func(id SessionID) ServerEvent {
+			return completeEvent(id, testProgress(testSize, 100))
+		}, TransferComplete},
+		{"after a failed transfer", func(id SessionID) ServerEvent {
+			return failedEvent(id, nil, NewError(ErrTransferFailed, "the stream broke"))
+		}, TransferError},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			metadata := h.transferring()
+			h.emit(testCase.outcome(metadata.SessionID))
+			h.awaitDrainer()
+
+			live := h.liveSession()
+			if live == nil {
+				t.Fatal("the terminal outcome cleared the session before its reset")
+			}
+			// The reset must not be announced while a goroutine of the finished
+			// session is still running.
+			h.observer.publish = func(event Event) {
+				if event.Kind != TransferReset {
+					return
+				}
+				select {
+				case <-live.drainerDone:
+				default:
+					t.Error("the reset was published while the session's drainer was still running")
+				}
+			}
+			if h.timer.armed() != 1 {
+				t.Fatalf("%d resets are armed, want exactly one", h.timer.armed())
+			}
+
+			h.timer.fire()
+
+			events := h.observer.published()
+			assertEventGrammar(t, metadata.SessionID, events)
+			last := events[len(events)-1]
+			if last.Kind != TransferReset {
+				t.Errorf("the last event is %q, want %q", last.Kind, TransferReset)
+			}
+			if !slices.Contains(kindsOf(events), testCase.want) {
+				t.Errorf("published %v, want it to contain %q", kindsOf(events), testCase.want)
+			}
+			if got := h.state(); got != stateIdle {
+				t.Errorf("state is %q, want %q", got, stateIdle)
+			}
+			if h.liveSession() != nil {
+				t.Error("the reset left the session installed")
+			}
+			if live.ctx.Err() == nil {
+				t.Error("the reset left the session context uncancelled")
+			}
+			if h.coordinator.leaseHeld() {
+				t.Error("the reset kept the operation lease")
+			}
+		})
+	}
+}
+
+// Shutdown declares the UI gone. An outcome that took the lease just before
+// that must not publish into it -- Shutdown is waiting for exactly that lease,
+// so without a re-check the event lands after the flag is up.
+func TestAnOutcomeInFlightPublishesNothingOnceShutdownBegins(t *testing.T) {
+	h := newHarness(t)
+	h.bufferLane(4)
+	metadata := h.transferring()
+
+	// Raise the flag from inside the teardown the outcome runs, which is the
+	// window: the outcome already owns the lease, and Shutdown is blocked on it.
+	shutdown := make(chan error, 1)
+	h.server.stop = func() error {
+		go func() { shutdown <- h.coordinator.Shutdown() }()
+		h.awaitClosing()
+		return nil
+	}
+
+	if !h.server.publish(completeEvent(metadata.SessionID, testProgress(testSize, 100))) {
+		t.Fatal("the complete event was not queued")
+	}
+	h.awaitDrainer()
+
+	select {
+	case err := <-shutdown:
+		if err != nil {
+			t.Errorf("Shutdown returned %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown never returned")
+	}
+
+	events := h.observer.published()
+	kinds := kindsOf(events)
+	if !slices.Equal(kinds, []EventKind{TransferStarted}) {
+		t.Errorf("published %v, want only the started event -- Shutdown suppresses the rest", kinds)
+	}
+	if got := h.state(); got != stateIdle {
+		t.Errorf("state is %q, want %q", got, stateIdle)
+	}
+	if h.timer.armed() != 0 {
+		t.Errorf("%d resets are armed, want none once Shutdown has begun", h.timer.armed())
+	}
+}
+
+// Cancel promises success even when a cleanup step reports a diagnostic: every
+// Stop is quiescent on return, so a completed cancellation is not a failed
+// command.
+func TestCancelSucceedsThroughACleanupDiagnostic(t *testing.T) {
+	h := newHarness(t)
+	h.stageSuccessfully()
+	before := len(h.coordinator.diagnostics.snapshot())
+
+	h.server.stop = func() error {
+		return WrapError(ErrTransferFailed, "cleanup reported a problem", errors.New("boom"))
+	}
+	h.network.stopBeacon = func() error {
+		return WrapError(ErrBeaconWarning, "the advertisement lingered", errors.New("boom"))
+	}
+
+	if err := h.coordinator.Cancel(); err != nil {
+		t.Fatalf("Cancel returned %v, want success once the state is quiescent", err)
+	}
+	if got := h.state(); got != stateIdle {
+		t.Errorf("state is %q, want %q", got, stateIdle)
+	}
+	if got := len(h.coordinator.diagnostics.snapshot()); got <= before {
+		t.Errorf("%d diagnostics recorded, want more than the %d before", got, before)
+	}
+	events := h.observer.published()
+	if !slices.Equal(kindsOf(events), []EventKind{TransferReset}) {
+		t.Errorf("published %v, want exactly one reset", kindsOf(events))
+	}
+}
+
+// Neither command may panic where Stage and AuthorizeClaim answer with a code.
+func TestLifecycleCommandsSurviveAMissingCoordinator(t *testing.T) {
+	var absent *Coordinator
+	if got := ErrorCodeOf(absent.Cancel()); got != ErrTransferFailed {
+		t.Errorf("Cancel on a nil coordinator returned %q, want %q", got, ErrTransferFailed)
+	}
+	if err := absent.Shutdown(); err != nil {
+		t.Errorf("Shutdown on a nil coordinator returned %v, want nil -- nothing is running", err)
+	}
+}
+
+// The mirror of TestShutdownWaitsForTheLeaseWithNothingStaged. retire and
+// fireReset both clear the session several lines before they hand the lease
+// back, so a Cancel that read "no session" and returned would report IDLE while
+// a reset was still being published.
+func TestCancelFromIdleWaitsForAFinishingTeardown(t *testing.T) {
+	h := newHarness(t)
+
+	<-h.coordinator.lease
+	if h.liveSession() != nil {
+		t.Fatal("no session should exist")
+	}
+
+	returned := make(chan error, 1)
+	go func() { returned <- h.coordinator.Cancel() }()
+
+	select {
+	case <-returned:
+		t.Fatal("Cancel returned while the operation lease was still held")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	h.coordinator.lease <- struct{}{}
+	select {
+	case err := <-returned:
+		if err != nil {
+			t.Errorf("Cancel returned %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Cancel never returned after the lease was released")
+	}
+	if h.coordinator.leaseHeld() {
+		t.Error("the lease is still held after Cancel returned")
+	}
+	if got := h.calls.snapshot(); len(got) != 0 {
+		t.Errorf("Cancel from IDLE called %v, want no adapter at all", got)
+	}
+	if events := h.observer.published(); len(events) != 0 {
+		t.Errorf("Cancel from IDLE published %+v, want nothing", events)
+	}
+}
+
+// A scheduler that schedules without handing back a way to stop leaves the
+// reset uncancellable. The coordinator must record that and carry on, not call
+// a nil function on the drainer goroutine, where nothing recovers.
+func TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer(t *testing.T) {
+	h := newHarness(t)
+	h.timer.withoutStop = true
+	metadata := h.transferring()
+	before := len(h.coordinator.diagnostics.snapshot())
+
+	// Cancel races the arming so armReset reaches its "nobody will ever stop
+	// this" branch, which is the one that would make the nil call.
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferComplete {
+			go h.coordinator.Cancel()
+		}
+	}
+	h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
+	h.awaitDrainer()
+
+	if got := len(h.coordinator.diagnostics.snapshot()); got <= before {
+		t.Errorf("%d diagnostics recorded, want more than the %d before", got, before)
+	}
+	// The drainer survived: it closed its own done channel rather than dying
+	// mid-callback, which awaitDrainer above already proved by returning.
+	if err := h.coordinator.Cancel(); err != nil {
+		t.Errorf("Cancel after the withheld stop returned %v, want nil", err)
+	}
+	if got := h.state(); got != stateIdle {
+		t.Errorf("state is %q, want %q", got, stateIdle)
 	}
 }

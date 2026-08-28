@@ -105,6 +105,12 @@ type harness struct {
 	t     *testing.T
 	calls *recorder
 
+	// seen records every session the harness ever staged, so teardown can join
+	// a drainer belonging to a session that has since been cleared. close used
+	// to read only the live session, which is nil after every reset and every
+	// Cancel -- exactly the cases where a leaked drainer would hide.
+	seen []*session
+
 	coordinator *Coordinator
 
 	source   *fakeSource
@@ -153,15 +159,27 @@ func (h *harness) close() {
 	h.coordinator.mu.Lock()
 	live := h.coordinator.session
 	h.coordinator.mu.Unlock()
-	if live == nil {
-		return
+	if live != nil {
+		h.track(live)
 	}
-	if live.drainerDone != nil {
-		<-live.drainerDone
+	for _, session := range h.seen {
+		if session.drainerDone != nil {
+			<-session.drainerDone
+		}
+		if session.cancel != nil {
+			session.cancel()
+		}
 	}
-	if live.cancel != nil {
-		live.cancel()
+}
+
+// track remembers a session so close can join its drainer later.
+func (h *harness) track(live *session) {
+	for _, known := range h.seen {
+		if known == live {
+			return
+		}
 	}
+	h.seen = append(h.seen, live)
 }
 
 // enter is the gate every fake passes through. It proves the no-lock-across-an
@@ -218,6 +236,9 @@ func (h *harness) stageSuccessfully() FileMetadata {
 	metadata, err := h.stage()
 	if err != nil {
 		h.t.Fatalf("Stage returned %v, want a committed session", err)
+	}
+	if live := h.liveSession(); live != nil {
+		h.track(live)
 	}
 	return metadata
 }
@@ -656,6 +677,11 @@ func failedEvent(id SessionID, snapshot *ProgressSnapshot, cause error) ServerEv
 type fakeTimer struct {
 	h *harness
 
+	// withoutStop makes afterFunc schedule and then hand back no stop
+	// function, which is the one shape that can turn armReset's cancellation
+	// path into a nil call on the drainer goroutine.
+	withoutStop bool
+
 	mu        sync.Mutex
 	scheduled []*scheduledCall
 }
@@ -676,6 +702,9 @@ func (f *fakeTimer) afterFunc(delay time.Duration, run func()) StopTimer {
 	f.mu.Lock()
 	f.scheduled = append(f.scheduled, call)
 	f.mu.Unlock()
+	if f.withoutStop {
+		return nil
+	}
 	return call.stop
 }
 
@@ -770,4 +799,54 @@ func (h *harness) blockQRUntilCancelled() <-chan error {
 		return nil, NewError(ErrCancelled, "the capability code encoder was cancelled")
 	}
 	return released
+}
+
+// cancelSession marks the live session cancelled and cancels its data-plane
+// context, returning the session it marked.
+//
+// It lives here rather than in the coordinator because no production path
+// wants it: Cancel and Shutdown mark and then join, and this is the
+// interruption half without the join. Tests need exactly that -- a setup or
+// claim step has to observe the marker mid-flight, not wait for a teardown it
+// is racing.
+func (c *Coordinator) cancelSession() *session {
+	c.mu.Lock()
+	live := c.markCancelledLocked()
+	c.mu.Unlock()
+
+	if live != nil {
+		live.stop()
+	}
+	return live
+}
+
+// kindsOf reduces a published stream to its event kinds, which is what most
+// grammar assertions actually compare.
+func kindsOf(events []Event) []EventKind {
+	kinds := make([]EventKind, len(events))
+	for index, event := range events {
+		kinds[index] = event.Kind
+	}
+	return kinds
+}
+
+// awaitClosing blocks until the application-lifetime closing flag is raised. It
+// is how a test parks inside an adapter call until a Shutdown running on
+// another goroutine has committed to closing, which is the only way to reach
+// the window where an outcome already owns the lease Shutdown is waiting for.
+func (h *harness) awaitClosing() {
+	h.t.Helper()
+	deadline := time.Now().Add(mutexProbeTimeout)
+	for {
+		h.coordinator.mu.Lock()
+		closing := h.coordinator.closing
+		h.coordinator.mu.Unlock()
+		if closing {
+			return
+		}
+		if time.Now().After(deadline) {
+			h.t.Fatal("the closing flag was never raised")
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
 }
