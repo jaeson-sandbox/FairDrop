@@ -49,7 +49,7 @@ func compose(app *App) *transfer.Coordinator {
 		Network:  network.NewManager(),
 		Server:   server.New(stream.New(inspector)),
 		QR:       qr.New(),
-		Observer: app,
+		Observer: appObserver{app: app},
 		// Entropy, Now and AfterFunc stay defaulted: the process CSPRNG, the
 		// process clock and time.AfterFunc are the production sources, and
 		// only coordinator tests replace them.

@@ -59,7 +59,24 @@ type App struct {
 	openDirectory dialogFunc
 }
 
-var _ transfer.Observer = (*App)(nil)
+// appObserver adapts the App to transfer.Observer.
+//
+// It exists so that Publish is NOT a method on App. Wails binds every exported
+// method of a bound struct, so an exported Publish would be generated as a
+// fifth callable command -- letting the webview forge lifecycle events the
+// coordinator never produced, for sessions that are still running. The
+// contract fixes the public API at four commands, and this is what keeps the
+// generated bindings equal to it.
+type appObserver struct{ app *App }
+
+var _ transfer.Observer = appObserver{}
+
+func (o appObserver) Publish(event transfer.Event) {
+	if o.app == nil {
+		return
+	}
+	o.app.publish(event)
+}
 
 // NewApp creates a new App wired to the real Wails runtime.
 func NewApp() *App {
@@ -160,8 +177,9 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 	return selection, nil
 }
 
-// Publish turns one coordinator lifecycle event into the matching Wails
-// runtime emission.
+// publish turns one coordinator lifecycle event into the matching Wails
+// runtime emission. It is unexported so Wails cannot bind it; appObserver is
+// what satisfies the port.
 //
 // It is called while the coordinator holds its operation lease, which is what
 // orders events causally -- and what makes this method the riskiest code in
@@ -170,7 +188,7 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 // therefore owns that risk instead of exporting it: it guards the context,
 // recovers around the emission, calls nothing back into the coordinator, and
 // returns.
-func (a *App) Publish(event transfer.Event) {
+func (a *App) publish(event transfer.Event) {
 	ctx := a.runtimeContext()
 	if ctx == nil {
 		// Published before the window exists. Dropping it is the only safe

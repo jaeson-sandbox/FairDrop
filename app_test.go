@@ -242,7 +242,7 @@ func TestComposeWiresTheSixRealAdapters(t *testing.T) {
 		{"network", "*network.Manager"},
 		{"server", "*server.Server"},
 		{"qr", "*qr.Encoder"},
-		{"observer", "*main.App"},
+		{"observer", "main.appObserver"},
 	} {
 		if got := dynamicTypeOf(t, value, want.field); got != want.dynamic {
 			t.Errorf("coordinator field %q holds %s, want %s", want.field, got, want.dynamic)
@@ -269,9 +269,46 @@ func TestComposeClosesTheAppCoordinatorCycle(t *testing.T) {
 		t.Error("compose did not hand the App the coordinator it built")
 	}
 
-	observer := reflect.ValueOf(coordinator).Elem().FieldByName("observer")
-	if observer.Elem().Pointer() != reflect.ValueOf(app).Pointer() {
+	// The observer is a value type wrapping the App, so the identity check
+	// reaches through it to the pointer it carries.
+	observer := reflect.ValueOf(coordinator).Elem().FieldByName("observer").Elem()
+	if observer.Type() != reflect.TypeOf(appObserver{}) {
+		t.Fatalf("the coordinator observes a %s, want main.appObserver", observer.Type())
+	}
+	held := observer.FieldByName("app")
+	if held.Pointer() != reflect.ValueOf(app).Pointer() {
 		t.Error("the coordinator observes some other App than the one compose was given")
+	}
+}
+
+// Wails binds every exported method of a bound struct, so the App's exported
+// method set IS the public command surface. The contract fixes that surface at
+// four commands; an exported Publish would become a fifth, letting the webview
+// forge lifecycle events -- a transfer-complete for a session still running --
+// that the coordinator never produced and the reducer would believe.
+func TestTheAppBindsExactlyTheFourContractCommands(t *testing.T) {
+	want := map[string]bool{
+		"StageTransfer":   true,
+		"CancelTransfer":  true,
+		"SelectFile":      true,
+		"SelectDirectory": true,
+	}
+
+	appType := reflect.TypeOf(NewApp())
+	got := make(map[string]bool, appType.NumMethod())
+	for index := 0; index < appType.NumMethod(); index++ {
+		got[appType.Method(index).Name] = true
+	}
+
+	for name := range want {
+		if !got[name] {
+			t.Errorf("the App no longer exports %s, so the frontend cannot call it", name)
+		}
+	}
+	for name := range got {
+		if !want[name] {
+			t.Errorf("the App exports %s, which Wails will bind as a fifth command", name)
+		}
 	}
 }
 
@@ -571,7 +608,7 @@ func TestPublishEmitsOneRuntimeEventPerKind(t *testing.T) {
 		t.Run(published.want, func(t *testing.T) {
 			h := newHarness(t)
 
-			h.app.Publish(transfer.Event{SessionID: testSessionID, Seq: 7, Kind: published.kind})
+			h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 7, Kind: published.kind})
 
 			events := h.emitted()
 			if len(events) != 1 {
@@ -590,7 +627,7 @@ func TestPublishEmitsOneRuntimeEventPerKind(t *testing.T) {
 func TestPublishedPayloadCarriesSessionAndSeqAndNoKind(t *testing.T) {
 	h := newHarness(t)
 
-	h.app.Publish(transfer.Event{SessionID: testSessionID, Seq: 3, Kind: transfer.TransferStarted})
+	h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 3, Kind: transfer.TransferStarted})
 
 	encoded := marshalOnlyEmission(t, h)
 	var decoded map[string]any
@@ -639,7 +676,7 @@ func TestPublishedPayloadMatchesTheContractPayloadTable(t *testing.T) {
 			event.SessionID = testSessionID
 			event.Seq = 1
 
-			h.app.Publish(event)
+			h.app.publish(event)
 
 			var decoded map[string]any
 			if err := json.Unmarshal(marshalOnlyEmission(t, h), &decoded); err != nil {
@@ -658,7 +695,7 @@ func TestPublishedPayloadMatchesTheContractPayloadTable(t *testing.T) {
 func TestPublishBeforeStartupDropsTheEventWithoutEmitting(t *testing.T) {
 	h := newUnstartedHarness(t)
 
-	h.app.Publish(transfer.Event{SessionID: testSessionID, Seq: 1, Kind: transfer.TransferStarted})
+	h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 1, Kind: transfer.TransferStarted})
 
 	if events := h.emitted(); len(events) != 0 {
 		t.Errorf("Publish emitted %+v with no window context", events)
@@ -681,7 +718,7 @@ func TestPublishRecoversAnEmitPanicSoTheLeaseIsNotStranded(t *testing.T) {
 	// A panic escaping here would strand the coordinator's operation lease and
 	// wedge every later Cancel and Shutdown, so returning at all is the whole
 	// guarantee this asserts.
-	h.app.Publish(transfer.Event{SessionID: testSessionID, Seq: 1, Kind: transfer.TransferProgress})
+	h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 1, Kind: transfer.TransferProgress})
 
 	if got := h.app.undelivered.Load(); got != 1 {
 		t.Errorf("undelivered = %d, want 1: the failed emission must be recorded", got)
@@ -694,7 +731,7 @@ func TestPublishRecoversAnEmitPanicSoTheLeaseIsNotStranded(t *testing.T) {
 	if err := h.app.CancelTransfer(); err != nil {
 		t.Errorf("the next command returned %v after a panicking emission", err)
 	}
-	h.app.Publish(transfer.Event{SessionID: testSessionID, Seq: 2, Kind: transfer.TransferReset})
+	h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 2, Kind: transfer.TransferReset})
 	if events := h.emitted(); len(events) != 1 || events[0].name != "transfer-reset" {
 		t.Errorf("the emitter did not recover for the next event: %+v", events)
 	}
@@ -710,7 +747,7 @@ func TestPublishNeverCallsBackIntoTheCoordinator(t *testing.T) {
 		transfer.TransferError,
 		transfer.TransferReset,
 	} {
-		h.app.Publish(transfer.Event{SessionID: testSessionID, Seq: uint64(seq + 1), Kind: kind})
+		h.app.publish(transfer.Event{SessionID: testSessionID, Seq: uint64(seq + 1), Kind: kind})
 	}
 
 	if calls := h.coordinator.log(); len(calls) != 0 {
@@ -858,7 +895,7 @@ func TestNoCommandErrorOrEmittedEventDisclosesPathOrToken(t *testing.T) {
 		transfer.TransferError,
 		transfer.TransferReset,
 	} {
-		h.app.Publish(transfer.Event{
+		h.app.publish(transfer.Event{
 			SessionID: testSessionID,
 			Seq:       uint64(seq + 1),
 			Kind:      kind,

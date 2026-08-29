@@ -4,8 +4,6 @@ import {transfer} from '../models';
 
 export function CancelTransfer():Promise<void>;
 
-export function Publish(arg1:transfer.Event):Promise<void>;
-
 export function SelectDirectory():Promise<string>;
 
 export function SelectFile():Promise<string>;

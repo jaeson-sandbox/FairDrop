@@ -6,10 +6,6 @@ export function CancelTransfer() {
   return window['go']['main']['App']['CancelTransfer']();
 }
 
-export function Publish(arg1) {
-  return window['go']['main']['App']['Publish'](arg1);
-}
-
 export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
 }
