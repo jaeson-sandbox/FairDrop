@@ -1,39 +1,31 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {StrictMode, act} from 'react'
 import {cleanup, render, screen} from '@testing-library/react'
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import App from './App'
 
-// Covers the I/O & Edge-Case Matrix in
-// _bmad-output/implementation-artifacts/spec-phase-1-wails-scaffold.md.
-//
-// The native half of the drop (OS -> webview -> absolute paths) belongs to the
-// Wails runtime and cannot run under jsdom. These tests stand in for it by
-// mocking the runtime module, then driving the exact callback the app
-// registered -- so what is asserted is our contract with Wails and what the app
-// does with the paths it is handed.
-
-const onFileDrop = vi.fn()
-const onFileDropOff = vi.fn()
-
-vi.mock('../wailsjs/runtime/runtime', () => ({
-    OnFileDrop: (
-        callback: (x: number, y: number, paths: string[]) => void,
-        useDropTarget: boolean,
-    ) => onFileDrop(callback, useDropTarget),
-    OnFileDropOff: () => onFileDropOff(),
+const mocks = vi.hoisted(() => ({
+    onFileDrop: vi.fn(),
+    onFileDropOff: vi.fn(),
+    useTransfer: vi.fn(),
+    stage: vi.fn(),
+    rejectSelection: vi.fn(),
+    cancel: vi.fn(),
+    dismissRetained: vi.fn(),
 }))
 
-/** The drop zone element -- the one carrying the --wails-drop-target property. */
+vi.mock('../wailsjs/runtime/runtime', () => ({
+    OnFileDrop: mocks.onFileDrop,
+    OnFileDropOff: mocks.onFileDropOff,
+}))
+
+vi.mock('./transfer/useTransfer', () => ({
+    useTransfer: mocks.useTransfer,
+}))
+
 function zone() {
     return screen.getByText('Drop a file or folder here').parentElement
 }
 
-/**
- * Resolves --wails-drop-target the way a browser would. The property inherits,
- * so the value is whatever the nearest ancestor that sets it says. jsdom does
- * not compute custom-property inheritance, so it is resolved here from inline
- * styles. Mirrors checkStyleDropTarget() in Wails' draganddrop.js.
- */
 function isDropTarget(element: Element | null): boolean {
     for (let node = element as HTMLElement | null; node; node = node.parentElement) {
         const value = node.style?.getPropertyValue('--wails-drop-target').trim()
@@ -42,125 +34,110 @@ function isDropTarget(element: Element | null): boolean {
     return false
 }
 
-/**
- * Replays a native drop landing on `target`, applying the same gate Wails
- * applies before it invokes our callback: it looks up the element under the
- * drop point and requires --wails-drop-target: drop. A drop that fails the gate
- * never reaches the app, which is exactly the "drop outside the zone" row of
- * the matrix.
- */
-function dropOn(target: Element | null, paths: string[]) {
-    expect(onFileDrop).toHaveBeenCalled()
-    // Wails holds the most recent registration.
-    const callback = onFileDrop.mock.calls.at(-1)![0]
+function dropOn(target: Element | null, paths: unknown) {
+    expect(mocks.onFileDrop).toHaveBeenCalled()
+    const callback = mocks.onFileDrop.mock.calls.at(-1)![0]
     if (!isDropTarget(target)) return
     act(() => callback(0, 0, paths))
 }
 
-/** Replays a native drop landing inside the drop zone. */
-function drop(paths: string[]) {
+function drop(paths: unknown) {
     dropOn(zone(), paths)
 }
 
 beforeEach(() => {
-    onFileDrop.mockClear()
-    onFileDropOff.mockClear()
+    for (const mock of Object.values(mocks)) mock.mockReset()
+    mocks.stage.mockResolvedValue(undefined)
+    mocks.cancel.mockResolvedValue(undefined)
+    mocks.useTransfer.mockReturnValue({
+        state: {phase: 'idle', retainedOutcome: null, commandError: null},
+        stage: mocks.stage,
+        cancel: mocks.cancel,
+        rejectSelection: mocks.rejectSelection,
+        dismissRetained: mocks.dismissRetained,
+    })
 })
-
 afterEach(cleanup)
 
-describe('drop zone', () => {
-    it('renders the absolute path of a single dropped file', () => {
+describe('production transfer controller integration', () => {
+    it('mounts the production controller and exposes its current phase without rendering a transfer view', () => {
         render(<App/>)
 
-        drop(['C:\\x\\a.txt'])
-
-        expect(screen.getByText('C:\\x\\a.txt')).toBeTruthy()
+        expect(mocks.useTransfer).toHaveBeenCalledTimes(1)
+        expect(screen.getByRole('main').getAttribute('data-transfer-phase')).toBe('idle')
+        expect(screen.queryByRole('progressbar')).toBeNull()
+        expect(screen.queryByRole('img')).toBeNull()
     })
 
-    it('renders the absolute path of a dropped directory', () => {
+    it('routes exactly one native path through Stage as unknown kind', () => {
         render(<App/>)
+        const originalPath = String.raw` C:\private\report.pdf `
 
-        drop(['C:\\x\\dir'])
+        drop([originalPath])
 
-        expect(screen.getByText('C:\\x\\dir')).toBeTruthy()
+        expect(mocks.stage).toHaveBeenCalledTimes(1)
+        expect(mocks.stage).toHaveBeenCalledWith(String.raw` C:\private\report.pdf `, 'unknown')
+        expect(mocks.rejectSelection).not.toHaveBeenCalled()
     })
 
-    it('renders every path of a multi-file drop', () => {
+    it.each([
+        ['zero paths', []],
+        ['multiple paths', [String.raw`C:\one.txt`, String.raw`C:\two.txt`]],
+        ['undefined input', undefined],
+        ['null input', null],
+        ['an object', {path: String.raw`C:\one.txt`}],
+        ['a non-string singleton', [null]],
+        ['an empty singleton', ['']],
+        ['a whitespace-only singleton', ['   ']],
+    ])('rejects %s and never stages one silently', (_name, paths) => {
         render(<App/>)
 
-        const paths = ['C:\\x\\a.txt', 'C:\\x\\b.txt', 'C:\\x\\c.txt']
         drop(paths)
 
-        for (const path of paths) {
-            expect(screen.getByText(path)).toBeTruthy()
-        }
+        expect(mocks.rejectSelection).toHaveBeenCalledTimes(1)
+        expect(mocks.stage).not.toHaveBeenCalled()
     })
+})
 
-    it('renders a repeated path once per occurrence without a key collision', () => {
+describe('native drop gate lifecycle', () => {
+    it('opts into the Wails drop-target gate and marks the inherited zone property', () => {
         render(<App/>)
 
-        drop(['C:\\x\\a.txt', 'C:\\x\\a.txt'])
-
-        expect(screen.getAllByText('C:\\x\\a.txt')).toHaveLength(2)
-    })
-
-    it('opts into the drop-target gate and marks the zone with the property', () => {
-        render(<App/>)
-
-        expect(onFileDrop).toHaveBeenCalledTimes(1)
-        expect(onFileDrop.mock.calls[0][1]).toBe(true)
+        expect(mocks.onFileDrop).toHaveBeenCalledTimes(1)
+        expect(mocks.onFileDrop.mock.calls[0][1]).toBe(true)
         expect(zone()?.style.getPropertyValue('--wails-drop-target')).toBe('drop')
+        expect(isDropTarget(zone()?.firstElementChild ?? null)).toBe(true)
     })
 
-    // Matrix row: a drop landing outside the zone must not fire the callback and
-    // must leave the UI untouched. Asserted from a non-empty state so it cannot
-    // pass trivially the way an initial-render assertion would.
-    it('ignores a drop that lands outside the zone, leaving the UI unchanged', () => {
+    it('ignores a drop outside the gated zone', () => {
         render(<App/>)
-        drop(['C:\\x\\a.txt'])
-        expect(screen.getAllByRole('listitem')).toHaveLength(1)
-
-        // The heading sits outside the zone and inherits no drop-target property.
         const outside = screen.getByRole('heading', {name: 'FairDrop'})
+
         expect(isDropTarget(outside)).toBe(false)
-        dropOn(outside, ['C:\\x\\ignored.txt'])
+        dropOn(outside, [String.raw`C:\ignored.txt`])
 
-        expect(screen.queryByText('C:\\x\\ignored.txt')).toBeNull()
-        expect(screen.getAllByRole('listitem')).toHaveLength(1)
-        expect(screen.getByText('C:\\x\\a.txt')).toBeTruthy()
+        expect(mocks.stage).not.toHaveBeenCalled()
+        expect(mocks.rejectSelection).not.toHaveBeenCalled()
     })
 
-    it('renders no list before anything has been dropped', () => {
-        render(<App/>)
+    it('deregisters the native listener on unmount and re-registers on remount', () => {
+        const first = render(<App/>)
+        expect(mocks.onFileDrop).toHaveBeenCalledTimes(1)
 
-        expect(screen.queryByRole('list')).toBeNull()
-    })
-
-    it('deregisters the listener on unmount and re-registers once on remount', () => {
-        const {unmount} = render(<App/>)
-        expect(onFileDrop).toHaveBeenCalledTimes(1)
-
-        unmount()
-        expect(onFileDropOff).toHaveBeenCalledTimes(1)
+        first.unmount()
+        expect(mocks.onFileDropOff).toHaveBeenCalledTimes(1)
 
         render(<App/>)
-        expect(onFileDrop).toHaveBeenCalledTimes(2)
+        expect(mocks.onFileDrop).toHaveBeenCalledTimes(2)
     })
 
-    // main.tsx renders under StrictMode, which double-invokes effects
-    // (effect -> cleanup -> effect). Wails guards re-registration with
-    // `if (flags.registered) return` and OnFileDropOff clears that flag, so the
-    // cleanup is what lets the second registration take effect. Asserted rather
-    // than assumed, since a missing cleanup would silently leave the app deaf.
-    it('keeps exactly one live listener under StrictMode double-invoked effects', () => {
+    it('keeps exactly one live native listener under StrictMode effect replay', () => {
         render(<StrictMode><App/></StrictMode>)
 
-        expect(onFileDropOff).toHaveBeenCalledTimes(1)
-        expect(onFileDrop).toHaveBeenCalledTimes(2)
+        expect(mocks.onFileDropOff).toHaveBeenCalledTimes(1)
+        expect(mocks.onFileDrop).toHaveBeenCalledTimes(2)
 
-        drop(['C:\\x\\a.txt'])
-
-        expect(screen.getAllByRole('listitem')).toHaveLength(1)
+        drop([String.raw`C:\report.pdf`])
+        expect(mocks.stage).toHaveBeenCalledTimes(1)
     })
 })

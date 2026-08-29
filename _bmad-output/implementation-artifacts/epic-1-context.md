@@ -4,7 +4,7 @@
 
 ## Goal
 
-A sender picks exactly one local regular file by native drop or keyboard-reachable browse controls, FairDrop stages it behind a random-port LAN listener with a QR code and direct capability URL, and exactly one nearby browser downloads it through a clear lifecycle with honest progress and cancellation. This epic builds nearly the whole spine — validation, LAN identity and discovery, bounded streaming, the one-shot HTTP protocol, the transactional coordinator, the Wails boundary, the frontend reducer, the view layer, and the accessibility contract — so Epic 2 only extends the source and payload adapters for directories and Epic 3 only packages and ships. There is no PRD or product brief: the canonical spec plus its binding architecture, contracts, and UX companions are the entire contract, and the contracts document governs domain values, error codes, port signatures, event payloads, claim ordering, HTTP outcomes, and teardown postconditions.
+Enable a sender to choose exactly one regular file through native drop or keyboard-accessible browse controls, prepare a QR code and direct capability URL, and let exactly one nearby browser download the file over the local network. The experience must remain simple and honest while the system enforces safe validation, transactional setup, bounded streaming, deterministic lifecycle behavior, cancellation, and complete resource cleanup.
 
 ## Stories
 
@@ -21,40 +21,36 @@ A sender picks exactly one local regular file by native drop or keyboard-reachab
 
 ## Requirements & Constraints
 
-- One process, one session, one selected root, one receiver; only IDLE accepts Stage, and zero or multiple dropped paths fail safely rather than silently taking the first.
-- Invalid, missing, link-like, reparse, and special paths fail with stable typed codes before any network resource is acquired. Spaces, Unicode, and native-supported long Windows/UNC paths are supported wherever Go filesystem APIs allow; never shell out or rewrite a path.
-- Staging is transactional: commit only when required resources are live, unwind in reverse on failure, and emit no lifecycle event before acknowledgement. A discovery failure alone is a non-fatal warning while HTTP and QR remain usable.
-- Session ID and capability token are independent, each 128+ bits from an injectable CSPRNG, never persisted. Tokens, source paths, and raw adapter text never reach discovery records, HTTP errors, events, logs, or the UI.
-- Memory stays O(buffer) at any payload size, and nothing persists: no database, settings, telemetry, logs, or payload copy.
-- Progress is wire-accurate: count only accepted bytes, cap events at four per second plus required terminal snapshots, keep values finite and clamped, and use an explicit known/unknown discriminator.
-- Every listener, connection, beacon, descriptor, goroutine, and timer has one owner and is quiescent before Stop returns; cancellation is never reported as a transfer error.
-- Plain HTTP on a trusted LAN; copy must never imply confidentiality, receiver identity, pairing, or sync. WCAG 2.2 AA is a release gate, and race checks need a cgo-capable native runner.
+- Accept one absolute regular-file path. Reject empty, multiple, missing, directory, link-like, reparse, and special-file selections with stable safe errors before acquiring network resources. Preserve spaces, Unicode, and native-supported long or UNC paths without shell invocation or destructive rewriting.
+- Generate independent session and capability identifiers with at least 128 cryptographically random bits. Never persist them; disclose the capability only in the local URL, QR code, and receiver request path.
+- Choose an eligible LAN IPv4 address deterministically and advertise only non-sensitive protocol metadata. Discovery failure is a warning when HTTP and QR remain usable.
+- Bind a ready listener on all interfaces at a random port. Only the first exact-token GET may claim the transfer; disguise wrong methods, routes, and tokens as 404, and expose no payload before synchronous authorization succeeds.
+- Revalidate the selected file from an opened descriptor before headers, derive its length from that descriptor, and stream exact bytes with O(buffer) memory. Create no payload copy, database, history, settings, telemetry, or persistent log.
+- Count only bytes accepted by the HTTP response. Progress is finite, clamped, wire-accurate, and emitted at most four times per second plus required terminal progress.
+- Cancellation and shutdown must leave every listener, connection, beacon, descriptor, worker, callback, and timer quiescent. Cancellation is not a transfer error.
+- V1 is trusted-LAN plain HTTP, not a confidential channel. Product copy must not imply encryption, receiver identity, pairing, synchronization, universal compatibility, or receiver-side save completion.
+- Verification must cover boundary behavior, source mutation, claim and teardown races, bounded memory, protocol responses, frontend event correlation, accessibility, native Wails configuration, and one real nearby-browser file download.
 
 ## Technical Decisions
 
-- Ports and adapters around one coordinator that owns lifecycle state; network, HTTP server, streaming, QR, and Wails are adapters. `main.go` composes, `app.go` only translates Wails commands, dialogs, hooks, and events, and the coordinator imports no Wails API or concrete adapter.
-- Delete each transitional Phase 1 provider-owned interface as its consumer-owned replacement lands — no duplicate or conversion-only shadow types.
-- A mutex guards state and session identity and is never held across an external call; after each unlocked adapter call, revalidate session, state, cancellation generation, and closing flag. The mutex-protected STAGED and TRANSFERRING commits are the linearization points, and one per-session operation lease performs all adapter Start/Stop/unwind work, held through synchronous publication of the started event.
-- Authorization is a synchronous handshake — reserve, stop the beacon, commit, publish — with no payload opened and no header or event emitted before it succeeds.
-- One synchronous FIFO event lane starts at `seq=1` and increments by one; coalesced snapshots get no sequence, no progress is accepted after a terminal outcome, and a drainer keeps delivery from blocking teardown.
-- Errors wrap with `%w` behind stable codes via an `errors.As`-compatible contract; unknown errors map to a fixed safe fallback, and the Wails error formatter serializes `{code,message}` JSON the frontend parses with that same fallback.
-- Conventions: lowerCamelCase JSON, `transfer-*` event names, `context.Context` first, injected clocks and entropy in coordinator tests, and no frontend lifecycle timers — the three-second terminal reset is a backend lease.
-- Stack: Wails v2.15.0 with the existing locked frontend stack, `hashicorp/mdns` v1.0.7, `boombuler/barcode` v1.1.0 (superseding the inactive QR dependency), Node 24 LTS pinned, `npm ci` with dev dependencies, both TypeScript projects moved together to `moduleResolution: "Bundler"`, Tailwind v4 via the Vite plugin with no v3/PostCSS config.
-- Preserve the proven Wails input boundary and application-lifetime runtime context, regenerate Wails bindings rather than editing them, and keep option assertions pinned in `main_test.go`.
+- Use ports and adapters around one lifecycle coordinator. The composition root constructs concrete adapters; the Wails layer translates commands, dialogs, lifecycle hooks, and notifications only. Consumer-owned ports replace transitional provider-owned interfaces rather than coexisting with shadow contracts.
+- Only the coordinator mutates lifecycle state. A mutex protects state and immutable session identity but is never held across an adapter call. After each unlocked setup or claim step, revalidate session, expected state, cancellation generation, and shutdown before using the result.
+- A per-session operation lease serializes setup, authorization, cancellation, teardown, and reverse-order unwind. The protected STAGED and TRANSFERRING commits are linearization points; claim authorization stops discovery before committing transfer or allowing headers and bytes.
+- Stage is transactional and emits no lifecycle event before successful acknowledgement. One synchronous FIFO event lane begins at sequence 1. Events and timers are session-scoped; stale identities, non-increasing sequences, invalid payloads, and post-terminal progress are ignored.
+- Public failures use stable coded errors and fixed safe messages. Unknown or malformed failures become the safe transfer fallback; arbitrary adapter text, source paths, and capability tokens never cross the Wails, HTTP, discovery, or UI boundaries.
+- Backend lifecycle is authoritative. The frontend may show local preparation while Stage is pending, but successful metadata initializes the session. The backend owns the three-second terminal reset; the frontend has no lifecycle timer.
+- Preserve the proven native Wails drop boundary and standard window chrome. Native file and directory dialogs return paths without staging automatically, and a cancelled dialog is quiet. Generated Wails bindings are regenerated, not hand-edited.
+- Keep the locked Wails v2, React, TypeScript, Vite, and Tailwind v4 stack. Use the approved mDNS and in-memory QR libraries, install frontend development dependencies with the lockfile, and use Bundler module resolution across both TypeScript projects.
 
 ## UX & Interaction Patterns
 
-- Paper Relay / Terracotta Linen tokens drive all visual decisions through Tailwind v4 CSS variables. Light/dark follow the OS preference with no theme control and no opposite-theme flash; forced colors supersede the palette except the tested QR substrate; color is never the sole cue.
-- Every literal string comes from the experience-spine copy registry by stable key, including the fixed error-message table rendered verbatim; banned vocabulary (secure, private, pair, sync, AirDrop naming, universal-compatibility claims) never appears.
-- Idle leads with firewall preflight guidance ahead of the selection controls; a local pending surface covers an outstanding Stage without claiming backend STAGED; Staged makes the QR primary beside a readonly URL, disclosures, and Cancel; Transferring shows wire bytes with visually-only throughput; terminal views show fixed safe text and never render cancellation as an error.
-- After a terminal outcome, reset clears the backend session while the same visible node stays in Idle as dismissible sessionless status until Dismiss or the next Stage; no frontend timer removes it, and reset moves no focus and makes no announcement.
-- Three progress presentations with matching ARIA — determinate for known positive totals, a static non-directional pattern for directory/unknown totals, and literal text with no percentage-bearing progressbar for known-empty files.
-- Exactly one announcement owner per transition (a focus move to a state heading or the single pre-mounted atomic polite announcer, never both), with assistive progress speech throttled separately from visual refresh and throughput never spoken.
-- Accessibility floor: 320 CSS-pixel one-dimensional reflow, 200% text with text-spacing overrides, targets at or above 44px, reduced motion preserving text and state, bidi-isolated names with full-value access, and every focus target proven to exist before focusing.
-- Receivers see only generic browser failures, so sender-side help explains wrong or expired links, a competing opener, a changed source, and guest or client isolation, directing the user to Cancel and make a fresh link. FairDrop never predicts, restyles, or duplicates the OS firewall prompt.
+- Use the Paper Relay / Terracotta Linen system: a compact utility with one current item, one next action, warm restrained surfaces, exact semantic tokens, and no dashboard styling. Follow the OS light/dark preference without a theme control; forced colors supersede the palette except for a tested QR substrate.
+- Idle presents firewall preflight before the native drop target and equal File/Directory browse actions. Pending preparation never claims STAGED. Staged makes the QR primary, keeps the direct URL readonly, and shows item details, trusted-LAN disclosure, recovery help, warnings, and Cancel.
+- Transferring shows actual wire bytes and visual-only throughput. Known positive totals are determinate; unknown totals use a static non-directional pattern; known-empty files use literal text without a percentage-bearing progress bar.
+- Done and Error use fixed safe copy. After backend reset, the same outcome remains visible in Idle as dismissible sessionless status until Dismiss or the next Stage attempt. Reset itself neither moves focus nor announces.
+- Exactly one mechanism announces each transition: either focus on an existing state heading or one pre-mounted atomic polite status region, never both. Progress speech is throttled independently of visual updates, and throughput is never spoken.
+- Meet WCAG 2.2 AA with semantic keyboard equivalents, visible focus, targets at least 44px, one-column 320 CSS-pixel reflow, 200% text plus text-spacing support, reduced-motion behavior, forced-color support, and bidi-isolated full filenames.
 
 ## Cross-Story Dependencies
 
-- Stories 1.1–1.4 build the adapters that 1.5–1.6 compose, and 1.4 consumes the payload port defined in 1.3. Story 1.5 establishes the session, lease, and revalidation machinery that 1.6 extends for progress, terminal outcomes, cancel, reset, and shutdown.
-- Story 1.7 fixes the DTO shapes 1.8's reducer mirrors, 1.9 renders what 1.8 exposes, and 1.10 spans 1.8 and 1.9; Story 1.8 also carries the shared frontend toolchain migration 1.9 and 1.10 depend on.
-- Epic 2 extends the same source and payload ports for directories without changing the contracts fixed here, so keep the file-only adapters open to that extension. Epic 3 owns single-instance behavior, packaging, and release smoke tests, but Epic 1 still closes with its own native check that one file can be selected and downloaded exactly once by a nearby browser.
+Stories 1.1-1.4 establish the source, network, payload, and server capabilities consumed transactionally by Stories 1.5-1.6. Story 1.7 exposes that backend contract to Wails; Story 1.8 must correlate and defensively reduce those session-scoped results before Story 1.9 renders them. Story 1.10 applies across the frontend state and view layers. Epic 2 later extends the same source and payload boundaries for directories without changing the file-transfer contracts established here; native packaging and release evidence remain Epic 3 work.
