@@ -68,6 +68,14 @@ func compose(app *App) *transfer.Coordinator {
 // mapping here: it recognizes a coded error through its wrappers, maps
 // everything else to transfer_failed, and never copies adapter text.
 func formatCommandError(err error) any {
+	if err == nil {
+		// Wails only calls this for a real failure, but PublicErrorOf(nil) is
+		// the zero value, which would serialize an empty code the frontend
+		// could only treat as unknown anyway. Answering with the fallback
+		// keeps the function total and its output always a valid public error.
+		return unknownCommandError
+	}
+
 	encoded, marshalErr := json.Marshal(transfer.PublicErrorOf(err))
 	if marshalErr != nil {
 		// PublicError is two strings, so this cannot happen today. Falling
@@ -124,9 +132,21 @@ func appOptions(app *App) *options.App {
 	}
 }
 
-func main() {
+// newBoundApp builds the App exactly as main does: wired to the real Wails
+// runtime and holding the composed coordinator.
+//
+// It is a seam for the same reason appOptions is one. main cannot be called
+// from a test, so without this nothing asserted that main composes at all --
+// deleting the compose call shipped a binary whose every command answers "not
+// ready" while the whole suite stayed green.
+func newBoundApp() *App {
 	app := NewApp()
 	compose(app)
+	return app
+}
+
+func main() {
+	app := newBoundApp()
 
 	if err := wails.Run(appOptions(app)); err != nil {
 		// log.Fatal, not println: a bare print would fall off the end of main

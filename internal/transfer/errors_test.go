@@ -209,3 +209,39 @@ type independentCodedError struct{ code ErrorCode }
 
 func (e independentCodedError) Error() string   { return "independent coded error detail" }
 func (e independentCodedError) Code() ErrorCode { return e.code }
+
+// The copy test above walks a hand-written list, so it catches a renamed or
+// removed code and misses an added one entirely -- and an added code reaches
+// the Wails boundary as unrecognized, degrading to transfer_failed with the
+// wrong copy and no test failing anywhere. This pins the registry as a set.
+func TestTheCodeRegistryIsExactlyTheseTwelveCodes(t *testing.T) {
+	t.Parallel()
+
+	want := map[ErrorCode]bool{
+		ErrInvalidSelection:   true,
+		ErrBusy:               true,
+		ErrCancelled:          true,
+		ErrPathNotFound:       true,
+		ErrPathUnsupported:    true,
+		ErrSourceChanged:      true,
+		ErrNetworkUnavailable: true,
+		ErrServerStartFailed:  true,
+		ErrQRFailed:           true,
+		ErrBeaconWarning:      true,
+		ErrTransferFailed:     true,
+		ErrShuttingDown:       true,
+	}
+
+	for code := range publicMessages {
+		if !want[code] {
+			t.Errorf("publicMessages gained %q. Add it to this test, to the copy test above, "+
+				"to main_test.go's cross-language list, and to frontend/src/transfer/errors.ts "+
+				"-- otherwise it reaches the UI as an unrecognized code.", code)
+		}
+	}
+	for code := range want {
+		if _, found := publicMessages[code]; !found {
+			t.Errorf("publicMessages no longer defines %q", code)
+		}
+	}
+}

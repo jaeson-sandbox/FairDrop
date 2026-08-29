@@ -108,6 +108,17 @@ func TestEveryStableCodeIsRecognizedByTheFrontend(t *testing.T) {
 		t.Fatalf("the frontend error parser is missing: %v", err)
 	}
 
+	const listStart = "export const transferErrorCodes = ["
+	start := strings.Index(string(parser), listStart)
+	if start < 0 {
+		t.Fatal("frontend/src/transfer/errors.ts no longer exports transferErrorCodes")
+	}
+	end := strings.Index(string(parser)[start:], "]")
+	if end < 0 {
+		t.Fatal("the transferErrorCodes array is unterminated")
+	}
+	codeList := string(parser)[start : start+end]
+
 	// Spelled out, not ranged over a Go slice built from the same constants
 	// the formatter uses: a literal list is what makes a renamed code visible.
 	for _, code := range []string{
@@ -124,8 +135,11 @@ func TestEveryStableCodeIsRecognizedByTheFrontend(t *testing.T) {
 		"transfer_failed",
 		"shutting_down",
 	} {
-		if !strings.Contains(string(parser), `'`+code+`'`) {
-			t.Errorf("frontend/src/transfer/errors.ts does not recognize %q", code)
+		// Inside the exported array, not merely somewhere in the file: a code
+		// surviving only in a comment or an unused union would otherwise keep
+		// this green while parseCommandError rejected it.
+		if !strings.Contains(codeList, `'`+code+`'`) {
+			t.Errorf("frontend/src/transfer/errors.ts does not list %q in transferErrorCodes", code)
 		}
 
 		formatted, ok := formatCommandError(transfer.NewError(transfer.ErrorCode(code), "diagnostic")).(string)
@@ -135,5 +149,51 @@ func TestEveryStableCodeIsRecognizedByTheFrontend(t *testing.T) {
 		if !strings.Contains(formatted, `"code":"`+code+`"`) {
 			t.Errorf("formatCommandError turned %q into %s", code, formatted)
 		}
+	}
+}
+
+// Bind is what makes the App callable at all. Emptying it ships a binary with
+// zero commands while go build, go vet, go test and wails build all pass --
+// the same argument the file already makes for EnableFileDrop, and it became
+// load-bearing only when this story gave the App its first exported method.
+func TestAppOptionsBindsTheApp(t *testing.T) {
+	app := NewApp()
+	opts := appOptions(app)
+
+	if len(opts.Bind) != 1 {
+		t.Fatalf("Bind holds %d entries, want exactly the App", len(opts.Bind))
+	}
+	if opts.Bind[0] != app {
+		t.Error("Bind does not hold the App the options were built for: its commands would not be callable")
+	}
+}
+
+// main composes before it runs. Deleting that call shipped a binary whose
+// every command answered "not ready" with the whole suite green, because
+// nothing reached past appOptions into how main builds its App.
+func TestNewBoundAppInstallsACoordinator(t *testing.T) {
+	app := newBoundApp()
+
+	app.mu.RLock()
+	installed := app.transfers
+	app.mu.RUnlock()
+
+	if installed == nil {
+		t.Fatal("newBoundApp returned an App with no coordinator: every command would refuse")
+	}
+	if _, ok := installed.(*transfer.Coordinator); !ok {
+		t.Errorf("the installed coordinator is %T, want *transfer.Coordinator", installed)
+	}
+}
+
+// A nil error is not a failure, so the formatter must still answer with a
+// valid public error rather than an empty code the frontend cannot switch on.
+func TestFormatCommandErrorIsTotal(t *testing.T) {
+	got, ok := formatCommandError(nil).(string)
+	if !ok {
+		t.Fatal("formatCommandError returned a non-string for a nil error")
+	}
+	if got != unknownCommandError {
+		t.Errorf("formatCommandError(nil) = %s, want the fixed fallback", got)
 	}
 }

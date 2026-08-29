@@ -23,6 +23,18 @@ type transferCoordinator interface {
 	Shutdown() error
 }
 
+// emittableKinds is the closed set of lifecycle events this adapter knows how
+// to route. It is spelled out rather than derived so that a kind added to the
+// contract has to be added here too, deliberately, instead of silently
+// emitting under a name the frontend never subscribes to.
+var emittableKinds = map[transfer.EventKind]bool{
+	transfer.TransferStarted:  true,
+	transfer.TransferProgress: true,
+	transfer.TransferComplete: true,
+	transfer.TransferError:    true,
+	transfer.TransferReset:    true,
+}
+
 // dialogFunc is the shape both native open dialogs share.
 type dialogFunc func(ctx context.Context, dialogOptions wailsruntime.OpenDialogOptions) (string, error)
 
@@ -45,8 +57,12 @@ type App struct {
 	// undelivered counts lifecycle events the window could not be told about.
 	// The recovered panic value is deliberately dropped rather than logged: a
 	// value that escapes an adapter is adapter text, and adapter text is
-	// exactly where an absolute path or a capability token would be. The count
-	// is the record.
+	// exactly where an absolute path or a capability token would be.
+	//
+	// Nothing in production reads this counter yet -- it is assertable in
+	// tests and otherwise inert. It is kept because a drop is exactly the
+	// event nobody else can observe, and Story 1.10's recovery contract is
+	// where a degraded-state surface would consume it.
 	undelivered atomic.Uint64
 
 	// The three Wails runtime seams, set once at construction and never
@@ -63,10 +79,19 @@ type App struct {
 //
 // It exists so that Publish is NOT a method on App. Wails binds every exported
 // method of a bound struct, so an exported Publish would be generated as a
-// fifth callable command -- letting the webview forge lifecycle events the
-// coordinator never produced, for sessions that are still running. The
-// contract fixes the public API at four commands, and this is what keeps the
-// generated bindings equal to it.
+// fifth callable command. The contract fixes the public API at four commands,
+// and this is what keeps the generated bindings equal to it.
+//
+// What this does NOT do is make forged lifecycle events impossible. Wails'
+// frontend EventsEmit notifies same-webview listeners itself before it
+// forwards anything to Go, so any script in the window can already deliver a
+// transfer-complete to every EventsOn subscriber without this process being
+// involved. That is inherent to the event system, and the defence against it
+// is the frontend rule the contract already fixes: initialize
+// (sessionId, lastSeq) only from a successful Stage result and ignore events
+// carrying another session or a seq at or below the last one. Story 1.8 owns
+// that reducer. This type narrows the command surface; it is not a trust
+// boundary.
 type appObserver struct{ app *App }
 
 var _ transfer.Observer = appObserver{}
@@ -203,6 +228,16 @@ func (a *App) publish(event transfer.Event) {
 			a.undelivered.Add(1)
 		}
 	}()
+
+	if !emittableKinds[event.Kind] {
+		// The event name is the whole routing decision, so an empty or unknown
+		// kind would emit under a name no listener subscribes to -- lost, and
+		// indistinguishable from never having happened. Counting it is what
+		// makes a coordinator that grows a sixth kind visible here rather than
+		// silent in the UI.
+		a.undelivered.Add(1)
+		return
+	}
 
 	// Event.Kind is json:"-", so the kind travels as the event name and the
 	// payload carries sessionId, seq, and whichever of progress and error this

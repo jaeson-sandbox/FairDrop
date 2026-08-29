@@ -80,7 +80,9 @@ export function parseCommandError(rejection: unknown): CommandError {
 
     const {code, message} = decoded as {code?: unknown; message?: unknown}
     if (!isTransferErrorCode(code)) return unknownCommandError()
-    if (typeof message !== 'string' || message === '') return unknownCommandError()
+    // Trimmed, not just empty-checked: a message of spaces renders as a code
+    // beside a blank line, which reads as a UI bug rather than a failure.
+    if (typeof message !== 'string' || message.trim() === '') return unknownCommandError()
 
     return {code, message}
 }

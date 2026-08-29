@@ -2,7 +2,7 @@
 title: 'Story 1.7 — Expose Safe Transfer Commands through Wails'
 type: 'feature'
 created: '2026-08-28'
-status: 'in-progress'
+status: 'in-review'
 review_loop_iteration: 0
 baseline_commit: '30227e69bf5998271f4b903bf03e204d9854e12a'
 context:
@@ -82,6 +82,10 @@ context:
 - Given an `Observer.Publish` whose emission panics or arrives before startup, when the coordinator publishes under its operation lease, then the command that owns that lease still returns.
 - Given every emitted event, when its JSON is inspected, then it carries `sessionId` and `seq`, satisfies the contract's payload table, and contains no `Kind` field.
 - Given the finished boundary, when Go tests, frontend tests, and `wails build` run, then all pass and the Phase 1 drop, chrome, and lifecycle options are still asserted.
+
+## Spec Change Log
+
+- **Review round 1 (2026-08-28, patches only — no loopback):** All three layers ran and converged on the same top finding, which was in code added during pre-review verification rather than by the implementer. **Two severe verification gaps, both now killed by mutation.** `appObserver.Publish` — the sole link between the coordinator's `Observer` port and the Wails emitter — was never executed by a test: every publish test drove `App.publish` directly, so emptying the adapter left the entire suite green while no lifecycle event reached the window at all. And `main()` could lose its `compose(app)` call with `go vet` and the whole suite still passing, shipping a binary whose every command answers "FairDrop is not ready"; composition is now behind a `newBoundApp` seam for the same reason `appOptions` is one. **`Bind` was unpinned** — emptying it ships zero callable commands past build, vet, test and `wails build`, which is exactly the argument `main_test.go` already made for `EnableFileDrop`, and it became load-bearing only when this story gave the App its first exported method. **Four more production fixes:** every emission is now asserted to carry the stored application-lifetime context, because the real `EventsEmit` answers a foreign one with `log.Fatalf` and takes the process down rather than returning; an event kind this build cannot name is refused and counted instead of emitted under a name no listener subscribes to; `formatCommandError(nil)` returns the fixed fallback rather than an empty code; and a whitespace-only message falls back rather than rendering a code beside a blank line. **The error-code registry is now pinned as a set**, so a thirteenth code fails in `internal/transfer` with a message naming all four places it has to be added — previously both the Go and TypeScript lists were hand-written twelves and an *addition* failed nothing on either side, arriving at the UI as unrecognized. **One claim I made was corrected rather than defended:** the commit removing the bound `Publish` said it stopped the webview forging lifecycle events. It does not. Wails' frontend `EventsEmit` calls `notifyListeners(payload)` before it forwards anything to Go, so any script in the window can already deliver a `transfer-complete` to every `EventsOn` subscriber without this process being involved. Removing the binding narrows the *command surface* to the contract's four; the defence against forged events is the frontend rule the contract already fixes, and Story 1.8's reducer owns it. The comment and the commit message now say that. **KEEP:** the disclosure test now drives `StageTransfer` and asserts the token *is* present in the metadata while the path is absent — its predecessor built payloads out of two integers and a fixed string, so nothing it searched could ever have contained either.
 
 ## Design Notes
 

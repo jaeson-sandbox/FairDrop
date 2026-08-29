@@ -94,6 +94,10 @@ describe('parseCommandError', () => {
         ['an absent message', rejectionCarrying('{"code":"busy"}')],
         ['a non-string message', rejectionCarrying('{"code":"busy","message":7}')],
         ['an empty message field', rejectionCarrying('{"code":"busy","message":""}')],
+        // A message of spaces is not a message: it renders as a code beside a
+        // blank line, which reads to the user as a broken UI rather than a
+        // failure they can act on.
+        ['a whitespace-only message', rejectionCarrying('{"code":"busy","message":"   "}')],
         ['undefined', undefined],
         ['null', null],
         ['a plain object', {code: 'busy', message: 'x'}],

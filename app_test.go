@@ -40,7 +40,13 @@ const (
 )
 
 // emission is one recorded call to the Wails runtime event emitter.
+//
+// The context is recorded because it is load-bearing and invisible otherwise:
+// the real EventsEmit calls log.Fatalf for a context that did not come from a
+// running window, so emitting with anything but the stored one takes the
+// process down rather than returning an error.
 type emission struct {
+	ctx  context.Context
 	name string
 	data []interface{}
 }
@@ -110,7 +116,10 @@ type harness struct {
 	mu        sync.Mutex
 	emissions []emission
 
-	// dialogPath and dialogErr are what both fake dialogs answer with.
+	// dialogPath and dialogErr are what both fake dialogs answer with. They
+	// are read under h.mu like every other recorded field: tests drive the App
+	// from a second goroutine, and a bare read here would make the race
+	// detector report the fixture instead of the code.
 	dialogPath string
 	dialogErr  error
 	// dialogCtx records the context the dialog was handed.
@@ -145,12 +154,15 @@ func newUnstartedHarness(t *testing.T) *harness {
 	h.app = NewApp()
 	h.app.useCoordinator(h.coordinator)
 	h.app.emit = func(ctx context.Context, eventName string, optionalData ...interface{}) {
-		if h.emitPanic != nil {
-			panic(h.emitPanic)
+		h.mu.Lock()
+		shouldPanic := h.emitPanic
+		h.mu.Unlock()
+		if shouldPanic != nil {
+			panic(shouldPanic)
 		}
 		h.mu.Lock()
 		defer h.mu.Unlock()
-		h.emissions = append(h.emissions, emission{name: eventName, data: optionalData})
+		h.emissions = append(h.emissions, emission{ctx: ctx, name: eventName, data: optionalData})
 	}
 	// Each seam records which one it is: a SelectDirectory that reached the
 	// file chooser would otherwise be indistinguishable from a correct one.
@@ -159,8 +171,9 @@ func newUnstartedHarness(t *testing.T) *harness {
 			h.mu.Lock()
 			h.dialogCtx = ctx
 			h.dialogTitles = append(h.dialogTitles, seam+": "+dialogOptions.Title)
+			path, err := h.dialogPath, h.dialogErr
 			h.mu.Unlock()
-			return h.dialogPath, h.dialogErr
+			return path, err
 		}
 	}
 	h.app.openFile = dialog("openFile")
@@ -359,24 +372,33 @@ func TestStageTransferReturnsTheCoordinatorMetadataUnchanged(t *testing.T) {
 	}
 }
 
-func TestStageTransferSerializesWarningsAsAnEmptyArray(t *testing.T) {
+// The coordinator owns the non-null guarantee (it allocates the slice at
+// stage time); this asserts the boundary does not undo it. Driving the fixture
+// from nil is what makes that a claim about app.go rather than about the
+// fixture: a boundary that re-marshalled the value would turn nil into null
+// here, and the frontend would get null where it expects [].
+func TestStageTransferDoesNotUndoTheWarningsGuarantee(t *testing.T) {
 	h := newHarness(t)
-	h.coordinator.stageMetadata = stagedMetadata()
+	metadata := stagedMetadata()
+	metadata.Warnings = []transfer.Warning{}
+	h.coordinator.stageMetadata = metadata
 
-	got, err := h.app.StageTransfer(testPath)
+	staged, err := h.app.StageTransfer(testPath)
 	if err != nil {
-		t.Fatalf("StageTransfer returned %v, want no error", err)
+		t.Fatalf("StageTransfer returned %v", err)
 	}
-
-	encoded, err := json.Marshal(got)
+	encoded, err := json.Marshal(staged)
 	if err != nil {
-		t.Fatalf("the staged metadata does not serialize: %v", err)
+		t.Fatalf("staged metadata does not marshal: %v", err)
 	}
 	if !strings.Contains(string(encoded), `"warnings":[]`) {
-		t.Errorf("staged metadata serialized as %s, want a non-null warnings array", encoded)
+		t.Errorf("warnings serialized as %s, want an empty array", encoded)
 	}
-	if strings.Contains(string(encoded), `"path"`) {
-		t.Errorf("staged metadata serialized a path field: %s", encoded)
+
+	// And the passthrough itself: whatever the coordinator returned is what
+	// crosses, unremapped.
+	if staged.URL != metadata.URL || staged.QR != metadata.QR || staged.SessionID != metadata.SessionID {
+		t.Errorf("the boundary remapped the metadata: %+v", staged)
 	}
 }
 
@@ -913,5 +935,153 @@ func TestNoCommandErrorOrEmittedEventDisclosesPathOrToken(t *testing.T) {
 				t.Errorf("event %q disclosed %q: %s", event.name, secret, encoded)
 			}
 		}
+	}
+}
+
+// --- The adapter that actually satisfies the port ------------------------
+
+// Every other publish test drives App.publish directly, which leaves the one
+// type the coordinator really calls untested: emptying appObserver.Publish
+// left the whole suite green while no lifecycle event reached the window at
+// all. This is the only test that goes through the port.
+func TestTheObserverPortReachesTheRuntimeEmitter(t *testing.T) {
+	h := newHarness(t)
+
+	var observer transfer.Observer = appObserver{app: h.app}
+	observer.Publish(transfer.Event{
+		SessionID: testSessionID,
+		Seq:       4,
+		Kind:      transfer.TransferComplete,
+		Progress:  &transfer.ProgressSnapshot{BytesSent: 4096, TotalBytes: 4096, TotalKnown: true, Percent: 100},
+	})
+
+	emitted := h.emitted()
+	if len(emitted) != 1 {
+		t.Fatalf("the observer port produced %d emissions, want exactly one", len(emitted))
+	}
+	if emitted[0].name != "transfer-complete" {
+		t.Errorf("emitted %q, want %q", emitted[0].name, "transfer-complete")
+	}
+	if emitted[0].ctx != h.ctx {
+		t.Error("the emission did not carry the application-lifetime context")
+	}
+}
+
+// The nil guard exists because a misordered composition would otherwise panic
+// on the coordinator's goroutine, where the operation lease is held.
+func TestTheObserverPortWithoutAnAppIsInert(t *testing.T) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatalf("an unwired observer panicked: %v", recovered)
+		}
+	}()
+	appObserver{}.Publish(transfer.Event{SessionID: testSessionID, Seq: 1, Kind: transfer.TransferStarted})
+}
+
+// Every emission must carry the stored application-lifetime context. Nothing
+// else asserted it, and the real EventsEmit answers a foreign context with
+// log.Fatalf -- the process, not the call, is what fails.
+func TestEveryEmissionCarriesTheApplicationLifetimeContext(t *testing.T) {
+	h := newHarness(t)
+
+	for _, kind := range []transfer.EventKind{
+		transfer.TransferStarted,
+		transfer.TransferProgress,
+		transfer.TransferComplete,
+		transfer.TransferError,
+		transfer.TransferReset,
+	} {
+		h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 1, Kind: kind})
+	}
+
+	emitted := h.emitted()
+	if len(emitted) != 5 {
+		t.Fatalf("emitted %d events, want 5", len(emitted))
+	}
+	for index, got := range emitted {
+		if got.ctx != h.ctx {
+			t.Errorf("emission %d (%s) carried a different context", index, got.name)
+		}
+	}
+}
+
+// A kind this build cannot name has no event name to travel under, so it is
+// refused and counted rather than emitted into the void.
+func TestAnUnknownEventKindIsCountedRatherThanEmitted(t *testing.T) {
+	h := newHarness(t)
+
+	for _, kind := range []transfer.EventKind{"", "transfer-teleported"} {
+		h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 1, Kind: kind})
+	}
+
+	if emitted := h.emitted(); len(emitted) != 0 {
+		t.Errorf("emitted %+v, want nothing for a kind this build does not know", emitted)
+	}
+	if got := h.app.undelivered.Load(); got != 2 {
+		t.Errorf("undelivered = %d, want 2", got)
+	}
+}
+
+// The App is driven from two goroutines in production: startup runs on the
+// main one while publish runs on whichever goroutine owns the coordinator's
+// operation lease. That is what a.mu is for, and nothing exercised it.
+func TestStartupAndPublishAreSafeConcurrently(t *testing.T) {
+	h := newUnstartedHarness(t)
+
+	var wait sync.WaitGroup
+	wait.Add(2)
+	go func() {
+		defer wait.Done()
+		h.app.startup(h.ctx)
+	}()
+	go func() {
+		defer wait.Done()
+		for seq := 1; seq <= 50; seq++ {
+			h.app.publish(transfer.Event{
+				SessionID: testSessionID,
+				Seq:       uint64(seq),
+				Kind:      transfer.TransferProgress,
+				Progress:  &transfer.ProgressSnapshot{BytesSent: int64(seq)},
+			})
+		}
+	}()
+	wait.Wait()
+
+	// Every event either emitted or was counted; none may be lost silently.
+	if got := uint64(len(h.emitted())) + h.app.undelivered.Load(); got != 50 {
+		t.Errorf("%d of 50 events were accounted for", got)
+	}
+}
+
+// The disclosure row of the matrix, driven through the one command that
+// legitimately carries the capability token. The previous version built its
+// own payloads out of two integers and a fixed string, so nothing it searched
+// could ever have contained the path.
+func TestStagedMetadataCarriesTheTokenButNeverThePath(t *testing.T) {
+	h := newHarness(t)
+	h.coordinator.stageMetadata = stagedMetadata()
+
+	metadata, err := h.app.StageTransfer(testPath)
+	if err != nil {
+		t.Fatalf("StageTransfer returned %v", err)
+	}
+
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		t.Fatalf("staged metadata does not marshal: %v", err)
+	}
+	serialized := string(encoded)
+
+	// The token is allowed here and nowhere else: it is what the URL and the
+	// QR are for. Asserting its presence is what stops this test passing
+	// because the payload happened to be empty.
+	if !strings.Contains(serialized, testToken) {
+		t.Errorf("staged metadata carries no capability token: %s", serialized)
+	}
+	if strings.Contains(serialized, testPath) {
+		t.Errorf("staged metadata leaked the source path: %s", serialized)
+	}
+	if strings.Contains(serialized, `\\Users\\sender`) {
+		t.Errorf("staged metadata leaked part of the source path: %s", serialized)
 	}
 }
