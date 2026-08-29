@@ -2,7 +2,7 @@
 title: 'Story 1.7 — Expose Safe Transfer Commands through Wails'
 type: 'feature'
 created: '2026-08-28'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '30227e69bf5998271f4b903bf03e204d9854e12a'
 context:
@@ -105,3 +105,84 @@ context:
 - `rg -n 'net/http|os\.|mdns|stateStaged|sessionState' app.go` — no output: translation only.
 - `rg -n 'wails' internal/ --glob '!**/*_test.go'` — no output: the core stays framework-independent.
 - `go mod tidy && go mod verify`, `gofmt -l .`, `git diff --check` — no drift, formatting, or whitespace defects.
+
+## Suggested Review Order
+
+**The composition root**
+
+- Start here: the only place a concrete adapter is named, and the cycle it closes.
+  [`main.go:40`](../../main.go#L40)
+
+- Composition behind a seam, because main itself cannot be called from a test.
+  [`main.go:142`](../../main.go#L142)
+
+- The App's whole view of the transfer implementation; app.go names nothing concrete.
+  [`app.go:20`](../../app.go#L20)
+
+**Why Publish is not on the App**
+
+- An exported Publish would be bound as a fifth command; this narrows the surface.
+  [`app.go:95`](../../app.go#L95)
+
+- The riskiest code in the file: it runs while the coordinator holds its lease.
+  [`app.go:216`](../../app.go#L216)
+
+- A closed set, so a sixth kind has to be added deliberately rather than lost.
+  [`app.go:30`](../../app.go#L30)
+
+**The error path, both halves**
+
+- PublicErrorOf decides the code; this only serializes it, and never adapter text.
+  [`main.go:70`](../../main.go#L70)
+
+- Registered here, or every rejection carries raw text with no stable code.
+  [`main.go:125`](../../main.go#L125)
+
+- The consumer, with the same fixed fallback the backend applies.
+  [`errors.ts:64`](../../frontend/src/transfer/errors.ts#L64)
+
+**Commands and lifecycle**
+
+- Metadata crosses unchanged; remapping it would be a second definition that drifts.
+  [`app.go:133`](../../app.go#L133)
+
+- Cancel takes no context because it runs to quiescence.
+  [`app.go:155`](../../app.go#L155)
+
+- A dialog returns a path and stages nothing; a dismissal is not an error.
+  [`app.go:169`](../../app.go#L169)
+
+- The hook blocks until the listener, beacon and drainer are gone. That is the trade.
+  [`app.go:265`](../../app.go#L265)
+
+- The one context stored, and the one never stored over it.
+  [`app.go:251`](../../app.go#L251)
+
+**Evidence the boundary is real**
+
+- The port the coordinator actually calls; emptying it once left the suite green.
+  [`app_test.go:947`](../../app_test.go#L947)
+
+- Composition asserted on an App built the way main builds it.
+  [`main_test.go:174`](../../main_test.go#L174)
+
+- Bind pinned: emptying it ships zero callable commands past every other check.
+  [`main_test.go:159`](../../main_test.go#L159)
+
+- The exported method set is the command surface, so it is pinned as a set.
+  [`app_test.go:302`](../../app_test.go#L302)
+
+- A foreign context is log.Fatalf in production, so every emission is checked.
+  [`app_test.go:984`](../../app_test.go#L984)
+
+- The token is asserted present and the path absent, through a real command.
+  [`app_test.go:1060`](../../app_test.go#L1060)
+
+- The two goroutines a.mu exists for, finally driven at once.
+  [`app_test.go:1028`](../../app_test.go#L1028)
+
+- The cross-language pin, reading inside the exported array rather than the file.
+  [`main_test.go:105`](../../main_test.go#L105)
+
+- A thirteenth code now fails here, naming every place it has to be added.
+  [`errors_test.go:217`](../../internal/transfer/errors_test.go#L217)

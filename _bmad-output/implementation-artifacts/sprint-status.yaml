@@ -42,7 +42,7 @@ development_status:
   1-4-serve-a-one-shot-capability-download: done
   1-5-stage-and-authorize-a-transfer-transactionally: done
   1-6-complete-cancel-and-reset-the-transfer-lifecycle: review
-  1-7-expose-safe-transfer-commands-through-wails: in-progress
+  1-7-expose-safe-transfer-commands-through-wails: review
   1-8-manage-session-scoped-frontend-state-and-events: backlog
   1-9-render-the-paper-relay-transfer-views: backlog
   1-10-meet-the-accessibility-and-recovery-contract: backlog
