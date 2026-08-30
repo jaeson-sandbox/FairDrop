@@ -3,6 +3,16 @@
 Real findings surfaced during review that are not the current story's problem.
 Append-only. Each entry names the spec that surfaced it.
 
+> **Discharged (Story 1.8):** the Story 1.7 entry below requiring the frontend
+> reducer to treat forged lifecycle events as a security property is closed.
+> `reduceLifecycle` refuses any event whose `sessionId` differs from the active
+> session or whose `seq` does not exceed `lastSeq`, refuses every event at a
+> state that owns no session at all, and never consumes a sequence for a
+> rejected event. Mutation confirms each of those three is load-bearing and
+> named by a failing test. The webview can still deliver forged events to its
+> own listeners -- no backend change can prevent that -- but they can no longer
+> move the visible transfer.
+
 > **Discharged (Story 1.4):** three entries below are now closed and are kept only
 > for the trail. `TransferStats.Percent` with a zero total is resolved by
 > `ProgressSnapshot.TotalKnown` plus the clamped `percentOf`. `TransferServer.Stop`
@@ -231,3 +241,15 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
   summary: Two hardening changes at the Wails boundary are correct but undistinguishable by any test.
   evidence: Narrowing the cross-language pin to search inside the `transferErrorCodes` array rather than the whole file closes a real hole -- a code surviving only in a comment would have satisfied the old check -- but every one of the twelve codes genuinely sits inside that array, so both forms pass and mutation cannot tell them apart (verified: the earlier "caught" result was a compile error from an unused variable, which proves nothing either way). The same applies to `appObserver`'s nil-app guard, which no production path can reach. Both are kept; neither is a tested guarantee.
+
+- source_spec: `spec-1-8-manage-session-scoped-frontend-state-and-events.md`
+  summary: Regenerating `epic-1-context.md` silently discards refinements, and the next `compile-epic-context` run will do it again.
+  evidence: The 2026-08-29 run replaced a 1293-word compile with a 1064-word one, dropping the copy-registry-by-stable-key rule, the lowerCamelCase/`transfer-*`/`context.Context` conventions, the transitional-interface deletion rule, "every focus target proven to exist before focusing", Epic 1's own native download exit check, and the whole receiver-help paragraph that Stories 1.9 and 1.10 render from. The file is the compiled orientation artifact every later story reads, its own header invites free editing, and nothing reconciles an edit against a later regeneration -- so the loss was invisible until a diff was read. Restored by hand for Epic 1. The durable fix is a workflow question rather than a code one: either treat the compiled context as generated-only and move refinements into the planning artifacts it compiles from, or stop regenerating it once an epic is underway.
+
+- source_spec: `spec-1-8-manage-session-scoped-frontend-state-and-events.md`
+  summary: A malformed Stage acknowledgement is cancelled and reported, but nothing tells the user their selection was refused rather than lost.
+  evidence: `stage()` falls back to `publicError('transfer_failed')`, whose fixed copy says the transfer "stopped before FairDrop finished sending" -- the same mismatch the Story 1.3, 1.5, 1.6 and 1.7 entries record for states where no transfer began. Correct within this story, which may not change copy; it is the fifth instance of one missing code, and the accumulated case belongs to an EXPERIENCE.md decision before Story 1.10 fixes recovery text against it.
+
+- source_spec: `spec-1-8-manage-session-scoped-frontend-state-and-events.md`
+  summary: The frontend suite still runs only when someone types `npm test`, one story after the same finding.
+  evidence: `wails build` regenerates bindings and compiles the frontend without running a single Vitest file, and there is still no `.github/workflows`. Story 1.8 raised the frontend suite from 35 tests to 164 and made it the only executable evidence for the forged-event defence, which raises the cost of the gap rather than changing it. Restated here so Story 3.2 sees that it grew.
