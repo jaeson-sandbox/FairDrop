@@ -2,7 +2,7 @@
 title: 'Story 1.9 — Render the Paper Relay Transfer Views'
 type: 'feature'
 created: '2026-08-30'
-status: 'ready-for-dev'
+status: 'implemented'
 review_loop_iteration: 0
 baseline_commit: '19ad4ee9b8fdbacfb16364192fcaf4d047105ae0'
 context:
@@ -60,17 +60,17 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `frontend/src/style.css` — declare the Terracotta Linen tokens in a Tailwind v4 `@theme` block with a `prefers-color-scheme` dark pair and `color-scheme: light dark`, so first paint cannot flash the opposite theme.
-- [ ] `frontend/src/ui/copy.ts` — one frozen registry mapping every `EXPERIENCE.md` stable key to its exact string, plus the fixed error headings; re-export the error messages from `errors.ts` rather than duplicating them.
-- [ ] `frontend/src/transfer/useTransfer.ts` — add `selectFile`/`selectDirectory`, sharing the Stage generation guard: a non-empty result stages, an empty result is silent, a rejection becomes a command error.
-- [ ] `frontend/src/transfer/selectors.ts` — add only what the views need to stay logic-free (pending item kind, staged warnings, retained-outcome presentation).
-- [ ] `frontend/src/ui/IdleView.tsx` — firewall preflight, drop target, browse controls, retained outcome with `copy.outcome.dismiss`.
-- [ ] `frontend/src/ui/StagePendingCard.tsx` — kind-specific preparing copy and the preparation Cancel.
-- [ ] `frontend/src/ui/StagedView.tsx` — item summary, QR panel, direct URL row with copy action and feedback, disclosures, warning banner, Cancel.
-- [ ] `frontend/src/ui/TransferringView.tsx` — the three progress presentations and the wire-byte metrics.
-- [ ] `frontend/src/ui/OutcomePanel.tsx` — Done and Error panels, shared by the terminal phases and the retained Idle node.
-- [ ] `frontend/src/App.tsx` — compose one view per phase behind the existing controller and drop gate; keep the inherited CSS gate untouched.
-- [ ] `frontend/src/ui/*.test.tsx` — cover every matrix row, all three progress modes, the copy registry values as literals, QR rendering, and the reflow breakpoints.
+- [x] `frontend/src/style.css` — declare the Terracotta Linen tokens in a Tailwind v4 `@theme` block with a `prefers-color-scheme` dark pair and `color-scheme: light dark`, so first paint cannot flash the opposite theme.
+- [x] `frontend/src/ui/copy.ts` — one frozen registry mapping every `EXPERIENCE.md` stable key to its exact string, plus the fixed error headings; re-export the error messages from `errors.ts` rather than duplicating them.
+- [x] `frontend/src/transfer/useTransfer.ts` — add `selectFile`/`selectDirectory`, sharing the Stage generation guard: a non-empty result stages, an empty result is silent, a rejection becomes a command error.
+- [x] `frontend/src/transfer/selectors.ts` — add only what the views need to stay logic-free (pending item kind, staged warnings, retained-outcome presentation).
+- [x] `frontend/src/ui/IdleView.tsx` — firewall preflight, drop target, browse controls, retained outcome with `copy.outcome.dismiss`.
+- [x] `frontend/src/ui/StagePendingCard.tsx` — kind-specific preparing copy and the preparation Cancel.
+- [x] `frontend/src/ui/StagedView.tsx` — item summary, QR panel, direct URL row with copy action and feedback, disclosures, warning banner, Cancel.
+- [x] `frontend/src/ui/TransferringView.tsx` — the three progress presentations and the wire-byte metrics.
+- [x] `frontend/src/ui/OutcomePanel.tsx` — Done and Error panels, shared by the terminal phases and the retained Idle node.
+- [x] `frontend/src/App.tsx` — compose one view per phase behind the existing controller and drop gate; keep the inherited CSS gate untouched.
+- [x] `frontend/src/ui/*.test.tsx` — cover every matrix row, all three progress modes, the copy registry values as literals, QR rendering, and the reflow breakpoints.
 
 **Acceptance Criteria:**
 - Given any rendered view, when its text is read, then every string equals a registry value character for character, and no banned term or raw adapter text appears.
@@ -80,6 +80,51 @@ context:
 - Given 320 CSS pixels of effective width, when the layout reflows, then no page-level horizontal scrollbar exists and every action stays reachable at 44px.
 
 ## Spec Change Log
+
+Implementation decisions taken inside the approved boundaries, recorded so a
+reviewer can find them without a diff hunt. None of them changes the frozen
+intent; each is a place where the spec left one degree of freedom.
+
+- **A chooser rejection reaches Idle through the existing transitions.** The
+  matrix requires the fixed Error Panel, `state.ts` is marked do-not-modify, and
+  the reducer's only route to an Idle `commandError` is `stage-requested` →
+  `stage-failed`. `browse` therefore dispatches both halves back to back in the
+  catch. React applies them in one batch, so Pending is reduced but never
+  rendered; `useTransfer.test.tsx` records every rendered phase and asserts
+  `'pending'` is not among them. No reducer transition, correlation rule, or
+  reset rule was touched.
+- **The browse commands hold their own operation slot.** Sharing
+  `stageOperationRef` would have made the unmount path owe a `CancelTransfer`
+  for a session that was never staged. `browseOperationRef` blocks a second
+  chooser and a native drop for the same window, and a test pins that no
+  `CancelTransfer` is issued for an abandoned chooser.
+- **A `'unknown'` pending kind shows no kind tab and the file wording.** A
+  native drop supplies a path only, and the registry has no kind-neutral
+  preparing string. Epic 1's source adapter accepts regular files, so a dropped
+  folder fails validation a moment later with its own fixed copy. Epic 2 should
+  revisit this line when directories become stageable by drop.
+- **Two files beyond the Execution list.** `frontend/src/ui/format.ts` holds the
+  byte and rate presentation shared by the item summary and the metrics, built
+  from `copy.unit`; `frontend/src/ui/styles.test.ts` proves the token layer, the
+  44px floor and the reflow breakpoints against the stylesheet, because jsdom
+  performs no layout and evaluates no media query.
+- **`copy.label` and `copy.unit`.** The Voice-and-Tone table does not tabulate
+  control names, the firewall block's own headings, metric captions, or byte
+  units, but the views need them. They live in the same frozen registry, in
+  their own group, each carrying its source in a comment.
+- **Component styling is authored CSS over the `@theme` tokens.** Tailwind v4
+  declares the token layer; the Paper Relay components (dashed drop zone, packet
+  tab, static unknown-progress pattern, paper offset) read those variables from
+  `.fd-*` rules rather than utility strings. Nothing outside the two token
+  blocks contains a color, and a test enforces that.
+- **`@font-face` removed from `style.css`.** DESIGN.md allows system-safe stacks
+  only, and no view named the bundled face any more. The asset files are left in
+  place untouched.
+- **1.10's surfaces are registered but not rendered.** `copy.help.*`, the
+  firewall recovery strings, `copy.cancel.won`, `copy.name.show_full` and
+  `copy.external.promise` are in the registry as the task requires, and no view
+  renders them. The Status Announcer is pre-mounted, atomic and empty; 1.10
+  gives it its content and its focus routes.
 
 ## Design Notes
 

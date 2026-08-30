@@ -1,11 +1,15 @@
 import {describe, expect, it} from 'vitest'
 import {publicError} from './errors'
 import {
+    selectCommandError,
     selectMetadata,
+    selectOutcome,
+    selectPendingItemKind,
     selectProgress,
     selectProgressSnapshot,
     selectRetainedOutcome,
     selectVisibleError,
+    selectWarnings,
 } from './selectors'
 import type {TransferState} from './state'
 
@@ -168,5 +172,153 @@ describe('state-aware selectors', () => {
             message: 'The item changed after it was prepared. Cancel and create a fresh link.',
         })
         expect(selectRetainedOutcome(terminal)).toBeNull()
+    })
+})
+
+describe('pending item kind', () => {
+    it('reports the kind a browse command supplied', () => {
+        expect(selectPendingItemKind({phase: 'pending', generation: 1, itemKind: 'file', cancelPending: false}))
+            .toBe('file')
+        expect(selectPendingItemKind({phase: 'pending', generation: 1, itemKind: 'directory', cancelPending: false}))
+            .toBe('directory')
+    })
+
+    it('passes a native drop through as unknown rather than guessing', () => {
+        expect(selectPendingItemKind({phase: 'pending', generation: 1, itemKind: 'unknown', cancelPending: false}))
+            .toBe('unknown')
+    })
+
+    it('reports nothing outside the pending phase', () => {
+        expect(selectPendingItemKind({phase: 'idle', retainedOutcome: null, commandError: null})).toBeNull()
+    })
+})
+
+describe('staged warnings', () => {
+    const warning = {
+        code: 'beacon_warning',
+        message: 'Device discovery isn’t available. The QR code and download link still work.',
+    } as const
+
+    it('exposes the warnings carried by the live session metadata', () => {
+        const staged: TransferState = {
+            phase: 'staged',
+            session: {sessionId: metadata.sessionId, lastSeq: 0},
+            metadata: {...metadata, warnings: [warning]},
+            cancelPending: false,
+            commandError: null,
+        }
+
+        expect(selectWarnings(staged)).toEqual([warning])
+    })
+
+    it('keeps carrying them once the transfer starts', () => {
+        const transferring: TransferState = {
+            phase: 'transferring',
+            session: {sessionId: metadata.sessionId, lastSeq: 1},
+            metadata: {...metadata, warnings: [warning]},
+            progress: null,
+            cancelPending: false,
+            commandError: null,
+        }
+
+        expect(selectWarnings(transferring)).toEqual([warning])
+    })
+
+    it('returns an empty list where no session exists', () => {
+        expect(selectWarnings({phase: 'idle', retainedOutcome: null, commandError: null})).toEqual([])
+        expect(selectWarnings({phase: 'pending', generation: 1, itemKind: 'file', cancelPending: false})).toEqual([])
+    })
+})
+
+describe('command errors', () => {
+    it('selects the command error of whichever phase owns one', () => {
+        expect(selectCommandError({
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: publicError('invalid_selection'),
+        })).toEqual({code: 'invalid_selection', message: 'Choose exactly one file or folder.'})
+
+        expect(selectCommandError({
+            phase: 'staged',
+            session: {sessionId: metadata.sessionId, lastSeq: 0},
+            metadata,
+            cancelPending: false,
+            commandError: publicError('busy'),
+        })?.code).toBe('busy')
+    })
+
+    it('refuses to surface a cancellation as a command error', () => {
+        expect(selectCommandError({
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: publicError('cancelled'),
+        })).toBeNull()
+    })
+
+    it('ignores a retained terminal error, which the outcome selector owns', () => {
+        expect(selectCommandError({
+            phase: 'idle',
+            retainedOutcome: {kind: 'error', error: publicError('transfer_failed')},
+            commandError: null,
+        })).toBeNull()
+    })
+})
+
+describe('terminal and retained outcomes', () => {
+    it('presents a live terminal outcome as not retained', () => {
+        expect(selectOutcome({
+            phase: 'done',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'done'},
+        })).toEqual({kind: 'done', retained: false})
+
+        expect(selectOutcome({
+            phase: 'error',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'error', error: publicError('transfer_failed')},
+        })).toEqual({
+            kind: 'error',
+            retained: false,
+            error: {
+                code: 'transfer_failed',
+                message: 'The transfer stopped before FairDrop finished sending. ' +
+                    'Check the local network and create a fresh link.',
+            },
+        })
+    })
+
+    it('presents the same outcome as retained once reset has cleared the session', () => {
+        expect(selectOutcome({phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null}))
+            .toEqual({kind: 'done', retained: true})
+        expect(selectOutcome({
+            phase: 'idle',
+            retainedOutcome: {kind: 'error', error: publicError('source_changed')},
+            commandError: null,
+        })?.retained).toBe(true)
+    })
+
+    it('refuses to present a cancellation as an outcome panel', () => {
+        expect(selectOutcome({
+            phase: 'error',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'error', error: publicError('cancelled')},
+        })).toBeNull()
+        expect(selectOutcome({
+            phase: 'idle',
+            retainedOutcome: {kind: 'error', error: publicError('cancelled')},
+            commandError: null,
+        })).toBeNull()
+    })
+
+    it('presents nothing while a session is live or preparing', () => {
+        expect(selectOutcome({phase: 'idle', retainedOutcome: null, commandError: null})).toBeNull()
+        expect(selectOutcome({phase: 'pending', generation: 1, itemKind: 'file', cancelPending: false})).toBeNull()
+        expect(selectOutcome({
+            phase: 'staged',
+            session: {sessionId: metadata.sessionId, lastSeq: 0},
+            metadata,
+            cancelPending: false,
+            commandError: null,
+        })).toBeNull()
     })
 })

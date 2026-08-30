@@ -1,7 +1,13 @@
 import {useEffect} from 'react'
-import type {CSSProperties} from 'react'
+import type {CSSProperties, ReactElement} from 'react'
 import {OnFileDrop, OnFileDropOff} from '../wailsjs/runtime/runtime'
-import {useTransfer} from './transfer/useTransfer'
+import {selectOutcome} from './transfer/selectors'
+import {useTransfer, type TransferController} from './transfer/useTransfer'
+import {IdleView} from './ui/IdleView'
+import {OutcomePanel} from './ui/OutcomePanel'
+import {StagePendingCard} from './ui/StagePendingCard'
+import {StagedView} from './ui/StagedView'
+import {TransferringView} from './ui/TransferringView'
 
 // Wails gates native file drops on a CSS custom property rather than a class.
 // The property inherits, so every descendant of the zone is a valid drop point.
@@ -24,20 +30,52 @@ function App() {
     }, [transfer.rejectSelection, transfer.stage])
 
     return (
-        <main
-            data-transfer-phase={transfer.state.phase}
-            className="flex h-full flex-col gap-6 bg-slate-900 p-8 font-[Nunito,system-ui,sans-serif] text-slate-100"
-        >
-            <h1 className="text-2xl font-semibold tracking-tight">FairDrop</h1>
-
-            <div
-                style={dropTargetStyle}
-                className="flex flex-1 flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-slate-600 p-8 text-center transition-colors [&.wails-drop-target-active]:border-sky-400 [&.wails-drop-target-active]:bg-slate-800"
-            >
-                <p className="text-slate-400">Drop a file or folder here</p>
-            </div>
+        <main className="fd-app" data-transfer-phase={transfer.state.phase}>
+            {phaseView(transfer)}
+            <div className="fd-status-announcer" role="status" aria-live="polite" aria-atomic="true"/>
         </main>
     )
+}
+
+/**
+ * Exactly one view per phase, chosen by the reducer's own discriminator.
+ *
+ * No branch consults a path, a promise, elapsed time, or an animation: the
+ * phase field is the only input, so the screen cannot disagree with the state
+ * machine that Story 1.8 defended.
+ */
+function phaseView(transfer: TransferController): ReactElement | null {
+    const {state} = transfer
+
+    switch (state.phase) {
+        case 'idle':
+            return (
+                <IdleView
+                    state={state}
+                    dropTargetStyle={dropTargetStyle}
+                    onSelectFile={() => void transfer.selectFile()}
+                    onSelectDirectory={() => void transfer.selectDirectory()}
+                    onDismissRetained={transfer.dismissRetained}
+                />
+            )
+
+        case 'pending':
+            return <StagePendingCard state={state} onCancel={() => void transfer.cancel()}/>
+
+        case 'staged':
+            return <StagedView state={state} onCancel={() => void transfer.cancel()}/>
+
+        case 'transferring':
+            return <TransferringView state={state} onCancel={() => void transfer.cancel()}/>
+
+        case 'done':
+        case 'error': {
+            // The selector, not this switch, decides an outcome is renderable:
+            // it is what refuses to dress a cancellation up as an Error.
+            const outcome = selectOutcome(state)
+            return outcome === null ? null : <OutcomePanel outcome={outcome} level={1}/>
+        }
+    }
 }
 
 export default App

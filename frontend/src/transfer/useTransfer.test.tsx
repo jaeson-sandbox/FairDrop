@@ -6,12 +6,16 @@ import {useTransfer} from './useTransfer'
 const mocks = vi.hoisted(() => ({
     stageTransfer: vi.fn(),
     cancelTransfer: vi.fn(),
+    selectFile: vi.fn(),
+    selectDirectory: vi.fn(),
     eventsOn: vi.fn(),
 }))
 
 vi.mock('../../wailsjs/go/main/App', () => ({
     StageTransfer: mocks.stageTransfer,
     CancelTransfer: mocks.cancelTransfer,
+    SelectFile: mocks.selectFile,
+    SelectDirectory: mocks.selectDirectory,
 }))
 
 vi.mock('../../wailsjs/runtime/runtime', () => ({
@@ -73,6 +77,8 @@ beforeEach(() => {
     subscriptions = []
     mocks.stageTransfer.mockReset()
     mocks.cancelTransfer.mockReset()
+    mocks.selectFile.mockReset()
+    mocks.selectDirectory.mockReset()
     mocks.eventsOn.mockReset()
     mocks.cancelTransfer.mockResolvedValue(undefined)
     mocks.eventsOn.mockImplementation((name: string, callback: (...args: unknown[]) => void) => {
@@ -450,5 +456,191 @@ describe('command and event races', () => {
             phase: 'transferring', session: {sessionId: secondSessionId}, cancelPending: true,
         })
         expect(JSON.stringify(hook.result.current.state)).not.toContain('stale')
+    })
+})
+
+describe('native browse commands', () => {
+    it.each([
+        ['selectFile'],
+        ['selectDirectory'],
+    ])('stages a non-empty %s result immediately', async (command) => {
+        const chooser = command === 'selectFile' ? mocks.selectFile : mocks.selectDirectory
+        const other = command === 'selectFile' ? mocks.selectDirectory : mocks.selectFile
+        chooser.mockResolvedValue('C:\\chosen\\item')
+        mocks.stageTransfer.mockResolvedValue(metadata())
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => {
+            await (command === 'selectFile'
+                ? hook.result.current.selectFile()
+                : hook.result.current.selectDirectory())
+        })
+
+        expect(chooser).toHaveBeenCalledTimes(1)
+        expect(other).not.toHaveBeenCalled()
+        expect(mocks.stageTransfer).toHaveBeenCalledWith('C:\\chosen\\item')
+        expect(hook.result.current.state).toMatchObject({phase: 'staged', metadata: {name: 'report.pdf'}})
+    })
+
+    it('names the pending item kind the chooser established', async () => {
+        mocks.selectDirectory.mockResolvedValue('C:\\chosen\\folder')
+        const staging = deferred<unknown>()
+        mocks.stageTransfer.mockReturnValue(staging.promise)
+        const hook = renderHook(() => useTransfer())
+
+        let pending!: Promise<void>
+        await act(async () => {
+            pending = hook.result.current.selectDirectory()
+            await Promise.resolve()
+        })
+
+        expect(hook.result.current.state).toMatchObject({phase: 'pending', itemKind: 'directory'})
+
+        await act(async () => {
+            staging.resolve(metadata())
+            await pending
+        })
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    it.each([
+        ['a dismissed chooser', ''],
+        ['a whitespace-only path', '   '],
+    ])('stays silently in Idle for %s', async (_name, selection) => {
+        mocks.selectFile.mockResolvedValue(selection)
+        const hook = renderHook(() => useTransfer())
+        const before = hook.result.current.state
+
+        await act(async () => { await hook.result.current.selectFile() })
+
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+        expect(hook.result.current.state).toBe(before)
+    })
+
+    it('reports a chooser rejection as a fixed command error without ever showing preparation', async () => {
+        mocks.selectFile.mockRejectedValue(new Error(JSON.stringify({
+            code: 'shutting_down',
+            message: 'anything the adapter felt like saying',
+        })))
+        const phases: string[] = []
+        const hook = renderHook(() => {
+            const controller = useTransfer()
+            phases.push(controller.state.phase)
+            return controller
+        })
+
+        await act(async () => { await hook.result.current.selectFile() })
+
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+        expect(hook.result.current.state).toEqual({
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: {code: 'shutting_down', message: 'FairDrop is closing. Reopen it to start a transfer.'},
+        })
+        // The Idle command error is reached through Pending, but in one batch:
+        // no render ever observes the preparation surface.
+        expect(phases).not.toContain('pending')
+    })
+
+    it('falls back to the safe unknown failure when the rejection is not a public error', async () => {
+        mocks.selectDirectory.mockRejectedValue(new Error('C:\\Users\\jaeson\\Pictures could not be opened'))
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.selectDirectory() })
+
+        expect(hook.result.current.state).toMatchObject({
+            phase: 'idle',
+            commandError: {code: 'transfer_failed'},
+        })
+        expect(JSON.stringify(hook.result.current.state)).not.toContain('jaeson')
+    })
+
+    it('never reports a cancellation as a command error', async () => {
+        mocks.selectFile.mockRejectedValue(new Error(JSON.stringify({
+            code: 'cancelled',
+            message: 'Transfer canceled.',
+        })))
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.selectFile() })
+
+        expect(hook.result.current.state).toEqual({phase: 'idle', retainedOutcome: null, commandError: null})
+    })
+
+    it('runs one chooser at a time and ignores a drop while one is open', async () => {
+        const chooser = deferred<string>()
+        mocks.selectFile.mockReturnValue(chooser.promise)
+        mocks.stageTransfer.mockResolvedValue(metadata())
+        const hook = renderHook(() => useTransfer())
+
+        let first!: Promise<void>
+        await act(async () => {
+            first = hook.result.current.selectFile()
+            await Promise.resolve()
+        })
+
+        await act(async () => {
+            await hook.result.current.selectDirectory()
+            await hook.result.current.stage('C:\\dropped.pdf', 'unknown')
+        })
+        expect(mocks.selectDirectory).not.toHaveBeenCalled()
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+
+        await act(async () => {
+            chooser.resolve('C:\\chosen.pdf')
+            await first
+        })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfer).toHaveBeenCalledWith('C:\\chosen.pdf')
+    })
+
+    it('refuses to open a chooser outside Idle', async () => {
+        mocks.stageTransfer.mockResolvedValue(metadata())
+        mocks.selectFile.mockResolvedValue('C:\\second.pdf')
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.stage('C:\\first.pdf', 'unknown') })
+
+        await act(async () => { await hook.result.current.selectFile() })
+
+        expect(mocks.selectFile).not.toHaveBeenCalled()
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    it('drops a chooser result that resolves after unmount', async () => {
+        const chooser = deferred<string>()
+        mocks.selectFile.mockReturnValue(chooser.promise)
+        const hook = renderHook(() => useTransfer())
+
+        let pending!: Promise<void>
+        await act(async () => {
+            pending = hook.result.current.selectFile()
+            await Promise.resolve()
+        })
+        hook.unmount()
+
+        await act(async () => {
+            chooser.resolve('C:\\chosen.pdf')
+            await pending
+        })
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+    })
+
+    it('owes no CancelTransfer for a chooser that was never a session', async () => {
+        const chooser = deferred<string>()
+        mocks.selectFile.mockReturnValue(chooser.promise)
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => {
+            void hook.result.current.selectFile()
+            await Promise.resolve()
+        })
+        hook.unmount()
+        await act(async () => {
+            chooser.reject(new Error('dismissed'))
+            await Promise.resolve()
+        })
+
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
     })
 })

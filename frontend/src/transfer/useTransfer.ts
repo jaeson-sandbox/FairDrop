@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useReducer, useRef} from 'react'
-import {CancelTransfer, StageTransfer} from '../../wailsjs/go/main/App'
+import {CancelTransfer, SelectDirectory, SelectFile, StageTransfer} from '../../wailsjs/go/main/App'
 import {EventsOn} from '../../wailsjs/runtime/runtime'
 import {parseCommandError, publicError} from './errors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
@@ -17,9 +17,15 @@ interface ActiveCancelOperation {
     readonly sessionId: string
 }
 
+interface BrowseOperation {
+    readonly generation: number
+}
+
 export interface TransferController {
     readonly state: TransferState
     readonly stage: (absolutePath: string, itemKind?: PendingItemKind) => Promise<void>
+    readonly selectFile: () => Promise<void>
+    readonly selectDirectory: () => Promise<void>
     readonly cancel: () => Promise<void>
     readonly rejectSelection: () => void
     readonly dismissRetained: () => void
@@ -34,6 +40,7 @@ export function useTransfer(): TransferController {
     const stageOperationRef = useRef<StageOperation | null>(null)
     const cancelGenerationRef = useRef(0)
     const activeCancelRef = useRef<ActiveCancelOperation | null>(null)
+    const browseOperationRef = useRef<BrowseOperation | null>(null)
     const subscriptionEpochRef = useRef(0)
     stateRef.current = state
 
@@ -50,6 +57,7 @@ export function useTransfer(): TransferController {
             cancelGenerationRef.current += 1
             stageOperationRef.current = null
             activeCancelRef.current = null
+            browseOperationRef.current = null
         }
     }, [])
 
@@ -87,7 +95,8 @@ export function useTransfer(): TransferController {
         absolutePath: string,
         itemKind: PendingItemKind = 'unknown',
     ): Promise<void> => {
-        if (!mountedRef.current || stateRef.current.phase !== 'idle' || stageOperationRef.current !== null) return
+        if (!mountedRef.current || stateRef.current.phase !== 'idle') return
+        if (stageOperationRef.current !== null || browseOperationRef.current !== null) return
 
         const generation = stageGenerationRef.current + 1
         stageGenerationRef.current = generation
@@ -127,6 +136,56 @@ export function useTransfer(): TransferController {
             }
         }
     }, [])
+
+    /**
+     * Runs one native chooser and hands its result to the same Stage path a
+     * native drop uses.
+     *
+     * The dialog is not a Stage, so it holds its own slot rather than the Stage
+     * one: an outstanding chooser blocks a second chooser and a drop, but it
+     * never leaves a `CancelTransfer` owed for a session that was never staged.
+     * Three results are possible and each is spelled out below.
+     */
+    const browse = useCallback(async (
+        open: () => Promise<string>,
+        itemKind: PendingItemKind,
+    ): Promise<void> => {
+        if (!mountedRef.current || stateRef.current.phase !== 'idle') return
+        if (stageOperationRef.current !== null || browseOperationRef.current !== null) return
+
+        const generation = stageGenerationRef.current + 1
+        stageGenerationRef.current = generation
+        const operation: BrowseOperation = {generation}
+        browseOperationRef.current = operation
+
+        try {
+            const selected = await Promise.resolve().then(open)
+            if (!browseMayCommit(operation)) return
+
+            // A dismissed chooser returns an empty selection, which the spine
+            // makes a quiet cancel: no dispatch, no error, no announcement.
+            if (typeof selected !== 'string' || selected.trim() === '') return
+
+            browseOperationRef.current = null
+            await stage(selected, itemKind)
+        } catch (rejection) {
+            if (!browseMayCommit(operation)) return
+
+            // The chooser failed, so no Stage was ever attempted -- yet the
+            // reducer is the only owner of a visible command error, and its one
+            // route into Idle runs through Pending. Both halves are therefore
+            // dispatched together: React applies them in a single batch, so the
+            // Pending state is reduced but never rendered and no view can claim
+            // a preparation that never started.
+            dispatch({type: 'stage-requested', generation, itemKind})
+            dispatch({type: 'stage-failed', generation, error: parseCommandError(rejection)})
+        } finally {
+            if (browseOperationRef.current === operation) browseOperationRef.current = null
+        }
+    }, [stage])
+
+    const selectFile = useCallback(() => browse(SelectFile, 'file'), [browse])
+    const selectDirectory = useCallback(() => browse(SelectDirectory, 'directory'), [browse])
 
     const cancel = useCallback(async (): Promise<void> => {
         const current = stateRef.current
@@ -176,7 +235,11 @@ export function useTransfer(): TransferController {
     const rejectSelection = useCallback(() => dispatch({type: 'invalid-selection'}), [])
     const dismissRetained = useCallback(() => dispatch({type: 'dismiss-retained'}), [])
 
-    return {state, stage, cancel, rejectSelection, dismissRetained}
+    return {state, stage, selectFile, selectDirectory, cancel, rejectSelection, dismissRetained}
+
+    function browseMayCommit(operation: BrowseOperation): boolean {
+        return mountedRef.current && browseOperationRef.current === operation
+    }
 
     function stageMayCommit(operation: StageOperation): boolean {
         return mountedRef.current && stageOperationRef.current === operation && !operation.cancelRequested
