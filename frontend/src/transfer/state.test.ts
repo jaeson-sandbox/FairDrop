@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest'
 import {publicError} from './errors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
+import type {PublicError} from './types'
 
 const sessionId = '0123456789abcdef0123456789abcdef'
 const qrPNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
@@ -172,6 +173,29 @@ describe('authoritative lifecycle grammar', () => {
         expect(event(accepted, 'transfer-started', {sessionId, seq: 2})).toBe(accepted)
     })
 
+    it('ignores every lifecycle event while no session exists', () => {
+        const fresh = createInitialTransferState()
+        const pending = transferReducer(fresh, {type: 'stage-requested', generation: 1, itemKind: 'file'})
+        let retained = event(staged(), 'transfer-started', {sessionId, seq: 1})
+        retained = event(retained, 'transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        retained = event(retained, 'transfer-reset', {sessionId, seq: 3})
+        expect(retained).toMatchObject({phase: 'idle', retainedOutcome: {kind: 'done'}})
+
+        // A forged event reaches every window listener without the backend
+        // being involved, so a session-less state is as exposed as a live one
+        // and has no cursor of its own to reject the event with.
+        for (const state of [fresh, pending, retained]) {
+            for (const name of ['transfer-started', 'transfer-progress', 'transfer-complete',
+                'transfer-error', 'transfer-reset'] as const) {
+                expect(event(state, name, {sessionId, seq: 1})).toBe(state)
+                expect(event(state, name, {sessionId, seq: 9, progress: progress(100)})).toBe(state)
+                expect(event(state, name, {
+                    sessionId, seq: 9, error: {code: 'transfer_failed', message: 'forged'},
+                })).toBe(state)
+            }
+        }
+    })
+
     it('accepts a legal same-session event when its sequence skips ahead', () => {
         const state = event(staged(), 'transfer-started', {sessionId, seq: 7})
 
@@ -290,6 +314,28 @@ describe('terminal scrubbing and retained outcome', () => {
         expect(transferReducer(state, {
             type: 'stage-requested', generation: 2, itemKind: 'directory',
         })).toEqual({phase: 'pending', generation: 2, itemKind: 'directory', cancelPending: false})
+    })
+
+    it('rewrites caller-supplied error copy rather than storing what it was handed', () => {
+        const forged: PublicError = {code: 'busy', message: 'C:\\private\\report.pdf?token=fedcba98'}
+        const registryCopy = 'Finish or cancel the current transfer before choosing another item.'
+
+        const pending = transferReducer(createInitialTransferState(), {
+            type: 'stage-requested', generation: 1, itemKind: 'file',
+        })
+        const failed = transferReducer(pending, {type: 'stage-failed', generation: 1, error: forged})
+        expect(failed).toEqual({
+            phase: 'idle', retainedOutcome: null,
+            commandError: {code: 'busy', message: registryCopy},
+        })
+
+        const cancelling = transferReducer(staged(), {type: 'cancel-requested'})
+        const reported = transferReducer(cancelling, {type: 'active-cancel-failed', sessionId, error: forged})
+        expect(reported).toMatchObject({
+            phase: 'staged', cancelPending: false,
+            commandError: {code: 'busy', message: registryCopy},
+        })
+        expect(JSON.stringify(reported)).not.toContain('token=')
     })
 
     it('keeps retained terminal outcome when invalid selection supplies the visible command error', () => {

@@ -384,6 +384,31 @@ describe('command and event races', () => {
         expect(hook.result.current.state).toMatchObject({phase: 'transferring', session: {lastSeq: 1}})
     })
 
+    it('issues exactly one Cancel when two reach the same live session in one tick', async () => {
+        const cancelDeferred = deferred<void>()
+        mocks.stageTransfer.mockResolvedValue(metadata())
+        mocks.cancelTransfer.mockReturnValue(cancelDeferred.promise)
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.stage('C:\\report.pdf') })
+        act(() => emit('transfer-started', {sessionId, seq: 1}))
+
+        // Both activations read the same pre-dispatch state, so cancelPending
+        // has not been set for the second one yet and cannot deduplicate it.
+        let settled!: Promise<unknown>
+        act(() => {
+            settled = Promise.all([hook.result.current.cancel(), hook.result.current.cancel()])
+        })
+        expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1)
+
+        await act(async () => {
+            cancelDeferred.resolve()
+            await settled
+        })
+        expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1)
+        expect(hook.result.current.state).toMatchObject({phase: 'transferring', cancelPending: true})
+    })
+
     it('does not let a stale unresolved Cancel block cancellation of a new session', async () => {
         const firstCancel = deferred<void>()
         const secondCancel = deferred<void>()
