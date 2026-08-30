@@ -44,7 +44,7 @@ development_status:
   1-6-complete-cancel-and-reset-the-transfer-lifecycle: done
   1-7-expose-safe-transfer-commands-through-wails: done
   1-8-manage-session-scoped-frontend-state-and-events: done
-  1-9-render-the-paper-relay-transfer-views: backlog
+  1-9-render-the-paper-relay-transfer-views: in-progress
   1-10-meet-the-accessibility-and-recovery-contract: backlog
   epic-1-retrospective: optional
 
