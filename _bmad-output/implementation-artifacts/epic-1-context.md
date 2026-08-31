@@ -42,6 +42,7 @@ A sender picks exactly one local regular file by native drop or keyboard-reachab
 - Conventions: lowerCamelCase JSON, `transfer-*` event names, `context.Context` first, injected clocks and entropy in coordinator tests, and no frontend lifecycle timers — the three-second terminal reset is a backend lease.
 - Stack: Wails v2.15.0 with the existing locked frontend stack, `hashicorp/mdns` v1.0.7, `boombuler/barcode` v1.1.0 (superseding the inactive QR dependency), Node 24 LTS pinned, `npm ci` with dev dependencies, both TypeScript projects moved together to `moduleResolution: "Bundler"`, Tailwind v4 via the Vite plugin with no v3/PostCSS config.
 - Preserve the proven Wails input boundary and application-lifetime runtime context, regenerate Wails bindings rather than editing them, and keep option assertions pinned in `main_test.go`.
+- The webview is a secure context on Windows (`http://wails.localhost`) and not on macOS (the custom `wails://` scheme), so `navigator.clipboard`, `crypto.subtle`, geolocation and media capture are undefined on one supported platform with no error. Anything gated that way goes through a bound Go command; the clipboard already does. The native window's `BackgroundColour` must likewise track `--color-canvas`, since it paints before the webview.
 
 ## UX & Interaction Patterns
 
