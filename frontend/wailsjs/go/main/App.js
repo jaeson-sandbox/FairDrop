@@ -6,6 +6,10 @@ export function CancelTransfer() {
   return window['go']['main']['App']['CancelTransfer']();
 }
 
+export function CopyToClipboard(arg1) {
+  return window['go']['main']['App']['CopyToClipboard'](arg1);
+}
+
 export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
 }

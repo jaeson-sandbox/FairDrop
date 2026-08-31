@@ -1,5 +1,11 @@
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
+
+const mocks = vi.hoisted(() => ({copyToClipboard: vi.fn()}))
+
+vi.mock('../../wailsjs/go/main/App', () => ({
+    CopyToClipboard: mocks.copyToClipboard,
+}))
 import type {StagedTransferState} from '../transfer/state'
 import type {FileMetadata, PublicError} from '../transfer/types'
 import {StagedView} from './StagedView'
@@ -35,11 +41,13 @@ function staged(overrides: Partial<StagedTransferState> = {}): StagedTransferSta
     }
 }
 
-let writeText: ReturnType<typeof vi.fn>
+// The bound Go command, not navigator.clipboard: the browser API is undefined
+// on macOS, where this frontend runs from a non-secure custom scheme.
+const writeText = mocks.copyToClipboard
 
 beforeEach(() => {
-    writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', {value: {writeText}, configurable: true, writable: true})
+    writeText.mockReset()
+    writeText.mockResolvedValue(undefined)
 })
 
 describe('the staged handoff', () => {
@@ -169,15 +177,25 @@ describe('copy feedback', () => {
         expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
     })
 
-    it('leaves the action label alone when no clipboard exists at all', async () => {
-        Object.defineProperty(navigator, 'clipboard', {value: undefined, configurable: true, writable: true})
+    /*
+      The copy must not go through navigator.clipboard. WKWebView serves this
+      frontend from the custom wails:// scheme, which is not a secure context,
+      so that API is undefined on macOS and the action would silently do
+      nothing there -- on one of the two platforms V1 supports.
+    */
+    it('copies through the bound command and never through the browser API', async () => {
+        const browserWrite = vi.fn()
+        Object.defineProperty(navigator, 'clipboard', {
+            value: {writeText: browserWrite}, configurable: true, writable: true,
+        })
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
         })
 
-        expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+        expect(writeText).toHaveBeenCalledTimes(1)
+        expect(browserWrite).not.toHaveBeenCalled()
     })
 
     it('changes nothing but the label: no toast, no lifecycle move, no cleared clipboard', async () => {

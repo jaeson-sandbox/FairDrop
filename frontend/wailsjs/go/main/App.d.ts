@@ -4,6 +4,8 @@ import {transfer} from '../models';
 
 export function CancelTransfer():Promise<void>;
 
+export function CopyToClipboard(arg1:string):Promise<void>;
+
 export function SelectDirectory():Promise<string>;
 
 export function SelectFile():Promise<string>;

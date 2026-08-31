@@ -41,6 +41,9 @@ type dialogFunc func(ctx context.Context, dialogOptions wailsruntime.OpenDialogO
 // emitFunc is the shape of the Wails runtime event emission.
 type emitFunc func(ctx context.Context, eventName string, optionalData ...interface{})
 
+// clipboardFunc is the shape of the Wails runtime clipboard write.
+type clipboardFunc func(ctx context.Context, text string) error
+
 // App is FairDrop's Wails boundary: it translates the four bound commands into
 // coordinator calls, translates coordinator lifecycle events into runtime
 // emissions, and owns nothing else. Every decision about what a transfer is,
@@ -73,6 +76,7 @@ type App struct {
 	emit          emitFunc
 	openFile      dialogFunc
 	openDirectory dialogFunc
+	setClipboard  clipboardFunc
 }
 
 // appObserver adapts the App to transfer.Observer.
@@ -109,6 +113,7 @@ func NewApp() *App {
 		emit:          wailsruntime.EventsEmit,
 		openFile:      wailsruntime.OpenFileDialog,
 		openDirectory: wailsruntime.OpenDirectoryDialog,
+		setClipboard:  wailsruntime.ClipboardSetText,
 	}
 }
 
@@ -174,6 +179,51 @@ func (a *App) SelectFile() (string, error) {
 // Like SelectFile it stages nothing.
 func (a *App) SelectDirectory() (string, error) {
 	return a.chooseWith(a.openDirectory, "Choose a folder to send")
+}
+
+// maxClipboardText bounds what the window may put on the user's clipboard.
+// The only legitimate payload is one capability URL, which is well under a
+// hundred characters; the bound keeps a defect in the view from handing the
+// platform an unbounded string.
+const maxClipboardText = 2048
+
+// CopyToClipboard writes text to the system clipboard through the Wails
+// runtime rather than through the webview.
+//
+// The webview cannot do this itself on every platform: WKWebView serves the
+// frontend from the custom `wails://` scheme, which is not a secure context, so
+// `navigator.clipboard` is undefined there and a browser-side copy silently
+// does nothing on macOS. WebView2 serves `http://wails.localhost`, which is
+// trustworthy, so the browser API works on Windows -- the asymmetry is exactly
+// why this goes through Go, where one path serves both.
+func (a *App) CopyToClipboard(text string) error {
+	if len(text) > maxClipboardText {
+		return transfer.NewError(
+			transfer.ErrTransferFailed,
+			"the text to copy is larger than the clipboard command accepts",
+		)
+	}
+
+	ctx := a.runtimeContext()
+	if ctx == nil {
+		// Same reasoning as the dialogs: the real runtime answers a context
+		// that never came from a window by taking the process down.
+		return transfer.NewError(
+			transfer.ErrTransferFailed,
+			"FairDrop is not ready to use the clipboard",
+		)
+	}
+
+	if err := a.setClipboard(ctx, text); err != nil {
+		// The platform's own clipboard diagnostic is adapter text; only the
+		// code and its fixed copy cross the boundary.
+		return transfer.WrapError(
+			transfer.ErrTransferFailed,
+			"the clipboard could not be written",
+			err,
+		)
+	}
+	return nil
 }
 
 // chooseWith runs one native open dialog.

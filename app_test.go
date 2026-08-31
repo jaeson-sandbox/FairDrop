@@ -129,6 +129,12 @@ type harness struct {
 
 	// emitPanic, when non-nil, is what the fake emitter panics with.
 	emitPanic error
+
+	// clipboardErr is what the fake clipboard answers with; clipboardText and
+	// clipboardCtx record what it was handed.
+	clipboardErr  error
+	clipboardText []string
+	clipboardCtx  context.Context
 }
 
 // newHarness returns a started App: startup has run, so a.ctx is installed.
@@ -178,8 +184,23 @@ func newUnstartedHarness(t *testing.T) *harness {
 	}
 	h.app.openFile = dialog("openFile")
 	h.app.openDirectory = dialog("openDirectory")
+	h.app.setClipboard = func(ctx context.Context, text string) error {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		h.clipboardCtx = ctx
+		h.clipboardText = append(h.clipboardText, text)
+		return h.clipboardErr
+	}
 
 	return h
+}
+
+func (h *harness) clipboardWrites() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]string, len(h.clipboardText))
+	copy(out, h.clipboardText)
+	return out
 }
 
 type runtimeContextKey struct{}
@@ -295,16 +316,18 @@ func TestComposeClosesTheAppCoordinatorCycle(t *testing.T) {
 }
 
 // Wails binds every exported method of a bound struct, so the App's exported
-// method set IS the public command surface. The contract fixes that surface at
-// four commands; an exported Publish would become a fifth, letting the webview
-// forge lifecycle events -- a transfer-complete for a session still running --
-// that the coordinator never produced and the reducer would believe.
-func TestTheAppBindsExactlyTheFourContractCommands(t *testing.T) {
+// method set IS the public command surface. An exported Publish would become
+// one more, letting the webview forge lifecycle events -- a transfer-complete
+// for a session still running -- that the coordinator never produced and the
+// reducer would believe. Every name here is a deliberate command; anything else
+// appearing in this set is an accident.
+func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 	want := map[string]bool{
 		"StageTransfer":   true,
 		"CancelTransfer":  true,
 		"SelectFile":      true,
 		"SelectDirectory": true,
+		"CopyToClipboard": true,
 	}
 
 	appType := reflect.TypeOf(NewApp())
@@ -322,6 +345,94 @@ func TestTheAppBindsExactlyTheFourContractCommands(t *testing.T) {
 		if !want[name] {
 			t.Errorf("the App exports %s, which Wails will bind as a fifth command", name)
 		}
+	}
+}
+
+// --- CopyToClipboard -----------------------------------------------------
+
+// The webview cannot do this itself on both platforms. WKWebView serves the
+// frontend from the custom `wails://` scheme, which is not a secure context, so
+// navigator.clipboard is undefined and a browser-side copy silently does
+// nothing on macOS. Routing through Go is what makes one path work on both, so
+// the command has to actually reach the runtime seam with the text unchanged.
+func TestCopyToClipboardWritesTheTextThroughTheRuntime(t *testing.T) {
+	h := newHarness(t)
+	const link = "http://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210"
+
+	if err := h.app.CopyToClipboard(link); err != nil {
+		t.Fatalf("CopyToClipboard returned %v, want no error", err)
+	}
+
+	if got := h.clipboardWrites(); len(got) != 1 || got[0] != link {
+		t.Errorf("clipboard writes = %q, want exactly [%q]", got, link)
+	}
+}
+
+// The real ClipboardSetText answers a context that never came from a running
+// window by taking the process down, exactly as the dialogs do.
+func TestCopyToClipboardPassesTheApplicationLifetimeContext(t *testing.T) {
+	h := newHarness(t)
+
+	if err := h.app.CopyToClipboard("link"); err != nil {
+		t.Fatalf("CopyToClipboard returned %v", err)
+	}
+
+	h.mu.Lock()
+	got := h.clipboardCtx
+	h.mu.Unlock()
+	if got != h.ctx {
+		t.Errorf("clipboard context = %v, want the stored application-lifetime context %v", got, h.ctx)
+	}
+}
+
+func TestCopyToClipboardRefusesBeforeStartup(t *testing.T) {
+	h := newUnstartedHarness(t)
+
+	err := h.app.CopyToClipboard("link")
+	if err == nil {
+		t.Fatal("CopyToClipboard succeeded before startup, so it reached the runtime with a nil context")
+	}
+	if got := len(h.clipboardWrites()); got != 0 {
+		t.Errorf("clipboard was written %d times before startup, want 0", got)
+	}
+	if code := transfer.PublicErrorOf(err).Code; code != transfer.ErrTransferFailed {
+		t.Errorf("code = %q, want %q", code, transfer.ErrTransferFailed)
+	}
+}
+
+// A platform clipboard failure names the platform; only the code and its fixed
+// copy may cross the boundary.
+func TestCopyToClipboardKeepsThePlatformDiagnosticBehindTheCode(t *testing.T) {
+	h := newHarness(t)
+	h.clipboardErr = errors.New("NSPasteboard declineType: com.apple.pasteboard denied")
+
+	err := h.app.CopyToClipboard("link")
+	if err == nil {
+		t.Fatal("CopyToClipboard returned no error for a failing clipboard")
+	}
+	public := transfer.PublicErrorOf(err)
+	if public.Code != transfer.ErrTransferFailed {
+		t.Errorf("code = %q, want %q", public.Code, transfer.ErrTransferFailed)
+	}
+	if strings.Contains(public.Message, "NSPasteboard") {
+		t.Errorf("public message leaked the platform diagnostic: %q", public.Message)
+	}
+}
+
+// The only legitimate payload is one capability URL. An unbounded string from
+// a defective view should not reach the platform at all.
+func TestCopyToClipboardRefusesTextBeyondTheBound(t *testing.T) {
+	h := newHarness(t)
+
+	if err := h.app.CopyToClipboard(strings.Repeat("a", maxClipboardText)); err != nil {
+		t.Fatalf("CopyToClipboard refused text at the bound: %v", err)
+	}
+	if err := h.app.CopyToClipboard(strings.Repeat("a", maxClipboardText+1)); err == nil {
+		t.Error("CopyToClipboard accepted text past the bound")
+	}
+
+	if got := len(h.clipboardWrites()); got != 1 {
+		t.Errorf("clipboard was written %d times, want 1: the oversized text still reached the platform", got)
 	}
 }
 

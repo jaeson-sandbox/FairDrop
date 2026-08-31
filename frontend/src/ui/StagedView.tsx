@@ -1,4 +1,5 @@
 import {useState} from 'react'
+import {CopyToClipboard} from '../../wailsjs/go/main/App'
 import {selectCommandError, selectWarnings} from '../transfer/selectors'
 import type {StagedTransferState} from '../transfer/state'
 import {OutcomePanel} from './OutcomePanel'
@@ -32,18 +33,22 @@ export function StagedView({state, onCancel}: StagedViewProps) {
         : formatBytes(metadata.size)
 
     /**
-     * A clipboard write that never happened is never reported as one: the label
-     * changes only on a resolved promise. Wails exposes no clipboard helper, so
-     * a browser that withholds the API leaves the action exactly as it was.
+     * The copy goes through the bound Go command, not `navigator.clipboard`.
+     *
+     * The browser API is unavailable on one of the two supported platforms:
+     * WKWebView serves this frontend from the custom `wails://` scheme, which
+     * is not a secure context, so `navigator.clipboard` is undefined on macOS
+     * and a browser-side copy would silently do nothing there. WebView2 serves
+     * `http://wails.localhost`, which is trustworthy, so it would have worked
+     * on Windows only. The Wails runtime clipboard works on both.
+     *
+     * A write that never happened is still never reported as one: the label
+     * changes only after the command resolves.
      */
     const handleCopy = () => {
-        try {
-            const clipboard = navigator.clipboard
-            if (clipboard === undefined || clipboard === null) return
-            void clipboard.writeText(metadata.url).then(() => setCopied(true), () => undefined)
-        } catch {
-            // A synchronous throw is the same non-event as a rejection.
-        }
+        void Promise.resolve()
+            .then(() => CopyToClipboard(metadata.url))
+            .then(() => setCopied(true), () => undefined)
     }
 
     return (
