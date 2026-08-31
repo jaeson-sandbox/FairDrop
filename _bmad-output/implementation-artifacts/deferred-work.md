@@ -253,3 +253,39 @@ Append-only. Each entry names the spec that surfaced it.
 - source_spec: `spec-1-8-manage-session-scoped-frontend-state-and-events.md`
   summary: The frontend suite still runs only when someone types `npm test`, one story after the same finding.
   evidence: `wails build` regenerates bindings and compiles the frontend without running a single Vitest file, and there is still no `.github/workflows`. Story 1.8 raised the frontend suite from 35 tests to 164 and made it the only executable evidence for the forged-event defence, which raises the cost of the gap rather than changing it. Restated here so Story 3.2 sees that it grew.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: The native window paints a single background colour, so one of the two themes still gets a one-frame flash.
+  evidence: `main.go` takes one `options.RGBA` and Wails offers no per-theme value, so the constant now tracks the light `--color-canvas` and a dark-mode OS gets one light frame before the webview paints. Before this story it tracked a Tailwind class the story deleted, so light mode flashed slate-900 on every launch and nothing failed -- `main_test.go` now pins the constant to the token and names the coupling. Closing the residual means reading the OS theme in Go before building the options: on Windows that is one `golang.org/x/sys/windows/registry` read of `AppsUseLightTheme` (already an indirect dependency), with a build-tag sibling for macOS. That is platform code Story 1.9 was not scoped for, and Story 3.3's release evidence is where a first-paint check belongs.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: `selectVisibleError` and `selectRetainedOutcome` are now dead, and one of them answers the same question differently from its replacement.
+  evidence: No view imports either; `selectCommandError` and `selectOutcome` replaced them. `selectVisibleError` folds a retained terminal error into the "visible error" and does not refuse `cancelled` -- precisely the two behaviours the replacements were written to prevent -- so the module exports contradictory answers and a later view can pick the wrong one and still compile. Not removed here because the spec's Code Map says `selectors.ts` may be extended "only additively", which is the right default for a module Story 1.8 defended; deleting an exported symbol and its tests is a separate, deliberate edit.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: Muted text now sits on the elevated surface, a pairing DESIGN.md's contrast table does not publish.
+  evidence: Every muted string in the new views (`.fd-meta`, `.fd-trust`, `.fd-packet-tab`) renders inside `.fd-packet`/`.fd-transfer-view`, which are `--color-elevated`. DESIGN.md proves muted/canvas at 5.070533:1 and instructs "Re-run unrounded automated checks if ... adjacent surfaces change". Computed here, muted/elevated is 4.504478:1 light and 6.569759:1 dark -- it passes AA, with about 0.1% headroom in light mode, and `.fd-packet-tab` renders it at 12px. Story 1.10 owns the unrounded contrast proof and should add this pair to the published table rather than leave it derived.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: The direct URL is exposed as a `div` with `role="textbox"`, which assistive technology handles inconsistently.
+  evidence: A textbox role with no editable host is not a pattern browsers agree on; a readonly `<input>` or a labelled `<output>` carries the value reliably and keeps it selectable. It also joins the Tab order and takes its 44px floor from a duplicated `min-block-size` rather than the shared `.fd-target` rule that a test pins. Story 1.10 owns the accessibility contract and should settle the element, not just its name.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: A terminal outcome offers no control at all, so a lost `transfer-reset` strands the window.
+  evidence: Done and Error render heading, message and nothing else; the way out is the backend's three-second reset, which produces the retained Idle node that carries Dismiss. The Story 1.7 entry above records that `publish` silently drops an event it cannot deliver and counts it in an inert `undelivered`, so a dropped reset is both possible and invisible. The frontend is forbidden a lifecycle timer, which makes this a recovery-contract question for Story 1.10 rather than something a view can fix.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: Idle's document outline opens on an `h2`, and the registered-but-unrendered Story 1.10 copy is tracked only in spec prose.
+  evidence: The firewall guidance is an `<h2>` and any outcome panel above it is another, while the page's only `<h1>` is the drop instruction below both -- a consequence of the acceptance criterion that puts preflight first in document order, and no test pins the resolution. Separately, `copy.help.*`, both firewall recovery strings, `copy.cancel.won`, `copy.name.showFull` and `copy.external.promise` are registered and rendered nowhere, and nothing outside this spec's Design Notes records that debt. Story 1.10 owns both; a test asserting these strings stay unrendered until it does would make the boundary executable.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: Two declared assets are now referenced by nothing: the bundled Nunito face and `framer-motion`.
+  evidence: `style.css` no longer declares `@font-face`, so `frontend/src/assets/fonts/nunito-v16-latin-regular.woff2` and its `OFL.txt` are unreferenced (Vite will stop emitting the file, but it stays in the tree). `framer-motion` is a locked runtime dependency that nothing imports, and this story's Never list bans every animation it would serve. Neither is a defect; both are weight a later story should either use or drop deliberately.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: The phase re-check added to the chooser's failure path is correct but adds nothing the reducer was not already doing.
+  evidence: Applied during review so a chooser that failed while a drop was being staged could not report against another session. Mutation shows it is undistinguishable: `browse` reserves its own generation, so its `stage-requested` is refused for not being Idle and its `stage-failed` is refused on generation mismatch -- the reducer rejects both halves without the guard. Kept as a documented second line, in the same spirit as `selectCommandError`'s redundant `cancelled` refusal, but it is not a tested guarantee and should not be described as a race fix.
+
+- source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
+  summary: The working tree holds mixed line endings, so text-matching tests and diffs behave differently per file.
+  evidence: `TransferringView.tsx` and `StagedView.tsx` are CRLF on disk while `useTransfer.ts` and `style.css` are LF, because only `*.go` was pinned before this story. Two review mutations silently matched nothing for that reason and had to be re-run against normalized text -- a harness that reports "anchor matched 0" rather than a failure is exactly how a mutation pass overstates its own coverage. `.gitattributes` now pins `*.css`, `*.ts` and `*.tsx` to LF, so git renormalizes them on the next write, but nothing has rewritten the existing files and no check fails while they disagree.

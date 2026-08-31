@@ -2,7 +2,7 @@
 title: 'Story 1.9 — Render the Paper Relay Transfer Views'
 type: 'feature'
 created: '2026-08-30'
-status: 'implemented'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '19ad4ee9b8fdbacfb16364192fcaf4d047105ae0'
 context:
@@ -70,7 +70,8 @@ context:
 - [x] `frontend/src/ui/TransferringView.tsx` — the three progress presentations and the wire-byte metrics.
 - [x] `frontend/src/ui/OutcomePanel.tsx` — Done and Error panels, shared by the terminal phases and the retained Idle node.
 - [x] `frontend/src/App.tsx` — compose one view per phase behind the existing controller and drop gate; keep the inherited CSS gate untouched.
-- [x] `frontend/src/ui/*.test.tsx` — cover every matrix row, all three progress modes, the copy registry values as literals, QR rendering, and the reflow breakpoints.
+- [x] `frontend/src/ui/format.ts` — byte and rate presentation shared by the item summary and the metrics, built from `copy.unit`.
+- [x] `frontend/src/ui/*.test.tsx`, `styles.test.ts` — cover every matrix row, all three progress modes, the copy registry values as literals, QR rendering, and the reflow breakpoints; the stylesheet guarantees are proved against the stylesheet because jsdom performs no layout.
 
 **Acceptance Criteria:**
 - Given any rendered view, when its text is read, then every string equals a registry value character for character, and no banned term or raw adapter text appears.
@@ -126,6 +127,8 @@ intent; each is a place where the spec left one degree of freedom.
   renders them. The Status Announcer is pre-mounted, atomic and empty; 1.10
   gives it its content and its focus routes.
 
+- **Review round 1 (2026-08-30, patches only -- no loopback):** All three layers ran over the full diff and converged on two findings that a green suite could not see. **The window flashed the wrong theme on every launch.** `main.go` still set `BackgroundColour` to slate-900 with a comment saying it "matches the frontend's `bg-slate-900`" -- the class this story deleted. The native window therefore painted near-black and repainted cream on every light-mode start, which the frozen "Always" rule forbids outright. Strict triage calls that `bad_spec`, because the Code Map never named `main.go:121` as a site coupled to the canvas token; the human approved patching in place rather than reverting 3,338 verified lines over one constant. `main_test.go` now pins the constant to the `--color-canvas` declaration and fails naming the coupling. Wails takes a single value, so a dark-mode OS still gets one light frame -- recorded as deferred work with the registry read that would close it. **A cancellation rendered an empty window.** `phaseView` returned `null` when `selectOutcome` refused a `cancelled` terminal outcome, leaving no heading, no drop target and no control, and `App.test.tsx` pinned that as intended. The spine gives `cancelled` one rule -- "Return to Idle; never render as Error" -- and rendering nothing is neither, so the branch now renders Idle and the test asserts the rule instead of the behaviour. **Four more production fixes:** `qrAltFor` used a string replacement, so `$&`, `` $` ``, `$'` and `$$` in a filename rewrote the accessible name -- `` $` `` copied the template back into it and `$'` truncated the name -- now a function replacement with the four names pinned; the trusted-LAN marker decorated the neutral no-extra-copy sentence as well as the not-encrypted one; a second decorative offset appeared on the drop symbol where DESIGN.md sanctions exactly one, on the packet; and duplicate warning codes collided on the React key. **Five test-quality fixes, each demonstrated first.** `.gitattributes` pinned only `*.go`, so with `core.autocrlf` a fresh Windows clone takes `style.css` as CRLF and the stylesheet parser throws at import -- verified, reporting "no tests" for all eighteen assertions; `*.css`, `*.ts` and `*.tsx` are now pinned and a test asserts the pin. The color-literal guard was hex-only (`outline: 1px solid red` passed), the horizontal-scroll guard read width-ish properties only (a 900px grid track passed), the registry completeness check was a hardcoded count over a number read back out of the object under test, and the banned-vocabulary list never looked for "universal compatibility" while exempting "encrypted" by a substring any future string could satisfy. **Two verification gaps closed:** a command error during Transferring had no test at all -- both narrowing the selector and deleting the panel outright passed 310/310 -- and two of six activation controls were never pinned to the 44px class. **Eighteen mutations against the review fixes; seventeen are now named by a failing test.** The one survivor is recorded rather than claimed: the phase re-check added to the chooser's failure path is undistinguishable, because the reducer already refuses both halves of that dispatch on generation. Two mutations initially reported "anchor matched 0" rather than a result -- `TransferringView.tsx` and `StagedView.tsx` are CRLF on disk while their neighbours are LF -- and were re-run against normalized text; a harness that silently matches nothing is how a mutation pass overstates its own coverage. **KEEP:** the copy registry's provenance split (spine-quoted strings above `label`, functional words below, each with its source) and `OutcomePanel` reading its text from the fixed table by code rather than from the error value it is handed -- that is what makes "no adapter text reaches the screen" structural instead of a promise.
+
 ## Design Notes
 
 Story 1.10 owns the accessibility contract, not this story: announcement ownership and focus routing, `role="progressbar"` ARIA semantics, the assistive speech throttle, `prefers-reduced-motion` behaviour, forced colors, unrounded contrast proof, `copy.name.show_full`, `aria-disabled` cancel-pending semantics, and the `copy.help.*` and firewall-recovery surfaces. Render the semantic elements and their copy here; do not invent the routing 1.10 will specify.
@@ -149,3 +152,5 @@ Clipboard copy uses `navigator.clipboard.writeText`; a rejection must leave the 
 
 **Manual checks (if no CLI):**
 - Launch `build/bin/fairdrop.exe`, stage a real file, and confirm the QR renders square and scannable, the URL row is readonly, and light/dark follow the OS with no flash on first paint.
+- Activate Copy download link in the real window: `navigator.clipboard` needs a secure context that a WebView2/WKWebView shell does not guarantee, and the failure mode is silence.
+- Run both native choosers -- pick a file, pick a directory, and dismiss each without choosing. This story calls `SelectFile`/`SelectDirectory` for the first time since they were bound, and every automated check for them runs against a mock.
