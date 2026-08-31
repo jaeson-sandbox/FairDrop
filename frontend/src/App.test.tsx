@@ -2,6 +2,7 @@ import {StrictMode, act} from 'react'
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import App from './App'
+import type {TransferState} from './transfer/state'
 
 const mocks = vi.hoisted(() => ({
     onFileDrop: vi.fn(),
@@ -162,7 +163,7 @@ const metadata = {
     warnings: [],
 }
 
-function mountWith(state: Record<string, unknown>) {
+function mountWith(state: TransferState) {
     mocks.useTransfer.mockReturnValue({
         state,
         stage: mocks.stage,
@@ -180,8 +181,11 @@ function phaseViews(): string[] {
         .map((element) => element.getAttribute('data-phase-view') ?? '')
 }
 
-describe('one view per phase', () => {
-    it.each([
+// Typed rather than Record<string, unknown>: this is the suite that claims
+// "exactly one view per phase", so a reducer field it stopped matching should
+// break it rather than leave it green against a stale shape. Declared here, not
+// inline, so the annotation actually reaches the object literals.
+const phaseCases: Array<[string, TransferState, string]> = [
         ['idle', {phase: 'idle', retainedOutcome: null, commandError: null}, 'idle'],
         ['pending', {phase: 'pending', generation: 1, itemKind: 'file', cancelPending: false}, 'pending'],
         ['staged', {
@@ -205,7 +209,10 @@ describe('one view per phase', () => {
             session: {sessionId, lastSeq: 4},
             outcome: {kind: 'error', error: {code: 'transfer_failed', message: 'ignored'}},
         }, 'outcome'],
-    ])('renders exactly the %s view and marks the phase on the shell', (phase, state, view) => {
+]
+
+describe('one view per phase', () => {
+    it.each(phaseCases)('renders exactly the %s view and marks the phase on the shell', (phase, state, view) => {
         mountWith(state)
 
         expect(phaseViews()).toEqual([view])
@@ -218,15 +225,21 @@ describe('one view per phase', () => {
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
     })
 
-    it('renders no phase view at all rather than showing a cancellation as an Error', () => {
+    // EXPERIENCE.md gives `cancelled` one rule -- "Return to Idle; never render
+    // as Error" -- and rendering nothing satisfies neither half of it. The
+    // predecessor of this test asserted an empty window, which locked in a
+    // screen with no heading, no drop target and no way forward.
+    it('returns to Idle rather than showing a cancellation as an Error', () => {
         mountWith({
             phase: 'error',
             session: {sessionId, lastSeq: 4},
             outcome: {kind: 'error', error: {code: 'cancelled', message: 'Transfer canceled.'}},
         })
 
-        expect(phaseViews()).toEqual([])
+        expect(phaseViews()).toEqual(['idle'])
         expect(screen.queryByText('Transfer canceled.')).toBeNull()
+        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Drop one file or folder.')
+        expect(document.querySelector('[data-outcome]')).toBeNull()
     })
 
     it('pre-mounts one atomic polite status region in every phase', () => {
@@ -239,6 +252,26 @@ describe('one view per phase', () => {
         expect(announcers[0].textContent).toBe('')
     })
 })
+
+const cancelCases: Array<[string, TransferState]> = [
+
+        ['Cancel preparation', {phase: 'pending', generation: 1, itemKind: 'file', cancelPending: false}],
+        ['Cancel', {
+            phase: 'staged',
+            session: {sessionId, lastSeq: 0},
+            metadata,
+            cancelPending: false,
+            commandError: null,
+        }],
+        ['Cancel', {
+            phase: 'transferring',
+            session: {sessionId, lastSeq: 1},
+            metadata,
+            progress: null,
+            cancelPending: false,
+            commandError: null,
+        }],
+]
 
 describe('controller wiring', () => {
     it('routes both browse controls to their own command', () => {
@@ -260,24 +293,7 @@ describe('controller wiring', () => {
         expect(mocks.dismissRetained).toHaveBeenCalledTimes(1)
     })
 
-    it.each([
-        ['Cancel preparation', {phase: 'pending', generation: 1, itemKind: 'file', cancelPending: false}],
-        ['Cancel', {
-            phase: 'staged',
-            session: {sessionId, lastSeq: 0},
-            metadata,
-            cancelPending: false,
-            commandError: null,
-        }],
-        ['Cancel', {
-            phase: 'transferring',
-            session: {sessionId, lastSeq: 1},
-            metadata,
-            progress: null,
-            cancelPending: false,
-            commandError: null,
-        }],
-    ])('routes %s to the one cancel command', (name, state) => {
+    it.each(cancelCases)('routes %s to the one cancel command', (name, state) => {
         mountWith(state)
 
         fireEvent.click(screen.getByRole('button', {name}))

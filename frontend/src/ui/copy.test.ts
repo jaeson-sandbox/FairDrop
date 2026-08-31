@@ -112,13 +112,80 @@ describe('approved product copy', () => {
         )
     })
 
-    it('exposes one accessor for each key the spine registers, and no extra prose', () => {
-        const strings = collectStrings(copy)
-        const registered = strings.length
-        const approved = 33
-        const functional = Object.keys(copy.label).length + Object.keys(copy.unit).length
+    /*
+      A count is blind to a rename: dropping one key and adding another keeps
+      the total identical. Derive nothing from the object under test -- the
+      expected paths are written out here, so a moved, renamed or silently
+      added string fails with the path that changed.
+    */
+    it('exposes exactly the key paths the spine registers, and no extra prose', () => {
+        const paths: string[] = []
+        const walk = (value: object, prefix: string): void => {
+            for (const [key, nested] of Object.entries(value)) {
+                const path = prefix === '' ? key : `${prefix}.${key}`
+                if (typeof nested === 'string') paths.push(path)
+                else walk(nested as object, path)
+            }
+        }
+        walk(copy, '')
 
-        expect(registered).toBe(approved + functional)
+        expect(paths.sort()).toEqual([
+            'cancel.action',
+            'cancel.pending',
+            'cancel.preparation',
+            'cancel.preparationPending',
+            'cancel.won',
+            'copy.confirmation',
+            'directLink.action',
+            'directLink.helper',
+            'discovery.warning',
+            'done.body',
+            'done.heading',
+            'external.promise',
+            'firewall.macos',
+            'firewall.macosRecovery',
+            'firewall.preflight',
+            'firewall.windows',
+            'firewall.windowsRecovery',
+            'firstOpener.warning',
+            'folder.note',
+            'help.differentLan',
+            'help.receiverHttp',
+            'idle.instruction',
+            'label.directLinkHeading',
+            'label.file',
+            'label.firewallHeading',
+            'label.folder',
+            'label.logicalSize',
+            'label.macos',
+            'label.metaSeparator',
+            'label.of',
+            'label.selectDirectory',
+            'label.selectFile',
+            'label.sending',
+            'label.sent',
+            'label.throughput',
+            'label.windows',
+            'label.wireBytes',
+            'localCopy.disclosure',
+            'name.showFull',
+            'network.disclosure',
+            'outcome.dismiss',
+            'progress.knownEmpty',
+            'progress.unknown',
+            'qr.alt',
+            'qr.instruction',
+            'stage.heading',
+            'stage.pending.file',
+            'stage.pending.folder',
+            'unit.byte',
+            'unit.bytes',
+            'unit.gigabytes',
+            'unit.kilobytes',
+            'unit.megabytes',
+            'unit.perSecond',
+            'unit.terabytes',
+        ])
     })
 })
 
@@ -194,6 +261,26 @@ describe('the QR accessible-name template', () => {
     })
 })
 
+describe('the QR accessible-name template under $-bearing names', () => {
+    /*
+      `String.replace` with a string replacement gives `$&`, `` $` ``, `$'` and
+      `$$` meaning inside the REPLACEMENT. A file may legally be named any of
+      them, and each used to rewrite its own accessible name: `` $` `` copied
+      the template back in and `$'` deleted the rest of it.
+    */
+    it.each([
+        ['$&', 'Download QR code for $&'],
+        ['$`', 'Download QR code for $`'],
+        ["$'", "Download QR code for $'"],
+        ['$$', 'Download QR code for $$'],
+        ['a$&b.pdf', 'Download QR code for a$&b.pdf'],
+        ['quarterly $`24 report.pdf', 'Download QR code for quarterly $`24 report.pdf'],
+        ['report.pdf', 'Download QR code for report.pdf'],
+    ])('inserts %j exactly as given', (name, expected) => {
+        expect(qrAltFor(name)).toBe(expected)
+    })
+})
+
 describe('banned vocabulary', () => {
     /*
       Each entry carries a sample that must match, so a pattern that stops
@@ -213,6 +300,7 @@ describe('banned vocabulary', () => {
         {term: 'airdrop', pattern: /\bairdrop\b/i, sample: 'AirDrop for any device'},
         {term: 'encrypted', pattern: /\bencrypted\b/i, sample: 'the transfer is encrypted'},
         {term: 'universal', pattern: /works with every device/i, sample: 'works with every device'},
+        {term: 'universal compatibility', pattern: /universal compat/i, sample: 'universal compatibility'},
     ]
 
     it('uses patterns that catch the term each one names', () => {
@@ -232,7 +320,11 @@ describe('banned vocabulary', () => {
         for (const value of collectStrings(copy)) {
             for (const {term, pattern} of banned) {
                 if (term === 'private' && profileStrings.includes(value)) continue
-                if (term === 'encrypted' && value.includes('not encrypted')) continue
+                // Exempt the two approved strings by identity. `includes` would
+                // have let any future sentence carry the term through by
+                // quoting the disclosure.
+                if (term === 'encrypted' && (value === copy.network.disclosure ||
+                    value === errorMessages.beacon_warning)) continue
                 expect(value, `${term} in ${JSON.stringify(value)}`).not.toMatch(pattern)
             }
         }

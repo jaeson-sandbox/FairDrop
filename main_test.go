@@ -42,6 +42,33 @@ func TestAppOptionsWindowContract(t *testing.T) {
 	}
 }
 
+// The window paints BackgroundColour before the webview renders anything, so a
+// value that disagrees with the frontend's canvas is a visible flash on every
+// launch -- and nothing in the frontend suite can see a Go constant. This
+// caught exactly that: the constant tracked a Tailwind class that Story 1.9
+// deleted, leaving every light-mode start painting slate-900 and repainting
+// cream.
+func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
+	const token = "--color-canvas: #F7F0E7;"
+
+	stylesheet, err := os.ReadFile(filepath.Join("frontend", "src", "style.css"))
+	if err != nil {
+		t.Fatalf("read stylesheet: %v", err)
+	}
+	if !strings.Contains(string(stylesheet), token) {
+		t.Fatalf("style.css no longer declares %q -- update this test and the option together", token)
+	}
+
+	got := appOptions(NewApp()).BackgroundColour
+	if got == nil {
+		t.Fatal("BackgroundColour is nil: the window would paint the platform default, not the canvas")
+	}
+	want := options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1}
+	if *got != want {
+		t.Errorf("BackgroundColour = %+v, want %+v (the light --color-canvas)", *got, want)
+	}
+}
+
 func TestAppOptionsRegistersLifecycleHooks(t *testing.T) {
 	opts := appOptions(NewApp())
 

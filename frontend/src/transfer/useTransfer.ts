@@ -170,6 +170,10 @@ export function useTransfer(): TransferController {
             await stage(selected, itemKind)
         } catch (rejection) {
             if (!browseMayCommit(operation)) return
+            // The success path is guarded by stage()'s own idle check; this one
+            // has to make it itself, or a chooser that failed while a drop was
+            // being staged would report against someone else's session.
+            if (stateRef.current.phase !== 'idle') return
 
             // The chooser failed, so no Stage was ever attempted -- yet the
             // reducer is the only owner of a visible command error, and its one

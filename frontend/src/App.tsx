@@ -2,6 +2,7 @@ import {useEffect} from 'react'
 import type {CSSProperties, ReactElement} from 'react'
 import {OnFileDrop, OnFileDropOff} from '../wailsjs/runtime/runtime'
 import {selectOutcome} from './transfer/selectors'
+import {createInitialTransferState, type IdleTransferState} from './transfer/state'
 import {useTransfer, type TransferController} from './transfer/useTransfer'
 import {IdleView} from './ui/IdleView'
 import {OutcomePanel} from './ui/OutcomePanel'
@@ -44,20 +45,12 @@ function App() {
  * phase field is the only input, so the screen cannot disagree with the state
  * machine that Story 1.8 defended.
  */
-function phaseView(transfer: TransferController): ReactElement | null {
+function phaseView(transfer: TransferController): ReactElement {
     const {state} = transfer
 
     switch (state.phase) {
         case 'idle':
-            return (
-                <IdleView
-                    state={state}
-                    dropTargetStyle={dropTargetStyle}
-                    onSelectFile={() => void transfer.selectFile()}
-                    onSelectDirectory={() => void transfer.selectDirectory()}
-                    onDismissRetained={transfer.dismissRetained}
-                />
-            )
+            return idleView(transfer, state)
 
         case 'pending':
             return <StagePendingCard state={state} onCancel={() => void transfer.cancel()}/>
@@ -73,9 +66,27 @@ function phaseView(transfer: TransferController): ReactElement | null {
             // The selector, not this switch, decides an outcome is renderable:
             // it is what refuses to dress a cancellation up as an Error.
             const outcome = selectOutcome(state)
-            return outcome === null ? null : <OutcomePanel outcome={outcome} level={1}/>
+            if (outcome !== null) return <OutcomePanel outcome={outcome} level={1}/>
+
+            // Only a cancellation is refused, and the spine's rule for one is
+            // "return to Idle; never render as Error". Rendering nothing would
+            // be neither: it leaves a window with no heading, no drop target
+            // and no control, which is the worst reachable screen in the app.
+            return idleView(transfer, createInitialTransferState())
         }
     }
+}
+
+function idleView(transfer: TransferController, state: IdleTransferState): ReactElement {
+    return (
+        <IdleView
+            state={state}
+            dropTargetStyle={dropTargetStyle}
+            onSelectFile={() => void transfer.selectFile()}
+            onSelectDirectory={() => void transfer.selectDirectory()}
+            onDismissRetained={transfer.dismissRetained}
+        />
+    )
 }
 
 export default App

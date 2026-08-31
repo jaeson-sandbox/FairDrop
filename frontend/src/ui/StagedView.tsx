@@ -54,8 +54,12 @@ export function StagedView({state, onCancel}: StagedViewProps) {
             <div>
                 <span className="fd-packet-tab">{metadata.isDir ? copy.label.folder : copy.label.file}</span>
                 <section className="fd-packet">
-                    {warnings.map((warning) => (
-                        <aside key={warning.code} className="fd-warning-banner" data-warning-code={warning.code}>
+                    {warnings.map((warning, index) => (
+                        <aside
+                            key={`${warning.code}-${index}`}
+                            className="fd-warning-banner"
+                            data-warning-code={warning.code}
+                        >
                             <strong className="fd-subheading">{errorHeadings[warning.code]}</strong>
                             <span>{warning.message}</span>
                         </aside>

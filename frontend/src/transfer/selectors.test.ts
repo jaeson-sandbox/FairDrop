@@ -231,6 +231,31 @@ describe('staged warnings', () => {
 })
 
 describe('command errors', () => {
+    // A Cancel that fails mid-transfer is the one way a command error reaches
+    // Transferring, and nothing exercised it: dropping 'transferring' from the
+    // guard left all 310 tests green.
+    it('selects the command error while a transfer is running', () => {
+        expect(selectCommandError({
+            phase: 'transferring',
+            session: {sessionId: '0123456789abcdef0123456789abcdef', lastSeq: 2},
+            metadata: {
+                sessionId: '0123456789abcdef0123456789abcdef',
+                name: 'report.pdf',
+                size: 100,
+                isDir: false,
+                url: 'http://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210',
+                qrBase64: 'iVBORw0KGgo=',
+                warnings: [],
+            },
+            progress: null,
+            cancelPending: false,
+            commandError: publicError('shutting_down'),
+        })).toEqual({
+            code: 'shutting_down',
+            message: 'FairDrop is closing. Reopen it to start a transfer.',
+        })
+    })
+
     it('selects the command error of whichever phase owns one', () => {
         expect(selectCommandError({
             phase: 'idle',

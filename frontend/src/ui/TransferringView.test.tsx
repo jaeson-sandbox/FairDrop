@@ -191,6 +191,31 @@ describe('the transfer surface', () => {
         expect(container.textContent).not.toContain('fedcba')
     })
 
+    // Deleting the panel from TransferringView, or narrowing the selector that
+    // feeds it, both passed the whole suite before this existed.
+    it('shows a failed cancellation on the fixed table without leaving the transfer', () => {
+        render(
+            <TransferringView
+                state={transferring(null, {commandError: {
+                    code: 'shutting_down',
+                    message: 'FairDrop is closing. Reopen it to start a transfer.',
+                }})}
+                onCancel={() => undefined}
+            />,
+        )
+
+        expect(screen.getByText('FairDrop is closing')).toBeTruthy()
+        expect(screen.getByText('FairDrop is closing. Reopen it to start a transfer.')).toBeTruthy()
+        expect(document.querySelector('[data-phase-view="transferring"]')).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Cancel'})).toBeTruthy()
+    })
+
+    it('keeps Cancel on the shared 44px activation floor', () => {
+        render(<TransferringView state={transferring(null)} onCancel={() => undefined}/>)
+
+        expect(screen.getByRole('button', {name: 'Cancel'}).className).toContain('fd-target')
+    })
+
     it('offers Cancel and changes its label while a cancellation is outstanding', () => {
         const onCancel = vi.fn()
         const {rerender} = render(<TransferringView state={transferring(null)} onCancel={onCancel}/>)

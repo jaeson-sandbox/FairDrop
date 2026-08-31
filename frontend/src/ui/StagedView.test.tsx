@@ -111,10 +111,35 @@ describe('the direct URL row', () => {
         expect(screen.getByRole('img').getAttribute('src')).not.toContain(token)
     })
 
+    it('renders every warning even when two arrive under the same code', () => {
+        const warning = {
+            code: 'beacon_warning' as const,
+            message: 'Device discovery isn’t available. The QR code and download link still work.',
+        }
+        // React renders both nodes even with a duplicate key, so a count proves
+        // nothing; the key collision surfaces as a console error instead.
+        const reported: unknown[] = []
+        const consoleError = vi.spyOn(console, 'error').mockImplementation((...args) => {
+            reported.push(args[0])
+        })
+
+        try {
+            render(<StagedView state={staged({metadata: metadata({warnings: [warning, warning]})})} onCancel={vi.fn()}/>)
+        } finally {
+            consoleError.mockRestore()
+        }
+
+        expect(document.querySelectorAll('[data-warning-code="beacon_warning"]').length).toBe(2)
+        expect(reported.filter((entry) => String(entry).includes('same key'))).toEqual([])
+    })
+
     it('carries the direct-link helper beside the action', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+        // The copy action was one of two controls with no floor assertion:
+        // stripping fd-target from it passed the whole suite.
+        expect(screen.getByRole('button', {name: 'Copy download link'}).className).toContain('fd-target')
         expect(screen.getByText('Open this link directly in the receiving device’s browser.')).toBeTruthy()
     })
 })

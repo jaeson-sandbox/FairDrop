@@ -116,9 +116,13 @@ func appOptions(app *App) *options.App {
 			Assets: assets,
 		},
 
-		// Matches the frontend's bg-slate-900 (#0f172a) so the window does not
-		// flash a different shade before the webview paints.
-		BackgroundColour: &options.RGBA{R: 15, G: 23, B: 42, A: 1},
+		// The shade the native window paints before the webview renders. It
+		// must track --color-canvas in frontend/src/style.css, or the window
+		// flashes one theme and repaints in another; main_test.go pins the two
+		// together. Wails takes a single value, so this is the light canvas and
+		// a dark-mode OS still gets one light frame -- deferred-work.md carries
+		// the theme-aware version.
+		BackgroundColour: &options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1},
 
 		// Without this, a rejected command carries err.Error() -- raw adapter
 		// text -- and the frontend has no stable code to switch on.

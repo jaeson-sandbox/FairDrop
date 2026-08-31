@@ -2,3 +2,11 @@
 # out as CRLF on Windows and `gofmt -l .` reports every one as unformatted even
 # though the stored content is clean.
 *.go text eol=lf
+
+# The stylesheet is parsed as text by frontend/src/ui/styles.test.ts, and the
+# frontend sources are read the same way. Without this, core.autocrlf checks
+# them out as CRLF on Windows and that parser aborts before a single assertion
+# runs -- 18 stylesheet guarantees vanish from a fresh clone.
+*.css text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf

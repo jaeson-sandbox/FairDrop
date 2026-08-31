@@ -151,9 +151,18 @@ export const errorHeadings: Readonly<Record<TransferErrorCode, string>> = {
 /** The exact `PublicError.message` table, re-exported rather than restated. */
 export const errorMessages = fixedErrorMessages
 
-/** Fills the one placeholder in the QR accessible-name template. */
+/**
+ * Fills the one placeholder in the QR accessible-name template.
+ *
+ * The replacement is a function on purpose. A string replacement makes `$&`,
+ * `` $` ``, `$'` and `$$` inside the item name mean something to `replace`, so
+ * a legitimately named file rewrites its own accessible name -- `` $` `` copies
+ * the template back into it and `$'` deletes the rest. A function replacement
+ * has no such syntax, so the name is inserted exactly as the backend sanitized
+ * it.
+ */
 export function qrAltFor(itemName: string): string {
-    return copy.qr.alt.replace('[item name]', itemName)
+    return copy.qr.alt.replace('[item name]', () => itemName)
 }
 
 /**

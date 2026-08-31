@@ -13,7 +13,12 @@ import {describe, expect, it} from 'vitest'
 const projectRoot = process.cwd()
 const repositoryRoot = resolve(projectRoot, '..')
 
-const stylesheet = readFileSync(resolve(projectRoot, 'src/style.css'), 'utf8')
+// Normalized on read: the block parser below slices on a literal newline, and
+// core.autocrlf checks this file out as CRLF on Windows. Without this the
+// parser throws at module scope and every assertion in the file silently stops
+// existing. .gitattributes pins the checkout too; this makes the test immune
+// either way.
+const stylesheet = readFileSync(resolve(projectRoot, 'src/style.css'), 'utf8').replace(/\r\n/g, '\n')
 
 function block(opening: string): string {
     const start = stylesheet.indexOf(opening)
@@ -116,8 +121,18 @@ describe('the Terracotta Linen token layer', () => {
     })
 
     it('reaches every component value through a token rather than a literal', () => {
-        const literals = componentRules.match(/#[0-9A-Fa-f]{3,8}\b/g) ?? []
-        expect(literals).toEqual([])
+        // Hex is not the only way to write a color. A named color, an rgb()/
+        // hsl()/oklch() triple or a color-mix() all reach the screen the same
+        // way and all used to pass this.
+        const colorLiteral = new RegExp([
+            '#[0-9A-Fa-f]{3,8}\\b',
+            '\\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\\(',
+            // Hyphen-guarded on both sides: a bare `\\b` matches the `white`
+            // inside `white-space`, which is a property name, not a color.
+            '(?<![-\\w])(?:red|blue|green|black|white|gray|grey|orange|purple|pink|brown|yellow|cyan|magenta)(?![-\\w])',
+        ].join('|'), 'g')
+
+        expect(componentRules.match(colorLiteral) ?? []).toEqual([])
     })
 })
 
@@ -169,7 +184,13 @@ describe('reflow to 320 CSS pixels', () => {
     })
 
     it('declares no width that could force a page-level horizontal scrollbar', () => {
-        const declarations = [...stylesheet.matchAll(/(?:^|[;{\s])((?:min-)?(?:width|inline-size))\s*:\s*([^;}]+)/g)]
+        // grid-template-columns and flex-basis are the two that actually
+        // overflowed in review: a 900px track passed the width-only guard.
+        // `max-width` stays excluded by the leading boundary, since capping a
+        // width cannot cause overflow.
+        const declarations = [...stylesheet.matchAll(
+            /(?:^|[;{\s])((?:min-)?(?:width|inline-size)|grid-template-columns|flex-basis)\s*:\s*([^;}]+)/g,
+        )]
         expect(declarations.length).toBeGreaterThan(0)
 
         for (const [, property, value] of declarations) {
@@ -183,6 +204,46 @@ describe('reflow to 320 CSS pixels', () => {
         expect(stylesheet).toMatch(/\.fd-url \{[^}]*overflow-wrap: anywhere;/)
         expect(stylesheet).toMatch(/\.fd-headline \{[^}]*overflow-wrap: anywhere;/)
         expect(stylesheet).toMatch(/\.fd-url \{[^}]*min-inline-size: 0;/)
+    })
+})
+
+describe('guarantees a stylesheet edit could silently undo', () => {
+    /*
+      These four were each applied during review and each survived mutation
+      until this block existed: the suite could not tell the fixed stylesheet
+      from the broken one.
+    */
+
+    it('pins the stylesheet to LF at checkout, so the parser above cannot vanish', () => {
+        // block() slices on a literal newline. core.autocrlf checks this file
+        // out as CRLF on Windows, which throws at module scope and takes all
+        // of these assertions with it -- reported as "no tests", not a failure
+        // anyone would read as a stylesheet problem.
+        const attributes = readFileSync(resolve(repositoryRoot, '.gitattributes'), 'utf8')
+
+        expect(attributes).toMatch(/^\*\.css text eol=lf$/m)
+    })
+
+    it('marks only the not-encrypted disclosure, never the neutral one', () => {
+        // DESIGN.md gives the trusted-LAN note a single warning marker. Applied
+        // to every paragraph it also decorated "FairDrop does not upload or
+        // store an extra copy", which is a plain statement of fact.
+        expect(stylesheet).toContain('.fd-trust p:first-child::before');
+        expect(stylesheet).not.toMatch(/\.fd-trust p::before/)
+    })
+
+    it('keeps the copy action a fixed width so its label swap cannot reflow the row', () => {
+        expect(componentRules).toMatch(
+            /\.fd-direct-row \.fd-button \{[^}]*min-inline-size: \d+px;/,
+        )
+    })
+
+    it('spends the one sanctioned paper offset on the packet and nowhere else', () => {
+        // DESIGN.md allows one decorative offset edge, names 3px 3px 0, scopes
+        // it to StagedView, and says every other surface stays flat.
+        const shadows = [...componentRules.matchAll(/box-shadow:\s*([^;]+);/g)].map(([, value]) => value.trim())
+
+        expect(shadows).toEqual(['var(--shadow-paper)'])
     })
 })
 

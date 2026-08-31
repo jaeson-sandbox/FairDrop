@@ -280,6 +280,15 @@ body {
     color: var(--color-success);
 }
 
+/*
+  The copy action keeps its box when its label becomes "Copied". Without this
+  the grid's auto column shrinks to the shorter word and the URL beside it
+  reflows -- the layout shift DESIGN.md's Copy Feedback row rules out.
+*/
+.fd-direct-row .fd-button {
+    min-inline-size: 168px;
+}
+
 /* --------------------------------------------------------------------- Idle */
 
 .fd-idle {
@@ -348,7 +357,6 @@ body {
     place-items: center;
     border: 2px solid var(--color-primary);
     border-radius: var(--radius-xs);
-    box-shadow: 4px 4px 0 var(--color-drop);
     color: var(--color-primary);
     font-size: var(--text-display);
 }
@@ -501,8 +509,12 @@ body {
     color: var(--color-muted);
 }
 
-/* A literal marker, never a lock or shield. */
-.fd-trust p::before {
+/*
+  One marker, on the not-encrypted disclosure only: DESIGN.md gives the
+  trusted-LAN note a single warning marker, and the no-extra-copy sentence is a
+  neutral statement of fact rather than a caution.
+*/
+.fd-trust p:first-child::before {
     content: "!";
     display: inline-grid;
     width: 18px;
