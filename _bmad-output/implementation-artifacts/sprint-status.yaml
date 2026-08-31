@@ -45,7 +45,7 @@ development_status:
   1-7-expose-safe-transfer-commands-through-wails: done
   1-8-manage-session-scoped-frontend-state-and-events: done
   1-9-render-the-paper-relay-transfer-views: done
-  1-10-meet-the-accessibility-and-recovery-contract: backlog
+  1-10-meet-the-accessibility-and-recovery-contract: in-progress
   epic-1-retrospective: optional
 
   epic-2: backlog
