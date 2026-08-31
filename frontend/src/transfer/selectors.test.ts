@@ -7,8 +7,6 @@ import {
     selectPendingItemKind,
     selectProgress,
     selectProgressSnapshot,
-    selectRetainedOutcome,
-    selectVisibleError,
     selectWarnings,
 } from './selectors'
 import type {TransferState} from './state'
@@ -135,7 +133,13 @@ describe('state-aware selectors', () => {
         expect(selectMetadata(done)).toBeNull()
     })
 
-    it('selects retained outcome and gives current command error precedence', () => {
+    // The two selectors this used to exercise -- selectVisibleError and
+    // selectRetainedOutcome -- were removed by Story 1.10. They were dead and
+    // they contradicted these replacements: selectVisibleError folded a
+    // retained terminal error into "the visible error" and did not refuse
+    // `cancelled`, which are the two behaviours selectOutcome and
+    // selectCommandError exist to prevent.
+    it('keeps a retained outcome and a current command failure separate', () => {
         const retainedError = publicError('path_not_found')
         const commandError = publicError('invalid_selection')
         const idle: TransferState = {
@@ -144,8 +148,8 @@ describe('state-aware selectors', () => {
             commandError,
         }
 
-        expect(selectRetainedOutcome(idle)).toEqual({kind: 'error', error: retainedError})
-        expect(selectVisibleError(idle)).toEqual({
+        expect(selectOutcome(idle)).toEqual({kind: 'error', retained: true, error: retainedError})
+        expect(selectCommandError(idle)).toEqual({
             code: 'invalid_selection', message: 'Choose exactly one file or folder.',
         })
     })
@@ -164,14 +168,19 @@ describe('state-aware selectors', () => {
             outcome: {kind: 'error', error: publicError('source_changed')},
         }
 
-        expect(selectVisibleError(staged)).toEqual({
+        expect(selectCommandError(staged)).toEqual({
             code: 'busy', message: 'Finish or cancel the current transfer before choosing another item.',
         })
-        expect(selectVisibleError(terminal)).toEqual({
-            code: 'source_changed',
-            message: 'The item changed after it was prepared. Cancel and create a fresh link.',
+        expect(selectOutcome(terminal)).toEqual({
+            kind: 'error',
+            retained: false,
+            error: {
+                code: 'source_changed',
+                message: 'The item changed after it was prepared. Cancel and create a fresh link.',
+            },
         })
-        expect(selectRetainedOutcome(terminal)).toBeNull()
+        // A terminal Error is a phase, not a retained node: nothing in Idle yet.
+        expect(selectCommandError(terminal)).toBeNull()
     })
 })
 

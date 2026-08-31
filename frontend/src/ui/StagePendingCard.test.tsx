@@ -81,3 +81,36 @@ describe('what preparation may not claim', () => {
         expect(views[0].getAttribute('data-phase-view')).toBe('pending')
     })
 })
+
+describe('the pending cancellation contract', () => {
+    it('keeps the control focused, marks it aria-disabled, and refuses a second activation', () => {
+        const onCancel = vi.fn()
+        const {rerender} = render(<StagePendingCard state={pending('file')} onCancel={onCancel}/>)
+
+        const cancel = screen.getByRole('button', {name: 'Cancel preparation'})
+        cancel.focus()
+        fireEvent.click(cancel)
+        expect(onCancel).toHaveBeenCalledTimes(1)
+
+        rerender(<StagePendingCard state={pending('file', true)} onCancel={onCancel}/>)
+
+        const outstanding = screen.getByRole('button', {name: 'Canceling preparation…'})
+        expect(outstanding).toBe(cancel)
+        expect(document.activeElement).toBe(outstanding)
+        expect(outstanding.getAttribute('aria-disabled')).toBe('true')
+        // `disabled` would move focus off the control the spine says keeps it.
+        expect(outstanding.hasAttribute('disabled')).toBe(false)
+
+        fireEvent.click(outstanding)
+        expect(onCancel).toHaveBeenCalledTimes(1)
+    })
+
+    it('marks the preparation heading as the target Stage pending focuses', () => {
+        render(<StagePendingCard state={pending('file')} onCancel={vi.fn()}/>)
+
+        const heading = document.querySelector('[data-focus-target="pending-heading"]') as HTMLElement
+        expect(heading.tagName).toBe('H1')
+        expect(heading.getAttribute('tabindex')).toBe('-1')
+        expect(heading.textContent).toBe('Preparing your file…')
+    })
+})

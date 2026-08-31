@@ -8,6 +8,17 @@ resolved by a later story) or `accepted` (reviewed and deliberately left alone).
 owner or names a story that does not exist, so a finding cannot quietly stop
 being anyone's problem.
 
+> **Discharged (Story 1.10):** the five entries below that named this story are
+> closed. `selectVisibleError` and `selectRetainedOutcome` are deleted with their
+> tests. The muted/elevated pair is published in `DESIGN.md`, along with every
+> other authored pair the views place together, and a test recomputes each ratio
+> from the stylesheet's own tokens and fails if the published figure drifts. The
+> direct URL is a readonly `<input>` taking its 44px floor from the shared
+> `.fd-target` rule. Idle's outline opens on its `h1`, and `copy.help.*`, both
+> firewall recoveries, `copy.cancel.won`, `copy.name.show_full` and
+> `copy.external.promise` are all rendered. `framer-motion` and the bundled Nunito
+> face are gone, and a test fails if either returns.
+>
 > **Discharged (Story 1.8):** the Story 1.7 entry below requiring the frontend
 > reducer to treat forged lifecycle events as a security property is closed.
 > `reduceLifecycle` refuses any event whose `sessionId` differs from the active
@@ -320,17 +331,17 @@ being anyone's problem.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   summary: `selectVisibleError` and `selectRetainedOutcome` are now dead, and one of them answers the same question differently from its replacement.
-  owner: 1-10-meet-the-accessibility-and-recovery-contract
+  owner: discharged
   evidence: No view imports either; `selectCommandError` and `selectOutcome` replaced them. `selectVisibleError` folds a retained terminal error into the "visible error" and does not refuse `cancelled` -- precisely the two behaviours the replacements were written to prevent -- so the module exports contradictory answers and a later view can pick the wrong one and still compile. Not removed here because the spec's Code Map says `selectors.ts` may be extended "only additively", which is the right default for a module Story 1.8 defended; deleting an exported symbol and its tests is a separate, deliberate edit.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   summary: Muted text now sits on the elevated surface, a pairing DESIGN.md's contrast table does not publish.
-  owner: 1-10-meet-the-accessibility-and-recovery-contract
+  owner: discharged
   evidence: Every muted string in the new views (`.fd-meta`, `.fd-trust`, `.fd-packet-tab`) renders inside `.fd-packet`/`.fd-transfer-view`, which are `--color-elevated`. DESIGN.md proves muted/canvas at 5.070533:1 and instructs "Re-run unrounded automated checks if ... adjacent surfaces change". Computed here, muted/elevated is 4.504478:1 light and 6.569759:1 dark -- it passes AA, with about 0.1% headroom in light mode, and `.fd-packet-tab` renders it at 12px. Story 1.10 owns the unrounded contrast proof and should add this pair to the published table rather than leave it derived.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   summary: The direct URL is exposed as a `div` with `role="textbox"`, which assistive technology handles inconsistently.
-  owner: 1-10-meet-the-accessibility-and-recovery-contract
+  owner: discharged
   evidence: A textbox role with no editable host is not a pattern browsers agree on; a readonly `<input>` or a labelled `<output>` carries the value reliably and keeps it selectable. It also joins the Tab order and takes its 44px floor from a duplicated `min-block-size` rather than the shared `.fd-target` rule that a test pins. Story 1.10 owns the accessibility contract and should settle the element, not just its name.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
@@ -340,12 +351,12 @@ being anyone's problem.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   summary: Idle's document outline opens on an `h2`, and the registered-but-unrendered Story 1.10 copy is tracked only in spec prose.
-  owner: 1-10-meet-the-accessibility-and-recovery-contract
+  owner: discharged
   evidence: The firewall guidance is an `<h2>` and any outcome panel above it is another, while the page's only `<h1>` is the drop instruction below both -- a consequence of the acceptance criterion that puts preflight first in document order, and no test pins the resolution. Separately, `copy.help.*`, both firewall recovery strings, `copy.cancel.won`, `copy.name.showFull` and `copy.external.promise` are registered and rendered nowhere, and nothing outside this spec's Design Notes records that debt. Story 1.10 owns both; a test asserting these strings stay unrendered until it does would make the boundary executable.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   summary: Two declared assets are now referenced by nothing: the bundled Nunito face and `framer-motion`.
-  owner: 1-10-meet-the-accessibility-and-recovery-contract
+  owner: discharged
   evidence: `style.css` no longer declares `@font-face`, so `frontend/src/assets/fonts/nunito-v16-latin-regular.woff2` and its `OFL.txt` are unreferenced (Vite will stop emitting the file, but it stays in the tree). `framer-motion` is a locked runtime dependency that nothing imports, and this story's Never list bans every animation it would serve. Neither is a defect; both are weight a later story should either use or drop deliberately.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
@@ -362,3 +373,23 @@ being anyone's problem.
   summary: Wails' custom `wails://` scheme is not a secure context, so every browser API gated on one is unavailable on macOS.
   owner: 3-3-produce-and-smoke-test-native-release-artifacts
   evidence: WKWebView loads `wails://wails/` through `setURLSchemeHandler:`, and Wails 2.15.0 registers no secure scheme anywhere in its darwin frontend; WebView2 loads `http://wails.localhost/`, which Chromium treats as trustworthy. The clipboard hit this first and is fixed by routing through `runtime.ClipboardSetText`, but the asymmetry is general: `crypto.subtle`, `navigator.geolocation`, media capture and service workers are gated the same way, and a frontend feature that works in `wails dev` on Windows can be inert on macOS with no error. Worth a line in the project's agent instructions before another story reaches for a browser API, and worth confirming on a real Mac during Story 3.3's release evidence.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  summary: The QR substrate now opts out of forced colors, which `DESIGN.md` gates on native scan evidence that does not exist.
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: `DESIGN.md` allows `forced-color-adjust: none` on the production QR bitmap and its quiet-zone substrate "only after native scan evidence confirms it remains readable", and the Compatibility and Evidence Gates record no such run. The alternative is worse -- without the opt-out the user agent repaints the quiet zone in the system palette and a scanner loses the code -- so the exemption is applied and scoped to `.fd-qr-panel, .fd-qr`, with a test that fails if a second selector ever takes it. What is missing is the evidence, not the rule: a real high-contrast Windows session and a phone camera, recorded like every other gate.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  summary: The `beacon_warning` row of the announcement table cannot fire from any transition the reducer can produce.
+  owner: accepted
+  evidence: A discovery warning reaches the frontend inside the successful `FileMetadata`, so it lands on the same transition as Stage success -- and that transition's owner is the focused Staged heading. Giving the warning the announcer as well would be the double speech the whole table exists to prevent, so `routeTransition` announces it only when warnings appear at a session that is already Staged, which today no event does. The warning is on the screen either way, in its own banner. Closing it properly means a lifecycle event that adds a warning after STAGED, which is a contracts change rather than a frontend one.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  summary: Idle with a retained outcome has two `h1`s.
+  owner: accepted
+  evidence: The retained node keeps the terminal panel's heading rank because reset "does not change what the user is looking at", and the drop instruction is Idle's own state heading. Two top-level headings is valid HTML and not a WCAG failure, and the alternative -- demoting the panel to `h2` at reset -- changes the visible node on a transition whose announcement owner is None. Recorded because it is a deliberate outline choice a later reviewer will otherwise read as an oversight.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  summary: The accessibility floor is proved against the stylesheet and the DOM, never against a rendered layout or a real screen reader.
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: jsdom performs no layout and evaluates no media query, so 320-pixel reflow, the 44px target floor, 200% text, forced colors and reduced motion are all asserted as stylesheet text; and no automated check can hear what a screen reader says. The routing table, the throttle and every focus target are unit-proved, but "each transition is announced exactly once" is ultimately an observation about NVDA or VoiceOver. The spec's own manual checks -- one keyboard-only transfer with a screen reader running, and Staged at 320 CSS pixels with 200% text and forced colors on -- are still owed, and belong with the release evidence rather than in a story that cannot run them.

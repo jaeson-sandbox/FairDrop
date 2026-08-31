@@ -14,7 +14,6 @@
     "postbuild": "node -e \"require('fs').writeFileSync('dist/.gitkeep','')\""
   },
   "dependencies": {
-    "framer-motion": "^13.1.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

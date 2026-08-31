@@ -109,6 +109,15 @@
 */
 :root {
     color-scheme: light dark;
+
+    /*
+      One focus indicator for the whole app. DESIGN.md names the focus color and
+      publishes its ratio against the weakest adjacent authored surface; the
+      width and offset live here so a control and a programmatic focus target
+      cannot end up wearing different rings.
+    */
+    --focus-ring-width: 3px;
+    --focus-ring-offset: 2px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -211,14 +220,33 @@ body {
     line-height: var(--leading-meta);
 }
 
-/* Pre-mounted, atomic, and layout-free; Story 1.10 owns what it says. */
-.fd-status-announcer {
+/*
+  Pre-mounted, atomic, and layout-free. It shares its geometry with the
+  full-value name description, because both are text that must reach assistive
+  technology without reaching layout.
+*/
+.fd-status-announcer,
+.fd-visually-hidden {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+}
+
+/*
+  The two-line visual clamp DESIGN.md permits for a long item name. It is a box
+  limit, never a JavaScript truncation: the complete value stays in the DOM, the
+  persistent Show-full-name control expands it, and the assistive description
+  carries it in full either way.
+*/
+.fd-clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
 }
 
 /* ----------------------------------------------------------------- Controls */
@@ -268,10 +296,18 @@ body {
     color: var(--color-error);
 }
 
+/*
+  `:focus-visible` for controls the user drives, plain `:focus` for the nodes
+  the routing table focuses programmatically: a state heading is only ever
+  focused by that table, and browsers disagree about whether a scripted focus
+  move counts as "visible". An indicator the user cannot see is a focus move
+  that did not happen.
+*/
 .fd-button:focus-visible,
-.fd-url:focus-visible {
-    outline: 3px solid var(--color-focus);
-    outline-offset: 2px;
+.fd-url:focus-visible,
+[data-focus-target]:focus {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
 }
 
 /* Copy Feedback: the same control, in success text. No toast, no layout shift. */
@@ -367,6 +403,20 @@ body {
     gap: var(--spacing-3);
 }
 
+/*
+  The cancel-winning summary. Quiet status, not an outcome panel: a cancellation
+  is never rendered as an Error, and this node carries no icon, rule or color
+  that would read as one.
+*/
+.fd-cancel-summary {
+    margin: 0;
+    padding: var(--spacing-4);
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
 /* ------------------------------------------------------------ Paper packets */
 
 .fd-packet-tab {
@@ -421,6 +471,39 @@ body {
     gap: var(--spacing-2);
 }
 
+/* The full-name control sits with the name, not stretched across the column. */
+.fd-name-toggle {
+    align-self: start;
+    padding-block: var(--spacing-2);
+}
+
+/* ----------------------------------------- Recovery help (Idle and Staged) */
+
+.fd-help {
+    display: grid;
+    gap: var(--spacing-3);
+    padding: var(--spacing-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+.fd-help__platforms {
+    display: grid;
+    gap: var(--spacing-2);
+    margin: 0;
+}
+
+.fd-help dt {
+    font-weight: var(--font-weight-label);
+}
+
+.fd-help dd {
+    margin: var(--spacing-1) 0 0;
+    color: var(--color-muted);
+}
+
 /* ---------------------------------------------------------------- QR Panel */
 
 .fd-qr-panel {
@@ -457,9 +540,13 @@ body {
     align-items: stretch;
 }
 
+/*
+  A readonly <input>, not a div wearing a textbox role. Its activation floor
+  comes from the shared .fd-target rule rather than a duplicated size here, and
+  it fills its grid column so the field can never set the row's width.
+*/
 .fd-url {
-    min-inline-size: 0;
-    min-block-size: var(--spacing-target-min);
+    inline-size: 100%;
     padding: var(--spacing-3);
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-sm);
@@ -469,8 +556,6 @@ body {
     font-size: var(--text-code);
     font-weight: var(--font-weight-code);
     line-height: var(--leading-code);
-    overflow-wrap: anywhere;
-    user-select: all;
 }
 
 .fd-copy-feedback {
@@ -671,5 +756,81 @@ body {
     .fd-selection,
     .fd-metrics {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ------------------------------------------------- Forced colors and motion */
+
+/*
+  Forced colors supersede Terracotta Linen.
+
+  The override is done on the tokens, not rule by rule, because every component
+  rule already reads a var(): one block therefore reaches the whole app and no
+  surface can be left behind. System color keywords are honoured in this mode --
+  ordinary author colors are not -- so a distinction that must survive is
+  restated here as a system color rather than left to the user agent's own
+  substitution, which flattens a progress fill into its track.
+
+  Nothing here opts out of forced colors except the QR substrate below, and no
+  state is left to color alone in either mode: the drop target's active state is
+  a solid boundary against a dashed one, unknown progress is a static pattern
+  plus its literal text, and every outcome carries a glyph and a heading.
+*/
+@media (forced-colors: active) {
+    :root {
+        --color-canvas: Canvas;
+        --color-surface: Canvas;
+        --color-elevated: Canvas;
+        --color-text: CanvasText;
+        --color-muted: CanvasText;
+        --color-border: CanvasText;
+        --color-control-border: CanvasText;
+        --color-primary: Highlight;
+        --color-primary-ink: HighlightText;
+        --color-hover: Highlight;
+        --color-drop: Canvas;
+        --color-progress: Highlight;
+        --color-focus: Highlight;
+        --color-success: CanvasText;
+        --color-warning: CanvasText;
+        --color-error: CanvasText;
+
+        /* Decorative depth has no meaning in this mode and no system color. */
+        --shadow-paper: none;
+    }
+
+    /*
+      The one sanctioned exemption. DESIGN.md allows forced-color-adjust to be
+      disabled on the production QR bitmap and its unrecolored quiet-zone
+      substrate and nowhere else, because a QR forced into the system palette loses the
+      quiet zone a scanner needs. It is still gated on native scan evidence,
+      which the Compatibility and Evidence Gates have not yet recorded.
+    */
+    .fd-qr-panel,
+    .fd-qr {
+        forced-color-adjust: none;
+    }
+}
+
+/*
+  Reduced motion.
+
+  The app declares no animation or transition today -- the unknown-progress
+  pattern is a static gradient, and state swaps are immediate -- so this is a
+  standing guarantee rather than a correction: any motion a later edit adds is
+  neutralised here before it can sweep, shimmer, blink, or move a lifecycle
+  region through space. Text, pattern, wire bytes and state are untouched,
+  because none of them is carried by movement.
+*/
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-delay: 0ms !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-delay: 0ms !important;
+        transition-duration: 1ms !important;
+        scroll-behavior: auto !important;
     }
 }

@@ -2,7 +2,7 @@ import type {CSSProperties} from 'react'
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {IdleTransferState} from '../transfer/state'
-import type {PublicError, RetainedOutcome} from '../transfer/types'
+import type {PublicError} from '../transfer/types'
 import {IdleView} from './IdleView'
 
 afterEach(cleanup)
@@ -13,29 +13,64 @@ function idle(overrides: Partial<IdleTransferState> = {}): IdleTransferState {
     return {phase: 'idle', retainedOutcome: null, commandError: null, ...overrides}
 }
 
-function show(state: IdleTransferState = idle(), handlers: Record<string, () => void> = {}) {
+function show(
+    state: IdleTransferState = idle(),
+    handlers: Record<string, () => void> = {},
+    cancelWon = false,
+) {
     const onSelectFile = handlers.onSelectFile ?? vi.fn()
     const onSelectDirectory = handlers.onSelectDirectory ?? vi.fn()
-    const onDismissRetained = handlers.onDismissRetained ?? vi.fn()
     const view = render(
         <IdleView
             state={state}
             dropTargetStyle={dropTargetStyle}
+            cancelWon={cancelWon}
             onSelectFile={onSelectFile}
             onSelectDirectory={onSelectDirectory}
-            onDismissRetained={onDismissRetained}
         />,
     )
-    return {view, onSelectFile, onSelectDirectory, onDismissRetained}
+    return {view, onSelectFile, onSelectDirectory}
 }
 
 describe('Idle at rest', () => {
-    it('leads with the firewall preflight, then the drop target, then the browse controls', () => {
+    it('leads with the drop target, keeps the preflight ahead of the browse controls, and closes with recovery', () => {
         const {view} = show()
 
-        const regions = [...view.container.querySelectorAll('.fd-preflight, .fd-drop-zone, .fd-selection')]
+        const regions = [...view.container.querySelectorAll(
+            '.fd-preflight, .fd-drop-zone, .fd-selection, .fd-help',
+        )]
         expect(regions.map((element) => element.className.split(' ')[0]))
-            .toEqual(['fd-preflight', 'fd-drop-zone', 'fd-selection'])
+            .toEqual(['fd-drop-zone', 'fd-preflight', 'fd-selection', 'fd-help'])
+    })
+
+    it('opens the outline on the h1, not on the preflight or a command failure', () => {
+        show(idle({commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}}))
+
+        const headings = [...document.querySelectorAll('h1, h2, h3')]
+        expect(headings[0].tagName).toBe('H1')
+        expect(headings[0].textContent).toBe('Drop one file or folder.')
+    })
+
+    it('states the approved external promise', () => {
+        show()
+
+        expect(screen.getByText('Send from FairDrop on Windows or Mac to one browser on the same local ' +
+            'network—no account or receiver app.')).toBeTruthy()
+    })
+
+    it('offers platform firewall recovery and receiver help from Idle', () => {
+        show()
+
+        expect(screen.getByText('Open Windows Firewall settings and allow FairDrop on Private networks only, ' +
+            'then prepare the item again.')).toBeTruthy()
+        expect(screen.getByText('Open System Settings → Network → Firewall → Options, allow incoming ' +
+            'connections for FairDrop, then prepare the item again.')).toBeTruthy()
+        expect(screen.getByText('Not downloading? Make sure both devices use the same local Wi-Fi. Guest or ' +
+            'isolated networks may block device-to-device traffic. Then cancel and prepare the item again for ' +
+            'a fresh link.')).toBeTruthy()
+        expect(screen.getByText('Browser says Not Found: the link may be wrong or expired. Locked: another ' +
+            'opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a ' +
+            'fresh link.')).toBeTruthy()
     })
 
     it('states the preflight and both platform guidances in document order', () => {
@@ -107,40 +142,15 @@ describe('Idle with a command failure', () => {
     })
 })
 
-describe('Idle with a retained outcome', () => {
-    it('keeps the finished outcome visible with a Dismiss control', () => {
-        const retained: RetainedOutcome = {kind: 'done'}
-        const {onDismissRetained} = show(idle({retainedOutcome: retained}))
+describe('what Idle no longer owns', () => {
+    // App renders the retained terminal outcome above this region, in a slot it
+    // keeps across the reset. Rebuilding it here would drop the focus that is
+    // sitting on it -- see App.test.tsx, "reset after a terminal outcome".
+    it('renders no outcome panel for a retained outcome', () => {
+        show(idle({retainedOutcome: {kind: 'done'}}))
 
-        expect(screen.getByRole('heading', {name: 'Transfer finished'})).toBeTruthy()
-        expect(screen.getByText('FairDrop finished sending the item.')).toBeTruthy()
-
-        fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
-        expect(onDismissRetained).toHaveBeenCalledTimes(1)
-    })
-
-    it('keeps a retained failure on the fixed table', () => {
-        const retained: RetainedOutcome = {
-            kind: 'error',
-            error: {code: 'transfer_failed', message: 'The transfer stopped before FairDrop finished sending. ' +
-                'Check the local network and create a fresh link.'},
-        }
-        show(idle({retainedOutcome: retained}))
-
-        expect(screen.getByRole('heading', {name: 'Transfer stopped'})).toBeTruthy()
-        expect(screen.getByRole('button', {name: 'Dismiss'})).toBeTruthy()
-    })
-
-    it('shows the retained node above a newer command failure, and both at once', () => {
-        show(idle({
-            retainedOutcome: {kind: 'done'},
-            commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
-        }))
-
-        const panels = [...document.querySelectorAll('.fd-outcome')]
-        expect(panels).toHaveLength(2)
-        expect(panels[0].getAttribute('data-retained')).toBe('true')
-        expect(panels[1].getAttribute('data-error-code')).toBe('invalid_selection')
+        expect(document.querySelector('.fd-outcome')).toBeNull()
+        expect(screen.queryByRole('button', {name: 'Dismiss'})).toBeNull()
     })
 
     it('renders exactly one Idle phase view whatever it carries', () => {
@@ -148,5 +158,42 @@ describe('Idle with a retained outcome', () => {
 
         expect(document.querySelectorAll('[data-phase-view]')).toHaveLength(1)
         expect(document.querySelector('[data-phase-view]')?.getAttribute('data-phase-view')).toBe('idle')
+    })
+})
+
+describe('Idle after a cancellation won its race', () => {
+    it('carries the cancellation summary as a focus target, not as an Error', () => {
+        show(idle(), {}, true)
+
+        const summary = document.querySelector('[data-focus-target="cancel-summary"]') as HTMLElement
+        expect(summary.textContent).toBe('Transfer canceled. Ready for another file or folder.')
+        expect(summary.getAttribute('tabindex')).toBe('-1')
+        // Never an Error, and never a live region: focus is this row's one owner.
+        expect(document.querySelector('.fd-outcome')).toBeNull()
+        expect(document.querySelector('[role="alert"]')).toBeNull()
+        expect(summary.closest('[aria-live]')).toBeNull()
+    })
+
+    it('shows no summary on the Idle the app simply starts in', () => {
+        show()
+
+        expect(document.querySelector('[data-focus-target="cancel-summary"]')).toBeNull()
+    })
+
+    it('marks the drop instruction as the target Dismiss focuses', () => {
+        show()
+
+        const instruction = document.querySelector('[data-focus-target="idle-instruction"]') as HTMLElement
+        expect(instruction.tagName).toBe('H1')
+        expect(instruction.textContent).toBe('Drop one file or folder.')
+        expect(instruction.getAttribute('tabindex')).toBe('-1')
+    })
+
+    it('gives a command failure its own focus target, distinct from the instruction', () => {
+        show(idle({commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}}))
+
+        const targets = [...document.querySelectorAll('[data-focus-target]')]
+            .map((element) => element.getAttribute('data-focus-target'))
+        expect(targets).toEqual(['idle-instruction', 'command-error'])
     })
 })

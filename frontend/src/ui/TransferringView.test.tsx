@@ -235,3 +235,84 @@ describe('the transfer surface', () => {
         expect(views[0].getAttribute('data-phase-view')).toBe('transferring')
     })
 })
+
+describe('the pending cancellation contract', () => {
+    it('keeps the control focused, marks it aria-disabled, and refuses a second activation', () => {
+        const onCancel = vi.fn()
+        const {rerender} = render(<TransferringView state={transferring(null)} onCancel={onCancel}/>)
+
+        const cancel = screen.getByRole('button', {name: 'Cancel'})
+        cancel.focus()
+        fireEvent.click(cancel)
+        expect(onCancel).toHaveBeenCalledTimes(1)
+
+        rerender(<TransferringView state={transferring(null, {cancelPending: true})} onCancel={onCancel}/>)
+
+        const outstanding = screen.getByRole('button', {name: 'Canceling…'})
+        expect(outstanding).toBe(cancel)
+        expect(document.activeElement).toBe(outstanding)
+        expect(outstanding.getAttribute('aria-disabled')).toBe('true')
+        expect(outstanding.hasAttribute('disabled')).toBe(false)
+
+        fireEvent.click(outstanding)
+        expect(onCancel).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps the metrics readable while the cancellation is outstanding', () => {
+        const snapshot: ProgressSnapshot = {
+            bytesSent: 5_800_000, totalBytes: 8_400_000, totalKnown: true, percent: 68, speedBytesPerSec: 4_700_000,
+        }
+        render(<TransferringView state={transferring(snapshot, {cancelPending: true})} onCancel={vi.fn()}/>)
+
+        expect(screen.getByText('5.8 MB of 8.4 MB')).toBeTruthy()
+        expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('68')
+    })
+
+    it('marks the sending heading as the target transfer-started focuses', () => {
+        render(<TransferringView state={transferring(null)} onCancel={vi.fn()}/>)
+
+        const heading = document.querySelector('[data-focus-target="transferring-heading"]') as HTMLElement
+        expect(heading.tagName).toBe('H1')
+        expect(heading.getAttribute('tabindex')).toBe('-1')
+        expect(heading.textContent).toBe('Sending')
+    })
+})
+
+describe('the progress ARIA the three modes already carry', () => {
+    // Verified rather than rebuilt: Story 1.10 owns the speech throttle and the
+    // announcement owner, not the roles. These pin what must not drift.
+    it('gives a known positive total a finite value between an explicit min and max', () => {
+        const snapshot: ProgressSnapshot = {
+            bytesSent: 4_200_000, totalBytes: 8_400_000, totalKnown: true, percent: 50, speedBytesPerSec: 1,
+        }
+        render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
+
+        const bar = screen.getByRole('progressbar')
+        expect(Number(bar.getAttribute('aria-valuenow'))).toBe(50)
+        expect(Number.isFinite(Number(bar.getAttribute('aria-valuenow')))).toBe(true)
+        expect(bar.getAttribute('aria-valuemin')).toBe('0')
+        expect(bar.getAttribute('aria-valuemax')).toBe('100')
+    })
+
+    it('omits aria-valuenow entirely for an unknown total', () => {
+        const snapshot: ProgressSnapshot = {
+            bytesSent: 48_200_000, totalBytes: 0, totalKnown: false, percent: 0, speedBytesPerSec: 1,
+        }
+        render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
+
+        const bar = screen.getByRole('progressbar')
+        expect(bar.hasAttribute('aria-valuenow')).toBe(false)
+        expect(bar.hasAttribute('aria-valuemin')).toBe(false)
+        expect(bar.hasAttribute('aria-valuemax')).toBe(false)
+    })
+
+    it('exposes a known-empty transfer as literal text with no progressbar at all', () => {
+        const snapshot: ProgressSnapshot = {
+            bytesSent: 0, totalBytes: 0, totalKnown: true, percent: 0, speedBytesPerSec: 0,
+        }
+        render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
+
+        expect(screen.queryByRole('progressbar')).toBeNull()
+        expect(screen.getByText('Empty file — 0 bytes to transfer')).toBeTruthy()
+    })
+})

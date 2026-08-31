@@ -3,7 +3,6 @@ import type {
     PendingItemKind,
     ProgressSnapshot,
     PublicError,
-    RetainedOutcome,
     Warning,
 } from './types'
 import type {TransferState} from './state'
@@ -76,18 +75,6 @@ export function selectProgressSnapshot(progress: ProgressSnapshot): ProgressSele
 
 export function selectMetadata(state: TransferState): FileMetadata | null {
     return state.phase === 'staged' || state.phase === 'transferring' ? state.metadata : null
-}
-
-export function selectRetainedOutcome(state: TransferState): RetainedOutcome | null {
-    return state.phase === 'idle' ? state.retainedOutcome : null
-}
-
-export function selectVisibleError(state: TransferState): PublicError | null {
-    if (state.phase === 'error') return state.outcome.error
-    if (state.phase === 'staged' || state.phase === 'transferring') return state.commandError
-    if (state.phase !== 'idle') return null
-    if (state.commandError !== null) return state.commandError
-    return state.retainedOutcome?.kind === 'error' ? state.retainedOutcome.error : null
 }
 
 function clampPercent(value: number): number {

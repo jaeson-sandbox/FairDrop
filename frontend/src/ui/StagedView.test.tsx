@@ -99,12 +99,18 @@ describe('the staged handoff', () => {
 })
 
 describe('the direct URL row', () => {
-    it('is readonly text rather than a sender-side activation link', () => {
+    it('is a readonly form control rather than a sender-side activation link', () => {
         const {container} = render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
-        const row = screen.getByRole('textbox')
-        expect(row.textContent).toBe(capabilityURL)
-        expect(row.getAttribute('aria-readonly')).toBe('true')
+        // A real <input readonly>, not a div wearing role="textbox": assistive
+        // technology reads the value of one reliably and disagrees about the
+        // other. It is named by the row's own heading and it is still not a link.
+        const field = screen.getByRole('textbox') as HTMLInputElement
+        expect(field.tagName).toBe('INPUT')
+        expect(field.value).toBe(capabilityURL)
+        expect(field.readOnly).toBe(true)
+        expect(field.className).toContain('fd-target')
+        expect(field.getAttribute('aria-labelledby')).toBe('fd-direct-link-heading')
         expect(container.querySelectorAll('a')).toHaveLength(0)
     })
 
@@ -114,7 +120,7 @@ describe('the direct URL row', () => {
         const serialized = container.innerHTML
         const occurrences = serialized.split(token).length - 1
         expect(occurrences).toBe(1)
-        expect(screen.getByRole('textbox').textContent).toContain(token)
+        expect((screen.getByRole('textbox') as HTMLInputElement).value).toContain(token)
         // The QR carries the same URL as an image, not as readable text.
         expect(screen.getByRole('img').getAttribute('src')).not.toContain(token)
     })
@@ -207,7 +213,7 @@ describe('copy feedback', () => {
 
         expect(writeText).toHaveBeenCalledTimes(1)
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Ready to pass along')
-        expect(screen.getByRole('textbox').textContent).toBe(capabilityURL)
+        expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe(capabilityURL)
         expect(document.querySelector('[role="alert"]')).toBeNull()
     })
 })
@@ -241,7 +247,7 @@ describe('the non-terminal discovery warning', () => {
         expect(banner?.textContent).toBe('Discovery unavailable' +
             'Device discovery isn’t available. The QR code and download link still work.')
         expect(screen.getByRole('img')).toBeTruthy()
-        expect(screen.getByRole('textbox').textContent).toBe(capabilityURL)
+        expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe(capabilityURL)
         // A warning is not an Error, so no outcome panel appears.
         expect(document.querySelector('.fd-outcome')).toBeNull()
     })
@@ -282,5 +288,138 @@ describe('cancellation and command failure', () => {
         expect(screen.getByRole('heading', {name: 'Item changed'})).toBeTruthy()
         expect(screen.getByRole('img')).toBeTruthy()
         expect(document.querySelectorAll('[data-phase-view]')).toHaveLength(1)
+    })
+})
+
+describe('full-value access to a long or bidi name', () => {
+    const unbroken = 'Q1-report-' + 'x'.repeat(180) + '.pdf'
+
+    it('clamps the name visually while keeping the complete value in the DOM', () => {
+        render(<StagedView state={staged({metadata: metadata({name: unbroken})})} onCancel={vi.fn()}/>)
+
+        const isolate = document.querySelector('bdi') as HTMLElement
+        expect(isolate.className).toContain('fd-clamp')
+        // Clamped by its box, never by JavaScript: no code unit is dropped.
+        expect(isolate.textContent).toBe(unbroken)
+    })
+
+    it('offers a persistent keyboard control that expands the clamp', () => {
+        render(<StagedView state={staged({metadata: metadata({name: unbroken})})} onCancel={vi.fn()}/>)
+
+        const control = screen.getByRole('button', {name: 'Show full name'})
+        expect(control.className).toContain('fd-target')
+        expect(control.getAttribute('aria-expanded')).toBe('false')
+
+        fireEvent.click(control)
+
+        expect(screen.getByRole('button', {name: 'Show full name'}).getAttribute('aria-expanded')).toBe('true')
+        expect((document.querySelector('bdi') as HTMLElement).className).not.toContain('fd-clamp')
+    })
+
+    it('describes the control with the complete value, so a tooltip is not the only route', () => {
+        render(<StagedView state={staged({metadata: metadata({name: unbroken})})} onCancel={vi.fn()}/>)
+
+        const describedBy = screen.getByRole('button', {name: 'Show full name'}).getAttribute('aria-describedby')
+        const description = document.getElementById(describedBy ?? '')
+        expect(description?.textContent).toBe(unbroken)
+        expect(description?.className).toContain('fd-visually-hidden')
+    })
+
+    it('isolates both copies of a mixed-direction name', () => {
+        const mixed = 'تقرير ٢٠٢٦ ‮report‬.pdf'
+        render(<StagedView state={staged({metadata: metadata({name: mixed})})} onCancel={vi.fn()}/>)
+
+        const isolates = [...document.querySelectorAll('bdi')]
+        expect(isolates).toHaveLength(2)
+        for (const isolate of isolates) {
+            expect(isolate.getAttribute('dir')).toBe('auto')
+            expect(isolate.textContent).toBe(mixed)
+        }
+        // The accessible name of the QR matches the visible name exactly.
+        expect(screen.getByRole('img').getAttribute('alt')).toBe(`Download QR code for ${mixed}`)
+    })
+})
+
+describe('recovery help beside the handoff', () => {
+    it('covers platform firewall recovery and every generic receiver failure', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        expect(document.querySelector('.fd-packet .fd-help')).toBeTruthy()
+        expect(screen.getByText('Open Windows Firewall settings and allow FairDrop on Private networks only, ' +
+            'then prepare the item again.')).toBeTruthy()
+        expect(screen.getByText('Open System Settings → Network → Firewall → Options, allow incoming ' +
+            'connections for FairDrop, then prepare the item again.')).toBeTruthy()
+        expect(screen.getByText('Not downloading? Make sure both devices use the same local Wi-Fi. Guest or ' +
+            'isolated networks may block device-to-device traffic. Then cancel and prepare the item again for ' +
+            'a fresh link.')).toBeTruthy()
+        expect(screen.getByText('Browser says Not Found: the link may be wrong or expired. Locked: another ' +
+            'opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a ' +
+            'fresh link.')).toBeTruthy()
+    })
+})
+
+describe('a pending cancellation', () => {
+    it('keeps the control focused, marks it aria-disabled, and issues no second command', () => {
+        const onCancel = vi.fn()
+        const {rerender} = render(<StagedView state={staged()} onCancel={onCancel}/>)
+
+        const cancel = screen.getByRole('button', {name: 'Cancel'})
+        cancel.focus()
+        fireEvent.click(cancel)
+        expect(onCancel).toHaveBeenCalledTimes(1)
+
+        rerender(<StagedView state={staged({cancelPending: true})} onCancel={onCancel}/>)
+
+        const pending = screen.getByRole('button', {name: 'Canceling…'})
+        // The same element, so focus never left it -- which `disabled` would
+        // have done, and `aria-disabled` does not.
+        expect(pending).toBe(cancel)
+        expect(document.activeElement).toBe(pending)
+        expect(pending.getAttribute('aria-disabled')).toBe('true')
+        expect(pending.hasAttribute('disabled')).toBe(false)
+
+        fireEvent.click(pending)
+        expect(onCancel).toHaveBeenCalledTimes(1)
+    })
+
+    it('carries no aria-disabled attribute at all while cancellation is available', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        expect(screen.getByRole('button', {name: 'Cancel'}).hasAttribute('aria-disabled')).toBe(false)
+    })
+})
+
+describe('the announcer rows this view owns', () => {
+    it('reports copy success to the announcer only after the write resolves', async () => {
+        const onAnnounce = vi.fn()
+        render(<StagedView state={staged()} onCancel={vi.fn()} onAnnounce={onAnnounce}/>)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        })
+
+        expect(onAnnounce).toHaveBeenCalledTimes(1)
+        expect(onAnnounce).toHaveBeenCalledWith('Copied')
+    })
+
+    it('says nothing when the write rejects', async () => {
+        const onAnnounce = vi.fn()
+        writeText.mockRejectedValue(new Error('denied'))
+        render(<StagedView state={staged()} onCancel={vi.fn()} onAnnounce={onAnnounce}/>)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        })
+
+        expect(onAnnounce).not.toHaveBeenCalled()
+    })
+
+    it('marks the staged heading as the target Stage success focuses', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        const heading = document.querySelector('[data-focus-target="staged-heading"]') as HTMLElement
+        expect(heading.tagName).toBe('H1')
+        expect(heading.textContent).toBe('Ready to pass along')
+        expect(heading.getAttribute('tabindex')).toBe('-1')
     })
 })

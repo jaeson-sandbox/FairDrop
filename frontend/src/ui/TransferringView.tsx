@@ -28,7 +28,9 @@ export function TransferringView({state, onCancel}: TransferringViewProps) {
 
     return (
         <div className="fd-region" data-phase-view="transferring">
-            <h1 className="fd-state-heading" tabIndex={-1}>{copy.label.sending}</h1>
+            <h1 className="fd-state-heading" tabIndex={-1} data-focus-target="transferring-heading">
+                {copy.label.sending}
+            </h1>
 
             <div>
                 <span className="fd-packet-tab">{metadata.isDir ? copy.label.folder : copy.label.file}</span>
@@ -45,14 +47,30 @@ export function TransferringView({state, onCancel}: TransferringViewProps) {
                         </>
                     )}
 
-                    <button type="button" className="fd-button fd-button--quiet fd-target" onClick={onCancel}>
+                    {/*
+                      A pending cancellation keeps this control focused and
+                      refuses a second activation. `aria-disabled`, never
+                      `disabled`: the latter would move focus off the control
+                      the spine says must keep it.
+                    */}
+                    <button
+                        type="button"
+                        className="fd-button fd-button--quiet fd-target"
+                        aria-disabled={state.cancelPending || undefined}
+                        onClick={() => {
+                            if (!state.cancelPending) onCancel()
+                        }}
+                    >
                         {state.cancelPending ? copy.cancel.pending : copy.cancel.action}
                     </button>
                 </section>
             </div>
 
             {commandError === null ? null : (
-                <OutcomePanel outcome={{kind: 'error', retained: false, error: commandError}}/>
+                <OutcomePanel
+                    outcome={{kind: 'error', retained: false, error: commandError}}
+                    focusTarget="command-error"
+                />
             )}
         </div>
     )

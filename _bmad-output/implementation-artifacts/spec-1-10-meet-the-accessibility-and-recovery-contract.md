@@ -61,16 +61,16 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `frontend/src/ui/announce.ts` — one owner map from transition to focus target or announcer text, so the routing table exists once rather than per view.
-- [ ] `frontend/src/App.tsx` — drive the announcer and the single focus move from state transitions, proving each target exists first.
-- [ ] `frontend/src/ui/progressSpeech.ts` — the assistive throttle: start once, then 5s plus 10pp or 10 MiB, cancelled by a terminal outcome, never speaking throughput.
-- [ ] `frontend/src/ui/IdleView.tsx` — platform firewall recovery and receiver help; `copy.cancel.won` as the focused cancel-winning summary; heading order that does not open the document on an `h2`.
-- [ ] `frontend/src/ui/StagedView.tsx` — recovery help beside the handoff; the URL as a readonly form control rather than a `div` with a textbox role; `copy.name.show_full` full-value access.
-- [ ] `frontend/src/ui/{StagePendingCard,TransferringView,OutcomePanel}.tsx` — `aria-disabled` and focus retention on a pending cancellation.
-- [ ] `frontend/src/style.css` — a `forced-colors: active` block, `prefers-reduced-motion: reduce` behaviour, and the focus indicator token.
-- [ ] `frontend/src/transfer/selectors.ts` — remove `selectVisibleError` and `selectRetainedOutcome` with their tests; they contradict their replacements.
-- [ ] `frontend/package.json`, `frontend/src/assets/fonts/` — drop `framer-motion` and the unreferenced face, or use them deliberately.
-- [ ] `frontend/src/ui/*.test.tsx`, `styles.test.ts` — one test per routing-table row, the throttle's boundaries, target existence, forced colors, reduced motion, and the unrounded contrast proof including muted on elevated.
+- [x] `frontend/src/ui/announce.ts` — one owner map from transition to focus target or announcer text, so the routing table exists once rather than per view.
+- [x] `frontend/src/App.tsx` — drive the announcer and the single focus move from state transitions, proving each target exists first.
+- [x] `frontend/src/ui/progressSpeech.ts` — the assistive throttle: start once, then 5s plus 10pp or 10 MiB, cancelled by a terminal outcome, never speaking throughput.
+- [x] `frontend/src/ui/IdleView.tsx` — platform firewall recovery and receiver help; `copy.cancel.won` as the focused cancel-winning summary; heading order that does not open the document on an `h2`.
+- [x] `frontend/src/ui/StagedView.tsx` — recovery help beside the handoff; the URL as a readonly form control rather than a `div` with a textbox role; `copy.name.show_full` full-value access.
+- [x] `frontend/src/ui/{StagePendingCard,TransferringView,OutcomePanel}.tsx` — `aria-disabled` and focus retention on a pending cancellation.
+- [x] `frontend/src/style.css` — a `forced-colors: active` block, `prefers-reduced-motion: reduce` behaviour, and the focus indicator token.
+- [x] `frontend/src/transfer/selectors.ts` — remove `selectVisibleError` and `selectRetainedOutcome` with their tests; they contradict their replacements.
+- [x] `frontend/package.json`, `frontend/src/assets/fonts/` — drop `framer-motion` and the unreferenced face, or use them deliberately.
+- [x] `frontend/src/ui/*.test.tsx`, `styles.test.ts` — one test per routing-table row, the throttle's boundaries, target existence, forced colors, reduced motion, and the unrounded contrast proof including muted on elevated.
 
 **Acceptance Criteria:**
 - Given each row of the routing table, when its transition occurs, then exactly one mechanism announces it and the other is provably silent.
@@ -80,6 +80,74 @@ context:
 - Given forced colors and reduced motion, when the UI renders, then no state or available action is distinguished by color or motion alone.
 
 ## Spec Change Log
+
+Implementation decisions taken inside the approved boundaries, recorded so a
+reviewer can find them without a diff hunt. None of them changes the frozen
+intent; each is a place where the spec left one degree of freedom.
+
+- **The lifecycle outcome panel moved out of the views and into `App`.** The
+  matrix requires that reset keep "the retained node mounted" and leave "focus
+  already inside the outcome" where it is. Rendered from `OutcomePanel` inside
+  the terminal phase view and again from inside `IdleView`, those are two
+  different positions in the tree, so React unmounts one and builds the other:
+  focus falls to the document body, silently, on the one row whose announcement
+  owner is None. `App` now renders it in a single slot above the phase body,
+  which makes it literally the same `<section>` across the reset. `IdleView` no
+  longer takes `onDismissRetained`, and `OutcomePanel` gained a `phaseView` prop
+  so heading rank and phase ownership can move independently — reset changes the
+  phase, never the visible node.
+- **Idle leads with the drop target.** The one binding ordering rule is that the
+  firewall guidance precedes the selection controls, and it still does. Opening
+  the region on the drop instruction is what puts an `h1` first, which the
+  Execution list asks for. The retained outcome above it keeps `h1` too, so Idle
+  with a retained outcome carries two — recorded in `deferred-work.md` as a
+  deliberate outline choice.
+- **`beacon_warning` announces only at a session that is already Staged.** A
+  discovery warning arrives inside the successful metadata, so today it lands on
+  the same transition as Stage success — whose owner is the focused heading.
+  Giving it the announcer as well would be exactly the double speech the table
+  exists to prevent. The row is implemented and tested; no current event can
+  reach it, and `deferred-work.md` records why.
+- **Progress speech uses either threshold, not one per mode.** The Always clause
+  reads "only after 10 percentage points **or** 10 MiB of new wire bytes", so a
+  known total that gains 10 MiB without gaining 10 points still speaks. Both the
+  five-second floor and a meaningful change are still required together.
+- **Recovery help carries no heading.** Every heading in the app is a registered
+  string and the spine registers none for this block; inventing one would be
+  inventing product copy. It renders as a platform list plus the two
+  self-describing help paragraphs, in Idle after the selection controls and in
+  Staged inside the packet.
+- **The firewall recovery strings sit in their own block, not in the preflight.**
+  The spine lists preflight and recovery as two sections with different
+  triggers — one before the first Stage, one after a failure — so folding the
+  recovery text into the preflight's `<dl>` would have made the Idle screen
+  claim the OS prompt has already been denied.
+- **Three files beyond the Execution list.** `frontend/src/ui/RecoveryHelp.tsx`
+  is the one recovery surface Idle and Staged both render, so the registry
+  strings appear at one call site rather than two.
+  `frontend/src/ui/announce.test.ts` and `frontend/src/ui/progressSpeech.test.ts`
+  are the unit suites for the two new modules.
+  `frontend/src/App.focus.test.tsx` stubs the routing table so a row can name a
+  target that is not on the screen: every row a real transition produces lands
+  on a target its view carries, which is exactly what makes the existence proof
+  impossible to exercise from real state.
+- **The full-name control keeps one label.** `copy.name.show_full` is the only
+  registered string for it, so the control's name never changes; `aria-expanded`
+  carries the state and `aria-describedby` points at a visually hidden copy of
+  the complete value.
+- **Forced colors are overridden on the tokens.** Every component rule already
+  reads a `var()`, so redefining the palette inside
+  `@media (forced-colors: active)` reaches the whole app and leaves no surface
+  behind. Distinctions the user agent would flatten — the progress fill against
+  its track, the action color, the focus ring — are restated as system colors.
+  `forced-color-adjust: none` appears once, on `.fd-qr-panel, .fd-qr`, and a
+  test fails if a second selector ever takes it.
+- **`DESIGN.md` gained the pairs it was already relying on.** Beyond the
+  muted/elevated pair the Code Map names, the views also place text and muted on
+  surface and elevated, error on elevated, the action boundary on elevated, and
+  a status rule and the trusted-LAN marker against canvas and elevated. All are
+  published unrounded, and `styles.test.ts` recomputes each from the
+  stylesheet's own tokens and fails if a published figure drifts.
 
 ## Design Notes
 

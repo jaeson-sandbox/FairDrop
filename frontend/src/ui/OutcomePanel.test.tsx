@@ -91,19 +91,31 @@ describe('the Error panel', () => {
     })
 })
 
-describe('heading rank', () => {
+describe('heading rank and phase ownership', () => {
     it('owns the document heading when it is the whole phase view', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}} level={1}/>)
+        render(<OutcomePanel outcome={{kind: 'done', retained: false}} level={1} phaseView/>)
 
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
         expect(panel().getAttribute('data-phase-view')).toBe('outcome')
     })
 
-    it('defers to the surrounding view when it is nested', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: true}} onDismiss={vi.fn()}/>)
+    it('keeps the heading rank but gives up the phase once it is retained status', () => {
+        // Rank and phase are separate props because reset changes only one of
+        // them: the user must be looking at the same node, at the same weight,
+        // while Idle becomes the phase view underneath it.
+        render(<OutcomePanel outcome={{kind: 'done', retained: true}} level={1} onDismiss={vi.fn()}/>)
 
-        expect(screen.getByRole('heading', {level: 2}).textContent).toBe('Transfer finished')
+        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
         expect(panel().hasAttribute('data-phase-view')).toBe(false)
+    })
+
+    it('defers to the surrounding view when it is a nested command failure', () => {
+        const error: PublicError = {code: 'busy', message: 'ignored'}
+        render(<OutcomePanel outcome={{kind: 'error', retained: false, error}} focusTarget="command-error"/>)
+
+        expect(screen.getByRole('heading', {level: 2}).textContent).toBe('Transfer already active')
+        expect(panel().hasAttribute('data-phase-view')).toBe(false)
+        expect(panel().getAttribute('data-focus-target')).toBe('command-error')
     })
 })
 

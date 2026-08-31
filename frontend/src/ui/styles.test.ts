@@ -30,7 +30,9 @@ function block(opening: string): string {
 
 const theme = block('@theme {')
 const dark = block('@media (prefers-color-scheme: dark) {')
-const componentRules = stylesheet.replace(theme, '').replace(dark, '')
+const forcedColors = block('@media (forced-colors: active) {')
+const reducedMotion = block('@media (prefers-reduced-motion: reduce) {')
+const componentRules = stylesheet.replace(theme, '').replace(dark, '').replace(forcedColors, '')
 
 describe('the Terracotta Linen token layer', () => {
     it('declares every authored light value as a Tailwind v4 theme variable', () => {
@@ -147,8 +149,104 @@ describe('following the operating-system scheme', () => {
         expect(stylesheet).not.toContain('.dark ')
     })
 
-    it('never disables forced-color adjustment', () => {
-        expect(stylesheet).not.toContain('forced-color-adjust')
+    it('disables forced-color adjustment on the QR substrate and nowhere else', () => {
+        // DESIGN.md allows exactly one exemption -- the production QR bitmap
+        // and its quiet-zone substrate -- because a code forced into the system
+        // palette loses the quiet zone a scanner needs. Applied anywhere else
+        // it would opt the whole app out of the user's own palette.
+        const declarations = stylesheet.match(/forced-color-adjust\s*:/g) ?? []
+
+        expect(declarations).toHaveLength(1)
+        expect(forcedColors).toMatch(
+            /\.fd-qr-panel,\s*\.fd-qr \{\s*forced-color-adjust: none;\s*\}/,
+        )
+    })
+})
+
+describe('forced colors', () => {
+    /*
+      The whole app reads colors through var(), so overriding the tokens is what
+      makes system colors reach every surface. A distinction the user agent
+      would flatten -- the progress fill against its track, the action color, the
+      focus ring -- is restated as a system color rather than left to it.
+    */
+
+    it('supersedes Terracotta Linen with system colors on every authored token', () => {
+        const systemColors: Record<string, string> = {
+            canvas: 'Canvas',
+            surface: 'Canvas',
+            elevated: 'Canvas',
+            text: 'CanvasText',
+            muted: 'CanvasText',
+            border: 'CanvasText',
+            'control-border': 'CanvasText',
+            primary: 'Highlight',
+            'primary-ink': 'HighlightText',
+            hover: 'Highlight',
+            drop: 'Canvas',
+            progress: 'Highlight',
+            focus: 'Highlight',
+            success: 'CanvasText',
+            warning: 'CanvasText',
+            error: 'CanvasText',
+        }
+
+        for (const [role, value] of Object.entries(systemColors)) {
+            expect(forcedColors, role).toContain(`--color-${role}: ${value};`)
+        }
+
+        // Every authored role is covered: a token added to @theme without a
+        // forced-colors answer keeps its Terracotta value in the system palette.
+        const authored = [...theme.matchAll(/--color-([a-z-]+):/g)].map(([, role]) => role)
+        const uncovered = authored.filter((role) => !(role in systemColors) && !role.startsWith('qr-'))
+        expect(uncovered).toEqual([])
+    })
+
+    it('keeps the progress fill distinguishable from its own track', () => {
+        // Highlight on Canvas. Left to the user agent both would become Canvas
+        // and a determinate meter would read as empty at every percentage.
+        expect(forcedColors).toContain('--color-progress: Highlight;')
+        expect(forcedColors).toContain('--color-drop: Canvas;')
+    })
+
+    it('drops the decorative paper offset, which has no system color', () => {
+        expect(forcedColors).toContain('--shadow-paper: none;')
+    })
+})
+
+describe('reduced motion', () => {
+    it('neutralises any animation or transition a later edit could add', () => {
+        expect(reducedMotion).toContain('animation-duration: 1ms !important;')
+        expect(reducedMotion).toContain('animation-iteration-count: 1 !important;')
+        expect(reducedMotion).toContain('transition-duration: 1ms !important;')
+        expect(reducedMotion).toMatch(/\*,\s*\*::before,\s*\*::after/)
+    })
+
+    it('removes nothing that carries meaning', () => {
+        // Text, the static unknown pattern, wire bytes and state are all
+        // painted rather than moved, so none of them can be inside this block.
+        for (const forbidden of ['display:', 'visibility:', 'content:', 'opacity:', 'background']) {
+            expect(reducedMotion, forbidden).not.toContain(forbidden)
+        }
+    })
+})
+
+describe('the focus indicator', () => {
+    it('draws one ring from the focus token for controls and routed targets alike', () => {
+        expect(stylesheet).toMatch(
+            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\[data-focus-target\]:focus \{\s*/,
+        )
+        expect(stylesheet).toContain('outline: var(--focus-ring-width) solid var(--color-focus);')
+        expect(stylesheet).toContain('outline-offset: var(--focus-ring-offset);')
+        expect(stylesheet).toContain('--focus-ring-width: 3px;')
+    })
+
+    it('uses plain :focus for the nodes only the routing table focuses', () => {
+        // A programmatic focus move is not reliably :focus-visible across
+        // engines, and a focus move with no visible ring is one the user cannot
+        // follow.
+        expect(stylesheet).toContain('[data-focus-target]:focus {')
+        expect(stylesheet).not.toContain('[data-focus-target]:focus-visible')
     })
 })
 
@@ -200,10 +298,13 @@ describe('reflow to 320 CSS pixels', () => {
         }
     })
 
-    it('lets long names and URLs wrap instead of overflowing', () => {
-        expect(stylesheet).toMatch(/\.fd-url \{[^}]*overflow-wrap: anywhere;/)
+    it('lets long names wrap and keeps the URL field inside its own column', () => {
         expect(stylesheet).toMatch(/\.fd-headline \{[^}]*overflow-wrap: anywhere;/)
-        expect(stylesheet).toMatch(/\.fd-url \{[^}]*min-inline-size: 0;/)
+        // The URL is a readonly <input>, which scrolls its value rather than
+        // wrapping it. What matters is that it cannot set the row's width: at
+        // 100% it is sized by its grid column instead of by its content.
+        expect(stylesheet).toMatch(/\.fd-url \{[^}]*inline-size: 100%;/)
+        expect(stylesheet).not.toMatch(/\.fd-url \{[^}]*min-inline-size: 0;/)
     })
 })
 
@@ -273,5 +374,160 @@ describe('progress presentation', () => {
         expect(stylesheet).toMatch(/\.fd-meter--unknown \{[^}]*repeating-linear-gradient\(/)
         expect(stylesheet).not.toContain('@keyframes')
         expect(stylesheet).not.toContain('animation:')
+    })
+})
+
+describe('the unrounded contrast proof', () => {
+    /*
+      The ratios DESIGN.md publishes are recomputed here from the tokens the
+      stylesheet actually declares, so a palette edit that quietly breaks a pair
+      fails at the assertion rather than at a reviewer's eye. The formula is
+      written out rather than imported: a proof that shares an implementation
+      with the thing it proves cannot fail.
+
+      "Placed together" means the views really put this foreground on this
+      background. `.fd-button--quiet` is what puts muted and error on elevated,
+      because it drops the surface fill every other control keeps; `.fd-trust`'s
+      marker is what puts warning there.
+    */
+
+    function channel(value: number): number {
+        const c = value / 255
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    }
+
+    function luminance(hex: string): number {
+        const digits = hex.replace('#', '')
+        return 0.2126 * channel(Number.parseInt(digits.slice(0, 2), 16)) +
+            0.7152 * channel(Number.parseInt(digits.slice(2, 4), 16)) +
+            0.0722 * channel(Number.parseInt(digits.slice(4, 6), 16))
+    }
+
+    function contrast(foreground: string, background: string): number {
+        const a = luminance(foreground)
+        const b = luminance(background)
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+    }
+
+    function declared(source: string): Record<string, string> {
+        const found: Record<string, string> = {}
+        for (const [, role, value] of source.matchAll(/--color-([a-z-]+):\s*(#[0-9A-Fa-f]{6});/g)) {
+            found[role] = value
+        }
+        return found
+    }
+
+    const lightTokens = declared(theme)
+    const darkTokens = {...lightTokens, ...declared(dark)}
+
+    const designSpine = readFileSync(
+        resolve(repositoryRoot, '_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-2026-08-23/DESIGN.md'),
+        'utf8',
+    )
+
+    /** [foreground, background, minimum ratio, published as an exact figure]. */
+    const placed: Array<[string, string, number, boolean]> = [
+        // Text: 4.5:1. Every one of these is body copy, a control label, or a
+        // heading at a size the AA large-text allowance does not reach.
+        ['text', 'canvas', 4.5, true],
+        ['text', 'surface', 4.5, true],
+        ['text', 'elevated', 4.5, true],
+        ['muted', 'canvas', 4.5, true],
+        ['muted', 'surface', 4.5, true],
+        ['muted', 'elevated', 4.5, true],
+        ['error', 'elevated', 4.5, true],
+        ['primary-ink', 'primary', 4.5, true],
+        // Status text on its own panel: published as a floor, checked below.
+        ['warning', 'surface', 4.5, false],
+        ['success', 'surface', 4.5, false],
+        ['error', 'surface', 4.5, false],
+
+        // Load-bearing non-text: 3:1, unrounded.
+        ['control-border', 'canvas', 3, true],
+        ['control-border', 'surface', 3, true],
+        ['control-border', 'elevated', 3, true],
+        ['progress', 'drop', 3, true],
+        ['primary', 'surface', 3, true],
+        ['primary', 'elevated', 3, true],
+        ['warning', 'elevated', 3, true],
+        ['focus', 'elevated', 3, true],
+        // Status rules and focus against the stronger surfaces are published as
+        // the weakest-adjacent claim rather than one row each.
+        ['warning', 'canvas', 3, false],
+        ['success', 'canvas', 3, false],
+        ['error', 'canvas', 3, false],
+        ['focus', 'canvas', 3, false],
+        ['focus', 'surface', 3, false],
+    ]
+
+    it.each(placed)('%s on %s clears its AA ratio in both authored modes', (foreground, background, minimum) => {
+        expect(lightTokens[foreground], foreground).toBeTruthy()
+        expect(lightTokens[background], background).toBeTruthy()
+
+        expect(contrast(lightTokens[foreground], lightTokens[background])).toBeGreaterThan(minimum)
+        expect(contrast(darkTokens[foreground], darkTokens[background])).toBeGreaterThan(minimum)
+    })
+
+    it('keeps the fixed QR substrate at its published ratio in both modes', () => {
+        const qr = contrast(lightTokens['qr-ink'], lightTokens['qr-surface'])
+
+        expect(designSpine).toContain(qr.toFixed(9))
+        expect(darkTokens['qr-ink']).toBe(lightTokens['qr-ink'])
+        expect(darkTokens['qr-surface']).toBe(lightTokens['qr-surface'])
+    })
+
+    it('publishes every figure it proves, unrounded, in DESIGN.md', () => {
+        for (const [foreground, background, , published] of placed) {
+            if (!published) continue
+            for (const tokens of [lightTokens, darkTokens]) {
+                const value = contrast(tokens[foreground], tokens[background]).toFixed(9)
+                expect(designSpine, `${foreground}/${background} = ${value}`).toContain(value)
+            }
+        }
+    })
+
+    it('keeps the floor DESIGN.md publishes instead of a row for status on its panel', () => {
+        expect(designSpine).toContain('exceed 5.14:1 light and 7.05:1 dark')
+
+        for (const status of ['warning', 'success', 'error']) {
+            expect(contrast(lightTokens[status], lightTokens['surface']), status).toBeGreaterThan(5.14)
+            expect(contrast(darkTokens[status], darkTokens['surface']), status).toBeGreaterThan(7.05)
+        }
+    })
+
+    it('keeps the weakest-of-three claim DESIGN.md makes for status rules on canvas', () => {
+        // An outcome panel's rule and the preflight's rule both meet canvas.
+        // One row for the weakest of the three is a claim about all of them,
+        // so the row has to stay the weakest as the palette moves.
+        for (const tokens of [lightTokens, darkTokens]) {
+            const weakest = Math.min(
+                ...['warning', 'success', 'error'].map((status) => contrast(tokens[status], tokens['canvas'])),
+            )
+            expect(designSpine).toContain(weakest.toFixed(9))
+        }
+    })
+
+    it('keeps the weakest-adjacent claim DESIGN.md makes for the focus indicator', () => {
+        const weakest = Math.min(
+            ...['canvas', 'surface', 'elevated'].map((surface) => contrast(lightTokens['focus'], lightTokens[surface])),
+        )
+
+        expect(weakest).toBe(contrast(lightTokens['focus'], lightTokens['elevated']))
+        expect(designSpine).toContain(weakest.toFixed(9))
+    })
+})
+
+describe('declared weight nothing uses', () => {
+    it('carries no animation library, since every animation one would serve is banned', () => {
+        const manifest = JSON.parse(readFileSync(resolve(projectRoot, 'package.json'), 'utf8')) as {
+            dependencies: Record<string, string>
+        }
+
+        expect(Object.keys(manifest.dependencies).sort()).toEqual(['react', 'react-dom'])
+        expect(JSON.stringify(manifest)).not.toContain('framer-motion')
+    })
+
+    it('bundles no font file, because the spine allows system-safe stacks only', () => {
+        expect(existsSync(resolve(projectRoot, 'src/assets/fonts'))).toBe(false)
     })
 })

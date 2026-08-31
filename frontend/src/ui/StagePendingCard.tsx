@@ -32,13 +32,23 @@ export function StagePendingCard({state, onCancel}: StagePendingCardProps) {
                     <span className="fd-packet-tab">{folder ? copy.label.folder : copy.label.file}</span>
                 )}
                 <section className="fd-pending-card">
-                    <h1 className="fd-state-heading" tabIndex={-1}>
+                    <h1 className="fd-state-heading" tabIndex={-1} data-focus-target="pending-heading">
                         {folder ? copy.stage.pending.folder : copy.stage.pending.file}
                     </h1>
+                    {/*
+                      A pending cancellation keeps this control focused and
+                      answers a second activation with nothing. `aria-disabled`
+                      rather than `disabled`: a disabled button loses focus, and
+                      the spine requires the control to keep it while the
+                      command is outstanding.
+                    */}
                     <button
                         type="button"
                         className="fd-button fd-button--quiet fd-target"
-                        onClick={onCancel}
+                        aria-disabled={state.cancelPending || undefined}
+                        onClick={() => {
+                            if (!state.cancelPending) onCancel()
+                        }}
                     >
                         {state.cancelPending ? copy.cancel.preparationPending : copy.cancel.preparation}
                     </button>

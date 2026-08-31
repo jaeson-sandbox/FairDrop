@@ -1,10 +1,30 @@
 import type {OutcomePresentation} from '../transfer/selectors'
+import type {FocusTarget} from './announce'
 import {copy, errorHeadings, errorMessages} from './copy'
 
 interface OutcomePanelProps {
     readonly outcome: OutcomePresentation
-    /** Heading rank. Terminal phases own the document heading; nested panels do not. */
+    /** Heading rank. The lifecycle outcome owns a document heading; nested panels do not. */
     readonly level?: 1 | 2
+    /**
+     * Whether this panel is the phase's own view.
+     *
+     * Separate from `level` because the retained node keeps the terminal
+     * panel's heading rank -- reset must not change what the user is looking at
+     * -- while the phase view moves to Idle underneath it.
+     */
+    readonly phaseView?: boolean
+    /**
+     * The routing-table target this panel answers to, when it is one.
+     *
+     * The lifecycle panel and a command-failure panel are different rows of the
+     * table and carry different targets, which is what lets Idle show a
+     * retained outcome and a fresh failure at once without the failure's focus
+     * landing on the wrong one. The lifecycle panel keeps its target across a
+     * reset even though no row targets it in Idle: focus is still sitting on
+     * it, and removing the attribute would take its focus ring with it.
+     */
+    readonly focusTarget?: FocusTarget
     readonly onDismiss?: () => void
 }
 
@@ -20,18 +40,29 @@ interface OutcomePanelProps {
  * value handed in. The reducer already replaces every incoming message with
  * registry copy; taking the code as the only input makes that structural, so a
  * message that somehow arrived from an adapter still cannot reach the screen.
+ *
+ * There is no `role="alert"` here, in any form. Every path that shows this
+ * panel is a focus-owned row of the routing table, and the spine allows an
+ * alert only on a path that does not also move focus.
  */
-export function OutcomePanel({outcome, level = 2, onDismiss}: OutcomePanelProps) {
+export function OutcomePanel({
+    outcome,
+    level = 2,
+    phaseView = false,
+    focusTarget,
+    onDismiss,
+}: OutcomePanelProps) {
     const done = outcome.kind === 'done'
     const Heading = level === 1 ? 'h1' : 'h2'
 
     return (
         <section
             className={`fd-outcome ${done ? 'fd-outcome--done' : 'fd-outcome--error'}`}
-            data-phase-view={level === 1 ? 'outcome' : undefined}
+            data-phase-view={phaseView ? 'outcome' : undefined}
             data-outcome={outcome.kind}
             data-retained={String(outcome.retained)}
             data-error-code={done ? undefined : outcome.error.code}
+            data-focus-target={focusTarget}
             tabIndex={-1}
         >
             <span className="fd-outcome__icon" aria-hidden="true">{done ? '✓' : '!'}</span>

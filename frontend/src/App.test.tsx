@@ -1,4 +1,5 @@
 import {StrictMode, act} from 'react'
+import type {ReactElement} from 'react'
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import App from './App'
@@ -7,6 +8,7 @@ import type {TransferState} from './transfer/state'
 const mocks = vi.hoisted(() => ({
     onFileDrop: vi.fn(),
     onFileDropOff: vi.fn(),
+    copyToClipboard: vi.fn(),
     useTransfer: vi.fn(),
     stage: vi.fn(),
     selectFile: vi.fn(),
@@ -23,6 +25,10 @@ vi.mock('../wailsjs/runtime/runtime', () => ({
 
 vi.mock('./transfer/useTransfer', () => ({
     useTransfer: mocks.useTransfer,
+}))
+
+vi.mock('../wailsjs/go/main/App', () => ({
+    CopyToClipboard: mocks.copyToClipboard,
 }))
 
 function zone(): HTMLElement | null {
@@ -54,6 +60,7 @@ beforeEach(() => {
     mocks.cancel.mockResolvedValue(undefined)
     mocks.selectFile.mockResolvedValue(undefined)
     mocks.selectDirectory.mockResolvedValue(undefined)
+    mocks.copyToClipboard.mockResolvedValue(undefined)
     mocks.useTransfer.mockReturnValue({
         state: {phase: 'idle', retainedOutcome: null, commandError: null},
         stage: mocks.stage,
@@ -298,5 +305,396 @@ describe('controller wiring', () => {
 
         fireEvent.click(screen.getByRole('button', {name}))
         expect(mocks.cancel).toHaveBeenCalledTimes(1)
+    })
+})
+
+/*
+  The routing table, driven through the real views.
+
+  `announce.test.ts` proves which owner each transition gets; these prove the
+  App obeys the answer -- that the focus move lands on a node that is really
+  there, and that the other mechanism is provably silent on the same transition.
+*/
+
+function controllerFor(state: TransferState) {
+    return {
+        state,
+        stage: mocks.stage,
+        selectFile: mocks.selectFile,
+        selectDirectory: mocks.selectDirectory,
+        cancel: mocks.cancel,
+        rejectSelection: mocks.rejectSelection,
+        dismissRetained: mocks.dismissRetained,
+    }
+}
+
+function transitionTo(view: {rerender: (ui: ReactElement) => void}, state: TransferState) {
+    mocks.useTransfer.mockReturnValue(controllerFor(state))
+    act(() => view.rerender(<App/>))
+}
+
+function announcer(): HTMLElement {
+    return document.querySelector('[role="status"]') as HTMLElement
+}
+
+function focused(): string | null {
+    return (document.activeElement as HTMLElement | null)?.getAttribute('data-focus-target') ?? null
+}
+
+const idleState: TransferState = {phase: 'idle', retainedOutcome: null, commandError: null}
+const pendingState: TransferState = {phase: 'pending', generation: 1, itemKind: 'file', cancelPending: false}
+const stagedState: TransferState = {
+    phase: 'staged',
+    session: {sessionId, lastSeq: 0},
+    metadata,
+    cancelPending: false,
+    commandError: null,
+}
+const transferringState: TransferState = {
+    phase: 'transferring',
+    session: {sessionId, lastSeq: 1},
+    metadata,
+    progress: null,
+    cancelPending: false,
+    commandError: null,
+}
+const doneState: TransferState = {phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done'}}
+
+const discoveryWarning = 'Device discovery isn’t available. The QR code and download link still work.'
+
+function warned(): TransferState {
+    return {
+        ...stagedState,
+        metadata: {...metadata, warnings: [{code: 'beacon_warning', message: discoveryWarning}]},
+    } as TransferState
+}
+
+function progressAt(bytesSent: number, percent: number): TransferState {
+    return {
+        ...transferringState,
+        progress: {bytesSent, totalBytes: 100_000_000, totalKnown: true, percent, speedBytesPerSec: 12_400_000},
+    } as TransferState
+}
+
+describe('focus-owned transitions', () => {
+    const focusRows: Array<[string, TransferState, TransferState, string]> = [
+        ['Stage pending', idleState, pendingState, 'pending-heading'],
+        ['Stage success', pendingState, stagedState, 'staged-heading'],
+        ['transfer-started', stagedState, transferringState, 'transferring-heading'],
+        ['Complete', transferringState, doneState, 'outcome'],
+        [
+            'Terminal Error',
+            transferringState,
+            {
+                phase: 'error',
+                session: {sessionId, lastSeq: 4},
+                outcome: {kind: 'error', error: {code: 'transfer_failed', message: 'ignored'}},
+            },
+            'outcome',
+        ],
+        [
+            'Validation failure',
+            idleState,
+            {
+                phase: 'idle',
+                retainedOutcome: null,
+                commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+            },
+            'command-error',
+        ],
+        [
+            'Cancel-winning reset',
+            {...stagedState, cancelPending: true} as TransferState,
+            idleState,
+            'cancel-summary',
+        ],
+        [
+            'Dismiss retained outcome',
+            {phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null},
+            idleState,
+            'idle-instruction',
+        ],
+    ]
+
+    it.each(focusRows)('moves focus once for %s and leaves the announcer silent', (_name, from, to, target) => {
+        const view = mountWith(from)
+
+        transitionTo(view, to)
+
+        expect(focused()).toBe(target)
+        expect(announcer().textContent).toBe('')
+    })
+
+    it('shows the cancellation summary it focuses, and never as an Error', () => {
+        const view = mountWith({...stagedState, cancelPending: true} as TransferState)
+
+        transitionTo(view, idleState)
+
+        expect(document.activeElement?.textContent).toBe('Transfer canceled. Ready for another file or folder.')
+        expect(document.querySelector('.fd-outcome')).toBeNull()
+        expect(document.querySelector('[role="alert"]')).toBeNull()
+    })
+})
+
+describe('announcer-owned transitions', () => {
+    const spokenRows: Array<[string, TransferState, TransferState, string]> = [
+        [
+            'Cancel requested during preparation',
+            pendingState,
+            {...pendingState, cancelPending: true} as TransferState,
+            'Canceling preparation…',
+        ],
+        [
+            'Cancel requested from Staged',
+            stagedState,
+            {...stagedState, cancelPending: true} as TransferState,
+            'Canceling…',
+        ],
+        ['beacon_warning', stagedState, warned(), discoveryWarning],
+    ]
+
+    it.each(spokenRows)('replaces the announcer for %s and moves no focus', (_name, from, to, text) => {
+        const view = mountWith(from)
+        const before = document.activeElement
+
+        transitionTo(view, to)
+
+        expect(announcer().textContent).toBe(text)
+        expect(document.activeElement).toBe(before)
+    })
+
+    it('keeps the pending cancel control focused while its announcement is made', () => {
+        const view = mountWith(stagedState)
+        const cancel = screen.getByRole('button', {name: 'Cancel'})
+        cancel.focus()
+
+        transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
+
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling…'}))
+        expect(announcer().textContent).toBe('Canceling…')
+    })
+
+    it('replaces the announcer rather than appending to it', () => {
+        const view = mountWith(stagedState)
+
+        transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
+        expect(announcer().textContent).toBe('Canceling…')
+
+        transitionTo(view, {...warned(), cancelPending: true} as TransferState)
+
+        expect(announcer().childElementCount).toBe(0)
+        expect(announcer().textContent).toBe(discoveryWarning)
+    })
+
+    it('reports a copy success without moving focus or changing the lifecycle', async () => {
+        mountWith(stagedState)
+        const copy = screen.getByRole('button', {name: 'Copy download link'})
+        copy.focus()
+
+        await act(async () => {
+            fireEvent.click(copy)
+        })
+
+        expect(announcer().textContent).toBe('Copied')
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Copied'}))
+        expect(screen.getByRole('main').getAttribute('data-transfer-phase')).toBe('staged')
+    })
+
+    it('empties the announcer again on the next focus-owned transition', () => {
+        const view = mountWith(stagedState)
+        transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
+        expect(announcer().textContent).toBe('Canceling…')
+
+        transitionTo(view, {...transferringState, cancelPending: true} as TransferState)
+
+        expect(announcer().textContent).toBe('')
+        expect(focused()).toBe('transferring-heading')
+    })
+})
+
+describe('reset after a terminal outcome', () => {
+    it('keeps the same node, keeps focus inside it, and says nothing', () => {
+        const view = mountWith(transferringState)
+        transitionTo(view, doneState)
+
+        const panel = document.activeElement
+        expect(panel).toBe(document.querySelector('[data-outcome="done"]'))
+
+        transitionTo(view, {phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null})
+
+        // The identical DOM node, still focused: reset is the one row whose
+        // owner is None, so neither mechanism may fire and focus may not move.
+        expect(document.querySelector('[data-outcome="done"]')).toBe(panel)
+        expect(document.activeElement).toBe(panel)
+        expect(announcer().textContent).toBe('')
+        // Idle is now the phase view underneath the retained node.
+        expect(phaseViews()).toEqual(['idle'])
+        expect(screen.getByRole('button', {name: 'Dismiss'})).toBeTruthy()
+    })
+
+    it('keeps the retained failure on the fixed table with a Dismiss control', () => {
+        mountWith({
+            phase: 'idle',
+            retainedOutcome: {kind: 'error', error: {code: 'transfer_failed', message: 'ignored'}},
+            commandError: null,
+        })
+
+        expect(screen.getByRole('heading', {name: 'Transfer stopped'})).toBeTruthy()
+        expect(screen.getByText('The transfer stopped before FairDrop finished sending. ' +
+            'Check the local network and create a fresh link.')).toBeTruthy()
+        fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
+        expect(mocks.dismissRetained).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows the retained node above a newer command failure, and both at once', () => {
+        mountWith({
+            phase: 'idle',
+            retainedOutcome: {kind: 'done'},
+            commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+        })
+
+        const panels = [...document.querySelectorAll('.fd-outcome')]
+        expect(panels).toHaveLength(2)
+        expect(panels[0].getAttribute('data-retained')).toBe('true')
+        expect(panels[1].getAttribute('data-error-code')).toBe('invalid_selection')
+    })
+})
+
+describe('assistive progress speech', () => {
+    it('speaks once at the first accepted snapshot without moving focus', () => {
+        const view = mountWith(transferringState)
+        const before = document.activeElement
+
+        transitionTo(view, progressAt(1_000_000, 1))
+
+        expect(announcer().textContent).toBe('1.0 MB of 100.0 MB · 1%')
+        expect(document.activeElement).toBe(before)
+    })
+
+    it('repaints the meter on every snapshot while staying silent between updates', () => {
+        vi.useFakeTimers()
+        try {
+            const view = mountWith(transferringState)
+            transitionTo(view, progressAt(1_000_000, 1))
+
+            vi.advanceTimersByTime(1_000)
+            transitionTo(view, progressAt(40_000_000, 40))
+
+            // The visual meter followed the snapshot; the announcer did not.
+            expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('40')
+            expect(announcer().textContent).toBe('1.0 MB of 100.0 MB · 1%')
+
+            vi.advanceTimersByTime(5_000)
+            transitionTo(view, progressAt(60_000_000, 60))
+
+            expect(announcer().textContent).toBe('60.0 MB of 100.0 MB · 60%')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('is cancelled by a terminal outcome, which owns the transition itself', () => {
+        vi.useFakeTimers()
+        try {
+            const view = mountWith(transferringState)
+            transitionTo(view, progressAt(1_000_000, 1))
+            vi.advanceTimersByTime(60_000)
+
+            transitionTo(view, doneState)
+
+            expect(announcer().textContent).toBe('')
+            expect(focused()).toBe('outcome')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('never speaks throughput, however many snapshots arrive', () => {
+        vi.useFakeTimers()
+        try {
+            const view = mountWith(transferringState)
+            for (let step = 1; step <= 9; step += 1) {
+                vi.advanceTimersByTime(6_000)
+                transitionTo(view, progressAt(step * 11_000_000, step * 11))
+            }
+
+            expect(announcer().textContent).not.toContain('/s')
+            expect(announcer().textContent).not.toContain('12.4 MB')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+})
+
+describe('progress speech across two transfers', () => {
+    it('starts again at the first snapshot of the next transfer, whatever the last one left behind', () => {
+        // The throttle's memory is dropped the moment the phase stops being
+        // Transferring. Without that, a second transfer beginning within five
+        // seconds of the first one's last update inherits its thresholds and
+        // says nothing at all at its start -- the one update that is never
+        // throttled.
+        vi.useFakeTimers()
+        try {
+            const view = mountWith(transferringState)
+            transitionTo(view, progressAt(1_000_000, 1))
+            expect(announcer().textContent).toBe('1.0 MB of 100.0 MB · 1%')
+
+            transitionTo(view, doneState)
+            transitionTo(view, {phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null})
+            transitionTo(view, stagedState)
+            transitionTo(view, transferringState)
+
+            // One second later, one percentage point on, one megabyte on: below
+            // both thresholds, and still the first update of a new transfer.
+            vi.advanceTimersByTime(1_000)
+            transitionTo(view, progressAt(2_000_000, 2))
+
+            expect(announcer().textContent).toBe('2.0 MB of 100.0 MB · 2%')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+})
+
+describe('the routing table under StrictMode effect replay', () => {
+    // main.tsx wraps App in StrictMode, so every effect runs mount, cleanup,
+    // mount in development. The routing effect has no dependency array and no
+    // cleanup: what stops it re-announcing is the previous-state ref it writes
+    // before it does anything else.
+    function strictly(state: TransferState) {
+        mocks.useTransfer.mockReturnValue(controllerFor(state))
+        return render(<StrictMode><App/></StrictMode>)
+    }
+
+    function strictTransitionTo(view: {rerender: (ui: ReactElement) => void}, state: TransferState) {
+        mocks.useTransfer.mockReturnValue(controllerFor(state))
+        act(() => view.rerender(<StrictMode><App/></StrictMode>))
+    }
+
+    it('announces nothing and moves no focus on the first mount', () => {
+        strictly(idleState)
+
+        expect(announcer().textContent).toBe('')
+        expect(focused()).toBeNull()
+    })
+
+    it('still makes exactly one focus move for a focus-owned transition', () => {
+        const view = strictly(idleState)
+
+        strictTransitionTo(view, pendingState)
+
+        expect(focused()).toBe('pending-heading')
+        expect(announcer().textContent).toBe('')
+    })
+
+    it('still leaves focus alone for an announcer-owned transition', () => {
+        const view = strictly(stagedState)
+        const cancel = screen.getByRole('button', {name: 'Cancel'})
+        cancel.focus()
+
+        strictTransitionTo(view, {...stagedState, cancelPending: true} as TransferState)
+
+        expect(announcer().textContent).toBe('Canceling…')
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling…'}))
     })
 })
