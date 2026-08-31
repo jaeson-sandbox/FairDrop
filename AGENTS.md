@@ -58,6 +58,10 @@ live in `_bmad-output/implementation-artifacts/`.
   track `--color-canvas` in `frontend/src/style.css` or every launch flashes.
 - The clipboard goes through the bound `CopyToClipboard` command, never
   `navigator.clipboard` — see the secure-context pitfall below.
+- Every entry in `_bmad-output/implementation-artifacts/deferred-work.md` carries an
+  `owner:` — a story key from `sprint-status.yaml`, or `discharged`/`accepted`.
+  `TestEveryDeferredEntryHasALiveOwner` fails without one, so a finding cannot stop
+  being someone's problem by being written down.
 
 ## Known pitfalls
 

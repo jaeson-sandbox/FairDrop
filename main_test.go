@@ -224,3 +224,72 @@ func TestFormatCommandErrorIsTotal(t *testing.T) {
 		t.Errorf("formatCommandError(nil) = %s, want the fixed fallback", got)
 	}
 }
+
+// Deferred work is where this project puts a real finding it is not fixing yet,
+// and prose alone let those findings stop being anyone's problem: entries named
+// an owning story inside their evidence text, or named none at all, and nothing
+// noticed. Every entry now carries an owner, and this fails if one is missing or
+// names a story that does not exist -- including a story key renamed in
+// sprint-status.yaml without the entries that point at it.
+func TestEveryDeferredEntryHasALiveOwner(t *testing.T) {
+	artifacts := filepath.Join("_bmad-output", "implementation-artifacts")
+
+	deferred, err := os.ReadFile(filepath.Join(artifacts, "deferred-work.md"))
+	if err != nil {
+		t.Fatalf("read deferred-work.md: %v", err)
+	}
+	sprint, err := os.ReadFile(filepath.Join(artifacts, "sprint-status.yaml"))
+	if err != nil {
+		t.Fatalf("read sprint-status.yaml: %v", err)
+	}
+
+	// Story keys are the indented `key: status` lines inside development_status,
+	// and only those: reading every indented line in the file would let an
+	// unrelated key satisfy an owner, and would leave the vacuity guard below
+	// unable to fire when the block itself is renamed away.
+	stories := map[string]bool{}
+	inBlock := false
+	for _, line := range strings.Split(strings.ReplaceAll(string(sprint), "\r\n", "\n"), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(line, " ") && trimmed != "" {
+			inBlock = trimmed == "development_status:"
+			continue
+		}
+		if !inBlock || trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		key, _, found := strings.Cut(trimmed, ":")
+		if found && key != "" {
+			stories[key] = true
+		}
+	}
+	if len(stories) == 0 {
+		t.Fatal("no story keys parsed from sprint-status.yaml, so this test would pass vacuously")
+	}
+
+	var summaries, owners int
+	for _, line := range strings.Split(strings.ReplaceAll(string(deferred), "\r\n", "\n"), "\n") {
+		switch {
+		case strings.HasPrefix(line, "  summary:"):
+			summaries++
+		case strings.HasPrefix(line, "  owner:"):
+			owners++
+			owner := strings.TrimSpace(strings.TrimPrefix(line, "  owner:"))
+			switch {
+			case owner == "discharged" || owner == "accepted":
+			case stories[owner]:
+			default:
+				t.Errorf("deferred entry %d is owned by %q, which is not a sprint-status story: "+
+					"the finding has no story that will resolve it", owners, owner)
+			}
+		}
+	}
+
+	if summaries == 0 {
+		t.Fatal("no deferred entries parsed, so this test would pass vacuously")
+	}
+	if summaries != owners {
+		t.Errorf("%d deferred entries carry %d owners: %d finding(s) belong to nobody",
+			summaries, owners, summaries-owners)
+	}
+}
