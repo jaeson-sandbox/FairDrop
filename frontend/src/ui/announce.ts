@@ -111,6 +111,12 @@ export function routeTransition(previous: TransferState, next: TransferState): A
 
         case 'idle':
             return toIdle(previous, next)
+
+        default:
+            // Unreachable while the reducer owns the union. Returning null
+            // rather than falling off the end keeps a state this build cannot
+            // name from throwing out of the caller's effect.
+            return null
     }
 }
 

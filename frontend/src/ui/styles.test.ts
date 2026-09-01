@@ -32,7 +32,14 @@ const theme = block('@theme {')
 const dark = block('@media (prefers-color-scheme: dark) {')
 const forcedColors = block('@media (forced-colors: active) {')
 const reducedMotion = block('@media (prefers-reduced-motion: reduce) {')
-const componentRules = stylesheet.replace(theme, '').replace(dark, '').replace(forcedColors, '')
+const componentRules = stylesheet
+    .replace(theme, '')
+    .replace(dark, '')
+    .replace(forcedColors, '')
+    // Reduced motion belongs out too: its universal-selector rules are not
+    // component rules, and leaving them in let them satisfy assertions about
+    // what components declare.
+    .replace(reducedMotion, '')
 
 describe('the Terracotta Linen token layer', () => {
     it('declares every authored light value as a Tailwind v4 theme variable', () => {
@@ -300,11 +307,19 @@ describe('reflow to 320 CSS pixels', () => {
 
     it('lets long names wrap and keeps the URL field inside its own column', () => {
         expect(stylesheet).toMatch(/\.fd-headline \{[^}]*overflow-wrap: anywhere;/)
-        // The URL is a readonly <input>, which scrolls its value rather than
-        // wrapping it. What matters is that it cannot set the row's width: at
-        // 100% it is sized by its grid column instead of by its content.
+
+        /*
+          `inline-size: 100%` is not enough on its own, and the predecessor of
+          this test asserted the opposite. A grid item's `min-inline-size`
+          defaults to `auto`, which resolves to its content-based minimum, and
+          an input's is its intrinsic size -- roughly twenty characters. The
+          percentage sets the preferred size; the automatic minimum is what
+          stops the column shrinking, so without `min-inline-size: 0` the URL
+          field forces a page-level horizontal scrollbar at 320px. The <div>
+          this replaced carried the same declaration for the same reason.
+        */
         expect(stylesheet).toMatch(/\.fd-url \{[^}]*inline-size: 100%;/)
-        expect(stylesheet).not.toMatch(/\.fd-url \{[^}]*min-inline-size: 0;/)
+        expect(stylesheet).toMatch(/\.fd-url \{[^}]*min-inline-size: 0;/)
     })
 })
 

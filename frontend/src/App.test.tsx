@@ -482,8 +482,45 @@ describe('announcer-owned transitions', () => {
 
         transitionTo(view, {...warned(), cancelPending: true} as TransferState)
 
-        expect(announcer().childElementCount).toBe(0)
+        // Replaced, not accumulated. The region holds one keyed node whose
+        // identity changes per announcement -- that node swap is what makes a
+        // repeated message audible a second time, since a polite region is only
+        // re-read when its content actually changes. What the contract forbids
+        // is an event log, so the count must stay at one and the text must be
+        // the newest message alone.
+        expect(announcer().childElementCount).toBe(1)
         expect(announcer().textContent).toBe(discoveryWarning)
+    })
+
+    it('does not announce a copy result once its own view is gone', async () => {
+        const view = mountWith(stagedState)
+        let resolveCopy!: () => void
+        mocks.copyToClipboard.mockReturnValue(new Promise<void>((resolve) => { resolveCopy = resolve }))
+
+        fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        // The transfer starts while the clipboard command is still in flight.
+        // That transition is focus-owned; announcing the copy as well would
+        // give one moment two owners, which is the rule this story enforces.
+        transitionTo(view, transferringState)
+        await act(async () => { resolveCopy() })
+
+        expect(announcer().textContent).toBe('')
+    })
+
+    it('re-announces a repeated message instead of going silent', async () => {
+        mountWith(stagedState)
+        const copy = screen.getByRole('button', {name: 'Copy download link'})
+
+        await act(async () => { fireEvent.click(copy) })
+        const first = announcer().firstElementChild
+        expect(announcer().textContent).toBe('Copied')
+
+        await act(async () => { fireEvent.click(copy) })
+
+        // Same words both times: without a node swap the live region observes
+        // no change and the second copy is announced to nobody.
+        expect(announcer().textContent).toBe('Copied')
+        expect(announcer().firstElementChild).not.toBe(first)
     })
 
     it('reports a copy success without moving focus or changing the lifecycle', async () => {

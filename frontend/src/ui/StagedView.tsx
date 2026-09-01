@@ -135,6 +135,7 @@ export function StagedView({state, onCancel, onAnnounce}: StagedViewProps) {
                                         readOnly
                                         value={metadata.url}
                                         aria-labelledby="fd-direct-link-heading"
+                                        onFocus={(event) => event.currentTarget.select()}
                                     />
                                     <button
                                         type="button"

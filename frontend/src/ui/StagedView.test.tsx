@@ -147,6 +147,19 @@ describe('the direct URL row', () => {
         expect(reported.filter((entry) => String(entry).includes('same key'))).toEqual([])
     })
 
+    it('selects the whole capability URL on focus, as the manual fallback', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+        const field = screen.getByRole('textbox') as HTMLInputElement
+        const select = vi.spyOn(field, 'select')
+
+        fireEvent.focus(field)
+
+        // The <div> this replaced carried `user-select: all`, so one click took
+        // the whole URL. An input has no such behaviour, and this is the path a
+        // user needs when the clipboard command fails.
+        expect(select).toHaveBeenCalledTimes(1)
+    })
+
     it('carries the direct-link helper beside the action', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 

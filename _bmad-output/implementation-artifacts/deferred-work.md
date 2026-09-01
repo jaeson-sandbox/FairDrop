@@ -393,3 +393,18 @@ being anyone's problem.
   summary: The accessibility floor is proved against the stylesheet and the DOM, never against a rendered layout or a real screen reader.
   owner: 3-2-automate-reproducible-cross-platform-verification
   evidence: jsdom performs no layout and evaluates no media query, so 320-pixel reflow, the 44px target floor, 200% text, forced colors and reduced motion are all asserted as stylesheet text; and no automated check can hear what a screen reader says. The routing table, the throttle and every focus target are unit-proved, but "each transition is announced exactly once" is ultimately an observation about NVDA or VoiceOver. The spec's own manual checks -- one keyboard-only transfer with a screen reader running, and Staged at 320 CSS pixels with 200% text and forced colors on -- are still owed, and belong with the release evidence rather than in a story that cannot run them.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: `go test ./...` failed once in `internal/transfer` on 2026-09-01 during the Story 1.10 gate, then did not reproduce in 40 in-process iterations plus 12 separate processes. The failure detail was lost because the command piped through `tail -3`, which discarded everything above the summary -- a gate that hides the evidence it exists to surface. Story 1.6 fixed a 1-in-40 flake in this same package, so a second one is plausible rather than hypothetical. Verification should run the suite without swallowing output and should keep failing runs.
+  summary: A single unreproduced failure in `internal/transfer`, whose evidence the gate discarded.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: Only the edge-case layer completed for Story 1.10; Blind Hunter and the verification-gap layer both terminated on a session rate limit. Blind Hunter is the layer that looks for what is missing rather than what is wrong, and it is the one that found the unexecuted `appObserver` in 1.7 and the blank-window test in 1.9. Story 1.10 closes Epic 1 and its own acceptance criteria are the epic's accessibility gate, so the thinnest review in the epic sits on its most cross-cutting story. Re-running the two layers against `f7338af..HEAD` costs nothing but time.
+  summary: Story 1.10 was reviewed by one adversarial layer instead of three, because a rate limit killed the other two.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  owner: accepted
+  evidence: A discovery warning arrives inside the successful Stage metadata, so it lands on the Stage-success transition, whose owner is the focused heading -- and one transition never gets two owners. The `beacon-warning` row is implemented and tested at the routing-table level but cannot fire in production. Closing it properly needs a lifecycle event emitted after STAGED, which is a contracts change rather than a frontend one. Recorded so the row is not later mistaken for dead code and deleted.
+  summary: The `beacon_warning` announcer row is unreachable, because the warning arrives with the metadata rather than after it.

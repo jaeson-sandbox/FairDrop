@@ -24,7 +24,7 @@ function App() {
 
     // The announcer's whole content. Replaced, never appended: an atomic polite
     // region that accumulated text would be the event log the spine forbids.
-    const [announcement, setAnnouncement] = useState('')
+    const [announcement, setAnnouncement] = useState({text: '', nonce: 0})
 
     // A cancel-winning reset lands on plain Idle, which is also the state the
     // app starts in, so the summary cannot be derived from the reducer. The
@@ -76,13 +76,13 @@ function App() {
         }
 
         if (routed.owner === 'announcer') {
-            setAnnouncement(routed.text)
+            announce(routed.text)
             return
         }
 
         // A focus-owned transition is announced by the focus move alone, so the
         // announcer is emptied rather than left holding an older message.
-        setAnnouncement('')
+        announce('')
         setFocusRequest({target: routed.target})
     })
 
@@ -109,7 +109,31 @@ function App() {
         if (speech === null) return
 
         speechRef.current = speech.memory
-        setAnnouncement(speech.text)
+        announce(speech.text)
+    }
+
+    /*
+      Announcing twice with the same words has to be audible twice.
+
+      A polite region is re-read when its content changes, and setting identical
+      text changes nothing -- so copying the link a second time was silent. The
+      nonce keys the child below, which makes React replace the node rather than
+      leave it alone, and the region is re-read.
+    */
+    function announce(text: string): void {
+        setAnnouncement((previous) => ({text, nonce: previous.nonce + 1}))
+    }
+
+    /*
+      The copy confirmation is announcer-owned, and a lifecycle transition that
+      lands while the clipboard command is still in flight is focus-owned. Both
+      firing would give one moment two owners, which is the rule this story
+      exists to keep. The command's result is only ever announced while its own
+      view is still the one on screen.
+    */
+    function announceFromStaged(text: string): void {
+        if (previousStateRef.current.phase !== 'staged') return
+        announce(text)
     }
 
     /*
@@ -138,9 +162,9 @@ function App() {
                     onDismiss={outcome.retained ? transfer.dismissRetained : undefined}
                 />
             )}
-            {phaseBody(transfer, cancelWon, setAnnouncement)}
+            {phaseBody(transfer, cancelWon, announceFromStaged)}
             <div className="fd-status-announcer" role="status" aria-live="polite" aria-atomic="true">
-                {announcement}
+                <span key={announcement.nonce}>{announcement.text}</span>
             </div>
         </main>
     )

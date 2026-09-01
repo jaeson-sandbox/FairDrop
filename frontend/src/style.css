@@ -547,6 +547,13 @@ body {
 */
 .fd-url {
     inline-size: 100%;
+    /*
+      Required, not decorative: an input has an intrinsic minimum size, so as a
+      grid item it refuses to shrink below roughly twenty characters and forces
+      a page-level horizontal scrollbar at the 320px reflow floor. The div this
+      replaced carried the same declaration.
+    */
+    min-inline-size: 0;
     padding: var(--spacing-3);
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-sm);
