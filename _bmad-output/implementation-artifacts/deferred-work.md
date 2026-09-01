@@ -2,8 +2,11 @@
 
 Real findings surfaced during review that are not the current story's problem.
 Append-only. Each entry names the spec that surfaced it and the `owner:` that will
-resolve it -- a story key from `sprint-status.yaml`, or `discharged` (already
-resolved by a later story) or `accepted` (reviewed and deliberately left alone).
+resolve it. An owner is a story key from `sprint-status.yaml`, or one of two
+closed states: `discharged` (a later story resolved it -- the banners above say
+which) or `accepted` (reviewed, and deliberately left as it is, with the reason
+in the evidence). An entry closed either way keeps its original evidence text,
+so read the owner before reading the evidence as open work.
 `TestEveryDeferredEntryHasALiveOwner` in `main_test.go` fails if an entry has no
 owner or names a story that does not exist, so a finding cannot quietly stop
 being anyone's problem.
@@ -396,15 +399,35 @@ being anyone's problem.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
   owner: 3-2-automate-reproducible-cross-platform-verification
-  evidence: `go test ./...` failed once in `internal/transfer` on 2026-09-01 during the Story 1.10 gate, then did not reproduce in 40 in-process iterations plus 12 separate processes. The failure detail was lost because the command piped through `tail -3`, which discarded everything above the summary -- a gate that hides the evidence it exists to surface. Story 1.6 fixed a 1-in-40 flake in this same package, so a second one is plausible rather than hypothetical. Verification should run the suite without swallowing output and should keep failing runs.
   summary: A single unreproduced failure in `internal/transfer`, whose evidence the gate discarded.
+  evidence: `go test ./...` failed once in `internal/transfer` on 2026-09-01 during the Story 1.10 gate, then did not reproduce in 40 in-process iterations plus 12 separate processes. The failure detail was lost because the command piped through `tail -3`, which discarded everything above the summary -- a gate that hides the evidence it exists to surface. Story 1.6 fixed a 1-in-40 flake in this same package, so a second one is plausible rather than hypothetical. Verification should run the suite without swallowing output and should keep failing runs.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
   owner: 3-2-automate-reproducible-cross-platform-verification
-  evidence: Only the edge-case layer completed for Story 1.10; Blind Hunter and the verification-gap layer both terminated on a session rate limit. Blind Hunter is the layer that looks for what is missing rather than what is wrong, and it is the one that found the unexecuted `appObserver` in 1.7 and the blank-window test in 1.9. Story 1.10 closes Epic 1 and its own acceptance criteria are the epic's accessibility gate, so the thinnest review in the epic sits on its most cross-cutting story. Re-running the two layers against `f7338af..HEAD` costs nothing but time.
   summary: Story 1.10 was reviewed by one adversarial layer instead of three, because a rate limit killed the other two.
+  evidence: Only the edge-case layer completed for Story 1.10; Blind Hunter and the verification-gap layer both terminated on a session rate limit. Blind Hunter is the layer that looks for what is missing rather than what is wrong, and it is the one that found the unexecuted `appObserver` in 1.7 and the blank-window test in 1.9. Story 1.10 closes Epic 1 and its own acceptance criteria are the epic's accessibility gate, so the thinnest review in the epic sits on its most cross-cutting story. Re-running the two layers against `f7338af..HEAD` costs nothing but time.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
-  owner: accepted
-  evidence: A discovery warning arrives inside the successful Stage metadata, so it lands on the Stage-success transition, whose owner is the focused heading -- and one transition never gets two owners. The `beacon-warning` row is implemented and tested at the routing-table level but cannot fire in production. Closing it properly needs a lifecycle event emitted after STAGED, which is a contracts change rather than a frontend one. Recorded so the row is not later mistaken for dead code and deleted.
-  summary: The `beacon_warning` announcer row is unreachable, because the warning arrives with the metadata rather than after it.
+  summary: The recovery panel is an unlabelled `div` that shows both platforms' guidance to every user, and Idle now carries four firewall paragraphs.
+  owner: 1-10-meet-the-accessibility-and-recovery-contract
+  evidence: `RecoveryHelp` is reachable only by linear reading -- absent from heading navigation and from the landmark list -- because the spine registers no heading string for it and inventing one is an Ask First change. It also renders Windows and macOS recovery unconditionally, directly below a preflight block that already renders Windows and macOS guidance, and Staged renders the same four strings again. Platform detection is likewise new behaviour rather than a fix. Both need a decision before this story is done: a registered heading string, and whether the running platform selects its own guidance.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  summary: Story 1.10 reordered Idle's document flow against the reading Story 1.9 recorded, inside a frozen block, without renegotiation.
+  owner: 1-10-meet-the-accessibility-and-recovery-contract
+  evidence: Story 1.9's own deferred entry describes "the acceptance criterion that puts preflight first in document order"; 1.10 puts the drop instruction first so the outline opens on an `h1`, justifying it in its Spec Change Log with a weaker reading of the same criterion and citing no `EXPERIENCE.md` line. The Story 1.9 test asserting `['fd-preflight','fd-drop-zone','fd-selection']` was rewritten rather than reconciled. Both orders are defensible; what is missing is the human deciding which the criterion means. The related two-`h1` case (a retained outcome above Idle's own heading) is recorded as accepted, but no test renders that configuration.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  summary: The full-name affordance renders for every name, including names that were never clamped.
+  owner: 1-10-meet-the-accessibility-and-recovery-contract
+  evidence: `StagedView` always emits the `copy.name.showFull` toggle and the visually hidden duplicate, so a ten-character filename gets a disclosure control for text that is fully visible, and `aria-describedby` makes a screen reader read the whole name again whenever that button takes focus. `DESIGN.md` permits the clamp conditionally ("A two-line visual clamp may be used only with a persistent keyboard-operable control"), which is satisfied, but nothing weighs the verbosity cost for the common case. Measuring whether the name actually clamped needs layout, which jsdom does not provide.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  summary: Three test-quality items from the review that are real but did not change behaviour.
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: `App.focus.test.tsx` redefines `mountWith`, `transitionTo` and the controller stub that `App.test.tsx` already has, with a different signature, so the two drift as the controller gains methods. The StrictMode describe is named for effect replay but only its first test exercises it -- React double-invokes effects on mount only, so the rest are ordinary updates. And `data-transfer-phase` can disagree with `data-phase-view` (a terminal `error` carrying `cancelled` renders the Idle body while the shell still advertises `error`); both are test and styling surfaces and nothing says which is authoritative.
+
+- source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
+  summary: `DESIGN.md` gained nine contrast pairs as prose beside the table that would have held them, and does not say a test now owns the figures.
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: Eighteen figures were added as one run-on sentence under a formatted contrast table. Separately, the retained instruction "Re-run unrounded automated checks if opacity, blending, color-mix, or adjacent surfaces change" predates `styles.test.ts` recomputing and pinning these ratios, so an editor following the spine's own instruction would hand-edit values a test derives -- and the test would then fail against the document it is meant to serve.

@@ -1,4 +1,4 @@
-import {existsSync, readFileSync} from 'node:fs'
+import {existsSync, readFileSync, readdirSync} from 'node:fs'
 import {resolve} from 'node:path'
 import {describe, expect, it} from 'vitest'
 
@@ -20,6 +20,19 @@ const repositoryRoot = resolve(projectRoot, '..')
 // either way.
 const stylesheet = readFileSync(resolve(projectRoot, 'src/style.css'), 'utf8').replace(/\r\n/g, '\n')
 
+/**
+ * The UX spine, found rather than spelled. The directory carries the date it
+ * was authored, so naming it here made re-dating or moving the folder fail this
+ * whole suite as a missing file instead of as contrast drift.
+ */
+function designSpinePath(): string {
+    const designs = resolve(repositoryRoot, '_bmad-output/planning-artifacts/ux-designs')
+    const folders = readdirSync(designs).filter((entry) => entry.startsWith('ux-'))
+
+    expect(folders, 'a ux-* design folder').toHaveLength(1)
+    return resolve(designs, folders[0], 'DESIGN.md')
+}
+
 function block(opening: string): string {
     const start = stylesheet.indexOf(opening)
     expect(start, opening).toBeGreaterThan(-1)
@@ -40,6 +53,29 @@ const componentRules = stylesheet
     // component rules, and leaving them in let them satisfy assertions about
     // what components declare.
     .replace(reducedMotion, '')
+
+describe('the stylesheet parser sees the whole file', () => {
+    /*
+      componentRules is built by subtracting the at-rule blocks. Round 1 found
+      reduced-motion leaking into every component assertion because it was not
+      subtracted; adding it fixed that instance without making the next one
+      fail. This counts the blocks instead, so a new at-rule has to be
+      classified deliberately rather than silently satisfying assertions about
+      what components declare.
+    */
+    it('subtracts every at-rule block it knows about, and knows about all of them', () => {
+        const atRules = [...stylesheet.matchAll(/^@(media|supports|theme)[^{]*\{/gm)].map((m) => m[0])
+
+        expect(atRules).toEqual([
+            '@theme {',
+            '@media (prefers-color-scheme: dark) {',
+            '@media (max-width: 759px) {',
+            '@media (max-width: 639px) {',
+            '@media (forced-colors: active) {',
+            '@media (prefers-reduced-motion: reduce) {',
+        ])
+    })
+})
 
 describe('the Terracotta Linen token layer', () => {
     it('declares every authored light value as a Tailwind v4 theme variable', () => {
@@ -453,11 +489,19 @@ describe('the unrounded contrast proof', () => {
     const darkTokens = {...lightTokens, ...declared(dark)}
 
     const designSpine = readFileSync(
-        resolve(repositoryRoot, '_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-2026-08-23/DESIGN.md'),
+        designSpinePath(),
         'utf8',
     )
 
     /** [foreground, background, minimum ratio, published as an exact figure]. */
+    /*
+      `border` is absent on purpose. DESIGN.md calls it the decorative edge --
+      "paper offsets and nonessential dividers only; never the sole boundary for
+      a control, drop target, QR, progress track, or status" -- and at 1.76:1
+      against surface it would fail any load-bearing floor. The test below
+      keeps it out of the places that would make it load-bearing, which is the
+      guarantee that lets it stay out of this table.
+    */
     const placed: Array<[string, string, number, boolean]> = [
         // Text: 4.5:1. Every one of these is body copy, a control label, or a
         // heading at a size the AA large-text allowance does not reach.
@@ -579,6 +623,22 @@ describe('rules the components can only reference by name', () => {
     it('shows an aria-disabled control as inert rather than merely saying so', () => {
         expect(componentRules).toMatch(/\.fd-button\[aria-disabled='true'\] \{[^}]*cursor: default;/)
     })
+})
+
+describe('the decorative edge stays decorative', () => {
+    // DESIGN.md requires the functional boundary token on controls, the
+    // rest-state drop target, the QR frame, the URL field and the progress
+    // track. --color-border is 1.76:1 against surface, so using it on any of
+    // them would put an invisible boundary on something that needs a visible
+    // one -- and it would still pass the contrast proof, which does not look
+    // at that token at all.
+    it.each(['.fd-button', '.fd-drop-zone', '.fd-qr-panel', '.fd-url', '.fd-meter'])(
+        '%s draws its boundary with the functional token', (selector) => {
+            const rule = block(`${selector} {`)
+
+            expect(rule).not.toContain('var(--color-border)')
+        },
+    )
 })
 
 describe('declared weight nothing uses', () => {

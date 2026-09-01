@@ -3,7 +3,7 @@ title: 'Story 1.10 — Meet the Accessibility and Recovery Contract'
 type: 'feature'
 created: '2026-08-31'
 status: 'in-review'
-review_loop_iteration: 0
+review_loop_iteration: 2
 baseline_commit: 'f7338af172c1225cf3935d6bbd8eca72ace77e87'
 context:
   - '{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-2026-08-23/EXPERIENCE.md'
@@ -39,7 +39,7 @@ context:
 | Progress speech | Accepted snapshots over time | One update at start, then at most every 5s and only after 10pp or 10 MiB | A terminal outcome cancels anything queued; throughput never spoken |
 | Cancel pending | Cancel activated from Pending, Staged, or Transferring | The control keeps focus, gains `aria-disabled="true"`, and swaps to the pending label | Repeat activation issues no second command |
 | Recovery guidance | Idle and Staged | Firewall preflight plus platform recovery, and receiver help covering wrong/expired link, competing opener, changed source, guest isolation | Copy comes from the registry verbatim |
-| Long or bidi name | Mixed LTR/RTL, emoji, bidi controls, long unbroken names | Bidi-isolated, with full value reachable through `copy.name.show_full` | Accessible name matches the visible name |
+| Long or bidi name | Mixed LTR/RTL, emoji, bidi controls, long unbroken names | Bidi-isolated, with full value reachable through `copy.name.showFull` | Accessible name matches the visible name |
 | Reduced motion / forced colors | `prefers-reduced-motion: reduce`, `forced-colors: active` | Motion removed, system colors applied, QR substrate exempt | No state distinguished by color alone |
 
 </frozen-after-approval>
@@ -65,7 +65,7 @@ context:
 - [x] `frontend/src/App.tsx` — drive the announcer and the single focus move from state transitions, proving each target exists first.
 - [x] `frontend/src/ui/progressSpeech.ts` — the assistive throttle: start once, then 5s plus 10pp or 10 MiB, cancelled by a terminal outcome, never speaking throughput.
 - [x] `frontend/src/ui/IdleView.tsx` — platform firewall recovery and receiver help; `copy.cancel.won` as the focused cancel-winning summary; heading order that does not open the document on an `h2`.
-- [x] `frontend/src/ui/StagedView.tsx` — recovery help beside the handoff; the URL as a readonly form control rather than a `div` with a textbox role; `copy.name.show_full` full-value access.
+- [x] `frontend/src/ui/StagedView.tsx` — recovery help beside the handoff; the URL as a readonly form control rather than a `div` with a textbox role; `copy.name.showFull` full-value access.
 - [x] `frontend/src/ui/{StagePendingCard,TransferringView,OutcomePanel}.tsx` — `aria-disabled` and focus retention on a pending cancellation.
 - [x] `frontend/src/style.css` — a `forced-colors: active` block, `prefers-reduced-motion: reduce` behaviour, and the focus indicator token.
 - [x] `frontend/src/transfer/selectors.ts` — remove `selectVisibleError` and `selectRetainedOutcome` with their tests; they contradict their replacements.
@@ -131,7 +131,7 @@ intent; each is a place where the spec left one degree of freedom.
   target that is not on the screen: every row a real transition produces lands
   on a target its view carries, which is exactly what makes the existence proof
   impossible to exercise from real state.
-- **The full-name control keeps one label.** `copy.name.show_full` is the only
+- **The full-name control keeps one label.** `copy.name.showFull` is the only
   registered string for it, so the control's name never changes; `aria-expanded`
   carries the state and `aria-describedby` points at a visually hidden copy of
   the complete value.

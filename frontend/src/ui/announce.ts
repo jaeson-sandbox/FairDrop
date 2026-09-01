@@ -55,7 +55,6 @@ export type TransitionRow =
     | 'cancel-requested'
     | 'cancel-won'
     | 'terminal-outcome'
-    | 'reset-after-terminal'
     | 'dismiss-retained'
 
 export interface FocusAnnouncement {
@@ -112,11 +111,15 @@ export function routeTransition(previous: TransferState, next: TransferState): A
         case 'idle':
             return toIdle(previous, next)
 
-        default:
-            // Unreachable while the reducer owns the union. Returning null
-            // rather than falling off the end keeps a state this build cannot
-            // name from throwing out of the caller's effect.
+        default: {
+            // The assignment is the real guard: `next` narrows to `never` only
+            // while every phase above is routed, so adding one to the reducer
+            // fails this build rather than reaching the return. The return is
+            // the runtime half, for a state this build cannot name.
+            const unrouted: never = next
+            void unrouted
             return null
+        }
     }
 }
 

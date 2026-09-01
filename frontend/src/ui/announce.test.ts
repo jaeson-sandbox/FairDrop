@@ -3,6 +3,7 @@ import {publicError} from '../transfer/errors'
 import {createInitialTransferState} from '../transfer/state'
 import type {TransferState} from '../transfer/state'
 import type {FileMetadata, Warning} from '../transfer/types'
+import {parseWarning} from '../transfer/validation'
 import {focusSelector, focusTargets, routeTransition, type Announcement} from './announce'
 
 const sessionId = '0123456789abcdef0123456789abcdef'
@@ -168,6 +169,60 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
         {row: 'dismiss-retained', owner: 'focus', target: 'idle-instruction'},
     ],
 ]
+
+describe('a cancellation that lands beside a command failure', () => {
+    /*
+      Both rows can be owed by one transition into Idle. The command failure
+      wins, so the user is told the command failed and never that the
+      cancellation succeeded -- a deliberate precedence that no test pinned,
+      which meant reordering the two branches was free.
+    */
+    it('gives the command failure the transition, not the cancel-won summary', () => {
+        const staged: TransferState = {
+            phase: 'staged',
+            session: {sessionId: '0123456789abcdef0123456789abcdef', lastSeq: 0},
+            metadata: metadata(),
+            cancelPending: true,
+            commandError: null,
+        }
+        const idle: TransferState = {
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: publicError('shutting_down'),
+        }
+
+        expect(routeTransition(staged, idle)).toEqual({
+            row: 'command-failure', owner: 'focus', target: 'command-error',
+        })
+    })
+
+    it('gives the cancel-won summary the transition when no command failed', () => {
+        const staged: TransferState = {
+            phase: 'staged',
+            session: {sessionId: '0123456789abcdef0123456789abcdef', lastSeq: 0},
+            metadata: metadata(),
+            cancelPending: true,
+            commandError: null,
+        }
+        const idle: TransferState = {phase: 'idle', retainedOutcome: null, commandError: null}
+
+        expect(routeTransition(staged, idle)).toEqual({
+            row: 'cancel-won', owner: 'focus', target: 'cancel-summary',
+        })
+    })
+})
+
+describe('the warning the beacon row speaks', () => {
+    // announce.ts fires this row on "a warning appeared" and then speaks the
+    // fixed discovery text. That is only correct because parseWarning admits
+    // exactly one code, which is asserted in another module and was relied on
+    // here in prose.
+    it('is the only warning code the validator can produce', () => {
+        expect(parseWarning({code: 'beacon_warning', message: 'x'})).not.toBeNull()
+        expect(parseWarning({code: 'some_other_warning', message: 'x'})).toBeNull()
+        expect(parseWarning({code: '', message: 'x'})).toBeNull()
+    })
+})
 
 describe('the announcement-ownership routing table', () => {
     it.each(rows)('routes %s to its one owner', (_name, previous, next, expected) => {
