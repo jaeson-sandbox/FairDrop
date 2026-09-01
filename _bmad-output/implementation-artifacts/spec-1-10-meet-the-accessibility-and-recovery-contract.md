@@ -2,7 +2,7 @@
 title: 'Story 1.10 — Meet the Accessibility and Recovery Contract'
 type: 'feature'
 created: '2026-08-31'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 2
 baseline_commit: 'f7338af172c1225cf3935d6bbd8eca72ace77e87'
 context:

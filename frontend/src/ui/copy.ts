@@ -103,6 +103,9 @@ export const copy = {
         firewallHeading: 'Local network access',
         windows: 'Windows',
         macos: 'macOS',
+        /* The recovery block's own labels, which the spine writes out. */
+        windowsRecovery: 'Windows recovery',
+        macosRecovery: 'macOS recovery',
         /** The approved item vocabulary: file, folder. */
         file: 'File',
         folder: 'Folder',

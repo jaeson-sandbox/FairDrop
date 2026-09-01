@@ -23,11 +23,11 @@ export function RecoveryHelp() {
         <div className="fd-help" data-recovery-help="true">
             <dl className="fd-help__platforms">
                 <div>
-                    <dt>{copy.label.windows}</dt>
+                    <dt>{copy.label.windowsRecovery}</dt>
                     <dd>{copy.firewall.windowsRecovery}</dd>
                 </div>
                 <div>
-                    <dt>{copy.label.macos}</dt>
+                    <dt>{copy.label.macosRecovery}</dt>
                     <dd>{copy.firewall.macosRecovery}</dd>
                 </div>
             </dl>
