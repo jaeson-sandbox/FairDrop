@@ -310,6 +310,22 @@ body {
     outline-offset: var(--focus-ring-offset);
 }
 
+/*
+  aria-disabled is a promise to everyone, not only to assistive technology: the
+  control still takes focus and still answers a second activation with nothing,
+  so it has to look like it.
+*/
+.fd-button[aria-disabled='true'] {
+    opacity: 0.7;
+    cursor: default;
+}
+
+.fd-button[aria-disabled='true']:hover {
+    background: var(--color-surface);
+    border-color: var(--color-control-border);
+    color: var(--color-muted);
+}
+
 /* Copy Feedback: the same control, in success text. No toast, no layout shift. */
 .fd-button--copied {
     border-color: var(--color-success);
@@ -547,6 +563,13 @@ body {
 */
 .fd-url {
     inline-size: 100%;
+    /*
+      A textarea, not an input, because the value has to wrap: at 320px under
+      200% text a single-line field shows a fraction of the capability URL, and
+      that URL is the fallback when the QR cannot be scanned.
+    */
+    resize: none;
+    overflow-wrap: anywhere;
     /*
       Required, not decorative: an input has an intrinsic minimum size, so as a
       grid item it refuses to shrink below roughly twenty characters and forces

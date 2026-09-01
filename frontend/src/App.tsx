@@ -104,7 +104,10 @@ function App() {
         const speech = nextProgressSpeech(
             speechRef.current,
             selectProgressSnapshot(next.progress),
-            Date.now(),
+            // Monotonic on purpose: Date.now() can step backwards under an NTP
+            // correction, which leaves the remembered timestamp in the future
+            // and mutes assistive progress for the rest of the transfer.
+            performance.now(),
         )
         if (speech === null) return
 
@@ -131,8 +134,12 @@ function App() {
       exists to keep. The command's result is only ever announced while its own
       view is still the one on screen.
     */
-    function announceFromStaged(text: string): void {
-        if (previousStateRef.current.phase !== 'staged') return
+    function announceFromStaged(sessionId: string, text: string): void {
+        const current = previousStateRef.current
+        // The session, not just the phase: a staged -> transferring -> staged
+        // round trip returns to the same phase under a different session, and
+        // an in-flight command belongs to the session that started it.
+        if (current.phase !== 'staged' || current.session.sessionId !== sessionId) return
         announce(text)
     }
 
@@ -183,7 +190,7 @@ function App() {
 function phaseBody(
     transfer: TransferController,
     cancelWon: boolean,
-    announce: (text: string) => void,
+    announce: (sessionId: string, text: string) => void,
 ): ReactElement | null {
     const {state} = transfer
 

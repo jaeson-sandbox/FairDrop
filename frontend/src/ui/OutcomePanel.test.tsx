@@ -119,6 +119,28 @@ describe('heading rank and phase ownership', () => {
     })
 })
 
+describe('the focused container has a name', () => {
+    /*
+      Focus lands on this section, and a container is not named by a heading
+      inside it unless it says so. Without this the terminal outcome -- the row
+      the whole routing table exists to deliver -- is announced as a nameless
+      region, which is the same "browsers disagree" problem that took the
+      role="textbox" div out of StagedView.
+    */
+    it.each([
+        ['done', {kind: 'done', retained: false} as const, 'Transfer finished'],
+        ['error', {kind: 'error', retained: false, error: {code: 'transfer_failed', message: 'x'} as PublicError} as const,
+            'Transfer stopped'],
+    ])('names the %s panel with its own heading', (_name, outcome, heading) => {
+        render(<OutcomePanel outcome={outcome} focusTarget="outcome"/>)
+        const panel = document.querySelector('[data-focus-target="outcome"]')!
+        const labelledBy = panel.getAttribute('aria-labelledby')
+
+        expect(labelledBy).toBeTruthy()
+        expect(document.getElementById(labelledBy!)?.textContent).toBe(heading)
+    })
+})
+
 describe('focus surface', () => {
     it('is reachable by a programmatic focus move without joining the Tab order', () => {
         render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)

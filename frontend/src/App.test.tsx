@@ -4,6 +4,7 @@ import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import App from './App'
 import type {TransferState} from './transfer/state'
+import {progressSpeechIntervalMs} from './ui/progressSpeech'
 
 const mocks = vi.hoisted(() => ({
     onFileDrop: vi.fn(),
@@ -226,6 +227,25 @@ describe('one view per phase', () => {
         expect(screen.getByRole('main').getAttribute('data-transfer-phase')).toBe(phase)
     })
 
+    it('shows the cancel-winning summary when a terminal error carries cancelled', () => {
+        const view = mountWith({...stagedState, cancelPending: true} as TransferState)
+
+        // Reached by transition, not by mounting: the summary exists only when
+        // the routing table has named this transition's owner, and the terminal
+        // branch has to forward that on. Rendering Idle without it leaves the
+        // one transition in the app with no owner at all.
+        transitionTo(view, {
+            phase: 'error',
+            session: {sessionId, lastSeq: 4},
+            outcome: {kind: 'error', error: {code: 'cancelled', message: 'Transfer canceled.'}},
+        } as TransferState)
+
+        const summary = document.querySelector('[data-focus-target="cancel-summary"]')
+        expect(summary).toBeTruthy()
+        expect(document.activeElement).toBe(summary)
+        expect(document.querySelector('[data-outcome]')).toBeNull()
+    })
+
     it('gives the terminal outcome the document heading', () => {
         mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done'}})
 
@@ -436,6 +456,16 @@ describe('focus-owned transitions', () => {
     })
 })
 
+function snapshotAt(percent: number) {
+    return {
+        bytesSent: Math.round(100_000_000 * percent / 100),
+        totalBytes: 100_000_000,
+        totalKnown: true,
+        percent,
+        speedBytesPerSec: 12_400_000,
+    }
+}
+
 describe('announcer-owned transitions', () => {
     const spokenRows: Array<[string, TransferState, TransferState, string]> = [
         [
@@ -502,6 +532,51 @@ describe('announcer-owned transitions', () => {
         // That transition is focus-owned; announcing the copy as well would
         // give one moment two owners, which is the rule this story enforces.
         transitionTo(view, transferringState)
+        await act(async () => { resolveCopy() })
+
+        expect(announcer().textContent).toBe('')
+    })
+
+    it('measures the speech interval on a monotonic clock, not the wall clock', () => {
+        /*
+          The two clocks are driven to disagree. The monotonic one advances past
+          the interval; the wall clock stands still, as it would after an NTP
+          correction stepped it backwards and left the remembered timestamp in
+          the future. Reading the wall clock mutes assistive progress for the
+          rest of the transfer, so the second snapshot must still be spoken.
+        */
+        let tick = 0
+        const monotonic = vi.spyOn(performance, 'now').mockImplementation(() => {
+            tick += progressSpeechIntervalMs * 2
+            return tick
+        })
+        const wall = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+        const view = mountWith(stagedState)
+
+        try {
+            transitionTo(view, transferringState)
+            transitionTo(view, {...transferringState, progress: snapshotAt(10)} as TransferState)
+            transitionTo(view, {...transferringState, progress: snapshotAt(40)} as TransferState)
+
+            expect(announcer().textContent).toContain('40%')
+        } finally {
+            monotonic.mockRestore()
+            wall.mockRestore()
+        }
+    })
+
+    it('refuses a copy result that belongs to a session the view has left', async () => {
+        const view = mountWith(stagedState)
+        let resolveCopy!: () => void
+        mocks.copyToClipboard.mockReturnValue(new Promise<void>((resolve) => { resolveCopy = resolve }))
+
+        fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        // Staged again, but a different session: the in-flight command belongs
+        // to the one that started it, and the phase alone cannot tell them apart.
+        transitionTo(view, {
+            ...stagedState,
+            session: {sessionId: '11111111111111111111111111111111', lastSeq: 0},
+        } as TransferState)
         await act(async () => { resolveCopy() })
 
         expect(announcer().textContent).toBe('')

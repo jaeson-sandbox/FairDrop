@@ -54,6 +54,9 @@ export function OutcomePanel({
 }: OutcomePanelProps) {
     const done = outcome.kind === 'done'
     const Heading = level === 1 ? 'h1' : 'h2'
+    // Focus lands on this section, so it needs a name of its own: a container
+    // with a heading inside it is not named by that heading unless it says so.
+    const headingId = `fd-outcome-heading-${outcome.kind}${outcome.retained ? '-retained' : ''}`
 
     return (
         <section
@@ -63,10 +66,11 @@ export function OutcomePanel({
             data-retained={String(outcome.retained)}
             data-error-code={done ? undefined : outcome.error.code}
             data-focus-target={focusTarget}
+            aria-labelledby={headingId}
             tabIndex={-1}
         >
             <span className="fd-outcome__icon" aria-hidden="true">{done ? '✓' : '!'}</span>
-            <Heading className="fd-state-heading">
+            <Heading className="fd-state-heading" id={headingId}>
                 {done ? copy.done.heading : errorHeadings[outcome.error.code]}
             </Heading>
             <p className="fd-outcome__body">

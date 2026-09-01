@@ -28,6 +28,20 @@ const empty: ProgressSelection = selectProgressSnapshot({
 const mib = 1024 * 1024
 
 describe('the assistive progress throttle', () => {
+    /*
+      EXPERIENCE.md reads per-mode -- "10 percentage points for known totals or
+      10 MiB of new wire bytes for unknown totals" -- while the spec's frozen
+      Always clause reads cross-mode, and the implementation follows the spec.
+      Neither reading was pinned, so rewriting this to one threshold per mode
+      passed the whole suite. This case is the difference between them.
+    */
+    it('speaks a known total that gained bytes without gaining percentage points', () => {
+        const memory = {spokenAtMs: 0, percent: 0, bytesSent: 0}
+        const snapshot = known(progressSpeechBytes, 5)
+
+        expect(nextProgressSpeech(memory, snapshot, progressSpeechIntervalMs)).not.toBeNull()
+    })
+
     it('speaks once at the start, before any interval has passed', () => {
         expect(nextProgressSpeech(null, known(1_000, 0), 0)).toEqual({
             text: '1.0 KB of 100.0 MB · 0%',

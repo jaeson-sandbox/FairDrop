@@ -105,8 +105,13 @@ describe('the direct URL row', () => {
         // A real <input readonly>, not a div wearing role="textbox": assistive
         // technology reads the value of one reliably and disagrees about the
         // other. It is named by the row's own heading and it is still not a link.
-        const field = screen.getByRole('textbox') as HTMLInputElement
-        expect(field.tagName).toBe('INPUT')
+        const field = screen.getByRole('textbox') as HTMLTextAreaElement
+        // A textarea rather than an input: the value has to wrap, because at
+        // 320px under 200% text a single-line field shows a fraction of the
+        // capability URL and that URL is the fallback when the QR cannot be
+        // scanned. What matters to this assertion is that it is a readonly
+        // form control and not an anchor.
+        expect(field.tagName).toBe('TEXTAREA')
         expect(field.value).toBe(capabilityURL)
         expect(field.readOnly).toBe(true)
         expect(field.className).toContain('fd-target')
@@ -158,6 +163,19 @@ describe('the direct URL row', () => {
         // the whole URL. An input has no such behaviour, and this is the path a
         // user needs when the clipboard command fails.
         expect(select).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps the click that focuses the URL from collapsing its selection', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+        const field = screen.getByRole('textbox') as HTMLTextAreaElement
+
+        const prevented = !fireEvent.mouseDown(field)
+
+        // select-on-focus alone is defeated by the mouseup that follows: the
+        // selection collapses to a caret and the manual fallback is a call
+        // that happened and a selection nobody got.
+        expect(prevented).toBe(true)
+        expect(document.activeElement).toBe(field)
     })
 
     it('carries the direct-link helper beside the action', () => {
@@ -412,7 +430,7 @@ describe('the announcer rows this view owns', () => {
         })
 
         expect(onAnnounce).toHaveBeenCalledTimes(1)
-        expect(onAnnounce).toHaveBeenCalledWith('Copied')
+        expect(onAnnounce).toHaveBeenCalledWith(sessionId, 'Copied')
     })
 
     it('says nothing when the write rejects', async () => {

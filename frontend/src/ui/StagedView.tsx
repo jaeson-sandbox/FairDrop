@@ -17,7 +17,7 @@ interface StagedViewProps {
      * a reducer transition, so this view is the only thing that can report it.
      * Optional so the view still renders standalone.
      */
-    readonly onAnnounce?: (text: string) => void
+    readonly onAnnounce?: (sessionId: string, text: string) => void
 }
 
 /**
@@ -60,7 +60,7 @@ export function StagedView({state, onCancel, onAnnounce}: StagedViewProps) {
             .then(() => CopyToClipboard(metadata.url))
             .then(() => {
                 setCopied(true)
-                onAnnounce?.(copy.copy.confirmation)
+                onAnnounce?.(state.session.sessionId, copy.copy.confirmation)
             }, () => undefined)
     }
 
@@ -129,13 +129,22 @@ export function StagedView({state, onCancel, onAnnounce}: StagedViewProps) {
                                       the value of one reliably and disagrees
                                       about the other. It is still not a link.
                                     */}
-                                    <input
+                                    <textarea
                                         className="fd-url fd-target"
-                                        type="text"
                                         readOnly
+                                        rows={2}
                                         value={metadata.url}
                                         aria-labelledby="fd-direct-link-heading"
                                         onFocus={(event) => event.currentTarget.select()}
+                                        onMouseDown={(event) => {
+                                            // Without this the mouseup that follows collapses the
+                                            // selection to a caret, and select-on-focus becomes a
+                                            // call that happens and a selection nobody gets.
+                                            if (document.activeElement !== event.currentTarget) {
+                                                event.preventDefault()
+                                                event.currentTarget.focus()
+                                            }
+                                        }}
                                     />
                                     <button
                                         type="button"

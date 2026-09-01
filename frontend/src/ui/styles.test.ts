@@ -363,6 +363,23 @@ describe('guarantees a stylesheet edit could silently undo', () => {
     })
 })
 
+describe('forced colors beat the authored dark palette', () => {
+    it('declares the forced-colors block after the dark one, which is the only reason it wins', () => {
+        /*
+          Both blocks redefine the same custom properties on bare `:root`, both
+          match in a dark high-contrast theme, and their specificity is equal --
+          so source order is the whole mechanism. Moving the dark block to the
+          end of the file restores Terracotta Linen for a Windows High Contrast
+          user with all 462 tests green.
+        */
+        const darkAt = stylesheet.indexOf('@media (prefers-color-scheme: dark) {')
+        const forcedAt = stylesheet.indexOf('@media (forced-colors: active) {')
+
+        expect(darkAt).toBeGreaterThan(-1)
+        expect(forcedAt).toBeGreaterThan(darkAt)
+    })
+})
+
 describe('the Tailwind v4 setup', () => {
     it('imports Tailwind once, at the top', () => {
         expect(stylesheet.startsWith('@import "tailwindcss";')).toBe(true)
@@ -529,6 +546,38 @@ describe('the unrounded contrast proof', () => {
 
         expect(weakest).toBe(contrast(lightTokens['focus'], lightTokens['elevated']))
         expect(designSpine).toContain(weakest.toFixed(9))
+    })
+})
+
+describe('rules the components can only reference by name', () => {
+    /*
+      Each of these is applied by adding a class in a component and asserted
+      there only by that class name. jsdom applies no stylesheet, so the rule
+      behind the name is invisible to every component test -- emptying any of
+      them left all 462 green while the guarantee was gone.
+    */
+
+    it('clamps the item name to two lines and hides the overflow', () => {
+        const clamp = block('.fd-clamp {')
+        expect(clamp).toContain('-webkit-line-clamp: 2;')
+        expect(clamp).toContain('line-clamp: 2;')
+        expect(clamp).toContain('overflow: hidden;')
+    })
+
+    it('keeps the full item name off screen rather than merely invisible', () => {
+        // The full value is the aria-describedby target. Dropped from the
+        // off-screen rule it renders as visible duplicate text beside the name.
+        expect(componentRules).toMatch(/\.fd-visually-hidden[^{]*\{|,\s*\.fd-visually-hidden/)
+    })
+
+    it('lets the URL field wrap, because a scrolling one line loses the value', () => {
+        const url = block('.fd-url {')
+        expect(url).toContain('overflow-wrap: anywhere;')
+        expect(url).toContain('resize: none;')
+    })
+
+    it('shows an aria-disabled control as inert rather than merely saying so', () => {
+        expect(componentRules).toMatch(/\.fd-button\[aria-disabled='true'\] \{[^}]*cursor: default;/)
     })
 })
 
