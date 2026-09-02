@@ -46,7 +46,19 @@ export function IdleView({
     return (
         <div className="fd-region" data-phase-view="idle">
             <section className="fd-idle">
-                <div className="fd-drop-zone" style={dropTargetStyle}>
+                {/*
+                  Clicking the target opens the file chooser -- the same command
+                  the Select File control below runs. It is a pointer shortcut,
+                  not a control: the zone stays out of the tab order because the
+                  two browse buttons are already the keyboard path to both
+                  choosers, and a third tab stop reaching only one of them would
+                  be worse than none. The native drop gate is untouched.
+                */}
+                <div
+                    className="fd-drop-zone"
+                    style={dropTargetStyle}
+                    onClick={onSelectFile}
+                >
                     <div>
                         <div className="fd-drop-symbol" aria-hidden="true">↓</div>
                         <h1

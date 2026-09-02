@@ -32,6 +32,26 @@ function show(
     return {view, onSelectFile, onSelectDirectory}
 }
 
+describe('the drop target as a pointer shortcut', () => {
+    // Reported from the running app: the zone looks like the place to click
+    // and did nothing. It runs the same command as the Select File control.
+    it('opens the file chooser when the drop target is clicked', () => {
+        const {onSelectFile} = show()
+
+        fireEvent.click(document.querySelector('.fd-drop-zone')!)
+
+        expect(onSelectFile).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps the zone out of the tab order, because the buttons are the keyboard path', () => {
+        show()
+        const zone = document.querySelector('.fd-drop-zone')!
+
+        expect(zone.getAttribute('tabindex')).toBeNull()
+        expect(zone.tagName).toBe('DIV')
+    })
+})
+
 describe('Idle at rest', () => {
     it('leads with the drop target, keeps the preflight ahead of the browse controls, and closes with recovery', () => {
         const {view} = show()

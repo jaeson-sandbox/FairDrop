@@ -297,15 +297,21 @@ body {
 }
 
 /*
-  `:focus-visible` for controls the user drives, plain `:focus` for the nodes
-  the routing table focuses programmatically: a state heading is only ever
-  focused by that table, and browsers disagree about whether a scripted focus
-  move counts as "visible". An indicator the user cannot see is a focus move
-  that did not happen.
+  `:focus-visible` throughout, including the nodes the routing table focuses.
+
+  Those nodes carry `tabindex="-1"` so the table can reach them, which also
+  makes them click-focusable -- and a plain `:focus` ring then stays painted
+  after a mouse click, so an outcome panel or a heading reads as selected long
+  after the click that focused it.
+
+  `:focus-visible` still fires for the case that matters. When focus is moved by
+  script, the engine keeps the modality of the last real interaction: a keyboard
+  user gets the ring on the programmatic move, and a mouse user -- who is
+  already looking at the view that changed -- does not.
 */
 .fd-button:focus-visible,
 .fd-url:focus-visible,
-[data-focus-target]:focus {
+[data-focus-target]:focus-visible {
     outline: var(--focus-ring-width) solid var(--color-focus);
     outline-offset: var(--focus-ring-offset);
 }
@@ -381,6 +387,7 @@ body {
 }
 
 .fd-drop-zone {
+    cursor: pointer;
     display: grid;
     min-block-size: 200px;
     place-items: center;

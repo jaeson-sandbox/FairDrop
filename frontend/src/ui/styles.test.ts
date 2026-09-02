@@ -277,19 +277,24 @@ describe('reduced motion', () => {
 describe('the focus indicator', () => {
     it('draws one ring from the focus token for controls and routed targets alike', () => {
         expect(stylesheet).toMatch(
-            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\[data-focus-target\]:focus \{\s*/,
+            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\[data-focus-target\]:focus-visible \{\s*/,
         )
         expect(stylesheet).toContain('outline: var(--focus-ring-width) solid var(--color-focus);')
         expect(stylesheet).toContain('outline-offset: var(--focus-ring-offset);')
         expect(stylesheet).toContain('--focus-ring-width: 3px;')
     })
 
-    it('uses plain :focus for the nodes only the routing table focuses', () => {
-        // A programmatic focus move is not reliably :focus-visible across
-        // engines, and a focus move with no visible ring is one the user cannot
-        // follow.
-        expect(stylesheet).toContain('[data-focus-target]:focus {')
-        expect(stylesheet).not.toContain('[data-focus-target]:focus-visible')
+    it('rings the routed nodes only when focus is visible, never after a click', () => {
+        /*
+          These nodes carry tabindex="-1" so the routing table can reach them,
+          which also makes them click-focusable. Under a plain `:focus` rule the
+          ring stayed painted after a mouse click and an outcome panel read as
+          selected -- reported from the running app. `:focus-visible` still
+          fires for a scripted move made while the user is on the keyboard,
+          which is the case a visible ring exists for.
+        */
+        expect(stylesheet).toContain('[data-focus-target]:focus-visible {')
+        expect(stylesheet).not.toMatch(/\[data-focus-target\]:focus \{/)
     })
 })
 
