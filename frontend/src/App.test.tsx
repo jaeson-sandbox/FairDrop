@@ -450,7 +450,10 @@ describe('focus-owned transitions', () => {
 
         transitionTo(view, idleState)
 
-        expect(document.activeElement?.textContent).toBe('Transfer canceled. Ready for another file or folder.')
+        // The glyph beside it is aria-hidden and shares the focused
+        // container, so assert the text node it announces.
+        expect(document.activeElement?.querySelector('.fd-cancel-summary__text')?.textContent)
+            .toBe('Transfer canceled. Ready for another file or folder.')
         expect(document.querySelector('.fd-outcome')).toBeNull()
         expect(document.querySelector('[role="alert"]')).toBeNull()
     })

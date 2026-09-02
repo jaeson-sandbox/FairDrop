@@ -47,6 +47,32 @@ export function IdleView({
         <div className="fd-region" data-phase-view="idle">
             <section className="fd-idle">
                 {/*
+                  The cancel-winning summary, first in the region.
+
+                  It leads because it is the answer to what just happened, and
+                  because a retained Done or Error already renders above this
+                  view from the shell -- an outcome that appeared under the
+                  selection controls was the odd one out.
+
+                  Warning, not error. The spine's rule for `cancelled` is
+                  "return to Idle; never render as Error", and `--color-error`
+                  is the error language here: it appears on nothing but the
+                  Error Panel. Amber says "this stopped" without calling a
+                  deliberate action a failure. It is a focus target and nothing
+                  else -- no live region, because focus owns this transition.
+                */}
+                {cancelWon ? (
+                    <div
+                        className="fd-cancel-summary"
+                        tabIndex={-1}
+                        data-focus-target="cancel-summary"
+                    >
+                        <span className="fd-cancel-summary__icon" aria-hidden="true">&times;</span>
+                        <p className="fd-cancel-summary__text">{copy.cancel.won}</p>
+                    </div>
+                ) : null}
+
+                {/*
                   Clicking the target opens the file chooser -- the same command
                   the Select File control below runs. It is a pointer shortcut,
                   not a control: the zone stays out of the tab order because the
@@ -71,22 +97,6 @@ export function IdleView({
                         <p className="fd-meta">{copy.external.promise}</p>
                     </div>
                 </div>
-
-                {/*
-                  The cancel-winning summary. It is a focus target and nothing
-                  else: no live region, because focus is this transition's sole
-                  owner, and no Error Panel, because a cancellation is never
-                  rendered as an Error.
-                */}
-                {cancelWon ? (
-                    <p
-                        className="fd-cancel-summary"
-                        tabIndex={-1}
-                        data-focus-target="cancel-summary"
-                    >
-                        {copy.cancel.won}
-                    </p>
-                ) : null}
 
                 {commandError === null ? null : (
                     <OutcomePanel

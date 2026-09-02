@@ -32,6 +32,34 @@ function show(
     return {view, onSelectFile, onSelectDirectory}
 }
 
+describe('where the cancellation summary sits', () => {
+    // Reported from the running app: it read as nothing in particular, under
+    // the selection area. It now leads the region, which is also where a
+    // retained Done or Error already appears from the shell.
+    it('leads the Idle region rather than following the controls', () => {
+        show(idle(), {}, true)
+        const region = document.querySelector('.fd-idle')!
+
+        expect(region.firstElementChild?.classList.contains('fd-cancel-summary')).toBe(true)
+    })
+
+    it('carries a visible glyph beside the text, hidden from assistive technology', () => {
+        show(idle(), {}, true)
+        const icon = document.querySelector('.fd-cancel-summary__icon')!
+
+        // The colour is not the only cue, and the glyph is not read twice: the
+        // sentence already says the transfer was cancelled.
+        expect(icon.textContent?.trim()).not.toBe('')
+        expect(icon.getAttribute('aria-hidden')).toBe('true')
+    })
+
+    it('is absent entirely when no cancellation won', () => {
+        show()
+
+        expect(document.querySelector('.fd-cancel-summary')).toBeNull()
+    })
+})
+
 describe('the drop target as a pointer shortcut', () => {
     // Reported from the running app: the zone looks like the place to click
     // and did nothing. It runs the same command as the Select File control.
@@ -186,7 +214,11 @@ describe('Idle after a cancellation won its race', () => {
         show(idle(), {}, true)
 
         const summary = document.querySelector('[data-focus-target="cancel-summary"]') as HTMLElement
-        expect(summary.textContent).toBe('Transfer canceled. Ready for another file or folder.')
+        // The decorative glyph shares the focused container, so assert the
+        // text node rather than the container's raw textContent: the glyph
+        // is aria-hidden and is not part of what is announced.
+        expect(summary.querySelector('.fd-cancel-summary__text')?.textContent)
+            .toBe('Transfer canceled. Ready for another file or folder.')
         expect(summary.getAttribute('tabindex')).toBe('-1')
         // Never an Error, and never a live region: focus is this row's one owner.
         expect(document.querySelector('.fd-outcome')).toBeNull()

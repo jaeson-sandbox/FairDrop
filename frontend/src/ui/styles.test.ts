@@ -650,6 +650,26 @@ describe('rules the components can only reference by name', () => {
     })
 })
 
+describe('a cancellation is a status, and never an error', () => {
+    /*
+      EXPERIENCE.md's rule for `cancelled` is "return to Idle; never render as
+      Error", and --color-error is what the Error Panel means in this palette --
+      it is used by nothing else. The summary needs to be noticed, so it carries
+      the warning token; painting it with the error token would tell the user a
+      deliberate action failed.
+    */
+    it('paints the cancellation summary with the warning token, not the error one', () => {
+        const summary = block('.fd-cancel-summary {')
+
+        expect(summary).toContain('var(--color-warning)')
+        expect(summary).not.toContain('var(--color-error)')
+    })
+
+    it('pairs that colour with a glyph, so colour is never the only cue', () => {
+        expect(componentRules).toMatch(/\.fd-cancel-summary__icon \{[^}]*border: 1px solid currentColor;/)
+    })
+})
+
 describe('the decorative edge stays decorative', () => {
     // DESIGN.md requires the functional boundary token on controls, the
     // rest-state drop target, the QR frame, the URL field and the progress

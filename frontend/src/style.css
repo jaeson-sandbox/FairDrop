@@ -446,13 +446,35 @@ body {
   is never rendered as an Error, and this node carries no icon, rule or color
   that would read as one.
 */
+/*
+  A status, styled like the other statuses: coloured rule, coloured text, glyph.
+  Warning rather than error, because the spine forbids rendering a cancellation
+  as an Error and `--color-error` is what the Error Panel means here.
+*/
 .fd-cancel-summary {
-    margin: 0;
+    display: flex;
+    gap: var(--spacing-3);
+    align-items: center;
     padding: var(--spacing-4);
-    border: 1px solid var(--color-control-border);
+    border: 1px solid var(--color-warning);
     border-radius: var(--radius-md);
     background: var(--color-surface);
-    color: var(--color-text);
+    color: var(--color-warning);
+}
+
+.fd-cancel-summary__icon {
+    display: grid;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    border: 1px solid currentColor;
+    border-radius: var(--radius-full);
+    font-size: var(--text-body);
+}
+
+.fd-cancel-summary__text {
+    margin: 0;
 }
 
 /* ------------------------------------------------------------ Paper packets */
