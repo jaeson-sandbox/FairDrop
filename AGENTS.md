@@ -1,94 +1,71 @@
 <!-- bmad:context -->
-<!-- Verified 2026-08-22 against 854c1508fbe09c0d7a858c2e18a049ee3c8553ca. Managed by
-     bmad-project-context; edits inside this block are replaced on refresh. Keep anything
-     you want preserved outside the markers. -->
+<!-- Verified 2026-09-01 against bb4ef9e. Managed by bmad-project-context; edits
+     inside this block are replaced on refresh. Keep preserved guidance outside
+     the markers. -->
 
 ## FairDrop
 
-Ephemeral LAN peer-to-peer file transfer desktop app — drop a file, a receiver pulls it
-over HTTP, nothing is persisted. Go + Wails v2 with a React 19 / TypeScript / Tailwind v4
-frontend. The product spec is `docs/fairdrop-spec.md`; per-phase specs and review findings
-live in `_bmad-output/implementation-artifacts/`.
-
-## Policy
-
-- Never commit directly to `main` — branch per spec phase (e.g. `phase-1-wails-scaffold`).
+FairDrop is an ephemeral LAN peer-to-peer file-transfer desktop app: drop one file
+or folder, let one receiver pull it over HTTP, and persist nothing. It uses Go,
+Wails v2, React 19, TypeScript, and Tailwind v4. The canonical product contract is
+`_bmad-output/specs/spec-fairdrop/SPEC.md` with `docs/fairdrop-architecture.md` and
+`docs/fairdrop-contracts.md`; the UX `DESIGN.md` and `EXPERIENCE.md` control visual
+presentation, public copy, focus, and announcements. Treat `docs/fairdrop-spec.md`
+as historical narrative and apply all corrections and supersessions before using it.
 
 ## Where things are
 
-- `docs/fairdrop-spec.md` — read its "Phase 1 Corrections" section before the body; four
-  instructions in the original text are wrong and the corrections supersede them.
-- `_bmad-output/implementation-artifacts/` — one spec per phase (intent, boundaries, Code
-  Map) plus `deferred-work.md`, review findings that belong to phases not yet built.
-- `internal/{transfer,source,network,stream,server}` — implemented (Stories 1.1-1.4):
-  domain contracts, the file-only source adapter, LAN selection plus the mDNS beacon, the
-  file payload adapter, and the one-shot capability HTTP server.
-- Ports are consumer-owned, so they do not all live in `internal/transfer`:
-  `SourcePort`, `NetworkPort` and `ServerPort` do, but `PayloadPort`/`PreparedPayload`
-  belong to `internal/server`, which consumes them, and `internal/stream` implements them.
-- Every Phase 1 provider-owned interface is now gone: `NetworkManager` (1.2), `Streamer`
-  (1.3), `TransferServer`/`TransferStats` (1.4). A placeholder is *replaced* by its
-  consumer-owned port as its story lands; never leave a duplicate shadow type.
+- `main.go` composes adapters and Wails options; `app.go` is the bound command and
+  event boundary.
+- `internal/transfer` owns the domain, coordinator, and consumer-owned `SourcePort`,
+  `NetworkPort`, `QRPort`, and `ServerPort`.
+- `internal/server` owns the consumed `PayloadPort` and `PreparedPayload`;
+  `internal/{source,network,qr,stream,server}` provide concrete adapters.
+- Extend these existing ports for Epic 2. Never resurrect the retired
+  `NetworkManager`, `Streamer`, `TransferServer`, or `TransferStats` contracts.
+- `frontend/src/App.tsx` owns drop, focus, and announcement routing;
+  `frontend/src/transfer` owns validation and session state; `frontend/src/ui`
+  owns the Paper Relay views and accessibility behavior.
+- Current story specs, sprint state, retrospectives, and routed findings live in
+  `_bmad-output/implementation-artifacts/`.
 
 ## Running and verifying
 
-- Prepend `/c/Program Files/Go/bin` and `~/go/bin` to PATH — neither Go nor the Wails CLI
-  is on the default PATH here, so bare `go`/`wails` fail with command-not-found.
-- Run `wails build` before a standalone `npm run build` in a fresh tree: it regenerates
-  `frontend/wailsjs/`, and the committed copy can lack exports the frontend imports.
-- `go test -race` needs cgo, and the C toolchain is not on the default PATH. Prepend
-  `.../WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_*/mingw64/bin` and set
-  `CGO_ENABLED=1`; without both, the race detector fails with "requires cgo" rather than
-  reporting a clean run, so an unset PATH silently skips the check instead of failing it.
+- After changing the exported `App` command surface, run `wails build` before
+  standalone frontend checks so `frontend/wailsjs/` is regenerated. Never edit
+  generated bindings by hand.
+- Run `frontend/npm test` separately: `wails build` compiles the frontend but does
+  not run Vitest. CI coverage for this remains owned by Story 3.2.
+- BMAD Python scripts need `PYTHONIOENCODING=utf-8` outside the configured Claude
+  environment because the Windows default encoding is cp1252.
 
-- When a story deletes a contract, grep the whole repo — `docs/` included — not just
-  `internal/`. `docs/fairdrop-spec.md` kept publishing deleted interfaces twice because
-  the check was package-scoped, and a spec that still advertises a deleted type is what
-  the next agent reads first.
+## Non-default conventions
 
-## Conventions that differ from defaults
-
-- Tailwind is v4: the plugin goes in `vite.config.ts` with `@import "tailwindcss";` in CSS.
-  Never add `tailwind.config.js` or a PostCSS config — that is the v3 setup.
-- Native file drop is gated on the inherited CSS custom property `--wails-drop-target: drop`,
-  not a class or a DOM drop handler.
-- `main_test.go` pins the `wails.Run` options contract because compilation cannot catch a
-  wrong value — update its assertions whenever those options change. `BackgroundColour` is
-  among them: it is what the native window paints before the webview renders, so it must
-  track `--color-canvas` in `frontend/src/style.css` or every launch flashes.
-- The clipboard goes through the bound `CopyToClipboard` command, never
-  `navigator.clipboard` — see the secure-context pitfall below.
-- Every entry in `_bmad-output/implementation-artifacts/deferred-work.md` carries an
-  `owner:` — a story key from `sprint-status.yaml`, or `discharged`/`accepted`.
-  `TestEveryDeferredEntryHasALiveOwner` fails without one, so a finding cannot stop
-  being someone's problem by being written down.
+- Tailwind is v4: use the Vite plugin and `@import "tailwindcss";`; do not add v3
+  Tailwind or PostCSS configuration.
+- Native drop targets inherit `--wails-drop-target: drop`; do not replace this
+  with a DOM drop handler.
+- `main_test.go` pins the `wails.Run` options contract. Keep
+  `BackgroundColour` synchronized with `--color-canvas` to prevent launch flash.
+- Clipboard writes go through bound `CopyToClipboard`, never
+  `navigator.clipboard`.
+- Every deferred-work entry needs a live story owner or
+  `discharged`/`accepted`.
 
 ## Known pitfalls
 
-- `frontend/dist/.gitkeep` is tracked so `//go:embed all:frontend/dist` resolves on a clean
-  clone, and npm `postbuild` recreates it after Vite empties the directory. Keep
-  `.gitignore` on `frontend/dist/*`; the `frontend/dist/` form silently defeats the
-  `!frontend/dist/.gitkeep` negation.
-- BMAD's Python scripts crash with `UnicodeEncodeError` on Windows cp1252.
-  `PYTHONIOENCODING=utf-8` is set in `.claude/settings.json`; set it manually when running
-  them outside Claude Code.
-- `frontend/wailsjs/**` is regenerated by `wails build` — edits there are overwritten.
-  It is also **not** the whole runtime: the generated `runtime.d.ts` omits APIs the Go
-  `pkg/runtime` package has. Check `$(go env GOMODCACHE)/github.com/wailsapp/wails/v2@.../pkg/runtime`
-  before concluding Wails cannot do something — `ClipboardSetText` was missed exactly that way.
-- **The webview is not a secure context on macOS.** WKWebView loads `wails://wails/`, a custom
-  scheme registered with `setURLSchemeHandler:` that Wails never registers as secure; WebView2
-  loads `http://wails.localhost/`, which Chromium treats as trustworthy. So every browser API
-  gated on a secure context — `navigator.clipboard`, `crypto.subtle`, geolocation, media
-  capture, service workers — works on Windows and is *undefined* on macOS, with no error. A
-  feature verified in `wails dev` on Windows can be silently inert on a supported platform.
-  Route anything gated this way through a bound Go command instead.
-- Line endings are mixed in the working tree, and text-matching tests care. `.gitattributes`
-  pins `*.go`, `*.css`, `*.ts` and `*.tsx` to LF because `core.autocrlf` is on: without the
-  CSS pin, `frontend/src/ui/styles.test.ts` throws while parsing the stylesheet and reports
-  "no tests" for all of its assertions rather than failing one. Files committed before those
-  pins are still CRLF on disk, so normalize line endings before matching source text — a
-  patch or mutation harness that matches on `\n` silently matches nothing in those files.
+- Keep `frontend/dist/.gitkeep`, its `.gitignore` exception, and the npm
+  `postbuild` restoration so clean-clone embedding continues to work.
+- macOS Wails uses a non-secure custom webview scheme. Browser APIs gated on a
+  secure context may be absent there even when they work on Windows; route such
+  capabilities through Go.
+- Normalize line endings before source-text or mutation matching. This Windows
+  worktree uses `core.autocrlf`, and silent non-matches can produce false-green
+  verification.
+- Preserve complete failing-test output. Truncated logs destroyed the only
+  evidence for an unreproduced Epic 1 failure.
+- Browser-unit tests do not prove native interaction. Keep a real built-app,
+  nearby-device QR/download smoke test in each epic until Story 3.2 automates it.
 
 <!-- /bmad:context -->
 

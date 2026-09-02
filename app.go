@@ -44,7 +44,7 @@ type emitFunc func(ctx context.Context, eventName string, optionalData ...interf
 // clipboardFunc is the shape of the Wails runtime clipboard write.
 type clipboardFunc func(ctx context.Context, text string) error
 
-// App is FairDrop's Wails boundary: it translates the four bound commands into
+// App is FairDrop's Wails boundary: it translates the five bound commands into
 // coordinator calls, translates coordinator lifecycle events into runtime
 // emissions, and owns nothing else. Every decision about what a transfer is,
 // what state it is in, and what may happen next belongs to the coordinator.

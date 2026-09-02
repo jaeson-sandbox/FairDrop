@@ -1,10 +1,10 @@
 # FairDrop Architecture and Design
 
 Status: Final  
-Updated: 2026-08-22  
+Updated: 2026-09-01
 Binding companions: `_bmad-output/planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md` and `docs/fairdrop-contracts.md`
 
-This is the durable technical handoff for humans and implementation agents. The architecture spine is the terse source of binding invariants; this document explains how those invariants fit together and why. Product behavior comes from `docs/fairdrop-spec.md`, with its Phase 1 Corrections applied first. Where this document explicitly supersedes implementation guidance in that older spec, this document wins.
+This is the durable technical handoff for humans and implementation agents. The architecture spine is the terse source of binding invariants; this document explains how those invariants fit together and why. Product behavior comes from `_bmad-output/specs/spec-fairdrop/SPEC.md` and its binding companions. The corrected `docs/fairdrop-spec.md` is historical narrative only where it does not conflict.
 
 ## Goals
 
@@ -22,16 +22,16 @@ FairDrop uses ports and adapters around a single `internal/transfer.Coordinator`
 
 | Component | Responsibility | Must not own |
 | --- | --- | --- |
-| `main.go` | Construct concrete adapters, configure Wails, enforce one process | Transfer state or business rules |
+| `main.go` | Construct concrete adapters and configure Wails; Story 3.1 adds single-instance enforcement | Transfer state or business rules |
 | `app.go` | Translate Wails commands and coordinator notifications | HTTP handlers, filesystem traversal, lifecycle truth |
 | `internal/transfer` | Validate Stage intent, own state/session, coordinate setup and teardown | Wails runtime calls or concrete network/HTTP code |
 | `internal/network` | Select a LAN IPv4 address and own `_fairdrop._tcp` registration | Transfer state or UI events |
 | `internal/server` | Own listener, one-shot HTTP claim, headers, progress, and queued terminal events | Wails events or mDNS |
-| `internal/stream` | Copy a file or stream a directory ZIP with cancellation | Listener lifecycle or frontend state |
-| `internal/qrcode` | Encode the capability URL to an in-memory PNG | Filesystem output |
+| `internal/stream` | Copy a file with cancellation; Story 2.2 adds directory ZIP streaming | Listener lifecycle or frontend state |
+| `internal/qr` | Encode the capability URL to an in-memory PNG | Filesystem output |
 | React transfer reducer | Render backend-authoritative snapshots/events | Server or transfer lifecycle decisions |
 
-Interfaces belong to the package that consumes them. The three Phase 1 provider-owned interfaces are compile-only transitional scaffolding, not settled locations: before its first implementation, move the network/server lifecycle ports to `internal/transfer` and the streaming port to `internal/server`, then remove rather than duplicate the old public interface. Concrete constructors remain in `internal/network`, `internal/server`, and `internal/stream`. Context-aware Start/Stream behavior remains mandatory; Stop is idempotent and quiescent on every return; the server reports progress and terminal outcomes through the binding event stream.
+Interfaces belong to the package that consumes them. `SourcePort`, `NetworkPort`, `QRPort`, and `ServerPort` live in `internal/transfer`; `PayloadPort` and `PreparedPayload` live in `internal/server` and are implemented by `internal/stream`. The retired provider-owned interfaces must not be recreated as duplicate or conversion-only shadow types. Concrete constructors remain in their adapter packages. Context-aware Start/Stream behavior remains mandatory; Stop is idempotent and quiescent on every return; the server reports progress and terminal outcomes through the binding event stream.
 
 ## Transfer lifecycle
 
@@ -186,7 +186,7 @@ Required pre-merge checks grow to include Go tests/vet, frontend tests/build, an
 1. Multi-path drops are rejected in v1; the first path is never selected silently.
 2. Progress adds `totalKnown`; directory wire progress is indeterminate instead of dividing by zero or pretending uncompressed size equals response size.
 3. `FileMetadata` adds `sessionId` and warnings; lifecycle events add session ID, sequence, and `transfer-reset` so the backend remains authoritative.
-4. The Phase 1 provider-owned interfaces are replaced before first implementation by the consumer-owned ports in `docs/fairdrop-contracts.md`; context-aware behavior and adapter package responsibilities remain.
+4. The Phase 1 provider-owned interfaces were replaced by the consumer-owned ports in `docs/fairdrop-contracts.md`; context-aware behavior and adapter package responsibilities remain.
 5. `Stop` is idempotent and waits for owned work to finish.
 6. Mid-stream errors force an aborted response after notifying the coordinator.
 7. Capability URLs, trusted-LAN limits, and non-sensitive mDNS metadata define the previously missing security envelope.

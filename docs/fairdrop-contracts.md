@@ -1,7 +1,7 @@
 # FairDrop Binding Integration Contracts
 
 Status: Final  
-Updated: 2026-08-22  
+Updated: 2026-09-01
 Architecture: `docs/fairdrop-architecture.md`  
 Spine: `_bmad-output/planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md`
 
@@ -16,7 +16,7 @@ This document fixes the cross-package shapes and ordering rules that separate ph
 | Wails command DTOs | `app.go` adapter, derived from transfer values | `App` |
 | React event types | generated/hand-mirrored from Wails DTOs | `frontend/src/transfer` |
 
-The provider-owned interfaces created in Phase 1 are transitional. Delete each when its consumer-owned replacement lands; do not preserve duplicate interfaces or conversion-only shadow types.
+The provider-owned Phase 1 interfaces have been deleted. Do not recreate duplicate interfaces or conversion-only shadow types alongside the consumer-owned contracts above.
 
 ## Canonical domain values
 
@@ -251,9 +251,12 @@ func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
 func (a *App) CancelTransfer() error
 func (a *App) SelectFile() (string, error)
 func (a *App) SelectDirectory() (string, error)
+func (a *App) CopyToClipboard(text string) error
 ```
 
 `SelectFile` and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. A cancelled native dialog returns an empty selection without emitting a transfer error. The frontend validates that native drop arrays contain exactly one path before calling `StageTransfer`.
+
+`CopyToClipboard` writes through the Wails Go runtime. The frontend never relies on `navigator.clipboard`, because the macOS Wails webview is not a secure context.
 
 Wails command failures use `options.App.ErrorFormatter` to serialize `PublicError` as a JSON string. The generated runtime rejects with `Error.message` containing that JSON; frontend `parseCommandError` parses and validates `{code,message}`, falling back to `transfer_failed` for malformed/unknown errors. `main_test.go` pins the formatter option.
 
