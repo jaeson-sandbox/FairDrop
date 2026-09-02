@@ -29,24 +29,24 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 08-23-2026 15:18
+last_updated: 09-01-2026 22:24
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 development_status:
-  epic-1: backlog
-  1-1-validate-and-describe-one-file-selection: backlog
-  1-2-select-and-advertise-a-reachable-lan-endpoint: backlog
-  1-3-prepare-and-stream-a-regular-file-safely: backlog
-  1-4-serve-a-one-shot-capability-download: backlog
-  1-5-stage-and-authorize-a-transfer-transactionally: backlog
-  1-6-complete-cancel-and-reset-the-transfer-lifecycle: backlog
-  1-7-expose-safe-transfer-commands-through-wails: backlog
-  1-8-manage-session-scoped-frontend-state-and-events: backlog
-  1-9-render-the-paper-relay-transfer-views: backlog
-  1-10-meet-the-accessibility-and-recovery-contract: backlog
-  epic-1-retrospective: optional
+  epic-1: done
+  1-1-validate-and-describe-one-file-selection: done
+  1-2-select-and-advertise-a-reachable-lan-endpoint: done
+  1-3-prepare-and-stream-a-regular-file-safely: done
+  1-4-serve-a-one-shot-capability-download: done
+  1-5-stage-and-authorize-a-transfer-transactionally: done
+  1-6-complete-cancel-and-reset-the-transfer-lifecycle: done
+  1-7-expose-safe-transfer-commands-through-wails: done
+  1-8-manage-session-scoped-frontend-state-and-events: done
+  1-9-render-the-paper-relay-transfer-views: done
+  1-10-meet-the-accessibility-and-recovery-contract: done
+  epic-1-retrospective: done
 
   epic-2: backlog
   2-1-validate-and-stage-one-directory: backlog
@@ -57,4 +57,56 @@ development_status:
   3-1-enforce-one-running-fairdrop-instance: backlog
   3-2-automate-reproducible-cross-platform-verification: backlog
   3-3-produce-and-smoke-test-native-release-artifacts: backlog
+  3-4-bound-every-lifecycle-wait-and-prove-quiescence: backlog
+  3-5-reconcile-public-error-copy-with-its-states: backlog
   epic-3-retrospective: optional
+action_items:
+  - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
+    epic: 1
+    action: "Stop offering a folder path this build refuses: hide the directory chooser
+      and the folder wording until Epic 2, or state the limit in copy the spine registers.
+      Needs an EXPERIENCE.md decision."
+    owner: "Epic 2 / UX owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
+  - id: "epic-1-retro-item-2-make-a-dropped-or-unparsed-transfer-comp"
+    epic: 1
+    action: "Make a dropped or unparsed transfer-complete fail visibly instead of
+      rendering as a cancellation, and give the undelivered counter a surface."
+    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
+  - id: "epic-1-retro-item-3-constrain-warning-code-at-the-boundary-o"
+    epic: 1
+    action: "Constrain Warning.Code at the boundary, or widen the cross-language pin
+      to cover warning codes."
+    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
+  - id: "epic-1-retro-item-4-make-the-discovery-warning-reach-a-scree"
+    epic: 1
+    action: "Make the discovery warning reach a screen reader: give the beacon-warning
+      row a reachable trigger or move the banner inside the announced region."
+    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
+  - id: "epic-1-retro-item-5-rename-internal-stream-archiver-go-to-ma"
+    epic: 1
+    action: "Rename internal/stream/archiver.go to match what it does."
+    owner: "2-2-stream-a-safe-directory-zip"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
+  - id: "epic-1-retro-item-6-pin-all-twelve-public-error-messages-cro"
+    epic: 1
+    action: "Pin all twelve public error messages cross-language, or delete Go's display-dead
+      copies."
+    owner: "3-5-reconcile-public-error-copy-with-its-states"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
+  - id: "epic-1-retro-item-7-settle-progress-coherence-on-one-strateg"
+    epic: 1
+    action: "Settle progress coherence on one strategy, and stop parsing Stage metadata
+      twice."
+    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"

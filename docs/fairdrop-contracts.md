@@ -236,6 +236,12 @@ type PayloadPort interface {
 
 `Prepare` runs before response headers. For a file, it opens and stats the same descriptor, validates the staged root, and returns a known length. For a directory it returns an unknown wire length and begins streaming only from `WriteTo`. `Close` is idempotent.
 
+`Prepare` pins filesystem identity: it `Lstat`s the selected root immediately before opening it and compares that against the opened descriptor with `os.SameFile`. Kind, size, and modification time are forgeable together, so they are not sufficient on their own; a mismatch is `source_changed` before headers.
+
+`Size` is a bound, not a hint. `WriteTo` never writes more than the advertised length, and fails `transfer_failed` if the source delivers fewer bytes, because a short body reported as success would match no `Content-Length` already on the wire and would pass silently through any abort-on-error defense. `WriteTo` is once-only; a second call fails `transfer_failed` rather than reporting a no-op as success. A context deadline that expires is `transfer_failed`, not `cancelled` -- only a real cancellation is `cancelled`.
+
+`DownloadName` is sanitized by the payload, not by the server. It is a bare basename with no separator, no `..`, no control or Unicode format character, and none of the delimiters that terminate or extend the `filename` parameter. The server places the value in the header as given.
+
 After successful `Prepare`, the server owns exactly one `Close`. It never calls `Close` concurrently with `WriteTo`. Cancellation order is: cancel the data-plane context, force-close the HTTP connection/destination so writes unblock, wait for `WriteTo` and its workers to return, then call `Close`. The same ownership covers normal completion, receiver disconnect, header failure, Cancel, and Stop-before-Write.
 
 ## Public Wails API

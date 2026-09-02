@@ -1044,3 +1044,59 @@ So that users receive a desktop application whose actual transfer journey has be
 **When** release readiness is evaluated
 **Then** the release is blocked with the failing platform and scenario recorded
 **And** architecture or contract changes discovered during release feed back into the spec, architecture decision log and documents, relevant story, tests, and managed agent context before retry.
+
+### Story 3.4: Bound Every Lifecycle Wait and Prove Quiescence
+
+As a sender,
+I want FairDrop to always finish shutting a transfer down,
+So that a stuck adapter cannot leave the window unusable with no way out.
+
+**Acceptance Criteria:**
+
+**Given** every wait the coordinator and server perform while holding a lock or lease
+**When** the awaited party never returns
+**Then** the wait ends on a documented bound and the caller reports a coded failure rather than blocking forever
+**And** the bound is asserted by a test that drives an adapter which deliberately never returns, for each of: `unwind` on the drainer, the claim's `StopBeacon`, `AuthorizeClaim` as seen by `Stop`, and the two waits Story 1.6 added.
+
+**Given** `ServerPort.Stop` blocking while it holds the server mutex
+**When** a later `Start` is attempted
+**Then** neither deadlocks the other
+**And** restart after `Stop` has a specified, tested contract rather than being merely possible.
+
+**Given** an `Observer.Publish` that panics or blocks
+**When** the coordinator next runs a lifecycle command
+**Then** the operation lease is released on every path and the coordinator remains usable
+**And** a test drives both a panicking and a blocking observer through a full lifecycle.
+
+**Given** an event lane that closes while the session is STAGED or CLAIMING
+**When** the drainer observes the close
+**Then** the coordinator synthesizes a terminal outcome rather than holding a dead session
+**And** the UI is never left waiting on an event that cannot arrive.
+
+**Given** the dropped-event counter the Wails boundary maintains
+**When** a lifecycle event cannot be delivered
+**Then** the condition reaches a surface a user or a test can observe rather than an inert field
+**And** a lost terminal event no longer strands the window with no control.
+
+### Story 3.5: Reconcile Public Error Copy with the States It Describes
+
+As a sender,
+I want the message I am shown to describe what actually happened,
+So that I am not told a transfer stopped when none ever started.
+
+**Acceptance Criteria:**
+
+**Given** the fixed error copy registry in `EXPERIENCE.md`
+**When** every producer of a coded failure is enumerated
+**Then** each state that currently borrows `transfer_failed` or `busy` is listed with the message a user sees and whether that message is true of it
+**And** the audit names at least the pre-startup refusals, a CSPRNG failure during Stage, a Prepare-time deadline, a malformed Stage acknowledgement, and `Stage` during the three-second terminal lease.
+
+**Given** states that no existing code truthfully describes
+**When** the copy contract is revised
+**Then** `EXPERIENCE.md` gains the codes and exact strings they need, and the binding registry, the Go table, and the TypeScript mirror move together
+**And** the cross-language pin fails if any of the four places drifts.
+
+**Given** the revised registry
+**When** a user reaches each affected state
+**Then** the visible message describes that state and offers a recovery that applies to it
+**And** no state is described as an interrupted transfer unless a transfer began.
