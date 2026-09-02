@@ -146,10 +146,10 @@ describe('the Terracotta Linen token layer', () => {
             '--text-label: 12px;',
             '--text-code: 12px;',
             '--text-control: 13px;',
-            '--radius-xs: 3px;',
-            '--radius-sm: 5px;',
-            '--radius-md: 8px;',
-            '--radius-lg: 10px;',
+            '--radius-xs: 4px;',
+            '--radius-sm: 8px;',
+            '--radius-md: 12px;',
+            '--radius-lg: 16px;',
             '--radius-full: 9999px;',
             '--spacing-window-gutter: 20px;',
             '--spacing-target-min: 44px;',
@@ -159,10 +159,30 @@ describe('the Terracotta Linen token layer', () => {
         }
     })
 
-    it('loads no web font, because the spine allows system-safe stacks only', () => {
-        expect(stylesheet).not.toContain('@font-face')
-        expect(stylesheet).not.toContain('Nunito')
+    it('fetches no font over the network, and declares only the weight it ships', () => {
+        /*
+          The spine's rule was "system-safe stacks only, do not load a web
+          font", amended to allow one bundled face. What the rule was protecting
+          survives and is asserted here: nothing is fetched at runtime, so there
+          is no third party and no render-blocking request.
+
+          The weight matters as much as the source. Only Nunito 400 ships, so
+          asking for a heavier one would have the browser synthesise faux bold
+          -- smeared, and worse than the system face it replaced.
+        */
+        const face = block('@font-face {')
+        expect(face).toContain('font-weight: 400;')
+        expect(face).toMatch(/src: url\("assets\/fonts\/[^"]+\.woff2"\)/)
+        expect(stylesheet).not.toMatch(/@import url\(|https?:\/\//)
+
+        // Functional text stays on the system stack, which has real weights.
         expect(theme).toContain('--font-body: system-ui,')
+        expect(theme).toContain('--font-display: "Nunito"')
+
+        for (const [, weight] of theme.matchAll(/--font-weight-[a-z-]+: (\d+);/g)) {
+            expect(Number(weight), 'no weight may exceed what a real face carries')
+                .toBeLessThanOrEqual(650)
+        }
     })
 
     it('reaches every component value through a token rather than a literal', () => {
@@ -656,7 +676,13 @@ describe('declared weight nothing uses', () => {
         expect(JSON.stringify(manifest)).not.toContain('framer-motion')
     })
 
-    it('bundles no font file, because the spine allows system-safe stacks only', () => {
-        expect(existsSync(resolve(projectRoot, 'src/assets/fonts'))).toBe(false)
+    it('ships the face the stylesheet names, so the local reference resolves', () => {
+        const face = block('@font-face {')
+        const [, relative] = face.match(/src: url\("([^"]+)"\)/) ?? []
+
+        expect(relative, 'a local src in @font-face').toBeTruthy()
+        expect(existsSync(resolve(projectRoot, 'src', relative!))).toBe(true)
+        // The licence travels with the face it covers.
+        expect(existsSync(resolve(projectRoot, 'src/assets/fonts/OFL.txt'))).toBe(true)
     })
 })

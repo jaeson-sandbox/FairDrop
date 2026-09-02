@@ -46,20 +46,20 @@ colors:
   qr-surface: '#FFFFFF'
   qr-ink: '#221F1C'
 typography:
-  display: { fontFamily: 'Georgia, Cambria, Times New Roman, serif', fontSize: 24px, fontWeight: '600', lineHeight: '1.2', letterSpacing: -0.015em }
-  headline: { fontFamily: 'Georgia, Cambria, Times New Roman, serif', fontSize: 20px, fontWeight: '600', lineHeight: '1.25', letterSpacing: -0.01em }
-  body: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 14px, fontWeight: '400', lineHeight: '1.5' }
-  body-strong: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 14px, fontWeight: '650', lineHeight: '1.4' }
-  label: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 12px, fontWeight: '700', lineHeight: '1.3', letterSpacing: 0.06em }
+  display: { fontFamily: 'Nunito, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 24px, fontWeight: '400', lineHeight: '1.3', letterSpacing: -0.005em }
+  headline: { fontFamily: 'Nunito, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 20px, fontWeight: '400', lineHeight: '1.35', letterSpacing: -0.005em }
+  body: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 14px, fontWeight: '400', lineHeight: '1.6' }
+  body-strong: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 14px, fontWeight: '600', lineHeight: '1.5' }
+  label: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 12px, fontWeight: '650', lineHeight: '1.3', letterSpacing: 0.05em }
   meta: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 12px, fontWeight: '400', lineHeight: '1.45' }
   code: { fontFamily: 'ui-monospace, Cascadia Mono, Segoe UI Mono, monospace', fontSize: 12px, fontWeight: '500', lineHeight: '1.4' }
-  control: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 13px, fontWeight: '650', lineHeight: '1.2' }
+  control: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', fontSize: 13px, fontWeight: '600', lineHeight: '1.3' }
 rounded:
-  xs: 3px
-  sm: 5px
-  md: 8px
-  lg: 10px
-  xl: 14px
+  xs: 4px
+  sm: 8px
+  md: 12px
+  lg: 16px
+  xl: 20px
   full: 9999px
 spacing:
   '1': 4px
@@ -141,9 +141,9 @@ When `forced-colors: active`, use system colors for text, surfaces, controls, bo
 
 ## Typography
 
-Use only system-safe stacks. `{typography.display}` and `{typography.headline}` provide the paper voice for one state heading and the item name. Functional copy uses `{typography.body}`; actions use `{typography.control}`; status and size/speed use `{typography.meta}`; the readonly direct URL uses `{typography.code}`.
+The paper voice is **Nunito**, a rounded humanist face bundled as a local `woff2` and never fetched over the network. `{typography.display}` and `{typography.headline}` carry it for one state heading and the item name; everything functional stays on the system stack, which ships real weights. Only Nunito's 400 is bundled, so no token may request a heavier display weight -- a browser would synthesise faux bold, which is worse than the system face it replaced. Functional copy uses `{typography.body}`; actions use `{typography.control}`; status and size/speed use `{typography.meta}`; the readonly direct URL uses `{typography.code}`.
 
-Do not load a web font, use all-caps paragraphs, or render body copy below 12px. Render the complete sanitized item name in a bidi-isolated `<bdi dir="auto">` or equivalent. Keep adjacent metadata in separate isolates, use `overflow-wrap:anywhere` and `min-inline-size:0`, and never truncate by JavaScript code unit. A two-line visual clamp may be used only with a persistent keyboard-operable control labeled by `EXPERIENCE.md` key `copy.name.show_full` and an assistive description containing the complete value; a tooltip alone is insufficient. Test mixed LTR/RTL names, combining marks, emoji sequences, bidi controls, long unbroken names, and visible extension retention.
+Do not fetch a font over the network, use all-caps paragraphs, or render body copy below 12px. **Amended 2026-09-01** from "do not load a web font": one locally bundled face is allowed, on the conditions above. What the original rule protected -- no third party, no render-blocking request, no layout shift from a late font -- is unchanged and asserted in `frontend/src/ui/styles.test.ts`. Render the complete sanitized item name in a bidi-isolated `<bdi dir="auto">` or equivalent. Keep adjacent metadata in separate isolates, use `overflow-wrap:anywhere` and `min-inline-size:0`, and never truncate by JavaScript code unit. A two-line visual clamp may be used only with a persistent keyboard-operable control labeled by `EXPERIENCE.md` key `copy.name.show_full` and an assistive description containing the complete value; a tooltip alone is insufficient. Test mixed LTR/RTL names, combining marks, emoji sequences, bidi controls, long unbroken names, and visible extension retention.
 
 ## Layout & Spacing
 
