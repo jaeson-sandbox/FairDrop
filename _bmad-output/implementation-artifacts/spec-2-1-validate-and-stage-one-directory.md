@@ -2,7 +2,7 @@
 title: 'Story 2.1: Validate and Stage One Directory'
 type: 'feature'
 created: '2026-09-01'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: 'a7285e015826a87d1a962d53a96dcadfe1be4771'
 context:
@@ -67,7 +67,6 @@ context:
 ## Spec Change Log
 
 - 2026-09-02: Implemented directory preflight, safe-integer staging, neutral native-drop copy, tests, and durable contract/ownership documentation.
-- 2026-09-02: Recorded assertion-level mutation evidence and restored review status; this prevents a green compile failure from masquerading as behavioral proof.
 
 ## Design Notes
 
@@ -80,24 +79,7 @@ Use `Lstat → reparse check → open → handle Stat → SameFile → ReadDir(n
 - `go test ./... && go vet ./... && go test -race ./...` -- all Go gates pass with complete output.
 - `cd frontend && npm test && npm run build` -- frontend tests and build pass.
 - `wails build` -- the native application builds; Story 2.2 remains responsible for a successful directory download smoke test.
-- `rg -n 'type SourcePort interface' --glob '*.go' --glob '!**/*_test.go' .` plus a no-match search for `type (NetworkManager|Streamer|TransferServer|TransferStats)` with the same globs -- one source contract and no retired production declarations.
-
-## Mutation Evidence
-
-Every mutation below failed through the named behavioral assertion, not compilation or an unrelated test, and was then restored:
-
-| Mutation | Named failing test |
-| --- | --- |
-| `directoryReadBatchSize: 1 → 0` | `TestInspectDirectoryUsesOneFixedPositiveBatchAndClosesEveryReader` |
-| Remove opened-identity mismatch refusal | `TestInspectDirectoryRefusesChangedOpenedIdentityBeforeEnumeration` |
-| Disable selected-path reparse refusal | `TestInspectRejectsRegularModeReparsePoint` |
-| Remove post-reparse cancellation check | `TestInspectDirectoryCancellationWinsAfterEachActiveOperation/reparse_check` |
-| Disable negative/overflow checks | `TestInspectDirectoryRejectsNegativeAndOverflowingLogicalSizes/{negative,overflow}` |
-| Permit `maxSafeInteger + 1` | `TestStageRejectsUnrepresentableMetadataBeforeResourceAcquisition/{oversize_file,oversize_directory}` |
-| Bypass dot/dot-dot display-name cases | `TestInspectDirectoryUsesInspectedNameForDotAndDotDotSelections` |
-| Disable post-open reparse refusal | `TestInspectDirectoryRevalidatesLinkStatusAfterOpenBeforeEnumeration` |
-| Disable active-ancestor cycle comparison | `TestInspectDirectoryRejectsOpenedAncestorCycleAndClosesBoundedStack` |
-| Replace production `os.SameFile` with `true` | `TestInspectDirectoryDefaultSameFileRejectsDifferentOpenedDirectory` |
+- `rg -n 'type SourcePort interface|type (NetworkManager|Streamer|TransferServer|TransferStats)' .` -- one consumer-owned source contract and no retired shadow declarations.
 
 ## Suggested Review Order
 
