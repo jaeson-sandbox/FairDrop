@@ -77,6 +77,7 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.firewall.macos_recovery` | macOS recovery | “Open System Settings → Network → Firewall → Options, allow incoming connections for FairDrop, then prepare the item again.” |
 | `copy.stage.pending.file` | File Stage pending | “Preparing your file…” |
 | `copy.stage.pending.folder` | Folder Stage pending | “Preparing your folder…” |
+| `copy.stage.pending.item` | Native-drop Stage pending before kind is known | “Preparing your item…” |
 | `copy.stage.heading` | Staged heading | “Ready to pass along” |
 | `copy.qr.instruction` | QR instruction | “Scan this code on the receiving device to start the download.” |
 | `copy.qr.alt` | QR accessible-name template | “Download QR code for [item name]” |

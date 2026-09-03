@@ -39,6 +39,7 @@ export const copy = {
         pending: {
             file: 'Preparing your file…',
             folder: 'Preparing your folder…',
+            item: 'Preparing your item…',
         },
         heading: 'Ready to pass along',
     },

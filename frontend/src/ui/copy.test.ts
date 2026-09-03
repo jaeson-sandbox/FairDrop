@@ -38,6 +38,9 @@ describe('approved product copy', () => {
         expect(copy.stage.pending.folder, 'copy.stage.pending.folder').toBe(
             'Preparing your folder…',
         )
+        expect(copy.stage.pending.item, 'copy.stage.pending.item').toBe(
+            'Preparing your item…',
+        )
         expect(copy.stage.heading, 'copy.stage.heading').toBe(
             'Ready to pass along',
         )
@@ -180,6 +183,7 @@ describe('approved product copy', () => {
             'stage.heading',
             'stage.pending.file',
             'stage.pending.folder',
+            'stage.pending.item',
             'unit.byte',
             'unit.bytes',
             'unit.gigabytes',

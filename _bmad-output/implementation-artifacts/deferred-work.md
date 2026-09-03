@@ -104,7 +104,7 @@ being anyone's problem.
 
 - source_spec: `spec-1-1-validate-and-describe-one-file-selection.md`
   summary: Claim-time source revalidation and payload opening should pin filesystem identities so an ancestor replacement cannot exploit the metadata snapshot's TOCTOU window.
-  owner: 2-1-validate-and-stage-one-directory
+  owner: 2-2-stream-a-safe-directory-zip
   evidence: Story 1.1 now `Lstat`s every syntactic ancestor, rejects native Windows reparse attributes, and rechecks cancellation, but separate path-based metadata calls cannot atomically prevent a local rename between checks. The binding contract already assigns later defenses to claim-time re-`Lstat` and descriptor-first payload opening; their stories must preserve and verify that layering.
 
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
@@ -119,7 +119,7 @@ being anyone's problem.
 
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
   summary: The claim-time re-`Lstat` does not re-apply Story 1.1's reparse-point check, so a junction created inside the validate-to-open window surfaces as `source_changed` rather than `path_unsupported`.
-  owner: 2-1-validate-and-stage-one-directory
+  owner: 2-2-stream-a-safe-directory-zip
   evidence: `Payloads.lstatPath` is a bare `os.Lstat`. A reparse point created between `Inspect` and that `Lstat` is caught only incidentally, by `os.SameFile` failing. The transfer is still refused and no wrong bytes stream, so this is a code-accuracy issue rather than a safety hole, but the frozen matrix's link-like row promises `path_unsupported`.
 
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
