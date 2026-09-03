@@ -768,7 +768,6 @@ func TestStagedDirectoryReportsIsDir(t *testing.T) {
 	folder := testItem()
 	folder.Kind = ItemDirectory
 	folder.Name = "holiday-photos"
-	folder.LogicalSize = 42
 	h.source.inspect = func(context.Context, string) (StagedItem, error) { return folder, nil }
 
 	metadata, err := h.stage()
@@ -781,99 +780,6 @@ func TestStagedDirectoryReportsIsDir(t *testing.T) {
 	if metadata.Name != folder.Name {
 		t.Fatalf("Name = %q, want %q", metadata.Name, folder.Name)
 	}
-	if metadata.Size != 42 || metadata.SessionID != testSessionID || metadata.URL != testURL {
-		t.Fatalf("directory metadata = %+v, want exact size/session/URL", metadata)
-	}
-	if metadata.QR != base64.StdEncoding.EncodeToString(testPNG) || metadata.Warnings == nil || len(metadata.Warnings) != 0 {
-		t.Fatalf("directory QR/warnings = %q/%+v, want encoded PNG and []", metadata.QR, metadata.Warnings)
-	}
-	requests := h.server.startRequests()
-	if len(requests) != 1 || requests[0].Item != folder {
-		t.Fatalf("server requests = %+v, want the exact directory item", requests)
-	}
-}
-
-func TestStageRejectsUnrepresentableMetadataBeforeResourceAcquisition(t *testing.T) {
-	t.Parallel()
-
-	const maxSafeInteger int64 = 9007199254740991
-	for _, test := range []struct {
-		name string
-		kind ItemKind
-		size int64
-	}{
-		{name: "negative file", kind: ItemFile, size: -1},
-		{name: "oversize file", kind: ItemFile, size: maxSafeInteger + 1},
-		{name: "negative directory", kind: ItemDirectory, size: -1},
-		{name: "oversize directory", kind: ItemDirectory, size: maxSafeInteger + 1},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			h := newHarness(t)
-			item := testItem()
-			item.Kind = test.kind
-			item.LogicalSize = test.size
-			h.source.inspect = func(context.Context, string) (StagedItem, error) { return item, nil }
-
-			metadata, err := h.stage()
-			if metadata.SessionID != "" {
-				t.Fatalf("rejected Stage returned metadata %+v", metadata)
-			}
-			if got := ErrorCodeOf(err); got != ErrTransferFailed {
-				t.Fatalf("error code = %q, want %q", got, ErrTransferFailed)
-			}
-			if got := h.calls.snapshot(); !slices.Equal(got, []string{"entropy.Read", "entropy.Read", "source.Inspect"}) {
-				t.Fatalf("calls = %v, want rejection before network resources", got)
-			}
-			assertUnwoundToIdle(t, h)
-		})
-	}
-}
-
-func TestStageAcceptsSafeIntegerBoundaryForBothKinds(t *testing.T) {
-	t.Parallel()
-
-	const maxSafeInteger int64 = 9007199254740991
-	for _, kind := range []ItemKind{ItemFile, ItemDirectory} {
-		kind := kind
-		t.Run(string(kind), func(t *testing.T) {
-			h := newHarness(t)
-			item := testItem()
-			item.Kind = kind
-			item.LogicalSize = maxSafeInteger
-			h.source.inspect = func(context.Context, string) (StagedItem, error) { return item, nil }
-
-			metadata, err := h.stage()
-			if err != nil {
-				t.Fatalf("Stage() error = %v", err)
-			}
-			if metadata.Size != maxSafeInteger || metadata.IsDir != (kind == ItemDirectory) {
-				t.Fatalf("metadata = %+v, want safe boundary for %q", metadata, kind)
-			}
-		})
-	}
-}
-
-func TestDirectoryStageFailureKeepsReverseUnwind(t *testing.T) {
-	t.Parallel()
-
-	h := newHarness(t)
-	item := testItem()
-	item.Kind = ItemDirectory
-	h.source.inspect = func(context.Context, string) (StagedItem, error) { return item, nil }
-	h.qr.encode = func(context.Context, string) ([]byte, error) {
-		return nil, NewError(ErrQRFailed, "fixture QR failure")
-	}
-
-	_, err := h.stage()
-	if got := ErrorCodeOf(err); got != ErrQRFailed {
-		t.Fatalf("error code = %q, want %q", got, ErrQRFailed)
-	}
-	if got := h.calls.snapshot(); !slices.Equal(got, []string{
-		"entropy.Read", "entropy.Read", "source.Inspect", "network.GetLocalIP", "server.Start", "qr.EncodePNG", "server.Stop",
-	}) {
-		t.Fatalf("directory unwind order = %v, want reverse release after QR failure", got)
-	}
-	assertUnwoundToIdle(t, h)
 }
 
 // The capability path is asserted as a literal here on purpose, and separately

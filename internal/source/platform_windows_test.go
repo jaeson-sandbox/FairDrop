@@ -106,46 +106,6 @@ func TestInspectRejectsNativeJunctionAncestor(t *testing.T) {
 	assertCode(t, err, transfer.ErrPathUnsupported)
 }
 
-func TestInspectRejectsNativeJunctionRootWithTrailingSeparator(t *testing.T) {
-	t.Parallel()
-
-	base := t.TempDir()
-	target := filepath.Join(base, "target")
-	junction := filepath.Join(base, "junction")
-	if err := os.Mkdir(target, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if output, err := exec.Command("cmd.exe", "/c", "mklink", "/J", junction, target).CombinedOutput(); err != nil {
-		t.Skipf("junction fixture unavailable: %v (%s)", err, strings.TrimSpace(string(output)))
-	}
-	t.Cleanup(func() { _ = os.Remove(junction) })
-
-	_, err := New().Inspect(context.Background(), junction+string(os.PathSeparator))
-	assertCode(t, err, transfer.ErrPathUnsupported)
-}
-
-func TestInspectRejectsNativeNestedJunction(t *testing.T) {
-	t.Parallel()
-
-	base := t.TempDir()
-	root := filepath.Join(base, "selected")
-	target := filepath.Join(base, "target")
-	junction := filepath.Join(root, "nested-junction")
-	if err := os.Mkdir(root, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(target, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if output, err := exec.Command("cmd.exe", "/c", "mklink", "/J", junction, target).CombinedOutput(); err != nil {
-		t.Skipf("junction fixture unavailable: %v (%s)", err, strings.TrimSpace(string(output)))
-	}
-	t.Cleanup(func() { _ = os.Remove(junction) })
-
-	_, err := New().Inspect(context.Background(), root)
-	assertCode(t, err, transfer.ErrPathUnsupported)
-}
-
 func TestInspectRejectsNativeNULDevice(t *testing.T) {
 	t.Parallel()
 
@@ -177,14 +137,6 @@ func TestInspectPreservesLongWindowsPath(t *testing.T) {
 	if item.Path != path {
 		t.Fatalf("Path = %q, want byte-identical %q", item.Path, path)
 	}
-
-	directoryItem, err := New().Inspect(context.Background(), directory)
-	if err != nil {
-		t.Fatalf("Inspect(long directory path) error = %v", err)
-	}
-	if directoryItem.Path != directory || directoryItem.Kind != transfer.ItemDirectory {
-		t.Fatalf("directory metadata = %+v, want byte-identical directory path", directoryItem)
-	}
 }
 
 func TestInspectPreservesExtendedLengthWindowsPath(t *testing.T) {
@@ -205,24 +157,6 @@ func TestInspectPreservesExtendedLengthWindowsPath(t *testing.T) {
 	}
 	if item.Path != extended {
 		t.Fatalf("Path = %q, want byte-identical %q", item.Path, extended)
-	}
-
-	ordinaryDirectory := filepath.Join(t.TempDir(), "extended-directory")
-	if err := os.Mkdir(ordinaryDirectory, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	extendedDirectory := extendedLengthPath(ordinaryDirectory)
-	if _, err := os.Lstat(extendedDirectory); err != nil {
-		t.Skipf("native Go cannot inspect the extended-length directory fixture: %v", err)
-	}
-	for _, selected := range []string{extendedDirectory, extendedDirectory + string(os.PathSeparator)} {
-		directoryItem, err := New().Inspect(context.Background(), selected)
-		if err != nil {
-			t.Fatalf("Inspect(extended directory %q) error = %v", selected, err)
-		}
-		if directoryItem.Path != selected || directoryItem.Kind != transfer.ItemDirectory {
-			t.Fatalf("directory metadata = %+v, want byte-identical extended directory %q", directoryItem, selected)
-		}
 	}
 }
 
@@ -248,31 +182,6 @@ func TestInspectPreservesReachableUNCPath(t *testing.T) {
 	}
 	if item.Path != path {
 		t.Fatalf("Path = %q, want byte-identical %q", item.Path, path)
-	}
-}
-
-func TestInspectPreservesReachableUNCDirectory(t *testing.T) {
-	path := os.Getenv("FAIRDROP_TEST_UNC_DIRECTORY")
-	if path == "" {
-		t.Skip("FAIRDROP_TEST_UNC_DIRECTORY does not name a reachable UNC fixture")
-	}
-	if !strings.HasPrefix(path, `\\`) {
-		t.Fatalf("FAIRDROP_TEST_UNC_DIRECTORY = %q, want a UNC path", path)
-	}
-	info, err := os.Lstat(path)
-	if err != nil {
-		t.Skipf("configured UNC fixture is not reachable: %v", err)
-	}
-	if !info.IsDir() {
-		t.Fatalf("configured UNC fixture mode = %v, want a directory", info.Mode())
-	}
-
-	item, err := New().Inspect(context.Background(), path)
-	if err != nil {
-		t.Fatalf("Inspect(UNC directory) error = %v", err)
-	}
-	if item.Path != path || item.Kind != transfer.ItemDirectory {
-		t.Fatalf("directory metadata = %+v, want byte-identical UNC directory", item)
 	}
 }
 

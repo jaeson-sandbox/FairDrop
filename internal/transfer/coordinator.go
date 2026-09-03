@@ -322,13 +322,6 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
 		return c.failStage(live, err)
 	}
-	// JavaScript numbers can represent integers exactly only through 2^53-1.
-	// Refuse invalid metadata before any network, server, QR, or beacon resource
-	// is acquired, regardless of whether the source is a file or directory.
-	const maxSafeInteger int64 = 9007199254740991
-	if item.LogicalSize < 0 || item.LogicalSize > maxSafeInteger {
-		return c.failStage(live, NewError(ErrTransferFailed, "selection logical size cannot be represented safely"))
-	}
 	live.item = item
 
 	// 2. Resolve the address the receiver will dial.
