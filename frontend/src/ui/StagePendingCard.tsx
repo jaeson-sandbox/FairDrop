@@ -16,14 +16,15 @@ interface StagePendingCardProps {
  * only thing on screen that is allowed to be true before it is.
  *
  * A native drop supplies a path and nothing else, so its kind is `'unknown'`
- * until metadata arrives. An unknown kind therefore shows no kind tab at all
- * and falls back to the file wording, which is the one this epic's file-only
- * source adapter can actually accept; a folder dropped here fails validation a
- * moment later with its own fixed copy.
+ * until metadata arrives. An unknown kind therefore shows no kind tab and uses
+ * neutral item wording; the source adapter may prove either a file or folder.
  */
 export function StagePendingCard({state, onCancel}: StagePendingCardProps) {
     const itemKind = selectPendingItemKind(state)
     const folder = itemKind === 'directory'
+    const pendingCopy = itemKind === 'unknown'
+        ? copy.stage.pending.item
+        : folder ? copy.stage.pending.folder : copy.stage.pending.file
 
     return (
         <div className="fd-region" data-phase-view="pending" data-item-kind={itemKind ?? 'none'}>
@@ -33,7 +34,7 @@ export function StagePendingCard({state, onCancel}: StagePendingCardProps) {
                 )}
                 <section className="fd-pending-card">
                     <h1 className="fd-state-heading" tabIndex={-1} data-focus-target="pending-heading">
-                        {folder ? copy.stage.pending.folder : copy.stage.pending.file}
+                        {pendingCopy}
                     </h1>
                     {/*
                       A pending cancellation keeps this control focused and

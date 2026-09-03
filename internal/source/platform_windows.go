@@ -14,10 +14,13 @@ func platformReparsePoint(info fs.FileInfo) (bool, error) {
 		return false, errors.New("Windows file metadata is nil")
 	}
 	data, ok := info.Sys().(*syscall.Win32FileAttributeData)
-	if !ok || data == nil {
-		return false, fmt.Errorf("unexpected Windows file metadata type %T", info.Sys())
+	if ok && data != nil {
+		return data.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0, nil
 	}
-	return data.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0, nil
+	if metadata, ok := info.(interface{ FairDropReparse() bool }); ok {
+		return metadata.FairDropReparse(), nil
+	}
+	return false, fmt.Errorf("unexpected Windows file metadata type %T", info.Sys())
 }
 
 func platformUnreachableNetworkError(err error) bool {

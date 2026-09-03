@@ -109,19 +109,19 @@ Stable domain error codes are:
 | `invalid_selection` | zero/multiple paths or empty path at an input boundary |
 | `busy` | Stage requested outside IDLE |
 | `cancelled` | Stage/claim/transfer lost to Cancel or Shutdown |
-| `path_not_found` | selected root no longer exists |
+| `path_not_found` | selected root or nested entry disappears during inspection or preparation |
 | `path_unsupported` | link, reparse point, special file, or host-unsupported path |
-| `source_changed` | staged regular-file type/size/modtime changed before claim |
+| `source_changed` | directory identity mismatched before enumeration, or staged regular-file type/size/modtime changed before claim |
 | `network_unavailable` | no eligible LAN IPv4 |
 | `server_start_failed` | listener could not become ready |
 | `qr_failed` | capability QR could not be encoded |
 | `beacon_warning` | HTTP/QR are ready but mDNS publication failed; non-terminal |
-| `transfer_failed` | read, ZIP, connection, or post-header stream failure |
+| `transfer_failed` | invalid preflight size arithmetic, handle-close, read, ZIP, connection, or post-header stream failure |
 | `shutting_down` | command rejected after application shutdown begins |
 
 Errors wrap internal causes but expose only the stable code and safe message to React. Absolute paths and capability tokens are never included in HTTP or mDNS errors.
 
-`ErrorCodeOf` uses `errors.As` to find `CodedError` through `%w` wrappers and maps every unknown non-nil error to `transfer_failed`. `PublicErrorOf` uses the recognized code and a fixed safe message; it never copies arbitrary adapter text. `SourcePort` may return `path_not_found`, `path_unsupported`, or `source_changed`; network selection returns `network_unavailable`; beacon start returns `beacon_warning`; server start returns `server_start_failed`; QR encoding returns `qr_failed`; claim authorization returns `cancelled` or `shutting_down`; payload preparation/streaming returns the applicable path/source code or `transfer_failed`. Adapters create or preserve this `internal/transfer` carrier and never compare error strings. `ServerFailed.Err` preserves the wrapped coded error unchanged; the coordinator maps unknowns only at its UI boundary.
+`ErrorCodeOf` uses `errors.As` to find `CodedError` through `%w` wrappers and maps every unknown non-nil error to `transfer_failed`. `PublicErrorOf` uses the recognized code and a fixed safe message; it never copies arbitrary adapter text. `SourcePort` may return `cancelled`, `path_not_found`, `path_unsupported`, `source_changed`, or `transfer_failed` for invalid size arithmetic; network selection returns `network_unavailable`; beacon start returns `beacon_warning`; server start returns `server_start_failed`; QR encoding returns `qr_failed`; claim authorization returns `cancelled` or `shutting_down`; payload preparation/streaming returns the applicable path/source code or `transfer_failed`. Adapters create or preserve this `internal/transfer` carrier and never compare error strings. `ServerFailed.Err` preserves the wrapped coded error unchanged; the coordinator maps unknowns only at its UI boundary.
 
 ## Coordinator-facing ports
 
@@ -205,6 +205,10 @@ type Observer interface {
     Publish(event Event) // synchronous FIFO handoff; implementation must not reorder
 }
 ```
+
+`SourcePort.Inspect` preserves `absolutePath` byte-for-byte in `StagedItem.Path`. It parses only a POSIX root, Windows drive root, or UNC share (including their supported extended spellings), rejects device namespaces, alternate streams, and non-local Windows components, and then evaluates `.` and `..` against a validated handle stack without cleaning or reconstructing the path. Metadata opens request only attribute rights, lexical directory handles request search/traverse rights, and list/read rights are acquired only for a directory that will actually be enumerated. All component and nested lookups are native no-follow operations relative to the already-open parent; Windows uses `NtCreateFile` with `FILE_OPEN_REPARSE_POINT`, while POSIX uses `openat` with no-follow metadata/search handles. Before enumeration, the inspected and opened directory identities must match, the opened object must still be non-link-like, and every child directory identity is compared with active ancestors to refuse cycles without a global visited index. Enumeration is exactly `ReadDir(1)`; traversal sums only non-negative regular-file sizes with checked `int64` addition, attempts every owned close, and retains only active-depth handles plus one entry. Cancellation is checked immediately after every native operation and wins over operation or cleanup failures. A link-like, cyclic, or special entry is `path_unsupported`; a mismatched opened identity is `source_changed`; disappearance remains `path_not_found`; arithmetic faults are `transfer_failed`.
+
+After inspection and cancellation revalidation, the coordinator rejects every file or directory `LogicalSize` outside `0..9007199254740991` as `transfer_failed` before calling the network, server, QR, or beacon ports. This is the exact-integer boundary of the JavaScript metadata contract.
 
 The coordinator also consumes injectable entropy and clock/timer ports so session/token generation and the three-second reset are deterministic in tests. Those test seams may use idiomatic signatures chosen in the coordinator package; they must preserve the ownership and timing rules below.
 
