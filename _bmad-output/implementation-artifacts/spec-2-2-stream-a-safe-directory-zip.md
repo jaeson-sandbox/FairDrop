@@ -2,7 +2,7 @@
 title: 'Story 2.2: Stream a Safe Directory ZIP'
 type: 'feature'
 created: '2026-09-03'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '6ba41368789c6bb2980c755928ab1222b4b58a01'
 context:
@@ -187,3 +187,60 @@ POSIX content open is the sharp edge: `O_RDONLY|O_NOFOLLOW` on a FIFO blocks for
 - Greps: one production `SourcePort`; no `archive/zip` outside `internal/stream`; no `WalkDir`, `ReadDir(-1)`, or temp-file creation in the stream path
 - Unzip with a second tool and with `archive/zip` to prove central-directory validity
 - Record assertion-level mutations for entry-name relativity, one-top-level-root, close ordering, worker join, per-entry revalidation, the FIFO guard, and the `.zip` cap; restore after each
+
+## Suggested Review Order
+
+**The port and who owns the descriptors**
+
+- Start here: the visitor borrows a reader the source closes, so stream owns no handle.
+  [`ports.go:40`](../../internal/transfer/ports.go#L40)
+
+- The walk contract: re-validated per entry, no index, one handle per active depth.
+  [`ports.go:54`](../../internal/transfer/ports.go#L54)
+
+**Reading bytes safely, which Story 2.1 never did**
+
+- One traversal serves both inspection and streaming; only the size arm differs.
+  [`source.go:69`](../../internal/source/source.go#L69)
+
+- POSIX opens content non-blocking and rejects by fstat, so a FIFO cannot park the response.
+  [`handle_posix.go:74`](../../internal/source/handle_posix.go#L74)
+
+- Windows asks the kernel to refuse a directory rather than checking afterwards.
+  [`handle_windows.go:301`](../../internal/source/handle_windows.go#L301)
+
+- Entry names are built from the walk, never reconstructed from a path.
+  [`source.go:454`](../../internal/source/source.go#L454)
+
+**The archive, and what happens when it fails**
+
+- The worker is joined on every exit path, including the early cancellation returns.
+  [`archive.go:63`](../../internal/stream/archive.go#L63)
+
+- zip.Writer.Close precedes the pipe close so the central directory reaches the receiver.
+  [`archive.go:135`](../../internal/stream/archive.go#L135)
+
+- On failure the writer is halted first: a broken stream must not read as a complete archive.
+  [`archive.go:245`](../../internal/stream/archive.go#L245)
+
+- The last gate before a name goes into the archive.
+  [`archive.go:370`](../../internal/stream/archive.go#L370)
+
+**Claim time, the last moment a failure can still pick a status**
+
+- The re-Lstat now carries the reparse refusal, closing a deferred entry from Story 1.3.
+  [`payload.go:247`](../../internal/stream/payload.go#L247)
+
+**Peripherals**
+
+- Bounded memory, sampled inside the walk because measuring afterwards proved nothing.
+  [`archive_memory_test.go:37`](../../internal/stream/archive_memory_test.go#L37)
+
+- The empty-read guard, whose removal now hangs a named test instead of nothing.
+  [`archive_stall_test.go:34`](../../internal/stream/archive_stall_test.go#L34)
+
+- Size and ModTime, both of which were zeroable with the suite green.
+  [`walk_metadata_test.go:21`](../../internal/source/walk_metadata_test.go#L21)
+
+- The contract's directory carve-outs for identity pinning and the Size bound.
+  [`fairdrop-contracts.md:256`](../../docs/fairdrop-contracts.md#L256)
