@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-03-2026
+last_updated: 09-04-2026 13:30
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -50,8 +50,8 @@ development_status:
 
   epic-2: in-progress
   2-1-validate-and-stage-one-directory: done
-  2-2-stream-a-safe-directory-zip: review
-  epic-2-retrospective: optional
+  2-2-stream-a-safe-directory-zip: done
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-enforce-one-running-fairdrop-instance: backlog
@@ -110,3 +110,33 @@ action_items:
     owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
+  - id: "epic-2-retro-item-8-stage-a-real-folder-and-download-it-as-a"
+    epic: 2
+    action: "Stage a real folder and download it as a ZIP from a phone browser on
+      the same Wi-Fi, then record what was observed. This is the epic's own stated
+      acceptance evidence and the only claim still unverified."
+    owner: "Epic 2 / human"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
+  - id: "epic-2-retro-item-9-restore-the-dropped-agents-md-pitfalls-a"
+    epic: 2
+    action: "Restore the dropped AGENTS.md pitfalls, above all that -race without
+      cgo skips silently rather than failing, and note that a context refresh must
+      diff what it removes."
+    owner: "3-2-automate-reproducible-cross-platform-verification"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
+  - id: "epic-2-retro-item-10-drive-the-server-handler-with-a-director"
+    epic: 2
+    action: "Drive the server handler with a directory payload so the omitted Content-Length
+      and the unknown-total snapshot are proved where the requirement is phrased."
+    owner: "3-2-automate-reproducible-cross-platform-verification"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
+  - id: "epic-2-retro-item-11-give-archive-drain-the-stall-guard-its-t"
+    epic: 2
+    action: "Give archive.drain the stall guard its two sibling loops carry, or record
+      why it does not need one."
+    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
