@@ -4,7 +4,7 @@
 
 ## Goal
 
-Extend the proven one-item transfer journey from regular files to directories. A sender can stage one safe folder and a nearby browser receives a valid ZIP, while FairDrop preserves its defining constraints: no temporary payload archive, no payload-sized memory or retained file index, no unsafe filesystem traversal, and honest unknown-total progress.
+Extend the proven one-item transfer journey from regular files to directories. A sender stages one safe folder through the established workflow and a nearby browser receives a valid ZIP, while FairDrop preserves its defining constraints: no temporary payload archive, no payload-sized memory or retained file index, no unsafe filesystem traversal, and honest unknown-total progress. The completed one-file path must not regress.
 
 ## Stories
 
@@ -19,9 +19,9 @@ Extend the proven one-item transfer journey from regular files to directories. A
 - Directory staging returns the same complete immutable transfer metadata as file staging, with the directory flag, root name, logical display size, session identity, capability URL, QR image, and non-fatal warnings. Existing file behavior must remain unchanged.
 - The receiver must obtain a browser-compatible ZIP containing exactly one top-level root. Empty directories and empty files remain representable; archive entry names must never be absolute, volume-qualified, empty, dot-dot, or traversal-bearing.
 - Runtime product data remains ephemeral. Do not create a temporary archive, build a payload-sized index, persist metadata, or read the payload into memory. Preflight uses only traversal overhead and streaming remains O(buffer) in payload size.
-- Filesystem contents are not snapshotted. Revalidate entries during streaming, allow ordinary additions, removals, or in-place changes only under the defined unsnapshotted policy, and fail safely when a change creates an invalid or inaccessible source.
-- Directory progress reports actual ZIP bytes written to the HTTP response with an unknown total: `totalKnown=false`, `totalBytes=0`, and `percent=0`. Directory responses omit `Content-Length`.
-- Verification must cover nested and empty trees, unsafe entries, mutation, permissions, cancellation, receiver disconnects, Unicode and platform-capable long/UNC paths, bounded memory, ZIP central-directory integrity, close ordering, goroutine exit, and a native nearby-browser ZIP smoke test.
+- Filesystem contents are not snapshotted. Revalidate entries during streaming, allow ordinary additions, removals, or in-place changes only under the defined unsnapshotted policy, and fail safely when a change creates an invalid, link-like, special, or out-of-root source.
+- Directory progress reports actual ZIP bytes written to the HTTP response with an unknown total: `totalKnown=false`, `totalBytes=0`, and `percent=0`. Directory responses omit `Content-Length` while keeping the shared safe download, cache, CORS, and nosniff headers.
+- Verification must cover nested and empty trees, unsafe entries, mutation, permissions, cancellation, receiver disconnects, Unicode and platform-capable long/UNC paths, bounded memory, ZIP central-directory integrity, close ordering, goroutine exit, and a native nearby-browser ZIP smoke test proving no temporary payload file appears on disk.
 
 ## Technical Decisions
 
@@ -33,8 +33,15 @@ Extend the proven one-item transfer journey from regular files to directories. A
 
 ## UX & Interaction Patterns
 
-Folder selection uses the existing native drop and Select Directory paths, local preparation state, staged QR-first handoff, Cancel behavior, and backend-authoritative lifecycle. Staged metadata shows the sanitized folder name and logical size and explicitly says the folder downloads as a ZIP. During transfer, use the static unknown-total treatment with no `aria-valuenow`, plus live wire bytes and visual throughput; never infer a percentage from logical source size. Reduced motion must leave this state understandable without animation, and completion copy describes only sender-observed sending—not whether the receiving device opened or stored the ZIP.
+- Folder selection reuses the existing surfaces: the native drop target and the semantic Select Directory action, both keyboard-reachable, with a cancelled dialog staying quiet.
+- Local preparation uses the existing Stage Pending surface and its cancel-preparation control. The pending copy names the item kind by stable key: folder wording for the directory browse action, file wording for the file action, and kind-neutral "item" wording for a native drop, where the kind is not yet known when the pending surface appears. Pending state never claims backend STAGED, and an obsolete promise from a superseded request generation cannot commit state.
+- Staged keeps the QR-first handoff: the code is the primary path and the direct link is the fallback. It shows the sanitized, bidi-isolated folder name and its logical size, plus the fixed note that the folder downloads as a ZIP. The item summary must keep logical size visibly distinct from the unknown ZIP wire total.
+- Transferring uses the unknown-total treatment: no `aria-valuenow`, a static non-directional pattern, the unknown-total status string, live wire bytes, and visual-only throughput. Never infer a percentage from logical source size.
+- Reduced motion must leave the unknown-total state understandable without animation; text, pattern, and live byte counts carry it. Assistive progress speech stays throttled and meaningful-change gated, and throughput is never spoken.
+- Completion copy describes only sender-observed sending. Where the browser saved the ZIP, whether it opened, and Files integration are receiver-owned and must not be claimed.
+- All literal strings come from the copy registry by stable key, including the fixed public error messages; banned vocabulary stays out. Reuse the existing visual token set and components rather than inventing folder-specific styling; the paper-voice display face is bundled locally at one weight and is never fetched over the network.
+- Generic receiver 404/423/410 pages remain an accepted V1 limitation covered by the existing sender-side help copy; folder transfers introduce no receiver page.
 
 ## Cross-Story Dependencies
 
-Story 2.1 establishes safe directory identity, logical metadata, and staging behavior that Story 2.2 consumes. Story 2.2 must repeat safety checks at stream time because preflight is not a snapshot. Both stories depend on the existing single-use capability server, cancellation/teardown ownership, session-scoped events, and unknown-total frontend state; neither may regress the completed one-file path.
+Story 2.1 establishes safe directory identity, logical metadata, and staging behavior that Story 2.2 consumes. Story 2.2 must repeat safety checks at stream time because preflight is not a snapshot. Both stories depend on the existing single-use capability server, cancellation/teardown ownership, session-scoped events, and unknown-total frontend state; neither may regress the completed one-file path. The cross-device folder-ZIP checks in the native verification matrix remain open and are gated by Epic 3 release and smoke-test work.
