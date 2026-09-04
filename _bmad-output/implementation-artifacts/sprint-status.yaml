@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-04-2026 13:30
+last_updated: 09-04-2026 13:34
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -67,7 +67,7 @@ action_items:
       and the folder wording until Epic 2, or state the limit in copy the spine registers.
       Needs an EXPERIENCE.md decision."
     owner: "Epic 2 / UX owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-2-make-a-dropped-or-unparsed-transfer-comp"
     epic: 1
@@ -94,7 +94,7 @@ action_items:
     epic: 1
     action: "Rename internal/stream/archiver.go to match what it does."
     owner: "2-2-stream-a-safe-directory-zip"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-6-pin-all-twelve-public-error-messages-cro"
     epic: 1
