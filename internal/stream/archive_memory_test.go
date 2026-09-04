@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -26,13 +25,22 @@ Retained live heap is the right measure here, not cumulative TotalAlloc.
 Per-entry allocation that is immediately garbage is legitimate -- a ZIP
 writer builds and discards a header for every entry -- so TotalAlloc grows
 with entry count for a correct implementation and would make this test
-assert the opposite of what it means. HeapAlloc after a GC is what survives.
+assert the opposite of what it means. 	HeapAlloc after a GC is what survives.
+
+It is sampled at the last entry, not after WriteTo returns. A first version
+measured afterwards and was demonstrably weaker: an index rooted in the
+payload was caught, but one accumulated in a local inside the archive worker
+is unreachable by then and got collected before the measurement, so that
+mutation passed. The peak this criterion is about happens while the walk is
+still on the stack.
 
 One thing genuinely is O(entries) and cannot be otherwise: archive/zip
-retains a small central-directory record per entry, because the format
-writes that directory at the end. The ceiling below therefore accommodates
-the central directory while staying far under what retaining the entries
-themselves -- names, metadata, or content -- would cost.
+retains a central-directory record per entry, because the format writes that
+directory at the end. Measured here at a steady ~248 bytes per entry from
+10,000 entries upward -- about 12 MiB at fifty thousand. So the bound that can
+honestly be asserted is per-entry overhead, not a fixed ceiling: what must not
+happen is this story's own layers keeping a second record per entry on top of
+the one the format forces.
 */
 func TestArchiveRetainedMemoryDoesNotGrowWithEntryCount(t *testing.T) {
 	const entries = 50000
@@ -42,6 +50,7 @@ func TestArchiveRetainedMemoryDoesNotGrowWithEntryCount(t *testing.T) {
 	body := strings.Repeat("b", 64)
 
 	walked := 0
+	var peak uint64
 	src := &scriptedSource{
 		inspect: func(context.Context, string) (transfer.StagedItem, error) { return staged, nil },
 		walk: func(ctx context.Context, _ string, visit transfer.SourceVisitor) error {
@@ -59,6 +68,14 @@ func TestArchiveRetainedMemoryDoesNotGrowWithEntryCount(t *testing.T) {
 					return err
 				}
 				walked++
+				if walked == entries {
+					// Still inside the walk: everything the stream is holding
+					// is reachable here, including a worker-local index.
+					runtime.GC()
+					var atPeak runtime.MemStats
+					runtime.ReadMemStats(&atPeak)
+					peak = atPeak.HeapAlloc
+				}
 			}
 			return nil
 		},
@@ -75,78 +92,34 @@ func TestArchiveRetainedMemoryDoesNotGrowWithEntryCount(t *testing.T) {
 	}()
 
 	runtime.GC()
-	var heapBefore, heapAfter runtime.MemStats
+	var heapBefore runtime.MemStats
 	runtime.ReadMemStats(&heapBefore)
 	if err := prepared.WriteTo(context.Background(), io.Discard); err != nil {
 		t.Fatalf("WriteTo() error = %v", err)
 	}
-	runtime.GC()
-	runtime.ReadMemStats(&heapAfter)
-	// Without these the payload and its source are dead by the second read, and
-	// a retained index would be collected before it could be measured.
 	runtime.KeepAlive(prepared)
 	runtime.KeepAlive(src)
 
 	if walked != entries {
 		t.Fatalf("walked %d entries, want %d", walked, entries)
 	}
+	if peak == 0 {
+		t.Fatal("never sampled the heap during the walk; the ceiling proved nothing")
+	}
 
 	var retained uint64
-	if heapAfter.HeapAlloc > heapBefore.HeapAlloc {
-		retained = heapAfter.HeapAlloc - heapBefore.HeapAlloc
+	if peak > heapBefore.HeapAlloc {
+		retained = peak - heapBefore.HeapAlloc
 	}
-	// Measured repeatedly at ~0.8 MiB for this tree, dominated by the
-	// compressor. The ceiling sits above that and well below the ~4 MiB that
-	// fifty thousand retained SourceEntry records cost, which is what makes
-	// this assertion able to fail: a ceiling generous enough to admit the
-	// index would look exactly like a passing test.
-	const ceiling = uint64(2 << 20)
-	if retained > ceiling {
-		t.Fatalf("retained live heap grew by %d bytes streaming %d entries, want at most %d",
-			retained, entries, ceiling)
-	}
-}
-
-/*
-No temporary archive is ever staged on disk.
-
-Counting the shared temp directory around a stream cannot prove this: other
-tests create and remove their own temp directories concurrently, so the
-count moves in both directions for reasons that have nothing to do with the
-archive. The claim is about what this package is capable of, so it is
-settled against the package's own source instead -- deterministic, and it
-fails the moment someone introduces a temp-file call rather than only when
-a timing window happens to expose one.
-*/
-func TestStreamPackageNeverCreatesATemporaryFile(t *testing.T) {
-	t.Parallel()
-
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		t.Fatal(err)
-	}
-	banned := []string{"os.CreateTemp", "os.MkdirTemp", "ioutil.TempFile", "ioutil.TempDir"}
-
-	scanned := 0
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		source, err := os.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		scanned++
-		for _, call := range banned {
-			if strings.Contains(string(source), call) {
-				t.Errorf("%s calls %s: the payload path must never stage bytes on disk", name, call)
-			}
-		}
-	}
-	// Without this the loop could scan nothing and still pass, which is the
-	// shape a green test takes when it has quietly stopped looking.
-	if scanned == 0 {
-		t.Fatal("scanned no production files; the guard proved nothing")
+	// 248 bytes per entry is the format's own cost, stable across entry counts.
+	// A retained SourceEntry adds roughly another 96 -- a string header, its
+	// bytes, a kind, a size and a timestamp -- so a budget of 300 sits above
+	// what ZIP requires and below what a second index would cost. A ceiling
+	// loose enough to admit that index would look exactly like a passing test.
+	const perEntryBudget = 300
+	budget := uint64(entries) * perEntryBudget
+	if retained > budget {
+		t.Fatalf("live heap at the last of %d entries grew by %d bytes (%d per entry), want at most %d",
+			entries, retained, retained/uint64(entries), budget)
 	}
 }

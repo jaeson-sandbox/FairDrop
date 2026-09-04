@@ -20,7 +20,7 @@ context:
 
 ## Boundaries & Constraints
 
-**Always:** Reuse 2.1's no-follow handles. Content opens are parent-relative, no-follow; POSIX opens `O_NONBLOCK` and rejects by `fstat` before clearing it; Windows adds `FILE_READ_DATA` with `FILE_NON_DIRECTORY_FILE`. `internal/source` owns every handle and closes in reverse order; the visitor borrows a reader valid only for its call. Re-check every entry at stream time. Entry names are root-relative `filepath.ToSlash`, under one top-level directory, never absolute, volume-qualified, empty, dot-dot, or traversal-bearing. `zip.Writer.Close()` precedes pipe-writer close; `WriteTo` leaves no goroutine of its own and returns non-nil on truncation. `Size()` is `(0, false)`. Download name is the sanitized root plus `.zip`, capped after appending. Memory is O(buffer + depth), never O(entries). Contracts and architecture move with the port. File behavior stays byte-identical.
+**Always:** Reuse 2.1's no-follow handles. Content opens are parent-relative, no-follow; POSIX opens `O_NONBLOCK` and rejects by `fstat` before clearing it; Windows adds `FILE_READ_DATA` with `FILE_NON_DIRECTORY_FILE`. `internal/source` owns every handle and closes in reverse order; the visitor borrows a reader valid only for its call. Re-check every entry at stream time. Entry names are root-relative `filepath.ToSlash`, under one top-level directory, never absolute, volume-qualified, empty, dot-dot, or traversal-bearing. `zip.Writer.Close()` precedes pipe-writer close; `WriteTo` leaves no goroutine of its own and returns non-nil on truncation. `Size()` is `(0, false)`. Download name is the sanitized root plus `.zip`, capped after appending. Memory is O(buffer + depth + one central-directory record per entry), never O(payload bytes) and never a second per-entry index of this story's own. Contracts and architecture move with the port. File behavior stays byte-identical.
 
 **Ask First:** Any change to the frozen HTTP header matrix, including the recorded CORS, `Accept-Ranges`, and `Access-Control-Expose-Headers` gaps. Any `SourcePort` change beyond adding the walk. Weakening no-follow, identity, cancellation, memory, or path-preservation rules.
 
@@ -66,7 +66,7 @@ context:
 **Acceptance Criteria:**
 - Given a staged directory, when the receiver downloads, then a browser-openable ZIP arrives with one top-level root and a valid central directory, no `Content-Length`, and progress reporting `totalKnown=false`.
 - Given any exit — success, cancel, disconnect, unsafe entry, read failure — when `WriteTo` returns, then no goroutine of its own runs, both pipe ends and the ZIP writer are closed, and a later `Close` neither races nor double-releases.
-- Given a wide or deep tree, when it streams, then retained memory is bounded by buffer plus depth, does not grow with entry count, and no temporary archive exists on disk.
+- Given a wide or deep tree, when it streams, then live heap during the walk stays within the format's own per-entry central-directory cost, does not grow with payload bytes, and no temporary archive exists on disk.
 - Given each load-bearing guarantee is deliberately broken, when its focused mutation runs, then a named behavioral test fails rather than compilation or an unrelated assertion.
 
 ## Implementation Evidence
@@ -95,7 +95,7 @@ restored:
 | Deliberate break | Named failing test |
 | --- | --- |
 | Return from `WriteTo` without joining the worker | `TestWriteToPropagatesAWalkFailureWithoutAppendingToTheBody` |
-| Close the pipe writer before `zip.Writer.Close()` | `TestStreamedArchiveOpensWithASecondImplementation` |
+| Close the pipe writer before `zip.Writer.Close()` | `TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory` (cited over `TestStreamedArchiveOpensWithASecondImplementation`, which skips when no second ZIP tool is on PATH) |
 | Skip `halt()` so a failed stream still yields a valid archive | `TestWriteToAbortsOnAnEntryThatBecomesUnsafeMidStream` |
 | Report a known total from `Size()` | `TestPrepareDirectoryIsLazyAndReportsAnUnknownLength` |
 | Leave the pipe read end open after drain | `TestWriteToStopsPromptlyWhenTheReceiverDisconnects` |
@@ -103,15 +103,18 @@ restored:
 | Admit a backslash or NUL in an entry name | `TestArchiveEntryNamesAreRelativeAndNeverEscapeTheRoot/backslash` |
 | Admit a volume-qualified entry name | `TestArchiveEntryNamesAreRelativeAndNeverEscapeTheRoot/volume_qualified` |
 | Stop placing entries under the single root | `TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory` |
-| Retain one record per entry while streaming | `TestArchiveRetainedMemoryDoesNotGrowWithEntryCount` |
+| Retain one record per entry while streaming, rooted in the payload | `TestArchiveRetainedMemoryDoesNotGrowWithEntryCount` |
+| Retain one record per entry in a worker local | `TestArchiveRetainedMemoryDoesNotGrowWithEntryCount` |
 | Drop the withheld-stop diagnostic | `TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer` |
 
 Two survivors were examined and are not defects. Removing the absolute-prefix check in
 `archiveEntryName` is an equivalent mutant: a leading `/` splits to an empty first segment,
 which the segment check already refuses, and removing both together is caught. The bounded
-memory assertion was itself mutation-checked after a first version proved dead -- a 6 MiB
-ceiling admitted the ~4 MiB a retained index costs, so it was tightened to 2 MiB against a
-measured ~0.8 MiB baseline and now fails the retained-index mutation.
+memory assertion went through three versions, each killed by mutation rather than by argument. A
+6 MiB ceiling admitted the ~4 MiB a retained index costs. Tightening it to 2 MiB caught an index
+rooted in the payload but still missed one held in a worker local, because it read the heap after
+`WriteTo` returned, by which point that local is unreachable. It now samples inside the walk at the
+last entry against a per-entry budget, and catches both variants.
 
 Out of spec, recorded rather than hidden: `TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer`
 was flaky from Epic 1 and is now diagnosed and fixed. It spawned a `Cancel` racing the reset
@@ -121,7 +124,54 @@ own test asserting only what holds under both orderings, and the diagnostic asse
 deterministic. 1000 runs clean, and the diagnostic assertion still fails when the branch it
 covers is removed.
 
+## Formal Review Triage
+
+Three context-free layers reviewed the diff. Findings were deduplicated by claim and action, then
+routed. Two required a human decision and were taken to the user rather than inferred.
+
+- **Intent gap, resolved by amendment:** the frozen memory bound was unachievable. See the change log.
+- **Human decision, kept deliberately:** `Inspect` refusing a POSIX-legal backslash entry name. Kept so a
+  folder fails at selection rather than at download, and recorded at the `Inspect` boundary in the
+  contract.
+- **Patched:** the reintroduced shell fixture, which interpolated a caller path into a PowerShell
+  `-Command` string -- Story 2.1 removed the last such fixture and recorded that the no-shell rule covers
+  verification code, its own triage drawing the line at "no command shell or interpolated path"; the path
+  now reaches PowerShell through the environment. Also: the contract paragraphs that were false for a
+  directory (`Size` as a bound, and the `Lstat`-plus-`SameFile` identity claim); the undocumented
+  halt-on-failure invariant; two Windows mask assertions that implied a separation the API does not make,
+  since `FILE_LIST_DIRECTORY` and `FILE_READ_DATA` are the same bit; `SourceEntry.Size` and directory
+  `ModTime`, both of which could be zeroed with the suite green; the archive's empty-read guard, which had
+  no test and whose removal now hangs a named test; an inert fixture line and an `err != nil` assertion
+  that any failure satisfied; a dead test helper; and a comment naming the wrong rune.
+- **Deferred with owners:** native POSIX execution of the content-open guards, a traversal depth bound,
+  large-archive and ZIP64 validation, the entry-name versus download-name hardening asymmetry, borrowed
+  reader goroutine safety, per-entry file modes, root identity across the Prepare-to-WriteTo window, a
+  handler-level `Content-Length` proof, and the host-dependent name predicates.
+- **Accepted:** the post-open regular-file recheck in `emitFile`, which `verifyOpened` already makes
+  unreachable. Kept as defence in depth and recorded so it is not re-derived as a gap.
+
+Gates were rerun after the patches: `gofmt` clean, `go vet` 0, `go test` 0, `-race` 0, frontend 490
+unchanged, `wails build` exit 0 producing `build/bin/fairdrop.exe`.
+
 ## Spec Change Log
+
+- 2026-09-04: The frozen memory bound was unachievable and is amended with human approval. "Memory is
+  O(buffer + depth), never O(entries)" cannot hold for any streamed ZIP: the format writes its central
+  directory at the end, so `archive/zip` retains one record per entry -- measured at a steady ~248 bytes
+  from 10,000 entries upward, about 12 MiB at fifty thousand. The bound now names that cost explicitly and
+  forbids what this story can actually control: a second per-entry index of its own, and any growth with
+  payload bytes. The known-bad state avoided is a criterion no correct implementation could ever satisfy,
+  which a green test can only be hiding. **KEEP:** the pipe-and-worker design, the close ordering, the halt
+  on failure, and the per-entry budget assertion, which catches both a payload-rooted and a worker-local
+  index.
+- 2026-09-04: Recorded out-of-spec, human-approved: `Inspect` now refuses an entry name containing a
+  backslash, which is legal on POSIX, so a folder that staged under Story 2.1 no longer stages. Kept
+  deliberately rather than relaxed, because failing at selection is the behaviour the Epic 1 retrospective
+  demanded over offering a folder and refusing it at download. The contract records it at the `Inspect`
+  boundary rather than only under `Walk`.
+- 2026-09-04: Also out of spec and recorded rather than hidden:
+  `TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer` was flaky from Epic 1, diagnosed here,
+  and split so the race assertion and the diagnostic assertion no longer share a test.
 
 ## Design Notes
 

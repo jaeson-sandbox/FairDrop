@@ -455,3 +455,53 @@ being anyone's problem.
   summary: Pin the not-a-directory fallback after the component walk, which no mutation can currently reach.
   owner: discharged
   evidence: `source.go`'s `if !currentInfo.IsDir()` after the lexical walk survives deletion with the suite green. It is genuinely reachable -- a `..` pop re-`Stat`s the popped ancestor without re-running `rejectUnsupportedInfo`, so an ancestor swapped for a special file between descent and pop lands there -- but the fake handle harness cannot yet vary a non-opened handle's reported mode between two stats, which is what the case needs. Story 2.2 owns claim-time revalidation and the same TOCTOU window.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Execute the POSIX content-open guards -- O_NONBLOCK plus fstat-then-reject -- on native Linux and macOS.
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: `posixNode.OpenChildContent` is the only read-granting open in the source package and the architecture text now claims a FIFO cannot block the response, but nothing asserts it. Every fixture entry is an ordinary regular file, so dropping `O_NONBLOCK` or the `S_IFREG` branch leaves the suite green. The failure it guards -- an entry swapped for a FIFO inside the metadata-to-content window -- parks the serving goroutine inside `openat` forever, after the response has started. The Windows twin is pinned by literal constants; POSIX has no equivalent.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Bound traversal depth so descriptor exhaustion cannot land mid-response.
+  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  evidence: `walkDirectory` holds one enumeration handle per active level with no cap, and `classifyMetadataError` renders `EMFILE` as `path_unsupported`. Under Story 2.1 that failed during preflight, where it could still choose an HTTP status; under 2.2 the same exhaustion breaks a live download after headers, with a misleading code. The deepest fixture is twelve levels.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Validate a large-entry-count archive by reading it back, and cover the ZIP64 thresholds.
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: The fifty-thousand-entry archive is streamed to `io.Discard` and never opened, so nothing proves a large archive is still readable. No test approaches 65,535 entries, a 4 GiB entry, or a 4 GiB total, which are the points where `archive/zip` switches to ZIP64 and where a receiver's extractor is most likely to disagree.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Reconcile ZIP entry-name hardening with the download-name sanitizer.
+  owner: 3-3-produce-and-smoke-test-native-release-artifacts
+  evidence: `sanitizeDownloadName` strips control and format characters, quotes, semicolons, colons, and trailing dots and spaces. `archiveEntryName` refuses only empty, separator, NUL, volume-qualified and dot segments. Both land on a receiver's filesystem, but an entry name may still carry a Windows reserved device name, a trailing dot or space, or a bidi override. The asymmetry is unexplained rather than deliberate.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Make the borrowed content reader safe to touch from another goroutine, or prove it cannot be.
+  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  evidence: `borrowedContent.returned` is a plain bool written after `visit` returns, and the platform `Close` implementations nil their file without synchronisation. The port comment promises a retained reader 'reads nothing', but a visitor that hands the reader to another goroutine gets a data race instead of a clean `fs.ErrClosed`. The existing test retains readers only sequentially, so `-race` never observes it.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Decide whether archive entries should carry a file mode.
+  owner: 3-3-produce-and-smoke-test-native-release-artifacts
+  evidence: `writeArchiveDirectory` sets `fs.ModeDir | 0o755`; `writeArchiveFile` sets no mode at all, so extracted files take whatever default the extractor picks and an executable bit is dropped. No test asserts an extracted mode on either kind.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Pin the selected root's identity across the Prepare-to-WriteTo window, or record why it is not pinned.
+  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  evidence: `prepareArchive` pins identity with an `Lstat` but the archive keeps only the path, so `Walk` re-resolves by name. A root replaced between claim and streaming is streamed under the approved download name and root entry. The unsnapshotted policy covers contents changing; it does not obviously cover the root becoming a different object. `os.Lstat` also follows ancestors, so an ancestor swapped for a symlink passes Prepare and is refused only after headers.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Exercise the server handler with a directory payload so the omitted Content-Length is proved end to end.
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: The acceptance criterion names response headers and unknown-total progress, but the story verifies only `Size() == (0, false)` at the payload level. No file under `internal/server` changed, so `writeDownloadHeaders` and `newMeter` are never driven by a directory payload and nothing proves the handler actually omits the header for one.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: Portable archive names are validated with host-dependent predicates.
+  owner: 3-2-automate-reproducible-cross-platform-verification
+  evidence: `childRelativeName` and `archiveEntryName` both use `filepath.IsAbs` and `filepath.VolumeName`, which are compiled for the sender's platform. On a Linux sender `C:evil.txt` is neither absolute nor volume-qualified, so those branches are dead exactly where the threat -- a Windows receiver extracting the archive -- lives.
+
+- source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
+  summary: The post-open regular-file recheck in emitFile is unreachable.
+  owner: accepted
+  evidence: `verifyOpened` already runs `rejectUnsupportedInfo`, which admits only regular files and directories, and compares identity, so a file cannot become a directory under the same identity. The follow-up `IsRegular` check therefore cannot fire and no mutation can reach it. Kept as defence in depth rather than deleted, on the same reasoning as the other layered guards in this package; recorded so a later reviewer does not re-derive it as a gap.

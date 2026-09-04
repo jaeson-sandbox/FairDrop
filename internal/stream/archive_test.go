@@ -107,8 +107,9 @@ func TestStreamedArchiveOpensWithASecondImplementation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tool, args := secondZipReader(t, archivePath)
-	output, err := exec.Command(tool, args...).CombinedOutput()
+	command := secondZipReader(t, archivePath)
+	tool := command.Path
+	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("%s could not read the streamed archive: %v\n%s", tool, err, output)
 	}
@@ -840,21 +841,31 @@ func cancelledContext() context.Context {
 
 // secondZipReader finds a ZIP implementation that is not archive/zip, so the
 // central-directory proof does not rest on the same code that wrote it.
-func secondZipReader(t *testing.T, archivePath string) (string, []string) {
+func secondZipReader(t *testing.T, archivePath string) *exec.Cmd {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		if shell, err := exec.LookPath("powershell.exe"); err == nil {
-			script := "$ErrorActionPreference='Stop';" +
+			// The path reaches PowerShell through the environment, never
+			// through the script text. Story 2.1 removed the last shell
+			// fixture here and recorded that the no-shell rule covers
+			// verification code too, drawing its line at "no command shell or
+			// interpolated path". Building a -Command string around a
+			// caller-supplied path is both: a path holding a single quote ends
+			// the literal and runs whatever follows.
+			const script = "$ErrorActionPreference='Stop';" +
 				"Add-Type -AssemblyName System.IO.Compression.FileSystem;" +
-				"$zip=[System.IO.Compression.ZipFile]::OpenRead('" + archivePath + "');" +
+				"$zip=[System.IO.Compression.ZipFile]::OpenRead($env:FAIRDROP_ARCHIVE);" +
 				"$zip.Entries | ForEach-Object { $_.FullName };" +
 				"$zip.Dispose()"
-			return shell, []string{"-NoProfile", "-NonInteractive", "-Command", script}
+			command := exec.Command(shell, "-NoProfile", "-NonInteractive", "-Command", script)
+			command.Env = append(os.Environ(), "FAIRDROP_ARCHIVE="+archivePath)
+			return command
 		}
 	}
 	if unzip, err := exec.LookPath("unzip"); err == nil {
-		return unzip, []string{"-l", archivePath}
+		// Already a value argument rather than shell text.
+		return exec.Command(unzip, "-l", archivePath)
 	}
 	t.Skip("no second ZIP implementation available on this host")
-	return "", nil
+	return nil
 }

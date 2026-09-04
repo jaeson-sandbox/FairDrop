@@ -290,14 +290,6 @@ func (f *fakeSource) Walk(ctx context.Context, absolutePath string, visit Source
 	return NewError(ErrTransferFailed, "coordinator must not walk a source tree")
 }
 
-func (f *fakeSource) walked() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	out := make([]string, len(f.walks))
-	copy(out, f.walks)
-	return out
-}
-
 func (f *fakeSource) inspected() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()

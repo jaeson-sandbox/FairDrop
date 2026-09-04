@@ -87,11 +87,18 @@ func TestWindowsHandleRightsSeparateMetadataSearchAndEnumeration(t *testing.T) {
 	if got := windowsSearchAccess(); got != 0x000000a0 {
 		t.Fatalf("search access = %#x, want literal attributes plus traverse", got)
 	}
+	// FILE_LIST_DIRECTORY and FILE_READ_DATA are the same bit, 0x1, so these
+	// two masks are necessarily identical and asserting them proves no
+	// separation between enumeration and content -- swapping the two function
+	// bodies would fail nothing here. They are pinned only to catch a widened
+	// mask. The separation that actually exists is in the open options below:
+	// FILE_DIRECTORY_FILE versus FILE_NON_DIRECTORY_FILE, which is what makes
+	// the kernel refuse the wrong kind of object.
 	if got := windowsEnumerationAccess(); got != 0x00000081 {
-		t.Fatalf("enumeration access = %#x, want literal attributes plus list", got)
+		t.Fatalf("enumeration access = %#x, want literal attributes plus the 0x1 bit", got)
 	}
 	if got := windowsContentAccess(); got != 0x00000081 {
-		t.Fatalf("content access = %#x, want literal attributes plus read-data only", got)
+		t.Fatalf("content access = %#x, want literal attributes plus the 0x1 bit", got)
 	}
 	if got := windowsAnyOptions(); got&0x00200000 == 0 {
 		t.Fatalf("metadata open options = %#x, want literal FILE_OPEN_REPARSE_POINT", got)

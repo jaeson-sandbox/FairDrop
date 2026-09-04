@@ -60,7 +60,7 @@ const maxDownloadNameRunes = 200
 // nameTrailingCutset is trimmed from the end of every sanitized name. Windows
 // drops trailing dots and spaces from a filename anyway; trimming here also
 // reduces "." and ".." to nothing while leaving a leading dot, and therefore a
-// legitimate dotfile, intact. The third rune is U+00A0: it survives an ASCII
+// legitimate dotfile, intact. The second rune is U+00A0: it survives an ASCII
 // trim and reads as trailing whitespace.
 const nameTrailingCutset = ".  "
 

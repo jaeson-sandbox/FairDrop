@@ -347,11 +347,10 @@ func TestWalkPropagatesAContentOpenFailureWithItsCode(t *testing.T) {
 	t.Parallel()
 
 	root := fakeDirectory("root")
-	entry := fakeFile("entry.txt", "bytes")
-	entry.contentOpenErr = os.ErrNotExist
-	root.add("entry.txt", entry)
-	// contentOpenErr lives on the parent that opens the child, so place it on
-	// the directory the walk actually calls.
+	root.add("entry.txt", fakeFile("entry.txt", "bytes"))
+	// contentOpenErr lives on the parent that opens the child, so it goes on
+	// the directory the walk actually calls. Setting it on the entry too would
+	// be inert, and would imply a per-entry failure mode that is not covered.
 	root.contentOpenErr = os.ErrNotExist
 	factory := newFakeFactory(pathPlan{anchor: "root", rootLabel: "root"}, root)
 
@@ -370,8 +369,11 @@ func TestWalkPropagatesAContentReadFailureAndStillCloses(t *testing.T) {
 	factory := newFakeFactory(pathPlan{anchor: "root", rootLabel: "root"}, root)
 
 	_, err := recordWalk(t, &Inspector{handles: factory, sameFile: sameFakeFile}, "original")
-	if err == nil {
-		t.Fatal("Walk() error = nil, want the visitor's read failure")
+	// Not merely non-nil: any failure at all would satisfy that, including one
+	// raised before the read the fixture is arranging.
+	assertCode(t, err, transfer.ErrTransferFailed)
+	if !errors.Is(err, entry.readContentErr) {
+		t.Fatalf("Walk() error = %v, want it to wrap the fixture read failure", err)
 	}
 	assertFakeClosed(t, factory)
 }
