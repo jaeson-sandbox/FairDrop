@@ -814,6 +814,78 @@ func (h *fakeHandle) OpenEnumeration() (directoryHandle, error) {
 	return h.factory.open(h.node, "enumeration", true), nil
 }
 
+// OpenChildContent mirrors the production content open: it is reached only
+// through an enumeration handle, it refuses anything the node does not model as
+// readable bytes, and the handle it returns exposes Read and nothing else.
+func (h *fakeHandle) OpenChildContent(name string) (contentHandle, error) {
+	h.factory.record("content:" + h.node.name + ":" + name)
+	if h.node.contentOpenErr != nil {
+		return nil, h.node.contentOpenErr
+	}
+	child := h.node.children[name]
+	if child == nil {
+		return nil, fs.ErrNotExist
+	}
+	h.factory.active++
+	h.factory.opened++
+	if h.factory.active > h.factory.maxActive {
+		h.factory.maxActive = h.factory.active
+	}
+	return &fakeContent{factory: h.factory, node: child}, nil
+}
+
+type fakeContent struct {
+	factory *fakeFactory
+	node    *fakeNode
+	offset  int
+	closed  bool
+}
+
+func (c *fakeContent) Read(p []byte) (int, error) {
+	c.factory.record("read-content:" + c.node.name)
+	if c.closed {
+		return 0, fs.ErrClosed
+	}
+	if c.node.readContentErr != nil {
+		return 0, c.node.readContentErr
+	}
+	if c.offset >= len(c.node.contents) {
+		return 0, io.EOF
+	}
+	read := copy(p, c.node.contents[c.offset:])
+	c.offset += read
+	return read, nil
+}
+
+func (c *fakeContent) Stat() (fs.FileInfo, error) {
+	c.factory.record("stat-content:" + c.node.name)
+	if c.node.contentStatErr != nil {
+		return nil, c.node.contentStatErr
+	}
+	info := c.node.info()
+	if c.node.contentIdentity != 0 {
+		info.identity = c.node.contentIdentity
+	}
+	if c.node.contentMode != 0 {
+		info.mode = c.node.contentMode
+	}
+	if c.node.contentReparse {
+		info.reparse = true
+	}
+	return info, nil
+}
+
+func (c *fakeContent) Close() error {
+	if c == nil || c.closed {
+		return nil
+	}
+	c.factory.record("close-content:" + c.node.name)
+	c.closed = true
+	c.factory.active--
+	c.factory.closed++
+	return c.node.contentCloseErr
+}
+
 func (h *fakeHandle) ReadDir(count int) ([]fs.DirEntry, error) {
 	h.factory.record("read:" + h.node.name)
 	if h.factory.recordOps {
@@ -872,6 +944,15 @@ type fakeNode struct {
 	closeErr       error
 	closeErrByKind map[string]error
 	repeatEntries  int
+
+	contents        []byte
+	contentOpenErr  error
+	contentStatErr  error
+	readContentErr  error
+	contentCloseErr error
+	contentIdentity int
+	contentMode     fs.FileMode
+	contentReparse  bool
 }
 
 var nextFakeIdentity atomic.Int64
@@ -880,6 +961,11 @@ func fakeDirectory(name string) *fakeNode { return fakeMode(name, os.ModeDir) }
 func fakeRegular(name string, size int64) *fakeNode {
 	node := fakeMode(name, 0)
 	node.size = size
+	return node
+}
+func fakeFile(name string, contents string) *fakeNode {
+	node := fakeRegular(name, int64(len(contents)))
+	node.contents = []byte(contents)
 	return node
 }
 func fakeMode(name string, mode fs.FileMode) *fakeNode {

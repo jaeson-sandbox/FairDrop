@@ -128,8 +128,19 @@ Errors wrap internal causes but expose only the stable code and safe message to 
 ```go
 package transfer
 
+type SourceEntry struct {
+    RelativePath string // slash-separated, beneath the root, never empty/absolute/dot-dot
+    Kind         ItemKind
+    Size         int64 // meaningful only for ItemFile
+    ModTime      time.Time
+}
+
+// content is nil for a directory; for a file it is borrowed for the call only.
+type SourceVisitor func(entry SourceEntry, content io.Reader) error
+
 type SourcePort interface {
     Inspect(ctx context.Context, absolutePath string) (StagedItem, error)
+    Walk(ctx context.Context, absolutePath string, visit SourceVisitor) error
 }
 
 type BeaconRequest struct {
@@ -207,6 +218,8 @@ type Observer interface {
 ```
 
 `SourcePort.Inspect` preserves `absolutePath` byte-for-byte in `StagedItem.Path`. It parses only a POSIX root, Windows drive root, or UNC share (including their supported extended spellings), rejects device namespaces, alternate streams, and non-local Windows components, and then evaluates `.` and `..` against a validated handle stack without cleaning or reconstructing the path. Metadata opens request only attribute rights, lexical directory handles request search/traverse rights, and list/read rights are acquired only for a directory that will actually be enumerated. All component and nested lookups are native no-follow operations relative to the already-open parent; Windows uses `NtCreateFile` with `FILE_OPEN_REPARSE_POINT`, while POSIX uses `openat` with no-follow metadata/search handles. Before enumeration, the inspected and opened directory identities must match, the opened object must still be non-link-like, and every child directory identity is compared with active ancestors to refuse cycles without a global visited index. Enumeration is exactly `ReadDir(1)`; traversal sums only non-negative regular-file sizes with checked `int64` addition, attempts every owned close, and retains only active-depth handles plus one entry. Cancellation is checked immediately after every native operation and wins over operation or cleanup failures. A link-like, cyclic, or special entry is `path_unsupported`; a mismatched opened identity is `source_changed`; disappearance remains `path_not_found`; arithmetic faults are `transfer_failed`.
+
+`SourcePort.Walk` re-validates `absolutePath` under exactly the rules `Inspect` applies -- preflight is not a snapshot, so link, reparse, special-file, identity and cycle checks are repeated here rather than trusted -- and then calls `visit` once per entry, a parent before its children. `RelativePath` is slash-separated and locates the entry beneath the root: never empty, absolute, volume-qualified, or dot-dot bearing, and never the root itself, so a consumer places entries under a single top-level name without re-deriving a path. `content` is nil for a directory; for a regular file it is a reader borrowed for exactly that call, because the source owns the descriptor and closes it as the visitor returns. A retained reader is a use-after-close. A visitor error stops the walk and is returned unchanged unless cancellation or a close failure takes precedence. Walk keeps no per-entry index: one enumeration handle per active depth plus the entry being visited, every handle closed in reverse order on every exit. A selection that is not a directory is `path_unsupported`.
 
 After inspection and cancellation revalidation, the coordinator rejects every file or directory `LogicalSize` outside `0..9007199254740991` as `transfer_failed` before calling the network, server, QR, or beacon ports. This is the exact-integer boundary of the JavaScript metadata contract.
 

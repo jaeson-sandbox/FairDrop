@@ -258,9 +258,11 @@ func (h *harness) liveSession() *session {
 type fakeSource struct {
 	h       *harness
 	inspect func(ctx context.Context, absolutePath string) (StagedItem, error)
+	walk    func(ctx context.Context, absolutePath string, visit SourceVisitor) error
 
 	mu    sync.Mutex
 	paths []string
+	walks []string
 }
 
 func (f *fakeSource) Inspect(ctx context.Context, absolutePath string) (StagedItem, error) {
@@ -272,6 +274,28 @@ func (f *fakeSource) Inspect(ctx context.Context, absolutePath string) (StagedIt
 		return f.inspect(ctx, absolutePath)
 	}
 	return testItem(), nil
+}
+
+// Walk exists because the coordinator holds a SourcePort, not because the
+// coordinator calls it: staging never walks a tree. A call arriving here is
+// itself the finding, so the default fails rather than quietly succeeding.
+func (f *fakeSource) Walk(ctx context.Context, absolutePath string, visit SourceVisitor) error {
+	f.h.enter("source.Walk")
+	f.mu.Lock()
+	f.walks = append(f.walks, absolutePath)
+	f.mu.Unlock()
+	if f.walk != nil {
+		return f.walk(ctx, absolutePath, visit)
+	}
+	return NewError(ErrTransferFailed, "coordinator must not walk a source tree")
+}
+
+func (f *fakeSource) walked() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]string, len(f.walks))
+	copy(out, f.walks)
+	return out
 }
 
 func (f *fakeSource) inspected() []string {

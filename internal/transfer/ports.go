@@ -2,7 +2,9 @@ package transfer
 
 import (
 	"context"
+	"io"
 	"net/netip"
+	"time"
 )
 
 const (
@@ -12,10 +14,44 @@ const (
 	BeaconVersionTXT = "version=1"
 )
 
-// SourcePort validates and describes a selected source path without opening
-// its contents.
+// SourceEntry is one entry reached by a SourcePort walk.
+//
+// RelativePath locates the entry beneath the walked root with forward slashes
+// and nothing else: it is never empty, absolute, volume-qualified, dot-dot
+// bearing, nor does it name the root itself. A consumer is therefore free to
+// place every entry under whatever single top-level name it chooses without
+// re-deriving a path. Size is meaningful only for ItemFile.
+type SourceEntry struct {
+	RelativePath string
+	Kind         ItemKind
+	Size         int64
+	ModTime      time.Time
+}
+
+// SourceVisitor receives one entry per call, a parent directory before any of
+// its children.
+//
+// content is nil for a directory. For a regular file it is a reader borrowed
+// for exactly the duration of the call: the source owns the descriptor behind
+// it and releases it as soon as the visitor returns, so a retained reader is a
+// use-after-close and reads nothing. A non-nil return stops the walk; the
+// source unwinds every handle it owns and reports that error unchanged unless
+// cancellation or a close failure takes precedence.
+type SourceVisitor func(entry SourceEntry, content io.Reader) error
+
+// SourcePort validates and describes a selected source path, and walks a
+// selected directory without ever handing out a descriptor it does not close.
 type SourcePort interface {
+	// Inspect describes the selection without opening its contents.
 	Inspect(ctx context.Context, absolutePath string) (StagedItem, error)
+	// Walk re-validates absolutePath under the same link, reparse, special-file
+	// and identity rules as Inspect, then calls visit once for every entry
+	// beneath it. Preflight is not a snapshot, so every entry is re-checked
+	// here rather than trusted from Inspect. Walk retains no per-entry index:
+	// it holds one enumeration handle per active depth plus the entry it is
+	// visiting, and it closes every handle it opened, in reverse order, on
+	// every exit. A selection that is not a directory is path_unsupported.
+	Walk(ctx context.Context, absolutePath string, visit SourceVisitor) error
 }
 
 // BeaconRequest contains the non-sensitive values needed to publish a staged

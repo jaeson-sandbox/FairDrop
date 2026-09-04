@@ -2,8 +2,9 @@
 title: 'Story 2.2: Stream a Safe Directory ZIP'
 type: 'feature'
 created: '2026-09-03'
-status: 'ready-for-dev'
+status: 'in-review'
 review_loop_iteration: 0
+baseline_commit: '6ba41368789c6bb2980c755928ab1222b4b58a01'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/docs/fairdrop-contracts.md'
@@ -54,19 +55,71 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/transfer/ports.go` — add walk, visitor, entry types — contract names adapters as consumers, forbids a shadow port.
-- [ ] `internal/source/handle*.go` — parent-relative no-follow content open per platform — handles provably cannot read bytes; POSIX must dodge the FIFO block.
-- [ ] `internal/source/source.go` — one traversal for inspection and streaming, carrying a relative name per frame.
-- [ ] `internal/stream/` — rename `archiver.go`; add the directory payload: lazy `Prepare`, `io.Pipe`, joined worker, `zip.Writer.Close()` before pipe close.
-- [ ] `internal/stream` claim path — re-apply the reparse check to the claim-time `Lstat` — closes the entry promising `path_unsupported`, not `source_changed`.
-- [ ] tests — memory bound constant in tree size; goroutine exit; close ordering; central-directory validity; the `source.go:174` pin via `onOperation`.
-- [ ] `docs/fairdrop-{contracts,architecture}.md`, `deferred-work.md`, `sprint-status.yaml` — record port, guarantees, ownership.
+- [x] `internal/transfer/ports.go` — add walk, visitor, entry types — contract names adapters as consumers, forbids a shadow port.
+- [x] `internal/source/handle*.go` — parent-relative no-follow content open per platform — handles provably cannot read bytes; POSIX must dodge the FIFO block.
+- [x] `internal/source/source.go` — one traversal for inspection and streaming, carrying a relative name per frame.
+- [x] `internal/stream/` — rename `archiver.go`; add the directory payload: lazy `Prepare`, `io.Pipe`, joined worker, `zip.Writer.Close()` before pipe close.
+- [x] `internal/stream` claim path — re-apply the reparse check to the claim-time `Lstat` — closes the entry promising `path_unsupported`, not `source_changed`.
+- [x] tests — memory bound constant in tree size; goroutine exit; close ordering; central-directory validity; the `source.go:174` pin via `onOperation`.
+- [x] `docs/fairdrop-{contracts,architecture}.md`, `deferred-work.md`, `sprint-status.yaml` — record port, guarantees, ownership.
 
 **Acceptance Criteria:**
 - Given a staged directory, when the receiver downloads, then a browser-openable ZIP arrives with one top-level root and a valid central directory, no `Content-Length`, and progress reporting `totalKnown=false`.
 - Given any exit — success, cancel, disconnect, unsafe entry, read failure — when `WriteTo` returns, then no goroutine of its own runs, both pipe ends and the ZIP writer are closed, and a later `Close` neither races nor double-releases.
 - Given a wide or deep tree, when it streams, then retained memory is bounded by buffer plus depth, does not grow with entry count, and no temporary archive exists on disk.
 - Given each load-bearing guarantee is deliberately broken, when its focused mutation runs, then a named behavioral test fails rather than compilation or an unrelated assertion.
+
+## Implementation Evidence
+
+Gates on this worktree: `gofmt -l .` clean; `go vet ./...` 0; `go test -count=1 ./...` 0
+across three consecutive runs; `go test -count=1 -race ./...` 0; frontend Vitest 17 files /
+490 tests unchanged; frontend production build; `wails build` exit 0.
+
+Matrix coverage, every test executed and passing: safe tree
+(`TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory`, plus
+`TestStreamedArchiveOpensWithASecondImplementation`); empty root
+(`TestWriteToArchivesAnEmptyRootAsAFolder`); unsafe entry mid-stream
+(`TestWriteToAbortsOnAnEntryThatBecomesUnsafeMidStream`); entry lost
+(`TestWriteToPropagatesAWalkFailureWithoutAppendingToTheBody/missing`,
+`TestWalkPropagatesAContentOpenFailureWithItsCode`); root changed at claim
+(`TestPrepareRejectsARootThatIsNoLongerADirectory`, `...ThatDisappeared`,
+`...ALinkLikeRootWithPathUnsupported`); cancel or disconnect
+(`TestWriteToStopsPromptlyWhenTheReceiverDisconnects`,
+`TestPrepareHonorsCancellationForADirectory`); name
+(`TestArchiveDownloadNameIsCappedAfterTheExtensionIsAppended`); regular file
+(the unchanged `payload_test.go` suite).
+
+Mutations run against the new guarantees; each failed through the named test and was
+restored:
+
+| Deliberate break | Named failing test |
+| --- | --- |
+| Return from `WriteTo` without joining the worker | `TestWriteToPropagatesAWalkFailureWithoutAppendingToTheBody` |
+| Close the pipe writer before `zip.Writer.Close()` | `TestStreamedArchiveOpensWithASecondImplementation` |
+| Skip `halt()` so a failed stream still yields a valid archive | `TestWriteToAbortsOnAnEntryThatBecomesUnsafeMidStream` |
+| Report a known total from `Size()` | `TestPrepareDirectoryIsLazyAndReportsAnUnknownLength` |
+| Leave the pipe read end open after drain | `TestWriteToStopsPromptlyWhenTheReceiverDisconnects` |
+| Admit a dot-dot segment in an entry name | `TestArchiveEntryNamesAreRelativeAndNeverEscapeTheRoot/dot-dot` |
+| Admit a backslash or NUL in an entry name | `TestArchiveEntryNamesAreRelativeAndNeverEscapeTheRoot/backslash` |
+| Admit a volume-qualified entry name | `TestArchiveEntryNamesAreRelativeAndNeverEscapeTheRoot/volume_qualified` |
+| Stop placing entries under the single root | `TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory` |
+| Retain one record per entry while streaming | `TestArchiveRetainedMemoryDoesNotGrowWithEntryCount` |
+| Drop the withheld-stop diagnostic | `TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer` |
+
+Two survivors were examined and are not defects. Removing the absolute-prefix check in
+`archiveEntryName` is an equivalent mutant: a leading `/` splits to an empty first segment,
+which the segment check already refuses, and removing both together is caught. The bounded
+memory assertion was itself mutation-checked after a first version proved dead -- a 6 MiB
+ceiling admitted the ~4 MiB a retained index costs, so it was tightened to 2 MiB against a
+measured ~0.8 MiB baseline and now fails the retained-index mutation.
+
+Out of spec, recorded rather than hidden: `TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer`
+was flaky from Epic 1 and is now diagnosed and fixed. It spawned a `Cancel` racing the reset
+arming and then asserted a diagnostic that is only recorded when the race resolves one way;
+at `-count=200` it failed twice with "0 diagnostics recorded". The race assertion is now its
+own test asserting only what holds under both orderings, and the diagnostic assertion is
+deterministic. 1000 runs clean, and the diagnostic assertion still fails when the branch it
+covers is removed.
 
 ## Spec Change Log
 

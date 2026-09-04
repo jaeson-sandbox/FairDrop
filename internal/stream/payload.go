@@ -2,6 +2,11 @@
 // single authorized HTTP response. It opens nothing until Prepare runs, never
 // stages a copy on disk, and copies through one reusable buffer whose size is
 // independent of the payload's size.
+//
+// A regular file streams straight off its descriptor with a known length; a
+// directory streams as a ZIP built entry by entry while the response is being
+// written, so its wire length is unknown and no archive ever exists anywhere
+// but in flight.
 package stream
 
 import (
@@ -52,6 +57,13 @@ const maxEmptyReads = 100
 // and a staged name is only ever a basename in practice.
 const maxDownloadNameRunes = 200
 
+// nameTrailingCutset is trimmed from the end of every sanitized name. Windows
+// drops trailing dots and spaces from a filename anyway; trimming here also
+// reduces "." and ".." to nothing while leaving a leading dot, and therefore a
+// legitimate dotfile, intact. The third rune is U+00A0: it survives an ASCII
+// trim and reads as trailing whitespace.
+const nameTrailingCutset = ".  "
+
 // payloadFile is the descriptor behavior the adapter needs from an opened
 // source. *os.File satisfies it; tests inject fakes through the open seam.
 type payloadFile interface {
@@ -66,11 +78,9 @@ type (
 	sameFileFunc func(fs.FileInfo, fs.FileInfo) bool
 )
 
-// Payloads is the file-only payload adapter. Its function fields are immutable
-// per-instance test seams; the zero value uses the operating system.
-//
-// Directories are refused rather than stubbed: Epic 2 adds that payload kind
-// behind this same port without changing the port's shape.
+// Payloads is the payload adapter for both staged kinds. Its function fields
+// are immutable per-instance test seams; the zero value uses the operating
+// system.
 type Payloads struct {
 	source     transfer.SourcePort
 	open       openFunc
@@ -81,8 +91,8 @@ type Payloads struct {
 
 var _ server.PayloadPort = (*Payloads)(nil)
 
-// New returns a file-only payload adapter that re-validates every selection
-// through source before opening it.
+// New returns a payload adapter that re-validates every selection through
+// source before opening it.
 func New(source transfer.SourcePort) *Payloads {
 	return &Payloads{source: source}
 }
@@ -101,10 +111,10 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
-	if item.Kind != transfer.ItemFile {
+	if item.Kind != transfer.ItemFile && item.Kind != transfer.ItemDirectory {
 		return nil, transfer.NewError(
 			transfer.ErrPathUnsupported,
-			"payload preparation supports regular files only",
+			"payload preparation supports regular files and directories only",
 		)
 	}
 	if p == nil || p.source == nil {
@@ -112,6 +122,9 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 			transfer.ErrTransferFailed,
 			"payload preparation requires a source port",
 		)
+	}
+	if item.Kind == transfer.ItemDirectory {
+		return p.prepareArchive(ctx, item)
 	}
 
 	// First layer: re-run the selection policy at claim time so a root that
@@ -134,15 +147,9 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 	// filesystem identity immediately before the open so it can be compared
 	// against the descriptor below: the object verified is then the object
 	// streamed, not merely one whose metadata matches.
-	identity, err := p.lstatPath(item.Path)
+	identity, err := p.pinIdentity(item.Path)
 	if err != nil {
-		return nil, classifyAccessError(err, "payload source metadata could not be read")
-	}
-	if identity == nil {
-		return nil, transfer.NewError(
-			transfer.ErrTransferFailed,
-			"payload source metadata is unavailable",
-		)
+		return nil, err
 	}
 	if err := contextError(ctx); err != nil {
 		return nil, err
@@ -200,6 +207,69 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 		bufferSize: p.bufferLength(),
 		file:       file,
 	}, nil
+}
+
+// prepareArchive is deliberately lazy. A directory's wire length is unknowable
+// until the last entry has been compressed, so nothing is traversed here: the
+// tree walk starts from WriteTo. What must still happen before a header goes
+// out is the claim-time root check, because Prepare is the last moment a
+// failure can still choose an HTTP status instead of breaking a live download.
+func (p *Payloads) prepareArchive(ctx context.Context, item transfer.StagedItem) (server.PreparedPayload, error) {
+	identity, err := p.pinIdentity(item.Path)
+	if err != nil {
+		return nil, err
+	}
+	// Kind is the only staged field a directory can be held to: its contents,
+	// size, and modification time are expected to move between staging and
+	// claim, and the unsnapshotted policy covers that. A root that stopped
+	// being a directory is a different object under the same name.
+	if !identity.IsDir() {
+		return nil, sourceChangedError()
+	}
+	if err := contextError(ctx); err != nil {
+		return nil, err
+	}
+	root, download := archiveNames(item)
+	return &archive{
+		name:       download,
+		root:       root,
+		path:       item.Path,
+		modTime:    identity.ModTime(),
+		source:     p.source,
+		bufferSize: p.bufferLength(),
+	}, nil
+}
+
+// pinIdentity is the claim-time re-Lstat both payload kinds share. It carries
+// the link-like refusal with it: without that, a junction or symlink created
+// inside the validate-to-open window would surface as source_changed, or for a
+// directory not at all, when the contract promises path_unsupported.
+func (p *Payloads) pinIdentity(path string) (fs.FileInfo, error) {
+	identity, err := p.lstatPath(path)
+	if err != nil {
+		return nil, classifyAccessError(err, "payload source metadata could not be read")
+	}
+	if identity == nil {
+		return nil, transfer.NewError(
+			transfer.ErrTransferFailed,
+			"payload source metadata is unavailable",
+		)
+	}
+	reparse, err := reparsePoint(identity)
+	if err != nil {
+		return nil, transfer.WrapError(
+			transfer.ErrPathUnsupported,
+			"payload source platform metadata is unavailable",
+			err,
+		)
+	}
+	if reparse || identity.Mode()&os.ModeSymlink != 0 {
+		return nil, transfer.NewError(
+			transfer.ErrPathUnsupported,
+			"payload source became a link-like entry",
+		)
+	}
+	return identity, nil
 }
 
 func (p *Payloads) openPath(path string) (payloadFile, error) {
@@ -446,11 +516,27 @@ func sanitizeDownloadName(raw string) string {
 	if runes := []rune(cleaned); len(runes) > maxDownloadNameRunes {
 		cleaned = string(runes[:maxDownloadNameRunes])
 	}
-	// Windows drops trailing dots and spaces from a filename anyway; trimming
-	// them here also reduces "." and ".." to nothing while leaving a leading
-	// dot, and therefore a legitimate dotfile, intact. Trim the non-breaking
-	// space too: it survives the ASCII trim and reads as trailing whitespace.
-	return strings.TrimRight(cleaned, ".  ")
+	return strings.TrimRight(cleaned, nameTrailingCutset)
+}
+
+// archiveNames derives both names a directory payload needs from one sanitized
+// root: the single top-level directory inside the archive, and the filename the
+// receiver is offered. They stay in step, so "photos" downloads as "photos.zip"
+// and unpacks into "photos/".
+//
+// The cap is applied to the name that already carries ".zip", not to the base
+// before it: capping first and appending second is exactly how a name at the
+// limit becomes four runes over it.
+func archiveNames(item transfer.StagedItem) (root string, download string) {
+	root = downloadName(item)
+	limit := maxDownloadNameRunes - len([]rune(archiveExtension))
+	if runes := []rune(root); len(runes) > limit {
+		root = strings.TrimRight(string(runes[:limit]), nameTrailingCutset)
+		if root == "" {
+			root = fallbackDownloadName
+		}
+	}
+	return root, root + archiveExtension
 }
 
 func sourceChangedError() error {

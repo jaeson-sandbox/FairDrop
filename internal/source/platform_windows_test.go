@@ -90,8 +90,19 @@ func TestWindowsHandleRightsSeparateMetadataSearchAndEnumeration(t *testing.T) {
 	if got := windowsEnumerationAccess(); got != 0x00000081 {
 		t.Fatalf("enumeration access = %#x, want literal attributes plus list", got)
 	}
-	if got := windowsOpenOptions(false); got&0x00200000 == 0 {
+	if got := windowsContentAccess(); got != 0x00000081 {
+		t.Fatalf("content access = %#x, want literal attributes plus read-data only", got)
+	}
+	if got := windowsAnyOptions(); got&0x00200000 == 0 {
 		t.Fatalf("metadata open options = %#x, want literal FILE_OPEN_REPARSE_POINT", got)
+	}
+	if got := windowsDirectoryOptions(); got&0x00000001 == 0 || got&0x00200000 == 0 {
+		t.Fatalf("directory open options = %#x, want literal FILE_DIRECTORY_FILE with FILE_OPEN_REPARSE_POINT", got)
+	}
+	// FILE_NON_DIRECTORY_FILE is what makes the kernel, rather than a later
+	// check, refuse to hand back a readable directory handle.
+	if got := windowsContentOptions(); got&0x00000040 == 0 || got&0x00000001 != 0 || got&0x00200000 == 0 {
+		t.Fatalf("content open options = %#x, want literal FILE_NON_DIRECTORY_FILE with FILE_OPEN_REPARSE_POINT and no FILE_DIRECTORY_FILE", got)
 	}
 }
 

@@ -136,7 +136,7 @@ func isDriveLetter(value byte) bool {
 }
 
 func (nativeHandleFactory) OpenAnchor(plan pathPlan) (metadataHandle, error) {
-	return openWindowsNode(windowsLocator{absolute: plan.anchor}, windowsSearchAccess(), true, false)
+	return openWindowsNode(windowsLocator{absolute: plan.anchor}, windowsSearchAccess(), windowsDirectoryOptions(), false)
 }
 
 func (n *windowsNode) Stat() (fs.FileInfo, error) {
@@ -147,15 +147,56 @@ func (n *windowsNode) Stat() (fs.FileInfo, error) {
 }
 
 func (n *windowsNode) OpenChildMetadata(name string) (metadataHandle, error) {
-	return openWindowsNode(windowsLocator{parent: n, name: name}, windowsMetadataAccess(), false, false)
+	return openWindowsNode(windowsLocator{parent: n, name: name}, windowsMetadataAccess(), windowsAnyOptions(), false)
 }
 
 func (n *windowsNode) OpenSearch() (metadataHandle, error) {
-	return openWindowsNode(n.locator, windowsSearchAccess(), true, false)
+	return openWindowsNode(n.locator, windowsSearchAccess(), windowsDirectoryOptions(), false)
 }
 
 func (n *windowsNode) OpenEnumeration() (directoryHandle, error) {
-	return openWindowsNode(n.locator, windowsEnumerationAccess(), true, true)
+	return openWindowsNode(n.locator, windowsEnumerationAccess(), windowsDirectoryOptions(), true)
+}
+
+// OpenChildContent is the one read-capable open in the package. It stays
+// relative to this already-open directory and keeps FILE_OPEN_REPARSE_POINT so
+// a name swapped for a junction or symlink is opened as the link itself rather
+// than followed; FILE_NON_DIRECTORY_FILE makes the kernel refuse a directory
+// outright, so read access is never granted to one.
+func (n *windowsNode) OpenChildContent(name string) (contentHandle, error) {
+	file, err := openWindowsFile(windowsLocator{parent: n, name: name}, windowsContentAccess(), windowsContentOptions())
+	if err != nil {
+		return nil, err
+	}
+	return &windowsContent{file: file}, nil
+}
+
+// windowsContent is a read-only view of one opened regular file. It is a
+// separate type from windowsNode precisely so that no metadata, search, or
+// enumeration handle carries a Read at all.
+type windowsContent struct{ file *os.File }
+
+func (c *windowsContent) Read(p []byte) (int, error) {
+	if c == nil || c.file == nil {
+		return 0, fs.ErrClosed
+	}
+	return c.file.Read(p)
+}
+
+func (c *windowsContent) Stat() (fs.FileInfo, error) {
+	if c == nil || c.file == nil {
+		return nil, fs.ErrClosed
+	}
+	return c.file.Stat()
+}
+
+func (c *windowsContent) Close() error {
+	if c == nil || c.file == nil {
+		return nil
+	}
+	err := c.file.Close()
+	c.file = nil
+	return err
 }
 
 func (n *windowsNode) ReadDir(count int) ([]fs.DirEntry, error) {
@@ -174,7 +215,15 @@ func (n *windowsNode) Close() error {
 	return err
 }
 
-func openWindowsNode(locator windowsLocator, access uint32, directory, list bool) (*windowsNode, error) {
+func openWindowsNode(locator windowsLocator, access, options uint32, list bool) (*windowsNode, error) {
+	file, err := openWindowsFile(locator, access, options)
+	if err != nil {
+		return nil, err
+	}
+	return &windowsNode{file: file, locator: locator, list: list}, nil
+}
+
+func openWindowsFile(locator windowsLocator, access, options uint32) (*os.File, error) {
 	var objectName *windows.NTUnicodeString
 	var err error
 	oa := &windows.OBJECT_ATTRIBUTES{Attributes: windows.OBJ_CASE_INSENSITIVE}
@@ -192,7 +241,6 @@ func openWindowsNode(locator windowsLocator, access uint32, directory, list bool
 	}
 	oa.ObjectName = objectName
 	oa.Length = uint32(unsafe.Sizeof(*oa))
-	options := windowsOpenOptions(directory)
 	var handle windows.Handle
 	var status windows.IO_STATUS_BLOCK
 	err = windows.NtCreateFile(
@@ -220,7 +268,7 @@ func openWindowsNode(locator windowsLocator, access uint32, directory, list bool
 		_ = windows.CloseHandle(handle)
 		return nil, errors.New("Windows handle could not be wrapped")
 	}
-	return &windowsNode{file: file, locator: locator, list: list}, nil
+	return file, nil
 }
 
 func windowsMetadataAccess() uint32 {
@@ -235,12 +283,23 @@ func windowsEnumerationAccess() uint32 {
 	return windows.FILE_READ_ATTRIBUTES | windows.FILE_LIST_DIRECTORY
 }
 
-func windowsOpenOptions(directory bool) uint32 {
-	options := uint32(windows.FILE_OPEN_REPARSE_POINT | windows.FILE_SYNCHRONOUS_IO_NONALERT)
-	if directory {
-		options |= windows.FILE_DIRECTORY_FILE
-	}
-	return options
+// windowsContentAccess is the only right in this package that can pull bytes
+// out of a file, and it is requested only for an entry already proved regular
+// through its parent-relative metadata handle.
+func windowsContentAccess() uint32 {
+	return windows.FILE_READ_ATTRIBUTES | windows.FILE_READ_DATA
+}
+
+func windowsAnyOptions() uint32 {
+	return windows.FILE_OPEN_REPARSE_POINT | windows.FILE_SYNCHRONOUS_IO_NONALERT
+}
+
+func windowsDirectoryOptions() uint32 {
+	return windowsAnyOptions() | windows.FILE_DIRECTORY_FILE
+}
+
+func windowsContentOptions() uint32 {
+	return windowsAnyOptions() | windows.FILE_NON_DIRECTORY_FILE
 }
 
 func windowsOperationError(err error) error {
