@@ -409,6 +409,82 @@ func TestInspectRejectsLinksSpecialsAndStopsBeforeLaterEntries(t *testing.T) {
 	}
 }
 
+/*
+A *selected* special file, not only a nested one.
+
+The frozen matrix refuses a selected symlink, reparse point, or special file,
+but every case in the table above adds its unsafe node as a child of the
+selected directory. That left the selected-root half of the row resting on two
+guards -- the non-regular/non-directory clause in rejectUnsupportedInfo and the
+not-a-directory fallback after the component walk -- which could both be
+deleted with the suite still green, because each masked the other. Selecting
+the special entry directly pins the refusal instead of the redundancy.
+*/
+func TestInspectRejectsSelectedSpecialFile(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name string
+		mode fs.FileMode
+	}{
+		{name: "named pipe", mode: os.ModeNamedPipe},
+		{name: "device", mode: os.ModeDevice},
+		{name: "socket", mode: os.ModeSocket},
+		{name: "irregular", mode: os.ModeIrregular},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := fakeDirectory("root")
+			root.add("chosen", fakeMode("chosen", test.mode))
+			factory := newFakeFactory(pathPlan{anchor: "root", components: []string{"chosen"}, rootLabel: "root"}, root)
+			_, err := (&Inspector{handles: factory, sameFile: sameFakeFile}).Inspect(context.Background(), "original")
+			assertCode(t, err, transfer.ErrPathUnsupported)
+			assertFakeClosed(t, factory)
+		})
+	}
+}
+
+/*
+A trailing separator names a directory, so a regular file behind one is refused.
+
+parseWindowsPath and its POSIX peer were pinned to *report* hadTrailingSep, and
+the directory side of the matrix row was covered, but nothing drove Inspect
+with a trailing separator onto a file -- so the one branch that consumes the
+flag could be removed without a failure.
+*/
+func TestInspectRejectsTrailingSeparatorOnRegularFile(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "note.txt")
+	if err := os.WriteFile(path, []byte("hi"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	item, err := New().Inspect(context.Background(), path+string(os.PathSeparator))
+	if err == nil {
+		t.Fatalf("Inspect() staged %+v, want a refusal for a file behind a trailing separator", item)
+	}
+	assertCode(t, err, transfer.ErrPathUnsupported)
+}
+
+/*
+A nested directory that is a regular file by the time it is opened.
+
+The identity check and this kind recheck both defend the "checked directory is
+replaced before open" row, and identity alone caught every existing case -- so
+the recheck could be disabled with the suite green. Windows reuses file IDs
+after a delete, so a swap that preserves identity is the case only this guard
+refuses. openMode changes what the *opened* handle reports while leaving the
+inspected metadata and identity untouched, which is that swap exactly.
+*/
+func TestInspectRefusesNestedDirectoryOpenedAsFileWithUnchangedIdentity(t *testing.T) {
+	t.Parallel()
+	root := fakeDirectory("root")
+	sub := fakeDirectory("sub")
+	sub.openMode = 0o644
+	root.add("sub", sub)
+	factory := newFakeFactory(pathPlan{anchor: "root", rootLabel: "root"}, root)
+	_, err := (&Inspector{handles: factory, sameFile: sameFakeFile}).Inspect(context.Background(), "original")
+	assertCode(t, err, transfer.ErrSourceChanged)
+	assertFakeClosed(t, factory)
+}
+
 func TestInspectRejectsActiveAncestorCycle(t *testing.T) {
 	t.Parallel()
 	root := fakeDirectory("root")

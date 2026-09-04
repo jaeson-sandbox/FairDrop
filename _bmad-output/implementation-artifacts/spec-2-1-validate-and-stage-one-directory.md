@@ -171,6 +171,38 @@ Every loop-2 mutation below failed through the named behavioral assertion and wa
 | Reclassify coded adapter errors, including `transfer_failed` | both coded-error variants across all seven operations in `TestInspectPreservesCodedErrorsAcrossFilesystemClassifiers` |
 | Admit an unknown staged item kind | `TestStageRejectsUnknownItemKindBeforeResourceAcquisition` |
 
+## Independent Review Round (2026-09-03)
+
+The recorded loop-2 evidence was re-verified rather than accepted. Gates were rerun
+from a clean tree on this host: `gofmt -l .` clean, `go vet ./...` 0, `go test -count=1 ./...`
+0 across 7 packages, `go test -count=1 -race ./...` 0, frontend Vitest 17 files / 490 tests,
+frontend production build, and `wails build` exit 0.
+
+Sixteen fresh mutations were then run against guards the recorded table did not cover.
+Three load-bearing guarantees turned out to be pinned by **no** test, each because a second
+guard masked it:
+
+| Surviving mutation | Why it survived | Now caught by |
+| --- | --- | --- |
+| Delete the special-file clause in `rejectUnsupportedInfo` **and** the not-a-directory fallback together | Every unsafe-entry case added its node as a *child*; the frozen matrix refuses a **selected** special file too | `TestInspectRejectsSelectedSpecialFile` |
+| Delete the trailing-separator refusal in the regular-file branch | `hadTrailingSep` was pinned where it is *parsed*, never where it is *consumed* | `TestInspectRejectsTrailingSeparatorOnRegularFile` |
+| Disable the `requireDirectory` recheck in `verifyOpened` | The identity comparison caught every existing case; only an identity-preserving swap isolates this guard | `TestInspectRefusesNestedDirectoryOpenedAsFileWithUnchangedIdentity` |
+
+Two further survivors were examined and are **not** defects, recorded so a later loop does not re-chase them:
+
+- Removing `entrySize < 0` from the traversal sum is an equivalent mutant: `math.MaxInt64 - (-1)`
+  overflows to `math.MinInt64`, so the sibling overflow clause still rejects the entry. The
+  `/negative` subtest does pin the behaviour.
+- `if !currentInfo.IsDir()` after the component walk still survives alone. It is reachable only
+  when a lexical ancestor is swapped for a special file between descent and a `..` pop, because
+  that pop re-`Stat`s without re-running `rejectUnsupportedInfo`. Pinning it needs a fake that
+  changes its reported mode between two stats of the same non-opened handle, which the harness
+  cannot yet express. Deferred to `2-2-stream-a-safe-directory-zip`, which already owns
+  claim-time revalidation.
+
+The three added tests were themselves mutation-checked: each fails through its named assertion,
+not through a compile error, and the full gate is green with them in place.
+
 ## Suggested Review Order
 
 **Directory preflight spine**

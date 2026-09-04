@@ -436,3 +436,8 @@ being anyone's problem.
   summary: Execute Story 2.1's production no-follow, search-only-ancestor, and non-reading special-file tests on native Linux and macOS runners.
   owner: 3-2-automate-reproducible-cross-platform-verification
   evidence: The Linux and Darwin test binaries cross-compile and include direct tests for post-metadata symlink substitution, search-only ancestors, Linux `O_PATH`, and FIFO refusal, but this Windows host cannot execute those platform implementations. Windows production behavior, deterministic cross-platform seams, and cross-compilation are green; only native POSIX execution remains unproved.
+
+- source_spec: `spec-2-1-validate-and-stage-one-directory.md`
+  summary: Pin the not-a-directory fallback after the component walk, which no mutation can currently reach.
+  owner: 2-2-stream-a-safe-directory-zip
+  evidence: `source.go`'s `if !currentInfo.IsDir()` after the lexical walk survives deletion with the suite green. It is genuinely reachable -- a `..` pop re-`Stat`s the popped ancestor without re-running `rejectUnsupportedInfo`, so an ancestor swapped for a special file between descent and pop lands there -- but the fake handle harness cannot yet vary a non-opened handle's reported mode between two stats, which is what the case needs. Story 2.2 owns claim-time revalidation and the same TOCTOU window.
