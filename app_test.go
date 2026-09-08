@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -125,10 +129,14 @@ type harness struct {
 	// dialogCtx records the context the dialog was handed.
 	dialogCtx context.Context
 	// dialogTitles records each opened dialog in order.
-	dialogTitles []string
+	dialogTitles  []string
+	dialogFolders []string
 
 	// emitPanic, when non-nil, is what the fake emitter panics with.
 	emitPanic error
+
+	// logs records every diagnostic line the App wrote, in order.
+	logs []string
 
 	// clipboardErr is what the fake clipboard answers with; clipboardText and
 	// clipboardCtx record what it was handed.
@@ -177,6 +185,7 @@ func newUnstartedHarness(t *testing.T) *harness {
 			h.mu.Lock()
 			h.dialogCtx = ctx
 			h.dialogTitles = append(h.dialogTitles, seam+": "+dialogOptions.Title)
+			h.dialogFolders = append(h.dialogFolders, dialogOptions.DefaultDirectory)
 			path, err := h.dialogPath, h.dialogErr
 			h.mu.Unlock()
 			return path, err
@@ -184,6 +193,11 @@ func newUnstartedHarness(t *testing.T) *harness {
 	}
 	h.app.openFile = dialog("openFile")
 	h.app.openDirectory = dialog("openDirectory")
+	h.app.logf = func(format string, args ...any) {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		h.logs = append(h.logs, fmt.Sprintf(format, args...))
+	}
 	h.app.setClipboard = func(ctx context.Context, text string) error {
 		h.mu.Lock()
 		defer h.mu.Unlock()
@@ -213,6 +227,14 @@ func (h *harness) emitted() []emission {
 	return out
 }
 
+func (h *harness) logged() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]string, len(h.logs))
+	copy(out, h.logs)
+	return out
+}
+
 func (h *harness) dialogs() []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -235,7 +257,7 @@ func stagedMetadata() transfer.FileMetadata {
 
 // --- Composition ---------------------------------------------------------
 
-// The three runtime seams exist for the tests below, which means the values
+// The runtime seams exist for the tests below, which means the values
 // production actually runs on are untested unless they are pinned here.
 func TestNewAppWiresTheRealWailsRuntime(t *testing.T) {
 	app := NewApp()
@@ -248,6 +270,9 @@ func TestNewAppWiresTheRealWailsRuntime(t *testing.T) {
 		{"emit", app.emit, wailsruntime.EventsEmit},
 		{"openFile", app.openFile, wailsruntime.OpenFileDialog},
 		{"openDirectory", app.openDirectory, wailsruntime.OpenDirectoryDialog},
+		{"setClipboard", app.setClipboard, wailsruntime.ClipboardSetText},
+		{"homeDir", app.homeDir, os.UserHomeDir},
+		{"logf", app.logf, log.Printf},
 	} {
 		if seam.got == nil {
 			t.Errorf("%s is nil: NewApp left a runtime seam unwired", seam.name)
@@ -660,6 +685,119 @@ func TestSelectDialogsReturnTheChosenPathAndStageNothing(t *testing.T) {
 			}
 		})
 	}
+}
+
+/*
+A chooser opens at the user's home directory, and never fails trying.
+
+The starting folder was empty, so the platform picker reopened wherever the
+OS last left it -- observed in a live run as a folder chooser that took
+several navigations to reach the folder being sent.
+
+The failure cases matter more than the happy one. The Wails runtime rejects
+a DefaultDirectory that does not exist by returning an error instead of
+opening a chooser at all, so a wrong guess here is worse than no guess: it
+turns a tedious dialog into one that cannot open. Every unusable home
+therefore has to degrade to "", which is the old behaviour rather than a
+broken one.
+*/
+/*
+	Every lifecycle event except progress leaves exactly one diagnostic line,
+	and a dropped event says so.
+
+	FairDrop persists nothing, so a transfer that fails on a phone leaves no
+	record anywhere unless the app says something on stderr as it happens. The
+	first live folder failure was undiagnosable for exactly that reason: the
+	window had been closed and there was nothing to read back. These lines are
+	what the next failure will be explained from.
+
+	What must never appear in them is anything AD-9 keeps out of diagnostics:
+	the capability token, the selected name, or a path. An Event carries none
+	of those today, so the assertion is about shape -- the kind, the sequence,
+	the session, the byte count and the error code, and nothing else -- so that
+	a future field cannot be swept into the line by a %+v.
+*/
+func TestLifecycleEventsLeaveOneTokenFreeLogLineEach(t *testing.T) {
+	h := newHarness(t)
+
+	for _, event := range []transfer.Event{
+		{SessionID: testSessionID, Seq: 1, Kind: transfer.TransferStarted},
+		{SessionID: testSessionID, Seq: 2, Kind: transfer.TransferProgress, Progress: &transfer.ProgressSnapshot{BytesSent: 10}},
+		{SessionID: testSessionID, Seq: 3, Kind: transfer.TransferComplete, Progress: &transfer.ProgressSnapshot{BytesSent: 20}},
+		{SessionID: testSessionID, Seq: 4, Kind: transfer.TransferError, Error: &transfer.PublicError{Code: transfer.ErrTransferFailed, Message: "fixed copy"}},
+		{SessionID: testSessionID, Seq: 5, Kind: transfer.TransferReset},
+	} {
+		h.app.publish(event)
+	}
+
+	lines := h.logged()
+	want := []string{
+		"fairdrop: event transfer-started seq=1 session=" + string(testSessionID),
+		"fairdrop: event transfer-complete seq=3 session=" + string(testSessionID) + " bytes=20",
+		"fairdrop: event transfer-error seq=4 session=" + string(testSessionID) + " code=transfer_failed",
+		"fairdrop: event transfer-reset seq=5 session=" + string(testSessionID),
+	}
+	if len(lines) != len(want) {
+		t.Fatalf("logged %d lines %q, want %d: progress must not be logged", len(lines), lines, len(want))
+	}
+	for index, line := range lines {
+		// Exact, not Contains: the whole point is that nothing else is in it.
+		if line != want[index] {
+			t.Errorf("line %d = %q, want %q", index, line, want[index])
+		}
+	}
+
+	h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 6, Kind: "transfer-bogus"})
+	lines = h.logged()
+	last := lines[len(lines)-1]
+	if last != "fairdrop: undelivered (unknown kind) transfer-bogus seq=6 session="+string(testSessionID) {
+		t.Errorf("dropped event logged as %q", last)
+	}
+}
+
+func TestChoosersOpenAtHomeAndFallBackToTheOSDefault(t *testing.T) {
+	realHome := t.TempDir()
+	fileNotDirectory := filepath.Join(t.TempDir(), "home-is-a-file")
+	if err := os.WriteFile(fileNotDirectory, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		name string
+		home func() (string, error)
+		want string
+	}{
+		{name: "readable home", home: func() (string, error) { return realHome, nil }, want: realHome},
+		{name: "home is unknown", home: func() (string, error) { return "", errors.New("no home") }, want: ""},
+		{name: "home is empty", home: func() (string, error) { return "", nil }, want: ""},
+		{name: "home does not exist", home: func() (string, error) { return filepath.Join(realHome, "gone"), nil }, want: ""},
+		{name: "home is a file", home: func() (string, error) { return fileNotDirectory, nil }, want: ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.app.homeDir = test.home
+			h.dialogPath = testPath
+
+			if _, err := h.app.SelectDirectory(); err != nil {
+				t.Fatalf("SelectDirectory returned %v, want no error", err)
+			}
+			folders := h.folders()
+			if len(folders) != 1 {
+				t.Fatalf("opened %d choosers, want exactly one", len(folders))
+			}
+			if folders[0] != test.want {
+				t.Errorf("chooser opened at %q, want %q", folders[0], test.want)
+			}
+		})
+	}
+}
+
+func (h *harness) folders() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]string, len(h.dialogFolders))
+	copy(out, h.dialogFolders)
+	return out
 }
 
 func TestDismissedDialogIsAnEmptySelectionNotAnError(t *testing.T) {

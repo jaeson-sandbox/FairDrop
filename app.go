@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"log"
+	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -77,6 +80,22 @@ type App struct {
 	openFile      dialogFunc
 	openDirectory dialogFunc
 	setClipboard  clipboardFunc
+
+	// logf is the diagnostic seam. A transfer otherwise leaves no record at
+	// all -- FairDrop persists nothing, by contract -- so this is the one place
+	// a live failure can be explained afterwards: one stderr line per
+	// lifecycle event, visible when the app is launched from a shell. It
+	// carries the kind, sequence, session id, byte count and error code, and
+	// never the capability token, the selected name, or a path, which AD-9
+	// keeps out of diagnostics. Progress is not logged; at four a second it
+	// would bury the lines that matter, and the terminal events carry the
+	// final count.
+	logf func(format string, args ...any)
+
+	// homeDir is where a chooser opens. It is a seam for the same reason the
+	// dialogs are: the test binary must be able to answer it without depending
+	// on the machine running the tests.
+	homeDir func() (string, error)
 }
 
 // appObserver adapts the App to transfer.Observer.
@@ -114,6 +133,8 @@ func NewApp() *App {
 		openFile:      wailsruntime.OpenFileDialog,
 		openDirectory: wailsruntime.OpenDirectoryDialog,
 		setClipboard:  wailsruntime.ClipboardSetText,
+		homeDir:       os.UserHomeDir,
+		logf:          log.Printf,
 	}
 }
 
@@ -239,7 +260,10 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 		)
 	}
 
-	selection, err := open(ctx, wailsruntime.OpenDialogOptions{Title: title})
+	selection, err := open(ctx, wailsruntime.OpenDialogOptions{
+		Title:            title,
+		DefaultDirectory: a.startingDirectory(),
+	})
 	if err != nil {
 		// A dialog's own diagnostic text names directories, so it stays behind
 		// Unwrap: what crosses the boundary is the code and the fixed copy.
@@ -250,6 +274,41 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 		)
 	}
 	return selection, nil
+}
+
+/*
+startingDirectory is where a chooser opens, and "" means "wherever Windows
+left it last".
+
+The empty default is what made the folder chooser tedious: it reopens on the
+last location the OS remembers, which is often nowhere near the folder being
+sent, and the platform picker selects the directory you have navigated *into*
+rather than one you click. Opening at home shortens that walk.
+
+It is deliberately not the last folder chosen, which would be the nicer
+behaviour. FairDrop persists nothing between runs, and a remembered path is
+persistence -- of exactly the kind the product promises not to keep, since it
+records something about what the user shared.
+
+Every failure returns "": an unreadable home directory, or one that does not
+exist. That last case is not hypothetical caution. The runtime rejects a
+DefaultDirectory that is missing by returning an error instead of opening
+anything, so guessing here would replace a merely tedious chooser with one
+that cannot open at all.
+*/
+func (a *App) startingDirectory() string {
+	if a == nil || a.homeDir == nil {
+		return ""
+	}
+	home, err := a.homeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	info, err := os.Stat(home)
+	if err != nil || !info.IsDir() {
+		return ""
+	}
+	return home
 }
 
 // publish turns one coordinator lifecycle event into the matching Wails
@@ -270,12 +329,14 @@ func (a *App) publish(event transfer.Event) {
 		// answer: the real runtime would call log.Fatalf on a nil context and
 		// end the process rather than return.
 		a.undelivered.Add(1)
+		a.logEvent("undelivered (no window yet)", event)
 		return
 	}
 
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			a.undelivered.Add(1)
+			a.logEvent("undelivered (emit panicked)", event)
 		}
 	}()
 
@@ -286,13 +347,34 @@ func (a *App) publish(event transfer.Event) {
 		// makes a coordinator that grows a sixth kind visible here rather than
 		// silent in the UI.
 		a.undelivered.Add(1)
+		a.logEvent("undelivered (unknown kind)", event)
 		return
+	}
+	if event.Kind != transfer.TransferProgress {
+		a.logEvent("event", event)
 	}
 
 	// Event.Kind is json:"-", so the kind travels as the event name and the
 	// payload carries sessionId, seq, and whichever of progress and error this
 	// event kind is allowed to have.
 	a.emit(ctx, string(event.Kind), event)
+}
+
+// logEvent writes the one line a lifecycle event leaves behind. Everything in
+// it is either a fixed word, a number, or a value the contract already allows
+// on the wire to the window; nothing here can name a path or a token.
+func (a *App) logEvent(what string, event transfer.Event) {
+	if a == nil || a.logf == nil {
+		return
+	}
+	detail := ""
+	if event.Progress != nil {
+		detail += " bytes=" + strconv.FormatInt(event.Progress.BytesSent, 10)
+	}
+	if event.Error != nil {
+		detail += " code=" + string(event.Error.Code)
+	}
+	a.logf("fairdrop: %s %s seq=%d session=%s%s", what, event.Kind, event.Seq, event.SessionID, detail)
 }
 
 // startup is called when the app starts. The context is saved so the Wails
