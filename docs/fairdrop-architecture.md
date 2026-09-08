@@ -138,7 +138,7 @@ After claim authorization, a payload-preparation failure returns a generic `410 
 
 After `Prepare` succeeds, the server owns exactly one payload `Close`. It cancels the data-plane context and closes the HTTP destination, waits for `WriteTo` and workers, then calls `Close`; `Close` never races `WriteTo`.
 
-Buffer size and per-entry ZIP compression are Phase 3 benchmark choices. They may change without architecture review if payload memory remains O(buffer), cancellation remains prompt, and archive compatibility tests remain green.
+Buffer size and per-entry ZIP compression are Phase 3 benchmark choices. They may change without architecture review if payload memory remains O(buffer) in payload bytes (plus the ZIP format's own per-entry central-directory record, and nothing more per entry), cancellation remains prompt, and archive compatibility tests remain green.
 
 ## Network selection
 

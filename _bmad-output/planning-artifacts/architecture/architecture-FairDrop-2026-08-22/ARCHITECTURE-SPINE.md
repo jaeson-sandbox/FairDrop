@@ -7,8 +7,8 @@ paradigm: ports-and-adapters with a single lifecycle coordinator
 scope: FairDrop desktop application across Phases 2-6
 status: final
 created: '2026-08-22'
-updated: '2026-08-22'
-binds: [FR1-FR18, NFR1-NFR11]
+updated: '2026-09-08'
+binds: [FR1-FR24, NFR1-NFR15]
 sources:
   - docs/fairdrop-spec.md
   - _bmad-output/implementation-artifacts/spec-phase-1-wails-scaffold.md
@@ -20,6 +20,8 @@ companions:
 ---
 
 # Architecture Spine — FairDrop
+
+> **Amendments (2026-09-08, after Epic 2).** The Structural Seed below is corrected to the packages as built: `internal/qr` (not `qrcode`), `internal/source` added, and `frontend/src/ui` (not `components`). Framer Motion is removed from the Stack -- Story 1.10 deleted it. `binds` now covers the reconciled FR1-FR24 / NFR1-NFR15 inventory in `epics.md`. AD-6's bounded-memory rule is read with the qualification Story 2.2 measured and the SPEC now states: a streamed ZIP necessarily retains one central-directory record per entry (~250 bytes), so payload memory is O(buffer) in payload *bytes*, never a second per-entry index.
 
 ## Design Paradigm
 
@@ -157,26 +159,27 @@ Verified against the working tree, local module metadata, lockfile, and upstream
 | TypeScript | 5.9.3 |
 | Vite | 7.3.6 |
 | Tailwind CSS | 4.3.3 |
-| Framer Motion | 13.1.1 |
 | Vitest | 4.1.11 |
-| Node.js | 24.19.0 LTS (planned pin) |
-| hashicorp/mdns | 1.0.7 (planned) |
-| boombuler/barcode | 1.1.0 (planned) |
+| Node.js | 24.19.0 LTS (pin lands in Story 3.2) |
+| hashicorp/mdns | 1.0.7 |
+| boombuler/barcode | 1.1.0 |
+| golang.org/x/sys | 0.46.0 (Story 2.1: native no-follow handles) |
 
 ## Structural Seed
 
 ```text
 internal/
   transfer/   # coordinator, state, session, lifecycle ports, domain errors/events
+  source/     # selection validation and safe no-follow traversal (SourcePort adapter)
   network/    # LAN address and mDNS adapter
   server/     # one-shot HTTP adapter and progress writer
-  stream/     # file and directory streaming adapter
-  qrcode/     # in-memory PNG adapter
+  stream/     # file payload and directory ZIP streaming adapter (PayloadPort)
+  qr/         # in-memory PNG adapter
 app.go        # Wails command/event adapter
 main.go       # construction and process lifecycle
 frontend/src/
-  components/ # DropZone, StagedView, TransferView
-  transfer/   # reducer, event bindings, frontend transfer types
+  ui/         # IdleView, StagePendingCard, StagedView, TransferringView, OutcomePanel, copy registry
+  transfer/   # reducer, validation, event bindings, frontend transfer types
 ```
 
 ```mermaid

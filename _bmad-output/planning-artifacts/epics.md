@@ -76,7 +76,7 @@ FR24: After a terminal outcome, preserve the same visible Done or Error content 
 
 ### NonFunctional Requirements
 
-NFR1: Transfer memory remains O(buffer) in payload size; no whole-file read, payload-sized index, or staged ZIP is permitted.
+NFR1: Transfer memory remains O(buffer) in payload bytes; no whole-file read, payload-sized index, or staged ZIP is permitted. A streamed ZIP may retain only the per-entry central-directory record the format requires (~250 bytes per entry), never a second per-entry index.
 
 NFR2: FairDrop persists no runtime product data: no database, settings, telemetry, persistent logs, cloud service, or payload archive.
 

@@ -69,6 +69,41 @@ as historical narrative and apply all corrections and supersessions before using
 
 <!-- /bmad:context -->
 
+## Environment and verification pitfalls
+
+<!-- Outside the bmad:context block on purpose: the 2026-09-01 context refresh silently
+     dropped the first three of these from inside the managed block. Keep them here. -->
+
+- Neither Go nor the Wails CLI is on the default PATH in this environment. Prepend
+  `/c/Program Files/Go/bin` and `~/go/bin`, or bare `go`/`wails` fail with command-not-found.
+- **`go test -race` needs cgo, and without it the run fails with "requires cgo" rather than
+  reporting clean.** Prepend `.../WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_*/mingw64/bin`
+  and set `CGO_ENABLED=1`. Before trusting any race result, confirm `go env CGO_ENABLED` prints
+  `1` and that the run lists `ok` per package -- an environment that silently cannot run the
+  detector looks, in a truncated log, exactly like one that did.
+- Run `wails build` before a standalone `npm run build` in a fresh tree: it regenerates
+  `frontend/wailsjs/`, and the committed copy can lack exports the frontend imports.
+- Never run `wails build` concurrently with the frontend test suite. Its `frontend:install`
+  step is `npm install` and it rebuilds `frontend/dist`, both underneath a running Vitest;
+  the result is hundreds of import failures that look like a broken product and are not.
+  Run the Go gate, the frontend suite, and `wails build` one after another, never in parallel.
+- In a bash double-quoted string a Windows path such as `"C:\Users\x\$name"` turns `\$` into
+  a literal `$`. Quote Windows paths with single quotes; a "does not exist" result from a path
+  built in double quotes is a quoting bug until proven otherwise.
+- The HTTP server sets no `WriteTimeout` on purpose: one would cap every transfer at the
+  deadline, and a folder ZIP over Wi-Fi outlives any sensible value. `ReadTimeout` does *not*
+  cap a transfer -- net/http clears the read deadline before its background disconnect read, a
+  fact that was read the other way once and disproved by mutation.
+  `TestATransferLongerThanEveryTimeoutStillCompletes` pins both; read the comment above
+  `readTimeout` in `internal/server/lifecycle.go` before touching the deadlines.
+- A regenerated managed block or compiled epic context drops lines it does not consider
+  load-bearing. After any `bmad-project-context` refresh or `compile-epic-context` run, diff the
+  file against its previous commit and restore what was lost before continuing.
+- Nothing in the running app logs a transfer's lifecycle beyond the stderr lines `app.go`
+  writes. `internal/stream/diagnose_test.go` (env `FAIRDROP_DIAGNOSE`) runs the production
+  Inspect/Walk/Prepare/WriteTo path over a real folder and names the first stage that refuses;
+  start there when a live folder download fails.
+
 ## Git workflow
 
 <!-- Outside the bmad:context block on purpose: kept across `bmad-project-context` refreshes. -->
