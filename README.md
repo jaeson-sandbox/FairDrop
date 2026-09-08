@@ -12,7 +12,7 @@ Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the wi
 | --- | --- | --- |
 | 1 — Share one file | Native drop or browse, QR/direct URL, one-shot download, honest progress, cancel, accessibility contract | Done, verified on a real phone, merged to `main` |
 | 2 — Share one folder | Safe directory staging through native no-follow handles; streamed ZIP with no temp archive | Built and reviewed; live phone verification in progress on `epic-2-share-one-folder` |
-| 3 — Run reliably on supported desktops | Single instance, native CI, release artifacts, bounded lifecycle waits, honest error copy | Backlog |
+| 3 — Run reliably on supported desktops | Nine stories: single instance, native CI, release artifacts, bounded lifecycle waits, honest error copy, lost-event visibility, the native platform test matrix, directory-stream hardening, and a human release-evidence gate | Backlog |
 
 ## Read these first
 

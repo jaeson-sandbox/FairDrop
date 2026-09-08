@@ -1,0 +1,8 @@
+# FairDrop overrides for bmad-build. Lists append to the shipped defaults.
+
+[workflow]
+
+persistent_facts = [
+  "HOUSE RULE (evidence placement): the spec file spec-<slug>.md carries only intent, boundaries, the I/O matrix, the code map, tasks, acceptance criteria, the spec change log, design notes, verification commands and the suggested review order, and stays near 900-1600 tokens. Every mutation table, matrix-coverage audit, review-layer triage, loop evidence, gate transcript and independent-review record goes in the sibling file evidence-<slug>.md in the same directory -- created in step 03, appended in steps 04 and 05 -- and the spec links to it once under a '## Evidence' heading placed before '## Spec Change Log'. An implementer reads the spec; a reviewer reads both. Never let evidence grow the spec.",
+  "HOUSE RULE (deferred work): every entry in _bmad-output/implementation-artifacts/deferred-work.md has a stable id (D-NNN). When a story closes an entry, cite its id in the story's evidence file and set its owner to discharged; when a story's acceptance criteria name D-ids, those entries are part of the story's scope and must be closed or re-owned before the story is done.",
+]

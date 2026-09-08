@@ -60,15 +60,18 @@ describe('where the cancellation summary sits', () => {
     })
 })
 
-describe('the drop target as a pointer shortcut', () => {
-    // Reported from the running app: the zone looks like the place to click
-    // and did nothing. It runs the same command as the Select File control.
-    it('opens the file chooser when the drop target is clicked', () => {
-        const {onSelectFile} = show()
+describe('the drop target is only a drop target', () => {
+    // Reported from a live run: the zone said "file or folder" and clicking it
+    // opened the file chooser, so a folder sender was handed a single-file
+    // picker. A native chooser is one kind or the other; the labelled buttons
+    // are the only honest click targets, so the zone opens nothing.
+    it('opens no chooser when the drop target is clicked', () => {
+        const {onSelectFile, onSelectDirectory} = show()
 
         fireEvent.click(document.querySelector('.fd-drop-zone')!)
 
-        expect(onSelectFile).toHaveBeenCalledTimes(1)
+        expect(onSelectFile).not.toHaveBeenCalled()
+        expect(onSelectDirectory).not.toHaveBeenCalled()
     })
 
     it('keeps the zone out of the tab order, because the buttons are the keyboard path', () => {

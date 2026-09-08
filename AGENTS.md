@@ -50,7 +50,9 @@ as historical narrative and apply all corrections and supersessions before using
 - Clipboard writes go through bound `CopyToClipboard`, never
   `navigator.clipboard`.
 - Every deferred-work entry needs a live story owner or
-  `discharged`/`accepted`.
+  `discharged`/`accepted`, and carries a stable `id:` (D-NNN) that story acceptance criteria
+  cite. Evidence (mutation tables, triage, gate transcripts) lives in `evidence-<slug>.md`
+  beside each spec, never in the spec itself; see `_bmad/custom/bmad-build.toml`.
 
 ## Known pitfalls
 

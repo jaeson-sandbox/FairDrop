@@ -59,6 +59,10 @@ development_status:
   3-3-produce-and-smoke-test-native-release-artifacts: backlog
   3-4-bound-every-lifecycle-wait-and-prove-quiescence: backlog
   3-5-reconcile-public-error-copy-with-its-states: backlog
+  3-6-make-lost-and-malformed-events-visible: backlog
+  3-7-execute-the-native-platform-test-matrix: backlog
+  3-8-harden-the-directory-stream: backlog
+  3-9-record-human-release-evidence: backlog
   epic-3-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
@@ -73,21 +77,21 @@ action_items:
     epic: 1
     action: "Make a dropped or unparsed transfer-complete fail visibly instead of
       rendering as a cancellation, and give the undelivered counter a surface."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-6-make-lost-and-malformed-events-visible"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-3-constrain-warning-code-at-the-boundary-o"
     epic: 1
     action: "Constrain Warning.Code at the boundary, or widen the cross-language pin
       to cover warning codes."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-6-make-lost-and-malformed-events-visible"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-4-make-the-discovery-warning-reach-a-scree"
     epic: 1
     action: "Make the discovery warning reach a screen reader: give the beacon-warning
       row a reachable trigger or move the banner inside the announced region."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-6-make-lost-and-malformed-events-visible"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-5-rename-internal-stream-archiver-go-to-ma"
@@ -107,7 +111,7 @@ action_items:
     epic: 1
     action: "Settle progress coherence on one strategy, and stop parsing Stage metadata
       twice."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-6-make-lost-and-malformed-events-visible"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-2-retro-item-8-stage-a-real-folder-and-download-it-as-a"
@@ -124,19 +128,19 @@ action_items:
       cgo skips silently rather than failing, and note that a context refresh must
       diff what it removes."
     owner: "3-2-automate-reproducible-cross-platform-verification"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
   - id: "epic-2-retro-item-10-drive-the-server-handler-with-a-director"
     epic: 2
     action: "Drive the server handler with a directory payload so the omitted Content-Length
       and the unknown-total snapshot are proved where the requirement is phrased."
     owner: "3-2-automate-reproducible-cross-platform-verification"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
   - id: "epic-2-retro-item-11-give-archive-drain-the-stall-guard-its-t"
     epic: 2
     action: "Give archive.drain the stall guard its two sibling loops carry, or record
       why it does not need one."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-8-harden-the-directory-stream"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"

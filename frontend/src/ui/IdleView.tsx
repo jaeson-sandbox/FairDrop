@@ -73,17 +73,23 @@ export function IdleView({
                 ) : null}
 
                 {/*
-                  Clicking the target opens the file chooser -- the same command
-                  the Select File control below runs. It is a pointer shortcut,
-                  not a control: the zone stays out of the tab order because the
-                  two browse buttons are already the keyboard path to both
-                  choosers, and a third tab stop reaching only one of them would
-                  be worse than none. The native drop gate is untouched.
+                  A drop target and nothing else. It carries no click handler
+                  and no tab stop: the two browse controls below are the pointer
+                  and keyboard path to both choosers.
+
+                  It used to open the file chooser on click, added when only
+                  files could be sent. Once folders worked that shortcut
+                  contradicted the instruction it sat under -- "file or folder"
+                  -- by opening a picker that can only choose a file, and a live
+                  run went straight into it. A native chooser is one kind or the
+                  other, so the honest click targets are the two labelled
+                  buttons. They stay below the firewall preflight, not inside
+                  this zone, because FR23 requires the preflight ahead of the
+                  selection controls.
                 */}
                 <div
                     className="fd-drop-zone"
                     style={dropTargetStyle}
-                    onClick={onSelectFile}
                 >
                     <div>
                         <div className="fd-drop-symbol" aria-hidden="true">↓</div>

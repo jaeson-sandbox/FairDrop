@@ -402,7 +402,6 @@ body {
 }
 
 .fd-drop-zone {
-    cursor: pointer;
     display: grid;
     min-block-size: 200px;
     place-items: center;
