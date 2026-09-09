@@ -10,6 +10,7 @@ import (
 
 	"fairdrop/internal/transfer"
 
+	"github.com/wailsapp/wails/v2/pkg/options"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -47,6 +48,11 @@ type emitFunc func(ctx context.Context, eventName string, optionalData ...interf
 // clipboardFunc is the shape of the Wails runtime clipboard write.
 type clipboardFunc func(ctx context.Context, text string) error
 
+// windowActionFunc is the shape both window-restoration seams share:
+// WindowUnminimise and WindowShow in the real Wails runtime each take only
+// the application-lifetime context.
+type windowActionFunc func(ctx context.Context)
+
 // App is FairDrop's Wails boundary: it translates the five bound commands into
 // coordinator calls, translates coordinator lifecycle events into runtime
 // emissions, and owns nothing else. Every decision about what a transfer is,
@@ -71,15 +77,17 @@ type App struct {
 	// where a degraded-state surface would consume it.
 	undelivered atomic.Uint64
 
-	// The three Wails runtime seams, set once at construction and never
-	// written again. They exist because the real ones cannot run under `go
-	// test`: EventsEmit and both dialogs call log.Fatalf -- not panic -- when
-	// the context did not come from a running window, which would take the
-	// test binary down with it.
+	// The Wails runtime seams, set once at construction and never written
+	// again. They exist because the real ones cannot run under `go test`:
+	// EventsEmit, both dialogs, the clipboard write, and both window-restoration
+	// calls answer a context that did not come from a running window with
+	// log.Fatalf -- not panic -- which would take the test binary down with it.
 	emit          emitFunc
 	openFile      dialogFunc
 	openDirectory dialogFunc
 	setClipboard  clipboardFunc
+	unminimise    windowActionFunc
+	show          windowActionFunc
 
 	// logf is the diagnostic seam. A transfer otherwise leaves no record at
 	// all -- FairDrop persists nothing, by contract -- so this is the one place
@@ -133,6 +141,8 @@ func NewApp() *App {
 		openFile:      wailsruntime.OpenFileDialog,
 		openDirectory: wailsruntime.OpenDirectoryDialog,
 		setClipboard:  wailsruntime.ClipboardSetText,
+		unminimise:    wailsruntime.WindowUnminimise,
+		show:          wailsruntime.WindowShow,
 		homeDir:       os.UserHomeDir,
 		logf:          log.Printf,
 	}
@@ -402,6 +412,40 @@ func (a *App) shutdown(_ context.Context) {
 	// Shutdown is idempotent and reports cleanup diagnostics it has already
 	// made safe; there is no UI left to tell, and no caller above this one.
 	_ = coordinator.Shutdown()
+}
+
+// restoreWindow is the Wails OnSecondInstanceLaunch callback: a second launch
+// -- a double-click, "Open with", a stale shortcut -- hands the already-running
+// process this instead of starting a competing coordinator, listener and
+// beacon. It reaches the window through the same two runtime seams NewApp
+// wires to WindowUnminimise and WindowShow, unminimising before showing so a
+// minimised window is not left minimised by a Show that cannot see past it;
+// the runtime marshals the actual work to the UI thread itself.
+//
+// The second launch's Args and WorkingDirectory are ignored: nothing here
+// stages a path, so a second launch pointed at a file cannot compete with a
+// live transfer. Nothing here calls the coordinator or emits a lifecycle
+// event either -- the window's session, retained outcome and focus are left
+// exactly as they were, and the coordinator's operation lease, which a live
+// transfer may hold, is never waited on.
+//
+// Wails invokes this from a goroutine of its own that OnStartup never
+// synchronises with, so a second launch can win the race before a.ctx is
+// installed. The nil-context guard is not defensive: the real runtime
+// functions answer a context that never came from a window with log.Fatalf,
+// not an error, so calling them here would take the whole process down
+// instead of just failing this restoration.
+func (a *App) restoreWindow(_ options.SecondInstanceData) {
+	ctx := a.runtimeContext()
+	if ctx == nil {
+		a.undelivered.Add(1)
+		if a.logf != nil {
+			a.logf("fairdrop: undelivered (second instance before startup)")
+		}
+		return
+	}
+	a.unminimise(ctx)
+	a.show(ctx)
 }
 
 // delegate reads the two fields a command needs. The context is the

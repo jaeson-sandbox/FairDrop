@@ -80,6 +80,28 @@ func TestAppOptionsRegistersLifecycleHooks(t *testing.T) {
 	}
 }
 
+// Exactly one FairDrop process may run: a second launch must recognize the
+// first rather than starting a competing coordinator, listener and beacon.
+// The UniqueId is spelled out as a literal, not a reference to the constant
+// under test, so a build that quietly changed the UUID fails here rather than
+// only inside main.go, and OnSecondInstanceLaunch is asserted present so a
+// second launch always has somewhere to hand its window off to.
+func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
+	opts := appOptions(NewApp())
+
+	if opts.SingleInstanceLock == nil {
+		t.Fatal("SingleInstanceLock is nil: a second launch would start a competing coordinator, listener and beacon")
+	}
+
+	const want = "d1766c78-45cf-4e6d-9f04-c3700ab32024"
+	if opts.SingleInstanceLock.UniqueId != want {
+		t.Errorf("SingleInstanceLock.UniqueId = %q, want %q", opts.SingleInstanceLock.UniqueId, want)
+	}
+	if opts.SingleInstanceLock.OnSecondInstanceLaunch == nil {
+		t.Fatal("OnSecondInstanceLaunch is nil: a second launch would have nothing to hand the window to")
+	}
+}
+
 // The formatter is what turns a command failure into something the frontend
 // can act on. Without it Wails sends err.Error() -- raw adapter text with no
 // stable code -- and every rejection collapses into one indistinguishable

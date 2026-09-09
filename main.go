@@ -87,6 +87,15 @@ func formatCommandError(err error) any {
 	return string(encoded)
 }
 
+// singleInstanceLockUniqueID identifies FairDrop to Wails' single-instance
+// lock. It is a fixed, arbitrary UUID -- not a secret and not tied to any
+// build -- so every launch, on every machine, recognizes every other launch
+// as the same application and hands its window off instead of starting a
+// second coordinator, listener and beacon. main_test.go pins this exact
+// literal: a value that drifted between builds would silently let two
+// processes run at once.
+const singleInstanceLockUniqueID = "d1766c78-45cf-4e6d-9f04-c3700ab32024"
+
 // appOptions builds the Wails configuration for FairDrop.
 //
 // This is deliberately separate from main: wails.Run opens a real window and
@@ -127,6 +136,16 @@ func appOptions(app *App) *options.App {
 		// Without this, a rejected command carries err.Error() -- raw adapter
 		// text -- and the frontend has no stable code to switch on.
 		ErrorFormatter: formatCommandError,
+
+		// Exactly one FairDrop process runs. A second launch hands Wails a
+		// SecondInstanceData carrying its own Args and WorkingDirectory; app.go's
+		// restoreWindow is the only thing this callback may do with them --
+		// ignore them and restore the existing window -- see its comment for why
+		// it touches neither the coordinator nor a lifecycle event.
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId:               singleInstanceLockUniqueID,
+			OnSecondInstanceLaunch: app.restoreWindow,
+		},
 
 		OnStartup:  app.startup,
 		OnShutdown: app.shutdown,

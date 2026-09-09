@@ -2,8 +2,9 @@
 title: 'Story 3.1: Enforce One Running FairDrop Instance'
 type: 'feature'
 created: '2026-09-08'
-status: 'ready-for-dev'
+status: 'in-review'
 review_loop_iteration: 0
+baseline_commit: '31205904871e7430d6572e7d6b42f26ee6698805'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-3-context.md'
   - '{project-root}/docs/fairdrop-contracts.md'
@@ -50,13 +51,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `app.go` — `unminimise`/`show` seams with real defaults in `NewApp`; `restoreWindow(options.SecondInstanceData)` with the nil-context guard, `undelivered` and a log line, else unminimise then show.
-- [ ] `main.go` — the UUID constant and `SingleInstanceLock` in `appOptions`.
-- [ ] `main_test.go` — pin the UUID literal and the callback's presence; existing pins untouched.
-- [ ] `app_test.go` — harness seams; pre-startup no-op-with-log, post-startup order and exactly-once with the application-lifetime context, coordinator untouched, arguments ignored; extend the seam-pin test.
-- [ ] `release-evidence.md` — the pending second-instance smoke row, for a person to fill.
-- [ ] `docs/fairdrop-architecture.md:199` — item 10 recorded as delivered here.
-- [ ] `evidence-3-1-enforce-one-running-fairdrop-instance.md` — mutation table and gate transcript.
+- [x] `app.go` — `unminimise`/`show` seams with real defaults in `NewApp`; `restoreWindow(options.SecondInstanceData)` with the nil-context guard, `undelivered` and a log line, else unminimise then show.
+- [x] `main.go` — the UUID constant and `SingleInstanceLock` in `appOptions`.
+- [x] `main_test.go` — pin the UUID literal and the callback's presence; existing pins untouched.
+- [x] `app_test.go` — harness seams; pre-startup no-op-with-log, post-startup order and exactly-once with the application-lifetime context, coordinator untouched, arguments ignored; extend the seam-pin test.
+- [x] `release-evidence.md` — the pending second-instance smoke row, for a person to fill.
+- [x] `docs/fairdrop-architecture.md:199` — item 10 recorded as delivered here.
+- [x] `evidence-3-1-enforce-one-running-fairdrop-instance.md` — mutation table and gate transcript.
 
 **Acceptance Criteria:**
 - Given `appOptions`, when built, then `SingleInstanceLock` carries the literal UUID and a callback, and `main_test.go` fails if either is removed or the UUID changes.

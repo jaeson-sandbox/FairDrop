@@ -16,6 +16,7 @@ import (
 
 	"fairdrop/internal/transfer"
 
+	"github.com/wailsapp/wails/v2/pkg/options"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -53,6 +54,14 @@ type emission struct {
 	ctx  context.Context
 	name string
 	data []interface{}
+}
+
+// windowAction is one recorded call to a fake unminimise or show seam, in the
+// order it happened -- restoreWindow's ordering and exactly-once guarantees
+// are otherwise invisible to a test.
+type windowAction struct {
+	name string
+	ctx  context.Context
 }
 
 // fakeCoordinator is the transfer implementation the App delegates to. It
@@ -143,6 +152,10 @@ type harness struct {
 	clipboardErr  error
 	clipboardText []string
 	clipboardCtx  context.Context
+
+	// windowActions records every unminimise/show call the fake seams
+	// received, in order.
+	windowActions []windowAction
 }
 
 // newHarness returns a started App: startup has run, so a.ctx is installed.
@@ -205,8 +218,27 @@ func newUnstartedHarness(t *testing.T) *harness {
 		h.clipboardText = append(h.clipboardText, text)
 		return h.clipboardErr
 	}
+	// Each fake records which seam it is: unminimise and show share a
+	// signature, so a swapped call order would otherwise be invisible.
+	windowSeam := func(name string) windowActionFunc {
+		return func(ctx context.Context) {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			h.windowActions = append(h.windowActions, windowAction{name: name, ctx: ctx})
+		}
+	}
+	h.app.unminimise = windowSeam("unminimise")
+	h.app.show = windowSeam("show")
 
 	return h
+}
+
+func (h *harness) windowActionsLogged() []windowAction {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]windowAction, len(h.windowActions))
+	copy(out, h.windowActions)
+	return out
 }
 
 func (h *harness) clipboardWrites() []string {
@@ -271,6 +303,8 @@ func TestNewAppWiresTheRealWailsRuntime(t *testing.T) {
 		{"openFile", app.openFile, wailsruntime.OpenFileDialog},
 		{"openDirectory", app.openDirectory, wailsruntime.OpenDirectoryDialog},
 		{"setClipboard", app.setClipboard, wailsruntime.ClipboardSetText},
+		{"unminimise", app.unminimise, wailsruntime.WindowUnminimise},
+		{"show", app.show, wailsruntime.WindowShow},
 		{"homeDir", app.homeDir, os.UserHomeDir},
 		{"logf", app.logf, log.Printf},
 	} {
@@ -1110,6 +1144,89 @@ func TestShutdownIsRepeatableAndLeavesIdempotenceToTheCoordinator(t *testing.T) 
 
 	if calls := h.coordinator.log(); !reflect.DeepEqual(calls, []string{"Shutdown", "Shutdown"}) {
 		t.Errorf("the shutdown hook produced %v, want both calls delegated", calls)
+	}
+}
+
+// --- Second-instance restoration ------------------------------------------
+
+// Covers the I/O & Edge-Case Matrix in
+// _bmad-output/implementation-artifacts/spec-3-1-enforce-one-running-fairdrop-instance.md.
+//
+// A second launch can reach restoreWindow before startup has installed a.ctx:
+// Wails calls OnSecondInstanceLaunch from a goroutine of its own that
+// OnStartup never synchronises with. Calling the real runtime functions with
+// a nil context takes the whole process down (log.Fatalf, not an error), so
+// this is the difference between a dropped restoration and a dead process.
+func TestRestoreWindowBeforeStartupCountsUndeliveredAndLogsWithoutCallingTheRuntime(t *testing.T) {
+	h := newUnstartedHarness(t)
+
+	h.app.restoreWindow(options.SecondInstanceData{Args: []string{testPath}})
+
+	if got := h.windowActionsLogged(); len(got) != 0 {
+		t.Errorf("restoreWindow called the runtime before startup: %+v", got)
+	}
+	if got := h.app.undelivered.Load(); got != 1 {
+		t.Errorf("undelivered = %d, want 1: the drop must be recorded", got)
+	}
+	lines := h.logged()
+	if len(lines) != 1 {
+		t.Fatalf("logged %d lines, want exactly 1: %q", len(lines), lines)
+	}
+	if !strings.HasPrefix(lines[0], "fairdrop: ") {
+		t.Errorf("log line %q does not start with the fairdrop: prefix", lines[0])
+	}
+	if calls := h.coordinator.log(); len(calls) != 0 {
+		t.Errorf("restoreWindow reached the coordinator before startup: %v", calls)
+	}
+}
+
+// The acceptance criterion: unminimise then show, each exactly once, with the
+// application-lifetime context, and nothing else -- no coordinator call, no
+// lifecycle event, so the window's session, retained outcome and focus are
+// left exactly as they were.
+func TestRestoreWindowUnminimisesThenShowsExactlyOnceWithTheApplicationLifetimeContext(t *testing.T) {
+	h := newHarness(t)
+
+	h.app.restoreWindow(options.SecondInstanceData{})
+
+	got := h.windowActionsLogged()
+	if len(got) != 2 {
+		t.Fatalf("the runtime was called %d times, want exactly 2 (unminimise, show): %+v", len(got), got)
+	}
+	if got[0].name != "unminimise" || got[1].name != "show" {
+		t.Errorf("the calls were %s then %s, want unminimise then show", got[0].name, got[1].name)
+	}
+	for _, action := range got {
+		if action.ctx != h.ctx {
+			t.Errorf("%s was called with a different context than the stored application-lifetime one", action.name)
+		}
+	}
+	if calls := h.coordinator.log(); len(calls) != 0 {
+		t.Errorf("restoreWindow reached the coordinator: %v", calls)
+	}
+	if events := h.emitted(); len(events) != 0 {
+		t.Errorf("restoreWindow emitted %+v: a second launch is not a lifecycle event", events)
+	}
+}
+
+// A second launch pointed at a file must not stage it: that would let a
+// double-click on a file compete with a live transfer exactly the way this
+// story exists to prevent. restoreWindow's behavior must be identical whether
+// or not the second launch carried arguments.
+func TestRestoreWindowIgnoresTheSecondLaunchsArguments(t *testing.T) {
+	h := newHarness(t)
+
+	h.app.restoreWindow(options.SecondInstanceData{
+		Args:             []string{testPath, "--some-flag"},
+		WorkingDirectory: `C:\Users\sender\Documents`,
+	})
+
+	if calls := h.coordinator.log(); len(calls) != 0 {
+		t.Errorf("restoreWindow staged the second launch's arguments: %v", calls)
+	}
+	got := h.windowActionsLogged()
+	if len(got) != 2 || got[0].name != "unminimise" || got[1].name != "show" {
+		t.Errorf("restoreWindow with arguments behaved differently: %+v, want exactly [unminimise, show]", got)
 	}
 }
 
