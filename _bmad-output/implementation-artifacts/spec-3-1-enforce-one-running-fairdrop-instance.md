@@ -2,7 +2,7 @@
 title: 'Story 3.1: Enforce One Running FairDrop Instance'
 type: 'feature'
 created: '2026-09-08'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '31205904871e7430d6572e7d6b42f26ee6698805'
 context:
@@ -86,3 +86,46 @@ Seams for the reason `emit` has one: the real runtime functions `log.Fatalf` on 
 - Mutations, recorded in the evidence file: remove the nil-context guard; swap the call order; call show twice; change the UUID; drop the callback; make the callback touch the coordinator; read `a.ctx` directly instead of through the read lock (fails only under `-race`); swap `app.restoreWindow` for a stub wired into `appOptions`; lift the `undelivered` increment and the log call above the nil-context guard; log the second launch's `Args` in the drop line — each fails a named test.
 
 **Manual checks:** launching FairDrop twice on Windows and macOS is Story 3.9's evidence row, not this story's claim.
+
+## Suggested Review Order
+
+**The guard, and why it is not defensive**
+
+- Start here: the callback can arrive before startup on a goroutine Wails never synchronises; a nil context here is the difference between a refused restore and a dead process.
+  [`app.go:459`](../../app.go#L459)
+
+- The two window seams, wired to the real runtime in NewApp and pinned by pointer.
+  [`app.go:91`](../../app.go#L91)
+
+**What Wails is actually handed**
+
+- The lock, the fixed UUID, and the callback -- with the comment that says composition before the lock is inert, not absent.
+  [`main.go:158`](../../main.go#L158)
+
+- The UUID constant; the Windows mutex it names is session-local.
+  [`main.go:109`](../../main.go#L109)
+
+**The pins that make it load-bearing**
+
+- Drives the callback through the built options value: only the real restoreWindow passes.
+  [`main_test.go:111`](../../main_test.go#L111)
+
+- The literal UUID pin and the callback's presence.
+  [`main_test.go:89`](../../main_test.go#L89)
+
+- Startup and restoreWindow at the same moment, 200 rounds under -race, asserting only the invariant.
+  [`app_test.go:1266`](../../app_test.go#L1266)
+
+- Before startup: no runtime call, one drop counted, one line -- and no path in it.
+  [`app_test.go:1181`](../../app_test.go#L1181)
+
+- The disclosure helper; the WorkingDirectory value is deliberately not a substring of the test path.
+  [`app_test.go:1167`](../../app_test.go#L1167)
+
+**Peripherals**
+
+- Fourteen mutations, one survivor and the test that closed it.
+  [`evidence-3-1-enforce-one-running-fairdrop-instance.md:71`](evidence-3-1-enforce-one-running-fairdrop-instance.md#L71)
+
+- The native second-launch row a person fills, with its pass criteria.
+  [`release-evidence.md:18`](release-evidence.md#L18)

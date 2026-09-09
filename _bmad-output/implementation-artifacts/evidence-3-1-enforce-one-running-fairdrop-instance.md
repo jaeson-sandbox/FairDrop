@@ -140,3 +140,26 @@ Every I/O & Edge-Case Matrix row maps to an executed test, with two qualificatio
   `restoreWindow` (`app.go`) and `singleInstanceLockUniqueID` (`main.go`) now say this precisely,
   rather than the earlier, stronger-than-true "hands off instead of starting a second coordinator,
   listener and beacon" phrasing, which read as though composition itself did not happen.
+
+## Review Triage (step 04, 2026-09-08)
+
+Three context-free layers over `3120590..d6b1baf`, findings deduplicated by claim and action.
+
+- **Patched** (all test or documentation; no behaviour change): the callback pinned only as non-nil
+  (Verification Gap, Edge Case Hunter, Blind Hunter -- one finding, three names); the started path's
+  silence unpinned (all three); no disclosure assertion on the new log line (Blind Hunter); the
+  racing test's thinner assertions and misplaced comment (Blind Hunter, Edge Case Hunter); the
+  macOS-only ordering rationale written as universal, the "no second coordinator" overclaim, the
+  session-local mutex, the garbled option comment and three stale doc comments (Blind Hunter);
+  the second-instance evidence row lacking pass criteria (Blind Hunter); the evidence file and spec
+  not reconciled after the racing commit (Blind Hunter); the matrix audit overclaiming the
+  mid-transfer row (Blind Hunter).
+- **Deferred with owners:** Windows may refuse to foreground the restored window (D-086, 3.9); a
+  second launch during a blocked Shutdown is swallowed (D-087, 3.4); the Windows mutex is
+  session-local and falls through on any error but "already exists" (D-088, 3.3); macOS exits
+  silently on any lock-file failure but contention (D-089, 3.7).
+- **Already owned:** `-race` not in a committed gate is D-005 under Story 3.2.
+- **Rejected:** sprint status reading `in-progress` while the spec read `in-review` -- the build
+  workflow moves sprint status at close-out, which this section is part of.
+- **Not a finding:** a foreground-activation workaround (`AlwaysOnTop` toggle) proposed before any
+  native observation exists; it waits on D-086's evidence.
