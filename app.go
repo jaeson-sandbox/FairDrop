@@ -66,10 +66,12 @@ type App struct {
 	ctx       context.Context
 	transfers transferCoordinator
 
-	// undelivered counts lifecycle events the window could not be told about.
-	// The recovered panic value is deliberately dropped rather than logged: a
-	// value that escapes an adapter is adapter text, and adapter text is
-	// exactly where an absolute path or a capability token would be.
+	// undelivered counts lifecycle events the window could not be told about,
+	// plus a second-instance restoration that arrived before startup had
+	// installed a window to restore. The recovered panic value is deliberately
+	// dropped rather than logged: a value that escapes an adapter is adapter
+	// text, and adapter text is exactly where an absolute path or a capability
+	// token would be.
 	//
 	// Nothing in production reads this counter yet -- it is assertable in
 	// tests and otherwise inert. It is kept because a drop is exactly the
@@ -92,12 +94,15 @@ type App struct {
 	// logf is the diagnostic seam. A transfer otherwise leaves no record at
 	// all -- FairDrop persists nothing, by contract -- so this is the one place
 	// a live failure can be explained afterwards: one stderr line per
-	// lifecycle event, visible when the app is launched from a shell. It
-	// carries the kind, sequence, session id, byte count and error code, and
-	// never the capability token, the selected name, or a path, which AD-9
-	// keeps out of diagnostics. Progress is not logged; at four a second it
-	// would bury the lines that matter, and the terminal events carry the
-	// final count.
+	// lifecycle event, visible when the app is launched from a shell, plus one
+	// fixed line if a second launch's restoration arrives before startup --
+	// that line is not a lifecycle event and carries no kind, sequence or
+	// session, only the fixed drop message. Every line carries only a fixed
+	// word, a number, or a value the contract already allows on the wire, and
+	// never the capability token, the selected name, a path, or the second
+	// launch's Args/WorkingDirectory, which AD-9 keeps out of diagnostics.
+	// Progress is not logged; at four a second it would bury the lines that
+	// matter, and the terminal events carry the final count.
 	logf func(format string, args ...any)
 
 	// homeDir is where a chooser opens. It is a seam for the same reason the
@@ -388,8 +393,9 @@ func (a *App) logEvent(what string, event transfer.Event) {
 }
 
 // startup is called when the app starts. The context is saved so the Wails
-// runtime methods -- EventsEmit and the two dialogs -- can be called later.
-// This is the application-lifetime context and the only one the App stores.
+// runtime methods -- EventsEmit, the two dialogs, the clipboard write, and
+// window restoration -- can be called later. This is the application-lifetime
+// context and the only one the App stores.
 func (a *App) startup(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -416,18 +422,33 @@ func (a *App) shutdown(_ context.Context) {
 
 // restoreWindow is the Wails OnSecondInstanceLaunch callback: a second launch
 // -- a double-click, "Open with", a stale shortcut -- hands the already-running
-// process this instead of starting a competing coordinator, listener and
-// beacon. It reaches the window through the same two runtime seams NewApp
-// wires to WindowUnminimise and WindowShow, unminimising before showing so a
-// minimised window is not left minimised by a Show that cannot see past it;
-// the runtime marshals the actual work to the UI thread itself.
+// process this instead of running its own listener and beacon.
+//
+// A second launch does still compose. main() builds a second coordinator,
+// network manager, server and QR encoder before wails.Run ever reaches the
+// lock check, because composition happens in main() and the lock lives inside
+// Wails' Frontend.Run -- see singleInstanceLockUniqueID's comment in main.go
+// for the construction path and why it is inert. Nothing that construction
+// built is ever started: this callback never calls the coordinator and emits
+// no lifecycle event, so the window's session, retained outcome and focus are
+// left exactly as they were, and the coordinator's operation lease, which a
+// live transfer may hold, is never waited on.
+//
+// It reaches the window through the same two runtime seams NewApp wires to
+// WindowUnminimise and WindowShow. Unminimise precedes show because that
+// ordering is the one platform where it matters: on macOS, WindowShow is
+// makeKeyAndOrderFront:, which cannot bring a miniaturized window forward, so
+// calling it alone would leave the window minimised; WindowUnminimise is
+// deminiaturize: and must run first. Windows does not need the ordering --
+// its WindowShow already restores a minimised window itself
+// (IsWindowMinimised -> RestoreWindow, else ShowWindow, then
+// SetForegroundWindow/SetFocus, all inside mainWindow.Invoke) -- but calling
+// both, in this order, is correct and harmless there too, so the callback
+// does not special-case the platform.
 //
 // The second launch's Args and WorkingDirectory are ignored: nothing here
 // stages a path, so a second launch pointed at a file cannot compete with a
-// live transfer. Nothing here calls the coordinator or emits a lifecycle
-// event either -- the window's session, retained outcome and focus are left
-// exactly as they were, and the coordinator's operation lease, which a live
-// transfer may hold, is never waited on.
+// live transfer.
 //
 // Wails invokes this from a goroutine of its own that OnStartup never
 // synchronises with, so a second launch can win the race before a.ctx is

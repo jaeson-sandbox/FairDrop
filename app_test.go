@@ -1152,6 +1152,27 @@ func TestShutdownIsRepeatableAndLeavesIdempotenceToTheCoordinator(t *testing.T) 
 // Covers the I/O & Edge-Case Matrix in
 // _bmad-output/implementation-artifacts/spec-3-1-enforce-one-running-fairdrop-instance.md.
 //
+// secondLaunchWorkingDirectory is deliberately not a prefix or suffix of
+// testPath, so a disclosure check that only matched one of the two second-
+// launch fields could not pass by accident.
+const secondLaunchWorkingDirectory = `C:\Users\sender\Desktop`
+
+// assertLinesDiscloseNoSecondLaunchPath fails if any logged line contains the
+// second launch's Args or WorkingDirectory. AD-9 keeps source paths and
+// launch arguments out of diagnostics, and restoreWindow is handed both on
+// every call, so every path here has to actively prove neither ever reaches
+// logf -- unlike a plain "want silence" length check, this still means
+// something on a mutation that logs one of the two fields without producing
+// enough of them to fail a bare count.
+func assertLinesDiscloseNoSecondLaunchPath(t *testing.T, lines []string) {
+	t.Helper()
+	for _, line := range lines {
+		if strings.Contains(line, testPath) || strings.Contains(line, secondLaunchWorkingDirectory) {
+			t.Errorf("a log line disclosed the second launch's Args or WorkingDirectory: %q", line)
+		}
+	}
+}
+
 // A second launch can reach restoreWindow before startup has installed a.ctx:
 // Wails calls OnSecondInstanceLaunch from a goroutine of its own that
 // OnStartup never synchronises with. Calling the real runtime functions with
@@ -1160,7 +1181,10 @@ func TestShutdownIsRepeatableAndLeavesIdempotenceToTheCoordinator(t *testing.T) 
 func TestRestoreWindowBeforeStartupCountsUndeliveredAndLogsWithoutCallingTheRuntime(t *testing.T) {
 	h := newUnstartedHarness(t)
 
-	h.app.restoreWindow(options.SecondInstanceData{Args: []string{testPath}})
+	h.app.restoreWindow(options.SecondInstanceData{
+		Args:             []string{testPath},
+		WorkingDirectory: secondLaunchWorkingDirectory,
+	})
 
 	if got := h.windowActionsLogged(); len(got) != 0 {
 		t.Errorf("restoreWindow called the runtime before startup: %+v", got)
@@ -1175,6 +1199,7 @@ func TestRestoreWindowBeforeStartupCountsUndeliveredAndLogsWithoutCallingTheRunt
 	if !strings.HasPrefix(lines[0], "fairdrop: ") {
 		t.Errorf("log line %q does not start with the fairdrop: prefix", lines[0])
 	}
+	assertLinesDiscloseNoSecondLaunchPath(t, lines)
 	if calls := h.coordinator.log(); len(calls) != 0 {
 		t.Errorf("restoreWindow reached the coordinator before startup: %v", calls)
 	}
@@ -1182,8 +1207,12 @@ func TestRestoreWindowBeforeStartupCountsUndeliveredAndLogsWithoutCallingTheRunt
 
 // The acceptance criterion: unminimise then show, each exactly once, with the
 // application-lifetime context, and nothing else -- no coordinator call, no
-// lifecycle event, so the window's session, retained outcome and focus are
-// left exactly as they were.
+// lifecycle event, no undelivered count, and no diagnostic line, so the
+// window's session, retained outcome and focus are left exactly as they were.
+// The last two are not implied by the first two: lifting the undelivered
+// increment and the drop's log line above the nil-context guard would still
+// call unminimise and show correctly while also mislabeling every successful
+// restoration as a loss.
 func TestRestoreWindowUnminimisesThenShowsExactlyOnceWithTheApplicationLifetimeContext(t *testing.T) {
 	h := newHarness(t)
 
@@ -1207,24 +1236,33 @@ func TestRestoreWindowUnminimisesThenShowsExactlyOnceWithTheApplicationLifetimeC
 	if events := h.emitted(); len(events) != 0 {
 		t.Errorf("restoreWindow emitted %+v: a second launch is not a lifecycle event", events)
 	}
+	if got := h.app.undelivered.Load(); got != 0 {
+		t.Errorf("undelivered = %d, want 0: a successful restoration is not a drop", got)
+	}
+	if lines := h.logged(); len(lines) != 0 {
+		t.Errorf("restoreWindow logged %q on the success path, want silence", lines)
+	}
 }
 
-// A second launch pointed at a file must not stage it: that would let a
-// double-click on a file compete with a live transfer exactly the way this
-// story exists to prevent. restoreWindow's behavior must be identical whether
-// or not the second launch carried arguments.
-/*
-	A second launch racing startup is the case the callback exists for.
-
-	Wails invokes OnSecondInstanceLaunch from a goroutine it never synchronises
-	with OnStartup, so the callback and the context install can run at the same
-	moment. The two sequential tests above pin what each ordering must do; this
-	one runs both at once under the race detector and asserts only the
-	invariant, never which side won: the runtime is called either zero times or
-	exactly twice, in order, with the installed context, and never with nil.
-	It exists so that reading a.ctx directly -- which is a data race the
-	sequential tests can never see -- fails under -race by name.
-*/
+// A second launch racing startup is the case the callback exists for.
+//
+// Wails invokes OnSecondInstanceLaunch from a goroutine it never synchronises
+// with OnStartup, so the callback and the context install can run at the same
+// moment. The two sequential tests above pin what each ordering must do; this
+// one runs both at once under the race detector and asserts only the
+// invariant, never which side won: the runtime is called either zero times or
+// exactly twice, in order, with the installed context, and never with nil.
+// It exists so that reading a.ctx directly -- which is a data race the
+// sequential tests can never see -- fails under -race by name.
+//
+// The 200 rounds are not for the race detector's benefit: -race instruments
+// every access, so it would catch an unlocked read on any single round that
+// happened to interleave badly. They exist instead to exercise both outcomes
+// of the zero-or-two invariant -- which goroutine wins each round is
+// scheduler luck, and a suite that only ever observed one outcome would leave
+// the untaken branch of the switch below completely untested. Do not trim the
+// rounds to speed the suite up, and do not keep them "for the race detector":
+// they buy round coverage, not race coverage.
 func TestRestoreWindowRacingStartupNeverCallsTheRuntimeWithANilContext(t *testing.T) {
 	for round := 0; round < 200; round++ {
 		h := newUnstartedHarness(t)
@@ -1234,15 +1272,31 @@ func TestRestoreWindowRacingStartupNeverCallsTheRuntimeWithANilContext(t *testin
 		go func() { defer wg.Done(); h.app.restoreWindow(options.SecondInstanceData{}) }()
 		wg.Wait()
 
+		if calls := h.coordinator.log(); len(calls) != 0 {
+			t.Fatalf("round %d: restoreWindow reached the coordinator: %v", round, calls)
+		}
+		if events := h.emitted(); len(events) != 0 {
+			t.Fatalf("round %d: restoreWindow emitted %+v", round, events)
+		}
+
 		got := h.windowActionsLogged()
 		switch len(got) {
 		case 0:
 			if h.app.undelivered.Load() != 1 {
 				t.Fatalf("round %d: no runtime call and undelivered = %d, want 1", round, h.app.undelivered.Load())
 			}
+			if lines := h.logged(); len(lines) != 1 {
+				t.Fatalf("round %d: logged %d lines, want exactly 1: %q", round, len(lines), lines)
+			}
 		case 2:
 			if got[0].name != "unminimise" || got[1].name != "show" || got[0].ctx != h.ctx || got[1].ctx != h.ctx {
 				t.Fatalf("round %d: runtime calls %+v, want unminimise then show with the installed context", round, got)
+			}
+			if h.app.undelivered.Load() != 0 {
+				t.Fatalf("round %d: a successful restoration counted undelivered = %d, want 0", round, h.app.undelivered.Load())
+			}
+			if lines := h.logged(); len(lines) != 0 {
+				t.Fatalf("round %d: a successful restoration logged %q, want silence", round, lines)
 			}
 		default:
 			t.Fatalf("round %d: runtime called %d times: %+v", round, len(got), got)
@@ -1250,12 +1304,16 @@ func TestRestoreWindowRacingStartupNeverCallsTheRuntimeWithANilContext(t *testin
 	}
 }
 
+// A second launch pointed at a file must not stage it: that would let a
+// double-click on a file compete with a live transfer exactly the way this
+// story exists to prevent. restoreWindow's behavior must be identical whether
+// or not the second launch carried arguments.
 func TestRestoreWindowIgnoresTheSecondLaunchsArguments(t *testing.T) {
 	h := newHarness(t)
 
 	h.app.restoreWindow(options.SecondInstanceData{
 		Args:             []string{testPath, "--some-flag"},
-		WorkingDirectory: `C:\Users\sender\Documents`,
+		WorkingDirectory: secondLaunchWorkingDirectory,
 	})
 
 	if calls := h.coordinator.log(); len(calls) != 0 {
@@ -1265,6 +1323,17 @@ func TestRestoreWindowIgnoresTheSecondLaunchsArguments(t *testing.T) {
 	if len(got) != 2 || got[0].name != "unminimise" || got[1].name != "show" {
 		t.Errorf("restoreWindow with arguments behaved differently: %+v, want exactly [unminimise, show]", got)
 	}
+	if events := h.emitted(); len(events) != 0 {
+		t.Errorf("restoreWindow emitted %+v for a second launch carrying arguments", events)
+	}
+	if got := h.app.undelivered.Load(); got != 0 {
+		t.Errorf("undelivered = %d, want 0: a successful restoration is not a drop", got)
+	}
+	lines := h.logged()
+	if len(lines) != 0 {
+		t.Errorf("restoreWindow logged %q for arguments it must ignore, want silence", lines)
+	}
+	assertLinesDiscloseNoSecondLaunchPath(t, lines)
 }
 
 // --- Composition failure and disclosure ----------------------------------

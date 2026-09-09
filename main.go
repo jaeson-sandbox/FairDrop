@@ -89,11 +89,23 @@ func formatCommandError(err error) any {
 
 // singleInstanceLockUniqueID identifies FairDrop to Wails' single-instance
 // lock. It is a fixed, arbitrary UUID -- not a secret and not tied to any
-// build -- so every launch, on every machine, recognizes every other launch
-// as the same application and hands its window off instead of starting a
-// second coordinator, listener and beacon. main_test.go pins this exact
-// literal: a value that drifted between builds would silently let two
-// processes run at once.
+// build -- so every launch that carries it recognizes every other launch as
+// the same application. On Windows the lock is a named mutex with no
+// "Global\" prefix, so it is session-local: it recognizes every launch inside
+// the same logged-in session, not a launch from a different user or session.
+// main_test.go pins this exact literal: a value that drifted between builds
+// would silently let two processes run at once.
+//
+// A second launch does still compose before it is turned away. main() calls
+// newBoundApp -- which builds a coordinator, network manager, server and QR
+// encoder -- before wails.Run is even called, and Wails only checks this lock
+// once it is running, inside Frontend.Run. None of that construction binds a
+// listener or starts a beacon: NewCoordinator only assigns fields,
+// network.NewManager and qr.New only close over dependencies, and server.New
+// stores a listen closure it does not call. That construction is therefore
+// inert, and the second process's os.Exit(0) discards it before anything the
+// coordinator owns is ever started -- see app.go's restoreWindow for what the
+// first process's window does in response.
 const singleInstanceLockUniqueID = "d1766c78-45cf-4e6d-9f04-c3700ab32024"
 
 // appOptions builds the Wails configuration for FairDrop.
@@ -138,10 +150,11 @@ func appOptions(app *App) *options.App {
 		ErrorFormatter: formatCommandError,
 
 		// Exactly one FairDrop process runs. A second launch hands Wails a
-		// SecondInstanceData carrying its own Args and WorkingDirectory; app.go's
-		// restoreWindow is the only thing this callback may do with them --
-		// ignore them and restore the existing window -- see its comment for why
-		// it touches neither the coordinator nor a lifecycle event.
+		// SecondInstanceData carrying its own Args and WorkingDirectory; the
+		// callback is app.go's restoreWindow, which ignores both by design and
+		// restores the existing window instead -- see its comment for why it
+		// touches neither the coordinator nor a lifecycle event, and for what a
+		// second launch's inert composition does before it ever gets here.
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId:               singleInstanceLockUniqueID,
 			OnSecondInstanceLaunch: app.restoreWindow,

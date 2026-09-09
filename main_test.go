@@ -102,6 +102,52 @@ func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
 	}
 }
 
+// The non-nil check above is satisfied by any callback, including a stub
+// func(options.SecondInstanceData) {} that restores nothing -- appOptions
+// could swap in one and every test would stay green. This drives the callback
+// appOptions actually wires, through the options value itself, so only the
+// real restoreWindow -- with the real fake seams a harness installed on this
+// App -- can pass.
+func TestAppOptionsSecondInstanceCallbackRestoresTheWindow(t *testing.T) {
+	h := newHarness(t)
+	opts := appOptions(h.app)
+
+	opts.SingleInstanceLock.OnSecondInstanceLaunch(options.SecondInstanceData{Args: []string{testPath}})
+
+	got := h.windowActionsLogged()
+	if len(got) != 2 || got[0].name != "unminimise" || got[1].name != "show" {
+		t.Fatalf("the callback produced %+v, want exactly [unminimise, show]", got)
+	}
+	if got[0].ctx != h.ctx || got[1].ctx != h.ctx {
+		t.Error("the callback did not use the stored application-lifetime context")
+	}
+	if calls := h.coordinator.log(); len(calls) != 0 {
+		t.Errorf("the callback reached the coordinator: %v", calls)
+	}
+	if events := h.emitted(); len(events) != 0 {
+		t.Errorf("the callback emitted %+v", events)
+	}
+}
+
+// The pre-startup half of the same proof, so a stub could not pass this path
+// either by, say, answering "" or panicking instead of counting the drop.
+func TestAppOptionsSecondInstanceCallbackBeforeStartupIsSafe(t *testing.T) {
+	h := newUnstartedHarness(t)
+	opts := appOptions(h.app)
+
+	opts.SingleInstanceLock.OnSecondInstanceLaunch(options.SecondInstanceData{})
+
+	if got := h.windowActionsLogged(); len(got) != 0 {
+		t.Errorf("the callback called the runtime before startup: %+v", got)
+	}
+	if got := h.app.undelivered.Load(); got != 1 {
+		t.Errorf("undelivered = %d, want 1", got)
+	}
+	if lines := h.logged(); len(lines) != 1 {
+		t.Errorf("logged %d lines, want exactly 1: %q", len(lines), lines)
+	}
+}
+
 // The formatter is what turns a command failure into something the frontend
 // can act on. Without it Wails sends err.Error() -- raw adapter text with no
 // stable code -- and every rejection collapses into one indistinguishable

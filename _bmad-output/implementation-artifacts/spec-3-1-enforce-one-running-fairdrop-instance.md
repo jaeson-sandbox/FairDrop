@@ -54,7 +54,7 @@ context:
 - [x] `app.go` — `unminimise`/`show` seams with real defaults in `NewApp`; `restoreWindow(options.SecondInstanceData)` with the nil-context guard, `undelivered` and a log line, else unminimise then show.
 - [x] `main.go` — the UUID constant and `SingleInstanceLock` in `appOptions`.
 - [x] `main_test.go` — pin the UUID literal and the callback's presence; existing pins untouched.
-- [x] `app_test.go` — harness seams; pre-startup no-op-with-log, post-startup order and exactly-once with the application-lifetime context, coordinator untouched, arguments ignored; extend the seam-pin test.
+- [x] `app_test.go` — harness seams; pre-startup no-op-with-log, post-startup order and exactly-once with the application-lifetime context, coordinator untouched, arguments ignored; extend the seam-pin test; `TestRestoreWindowRacingStartupNeverCallsTheRuntimeWithANilContext` drives `startup` and `restoreWindow` concurrently, 200 rounds under `-race`, asserting only the zero-or-two invariant.
 - [x] `release-evidence.md` — the pending second-instance smoke row, for a person to fill.
 - [x] `docs/fairdrop-architecture.md:199` — item 10 recorded as delivered here.
 - [x] `evidence-3-1-enforce-one-running-fairdrop-instance.md` — mutation table and gate transcript.
@@ -72,6 +72,8 @@ Mutation tables, gate transcripts and review triage live in
 
 ## Spec Change Log
 
+- 2026-09-08: Review found two verification gaps and one wording gap, all closed in this pass without touching the frozen Intent, Boundaries, or Matrix. (1) `main_test.go`'s `SingleInstanceLock` pin checked `OnSecondInstanceLaunch` only for non-nilness, which a no-op stub `func(options.SecondInstanceData) {}` wired into `appOptions` also satisfies; two new tests now drive the callback through the built `options.App` value itself, so only the real `restoreWindow` can pass. (2) The started path's silence was unpinned: nothing asserted that `undelivered` stays `0` and nothing is logged on a successful restoration, so lifting the drop-path's `undelivered.Add(1)`/log call above the nil-context guard passed every existing test. The relevant tests now assert silence directly, and a disclosure check confirms no log line ever carries the second launch's `Args` or `WorkingDirectory`. (3) Comments describing what a second launch does claimed it hands off "instead of starting a second coordinator, listener and beacon", which reads as though composition itself does not happen. It does: `main()` composes before `wails.Run` reaches the lock check inside `Frontend.Run`. That composition is provably inert (`NewCoordinator` only assigns fields; `network.NewManager`/`qr.New` only close over dependencies; `server.New` stores an uncalled `listen` closure) and is discarded by the second process's `os.Exit(0)` before anything could start, but it does happen. Comments in `app.go` and `main.go`, and the evidence file's Notes, now say this precisely rather than implying nothing is constructed.
+
 ## Design Notes
 
 Seams for the reason `emit` has one: the real runtime functions `log.Fatalf` on a context that never came from a window, and the callback arrives on a goroutine Wails does not synchronise with `startup`. Unminimise precedes show because a minimised window that is only shown can stay minimised; the runtime marshals to the UI thread itself. The callback holds only `App`'s read lock and never waits on the coordinator, whose lease a live transfer may hold.
@@ -81,6 +83,6 @@ Seams for the reason `emit` has one: the real runtime functions `log.Fatalf` on 
 **Commands:**
 - `gofmt -l .`; `go vet ./...`; `go test -count=1 ./...`; `go test -count=1 -race ./...` — clean
 - `cd frontend && npx vitest run` — 490 unchanged; then, alone, `wails build` — exit 0
-- Mutations, recorded in the evidence file: remove the nil-context guard; swap the call order; call show twice; change the UUID; drop the callback; make the callback touch the coordinator — each fails a named test.
+- Mutations, recorded in the evidence file: remove the nil-context guard; swap the call order; call show twice; change the UUID; drop the callback; make the callback touch the coordinator; read `a.ctx` directly instead of through the read lock (fails only under `-race`); swap `app.restoreWindow` for a stub wired into `appOptions`; lift the `undelivered` increment and the log call above the nil-context guard; log the second launch's `Args` in the drop line — each fails a named test.
 
 **Manual checks:** launching FairDrop twice on Windows and macOS is Story 3.9's evidence row, not this story's claim.
