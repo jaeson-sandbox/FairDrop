@@ -468,6 +468,13 @@ func TestProgressValuesAreForcedIntoTheirContractRange(t *testing.T) {
 	if got := events[2].Progress.Percent; got != 100 {
 		t.Errorf("a percent of 150 published as %v, want the clamp at 100", got)
 	}
+	// The positive-infinity arm of the same clamp. Without this the only thing
+	// standing between +Inf and the UI is the json.Marshal loop below, which
+	// fails on any infinity and so cannot tell a clamped value from an
+	// unclamped one that happens to marshal.
+	if got := events[2].Progress.SpeedBytesPerSec; got != math.MaxFloat64 {
+		t.Errorf("an infinite speed published as %v, want the clamp at %v", got, math.MaxFloat64)
+	}
 	for _, event := range events {
 		if _, err := json.Marshal(event); err != nil {
 			t.Errorf("event %+v does not marshal: %v", event, err)
@@ -851,5 +858,34 @@ func TestASecondSessionsSequenceRestartsAtOneUnderItsOwnId(t *testing.T) {
 	// existing: no event was renumbered, relabeled or duplicated across them.
 	if got := eventsFor(first.SessionID, h.observer.published()); !slices.Equal(got, firstEvents) {
 		t.Errorf("the first session's events changed after the second session ran: got %+v, want %+v", got, firstEvents)
+	}
+}
+
+// terminalSnapshot's Complete arm is documented as refusing to downgrade a
+// success: a Complete with no snapshot is a port defect, the bytes did arrive,
+// and the outcome must still be DONE carrying the unknown-total zero snapshot.
+// completeEvent always builds a snapshot, so no test ever drove that arm.
+func TestACompleteCarryingNoSnapshotStillSucceeds(t *testing.T) {
+	h := newHarness(t)
+	metadata := h.transferring()
+
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerComplete})
+	h.awaitDrainer()
+
+	events := h.observer.published()
+	if !slices.Equal(kindsOf(events), []EventKind{TransferStarted, TransferComplete}) {
+		t.Fatalf("published %v, want exactly [started, complete] -- a missing snapshot must not add a progress event", kindsOf(events))
+	}
+	assertEventGrammar(t, metadata.SessionID, events)
+
+	final := events[1].Progress
+	if final == nil {
+		t.Fatal("the complete event carries no progress payload; the contract's payload table requires one")
+	}
+	if final.TotalKnown || final.TotalBytes != 0 || final.BytesSent != 0 || final.Percent != 0 {
+		t.Errorf("the complete event reports %+v, want the unknown-total zero snapshot", *final)
+	}
+	if got := h.state(); got != stateDone {
+		t.Errorf("state is %q, want %q -- a port defect must not downgrade a success", got, stateDone)
 	}
 }

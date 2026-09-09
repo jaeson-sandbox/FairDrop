@@ -567,6 +567,12 @@ func TestShutdownFromIdleIsSafe(t *testing.T) {
 // every one of them.
 func TestLifecycleContentionHoldsItsInvariants(t *testing.T) {
 	const iterations = 30
+	// Subtests here are sequential, so a plain counter needs no mutex. It
+	// exists because publish is non-blocking and returns false on a lane the
+	// teardown already closed: without counting, every iteration could have
+	// raced a teardown that won before the outcome was ever offered, and the
+	// invariants below would hold over a contention that never happened.
+	delivered := 0
 
 	for iteration := range iterations {
 		t.Run(fmt.Sprintf("iteration-%d", iteration), func(t *testing.T) {
@@ -578,6 +584,7 @@ func TestLifecycleContentionHoldsItsInvariants(t *testing.T) {
 			running.Add(3)
 			ready := make(chan struct{})
 			var cancelErr error
+			var outcomeLanded bool
 
 			go func() {
 				defer running.Done()
@@ -585,7 +592,7 @@ func TestLifecycleContentionHoldsItsInvariants(t *testing.T) {
 				// Non-blocking, and never sends on a closed lane, exactly like
 				// the real server's producer racing its own Stop.
 				h.server.publish(progressEvent(metadata.SessionID, testProgress(1024, 25)))
-				h.server.publish(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
+				outcomeLanded = h.server.publish(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
 			}()
 			go func() {
 				defer running.Done()
@@ -623,7 +630,18 @@ func TestLifecycleContentionHoldsItsInvariants(t *testing.T) {
 			if h.coordinator.leaseHeld() {
 				t.Error("the operation lease outlived the contention")
 			}
+			if outcomeLanded {
+				delivered++
+			}
 		})
+	}
+
+	// Which side wins is a scheduling accident and is not asserted, in the same
+	// way TestTheResetTimerAndCancelProduceExactlyOneReset logs its split. What
+	// is asserted is that the race happened at all in some iteration.
+	t.Logf("the outcome reached the lane in %d of %d iterations", delivered, iterations)
+	if delivered == 0 {
+		t.Errorf("no iteration ever got the outcome onto the lane, so nothing above raced a live outcome")
 	}
 }
 
@@ -647,6 +665,10 @@ func portCalls(h *harness) []string {
 // legitimate outcome once Shutdown wins -- and everything else must still hold.
 func TestShutdownContendsWithEveryOtherActor(t *testing.T) {
 	const iterations = 30
+	// Counted for the same reason as TestLifecycleContentionHoldsItsInvariants:
+	// a discarded publish result cannot distinguish "Shutdown beat the outcome"
+	// from "the outcome was never offered", and only the first is a contention.
+	delivered, cancelsWon := 0, 0
 
 	for iteration := range iterations {
 		t.Run(fmt.Sprintf("iteration-%d", iteration), func(t *testing.T) {
@@ -658,12 +680,13 @@ func TestShutdownContendsWithEveryOtherActor(t *testing.T) {
 			running.Add(4)
 			ready := make(chan struct{})
 			var cancelErr, shutdownErr error
+			var outcomeLanded bool
 
 			go func() {
 				defer running.Done()
 				<-ready
 				h.server.publish(progressEvent(metadata.SessionID, testProgress(1024, 25)))
-				h.server.publish(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
+				outcomeLanded = h.server.publish(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
 			}()
 			go func() {
 				defer running.Done()
@@ -715,7 +738,19 @@ func TestShutdownContendsWithEveryOtherActor(t *testing.T) {
 			if _, err := h.stage(); ErrorCodeOf(err) != ErrShuttingDown {
 				t.Errorf("Stage after the contention returned %q, want %q", ErrorCodeOf(err), ErrShuttingDown)
 			}
+			if outcomeLanded {
+				delivered++
+			}
+			if cancelErr == nil {
+				cancelsWon++
+			}
 		})
+	}
+
+	t.Logf("the outcome reached the lane in %d of %d iterations; Cancel linearized first in %d",
+		delivered, iterations, cancelsWon)
+	if delivered == 0 {
+		t.Errorf("no iteration ever got the outcome onto the lane, so Shutdown never actually contended with one")
 	}
 }
 
