@@ -597,3 +597,27 @@ being anyone's problem.
   summary: The post-open regular-file recheck in emitFile is unreachable.
   owner: accepted
   evidence: `verifyOpened` already runs `rejectUnsupportedInfo`, which admits only regular files and directories, and compares identity, so a file cannot become a directory under the same identity. The follow-up `IsRegular` check therefore cannot fire and no mutation can reach it. Kept as defence in depth rather than deleted, on the same reasoning as the other layered guards in this package; recorded so a later reviewer does not re-derive it as a gap.
+
+- source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
+  id: D-086
+  summary: Windows may refuse to bring the restored window to the foreground, leaving it behind with a flashing taskbar button.
+  owner: 3-9-record-human-release-evidence
+  evidence: `WindowShow` calls `SetForegroundWindow`, which Windows refuses from a process that is not the foreground process -- and by the time the first instance handles the second launch, the second process has already exited, so the first is not in the foreground. The window would unminimise and stay behind, taskbar flashing. Only a native second launch can show whether this happens; the `AlwaysOnTop` toggle workaround waits on that observation and on a decision about whether a flash counts as restored.
+
+- source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
+  id: D-087
+  summary: A second launch arriving while `Shutdown` is blocked on a live transfer's lease is swallowed: the lock and listener stay alive but no window returns.
+  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  evidence: `OnShutdown` blocks in `coordinator.Shutdown` (unbounded, see D-032) after the window has closed. The mutex is still held, so a second launch hands off and exits `0`, and `restoreWindow` runs against a window that no longer exists. Bounding the shutdown wait is this story's work; a log line at shutdown entry would at least make the swallowed relaunch diagnosable.
+
+- source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
+  id: D-088
+  summary: Wails' Windows lock falls through to a full second instance when the mutex exists but cannot be used, and the mutex is session-local.
+  owner: 3-3-produce-and-smoke-test-native-release-artifacts
+  evidence: `SetupSingleInstance` treats any `CreateMutex` error other than `ERROR_ALREADY_EXISTS` as "no other instance" (an elevated first instance is the common case), and returns without exiting when `FindWindowW` finds no event window (a tight double-launch), so two coordinators, listeners and beacons can run. Separately the mutex lives in the logon session, so two logged-in Windows users each get an instance. An app-owned backstop lock under `os.UserConfigDir` is the candidate fix; it is a release-platform decision, not this story's.
+
+- source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
+  id: D-089
+  summary: On macOS a lock file that cannot be opened for any reason but contention makes the launching process exit silently, so FairDrop never opens.
+  owner: 3-7-execute-the-native-platform-test-matrix
+  evidence: `darwin/single_instance.go` treats every `createLockFile` failure as "another instance holds it", sends the second-instance data, and `os.Exit(0)`s. A read-only or full temp directory therefore makes FairDrop refuse to launch with no message. Needs the native macOS runner to confirm and to decide between a pre-flight check and a documented limit.
