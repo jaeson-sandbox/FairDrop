@@ -1076,13 +1076,12 @@ func TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer(t *testing.
 	metadata := h.transferring()
 	before := len(h.coordinator.diagnostics.snapshot())
 
-	// Cancel races the arming so armReset reaches its "nobody will ever stop
-	// this" branch, which is the one that would make the nil call.
-	h.observer.publish = func(event Event) {
-		if event.Kind == TransferComplete {
-			go h.coordinator.Cancel()
-		}
-	}
+	// No racing Cancel here, deliberately. withoutStop already guarantees
+	// afterFunc hands back nil, so armReset reaches the nil-stop branch on its
+	// own; adding a Cancel could only retire the session first and skip the
+	// branch entirely. This assertion used to be raced against that Cancel and
+	// failed roughly one run in a hundred, reporting "0 diagnostics recorded"
+	// -- a real outcome of the race, not a defect in the code under test.
 	h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
 	h.awaitDrainer()
 
@@ -1091,6 +1090,38 @@ func TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer(t *testing.
 	}
 	// The drainer survived: it closed its own done channel rather than dying
 	// mid-callback, which awaitDrainer above already proved by returning.
+	if err := h.coordinator.Cancel(); err != nil {
+		t.Errorf("Cancel after the withheld stop returned %v, want nil", err)
+	}
+	if got := h.state(); got != stateIdle {
+		t.Errorf("state is %q, want %q", got, stateIdle)
+	}
+}
+
+/*
+A Cancel landing while the reset is being armed is survivable either way.
+
+This is the race the test above used to carry. Both orderings are correct:
+Cancel may retire the session before armReset checks whether a reset is due,
+in which case no timer is armed and no diagnostic is recorded, or armReset
+may get there first and record the withheld-stop diagnostic. Asserting the
+diagnostic here would be asserting which way a race resolved. What must hold
+under both is that the drainer survives, Cancel completes, and the session
+lands idle.
+*/
+func TestACancelRacingTheResetArmingLeavesTheCoordinatorIdle(t *testing.T) {
+	h := newHarness(t)
+	h.timer.withoutStop = true
+	metadata := h.transferring()
+
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferComplete {
+			go h.coordinator.Cancel()
+		}
+	}
+	h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
+	h.awaitDrainer()
+
 	if err := h.coordinator.Cancel(); err != nil {
 		t.Errorf("Cancel after the withheld stop returned %v, want nil", err)
 	}

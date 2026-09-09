@@ -313,31 +313,27 @@ func TestPrepareRejectsDescriptorThatIsNotRegular(t *testing.T) {
 	}
 }
 
-func TestPrepareRefusesDirectoryItemWithoutInspectingIt(t *testing.T) {
+func TestPrepareRejectsAnItemKindItDoesNotStream(t *testing.T) {
 	t.Parallel()
 
-	calls := 0
 	adapter := &Payloads{
 		source: sourceFunc(func(context.Context, string) (transfer.StagedItem, error) {
-			calls++
+			t.Error("source ran for an unknown item kind")
 			return transfer.StagedItem{}, errors.New("must not run")
 		}),
 		open: func(string) (payloadFile, error) {
-			t.Error("open ran for a directory item")
+			t.Error("open ran for an unknown item kind")
 			return nil, errors.New("must not run")
 		},
 	}
 	staged := transfer.StagedItem{
-		Path: filepath.Join(t.TempDir(), "folder"),
-		Name: "folder",
-		Kind: transfer.ItemDirectory,
+		Path: filepath.Join(t.TempDir(), "thing"),
+		Name: "thing",
+		Kind: transfer.ItemKind("device"),
 	}
 
 	prepared, err := adapter.Prepare(context.Background(), staged)
 	assertNoPayload(t, prepared, err, transfer.ErrPathUnsupported)
-	if calls != 0 {
-		t.Fatalf("source inspected %d times for a directory item, want 0", calls)
-	}
 }
 
 func TestPrepareRejectsUnreadableSource(t *testing.T) {
@@ -1404,6 +1400,13 @@ func (f sourceFunc) Inspect(ctx context.Context, absolutePath string) (transfer.
 	return f(ctx, absolutePath)
 }
 
+// Walk is deliberately fatal: every test using this seam is about a regular
+// file, and a file payload that reached a tree walk would be a defect this fake
+// must surface rather than absorb.
+func (f sourceFunc) Walk(context.Context, string, transfer.SourceVisitor) error {
+	return transfer.NewError(transfer.ErrTransferFailed, "file payload must not walk a tree")
+}
+
 // matchingSource reports the staged snapshot back unchanged, so path-level
 // validation cannot be what catches a descriptor-level divergence.
 func matchingSource(item transfer.StagedItem) sourceFunc {
@@ -1515,6 +1518,7 @@ type fakeFileInfo struct {
 	size    int64
 	mode    fs.FileMode
 	modTime time.Time
+	reparse bool
 }
 
 func (f fakeFileInfo) Name() string       { return f.name }
@@ -1523,6 +1527,11 @@ func (f fakeFileInfo) Mode() fs.FileMode  { return f.mode }
 func (f fakeFileInfo) ModTime() time.Time { return f.modTime }
 func (f fakeFileInfo) IsDir() bool        { return f.mode.IsDir() }
 func (f fakeFileInfo) Sys() any           { return nil }
+
+// FairDropReparse is the seam the reparse check falls back to when Sys()
+// carries no native attribute block, so a fabricated info can still say whether
+// the object it stands for is a reparse point.
+func (f fakeFileInfo) FairDropReparse() bool { return f.reparse }
 
 type countingWriter struct {
 	err     error

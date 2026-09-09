@@ -52,7 +52,7 @@ People need a quick way to move a local file or directory from a Windows or macO
 
 - V1 permits one process, one live session, one selected root, and one receiver; only IDLE accepts Stage, and multi-selection is rejected.
 - Runtime product state is ephemeral: no database, settings, telemetry, persistent logs, cloud service, or payload archive is written.
-- Payload memory remains O(buffer) regardless of payload size; files and ZIPs stream with prompt context cancellation and no whole-payload reads.
+- Payload memory remains O(buffer) in payload bytes regardless of payload size; files and ZIPs stream with prompt context cancellation and no whole-payload reads. A streamed ZIP additionally retains the one central-directory record per entry that the format requires (measured at ~250 bytes each) and never a second per-entry index of its own.
 - V1 is trusted-LAN plain HTTP with a separate cryptographically random capability token of at least 128 bits. The receiver uses a modern browser on the same LAN, and the sender permits the operating-system firewall access required for inbound HTTP.
 - Capability tokens and source paths never enter mDNS, diagnostics, unrelated HTTP errors, or persistent storage; receiver-visible names are sanitized as specified by the binding contracts.
 - The coordinator is the sole lifecycle owner. External calls occur outside its mutex, state commits are generation-checked, and every Stop is idempotent, force-closing, and quiescent on every return.

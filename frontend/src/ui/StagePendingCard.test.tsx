@@ -29,7 +29,8 @@ describe('local preparation copy', () => {
         render(<StagePendingCard state={pending('unknown')} onCancel={vi.fn()}/>)
 
         expect(document.querySelector('.fd-packet-tab')).toBeNull()
-        expect(screen.getByRole('heading', {name: 'Preparing your file…'})).toBeTruthy()
+        expect(screen.getByRole('heading', {name: 'Preparing your item…'})).toBeTruthy()
+        expect(screen.queryByText('File')).toBeNull()
         expect(screen.queryByText('Folder')).toBeNull()
     })
 })

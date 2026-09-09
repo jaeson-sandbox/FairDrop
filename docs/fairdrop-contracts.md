@@ -1,7 +1,7 @@
 # FairDrop Binding Integration Contracts
 
 Status: Final  
-Updated: 2026-08-22  
+Updated: 2026-09-01
 Architecture: `docs/fairdrop-architecture.md`  
 Spine: `_bmad-output/planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md`
 
@@ -16,7 +16,7 @@ This document fixes the cross-package shapes and ordering rules that separate ph
 | Wails command DTOs | `app.go` adapter, derived from transfer values | `App` |
 | React event types | generated/hand-mirrored from Wails DTOs | `frontend/src/transfer` |
 
-The provider-owned interfaces created in Phase 1 are transitional. Delete each when its consumer-owned replacement lands; do not preserve duplicate interfaces or conversion-only shadow types.
+The provider-owned Phase 1 interfaces have been deleted. Do not recreate duplicate interfaces or conversion-only shadow types alongside the consumer-owned contracts above.
 
 ## Canonical domain values
 
@@ -109,27 +109,38 @@ Stable domain error codes are:
 | `invalid_selection` | zero/multiple paths or empty path at an input boundary |
 | `busy` | Stage requested outside IDLE |
 | `cancelled` | Stage/claim/transfer lost to Cancel or Shutdown |
-| `path_not_found` | selected root no longer exists |
+| `path_not_found` | selected root or nested entry disappears during inspection or preparation |
 | `path_unsupported` | link, reparse point, special file, or host-unsupported path |
-| `source_changed` | staged regular-file type/size/modtime changed before claim |
+| `source_changed` | directory identity mismatched before enumeration, or staged regular-file type/size/modtime changed before claim |
 | `network_unavailable` | no eligible LAN IPv4 |
 | `server_start_failed` | listener could not become ready |
 | `qr_failed` | capability QR could not be encoded |
 | `beacon_warning` | HTTP/QR are ready but mDNS publication failed; non-terminal |
-| `transfer_failed` | read, ZIP, connection, or post-header stream failure |
+| `transfer_failed` | invalid preflight size arithmetic, handle-close, read, ZIP, connection, or post-header stream failure |
 | `shutting_down` | command rejected after application shutdown begins |
 
 Errors wrap internal causes but expose only the stable code and safe message to React. Absolute paths and capability tokens are never included in HTTP or mDNS errors.
 
-`ErrorCodeOf` uses `errors.As` to find `CodedError` through `%w` wrappers and maps every unknown non-nil error to `transfer_failed`. `PublicErrorOf` uses the recognized code and a fixed safe message; it never copies arbitrary adapter text. `SourcePort` may return `path_not_found`, `path_unsupported`, or `source_changed`; network selection returns `network_unavailable`; beacon start returns `beacon_warning`; server start returns `server_start_failed`; QR encoding returns `qr_failed`; claim authorization returns `cancelled` or `shutting_down`; payload preparation/streaming returns the applicable path/source code or `transfer_failed`. Adapters create or preserve this `internal/transfer` carrier and never compare error strings. `ServerFailed.Err` preserves the wrapped coded error unchanged; the coordinator maps unknowns only at its UI boundary.
+`ErrorCodeOf` uses `errors.As` to find `CodedError` through `%w` wrappers and maps every unknown non-nil error to `transfer_failed`. `PublicErrorOf` uses the recognized code and a fixed safe message; it never copies arbitrary adapter text. `SourcePort` may return `cancelled`, `path_not_found`, `path_unsupported`, `source_changed`, or `transfer_failed` for invalid size arithmetic; network selection returns `network_unavailable`; beacon start returns `beacon_warning`; server start returns `server_start_failed`; QR encoding returns `qr_failed`; claim authorization returns `cancelled` or `shutting_down`; payload preparation/streaming returns the applicable path/source code or `transfer_failed`. Adapters create or preserve this `internal/transfer` carrier and never compare error strings. `ServerFailed.Err` preserves the wrapped coded error unchanged; the coordinator maps unknowns only at its UI boundary.
 
 ## Coordinator-facing ports
 
 ```go
 package transfer
 
+type SourceEntry struct {
+    RelativePath string // slash-separated, beneath the root, never empty/absolute/dot-dot
+    Kind         ItemKind
+    Size         int64 // meaningful only for ItemFile
+    ModTime      time.Time
+}
+
+// content is nil for a directory; for a file it is borrowed for the call only.
+type SourceVisitor func(entry SourceEntry, content io.Reader) error
+
 type SourcePort interface {
     Inspect(ctx context.Context, absolutePath string) (StagedItem, error)
+    Walk(ctx context.Context, absolutePath string, visit SourceVisitor) error
 }
 
 type BeaconRequest struct {
@@ -206,6 +217,12 @@ type Observer interface {
 }
 ```
 
+`SourcePort.Inspect` preserves `absolutePath` byte-for-byte in `StagedItem.Path`. It parses only a POSIX root, Windows drive root, or UNC share (including their supported extended spellings), rejects device namespaces, alternate streams, and non-local Windows components, and then evaluates `.` and `..` against a validated handle stack without cleaning or reconstructing the path. Metadata opens request only attribute rights, lexical directory handles request search/traverse rights, and list/read rights are acquired only for a directory that will actually be enumerated. All component and nested lookups are native no-follow operations relative to the already-open parent; Windows uses `NtCreateFile` with `FILE_OPEN_REPARSE_POINT`, while POSIX uses `openat` with no-follow metadata/search handles. Before enumeration, the inspected and opened directory identities must match, the opened object must still be non-link-like, and every child directory identity is compared with active ancestors to refuse cycles without a global visited index. Enumeration is exactly `ReadDir(1)`; traversal sums only non-negative regular-file sizes with checked `int64` addition, attempts every owned close, and retains only active-depth handles plus one entry. Cancellation is checked immediately after every native operation and wins over operation or cleanup failures. An entry name that cannot be placed safely in an archive -- empty, `.`, `..`, or containing a separator or NUL byte -- is `path_unsupported` at `Inspect` as well as at `Walk`. This refuses a folder at selection rather than staging it and failing the download, and it means a name that is legal on POSIX but not archive-shaped, such as one containing a backslash, makes its folder unshareable. A link-like, cyclic, or special entry is `path_unsupported`; a mismatched opened identity is `source_changed`; disappearance remains `path_not_found`; arithmetic faults are `transfer_failed`.
+
+`SourcePort.Walk` re-validates `absolutePath` under exactly the rules `Inspect` applies -- preflight is not a snapshot, so link, reparse, special-file, identity and cycle checks are repeated here rather than trusted -- and then calls `visit` once per entry, a parent before its children. `RelativePath` is slash-separated and locates the entry beneath the root: never empty, absolute, volume-qualified, or dot-dot bearing, and never the root itself, so a consumer places entries under a single top-level name without re-deriving a path. `content` is nil for a directory; for a regular file it is a reader borrowed for exactly that call, because the source owns the descriptor and closes it as the visitor returns. A retained reader is a use-after-close. A visitor error stops the walk and is returned unchanged unless cancellation or a close failure takes precedence. Walk keeps no per-entry index: one enumeration handle per active depth plus the entry being visited, every handle closed in reverse order on every exit. A selection that is not a directory is `path_unsupported`.
+
+After inspection and cancellation revalidation, the coordinator rejects every file or directory `LogicalSize` outside `0..9007199254740991` as `transfer_failed` before calling the network, server, QR, or beacon ports. This is the exact-integer boundary of the JavaScript metadata contract.
+
 The coordinator also consumes injectable entropy and clock/timer ports so session/token generation and the three-second reset are deterministic in tests. Those test seams may use idiomatic signatures chosen in the coordinator package; they must preserve the ownership and timing rules below.
 
 ### Port postconditions
@@ -236,9 +253,9 @@ type PayloadPort interface {
 
 `Prepare` runs before response headers. For a file, it opens and stats the same descriptor, validates the staged root, and returns a known length. For a directory it returns an unknown wire length and begins streaming only from `WriteTo`. `Close` is idempotent.
 
-`Prepare` pins filesystem identity: it `Lstat`s the selected root immediately before opening it and compares that against the opened descriptor with `os.SameFile`. Kind, size, and modification time are forgeable together, so they are not sufficient on their own; a mismatch is `source_changed` before headers.
+`Prepare` pins filesystem identity. For a file it `Lstat`s the selected root immediately before opening it and compares that against the opened descriptor with `os.SameFile`; kind, size, and modification time are forgeable together, so they are not sufficient on their own, and a mismatch is `source_changed` before headers. A directory has no opened descriptor at `Prepare` and therefore no `SameFile` comparison: preparation is lazy, so the claim-time check is an `Lstat` that must still find a directory and must not find a link-like entry, and every deeper guarantee is re-established per entry during `Walk`. A root that stopped being a directory is `source_changed`; a root that became link-like is `path_unsupported`. Because the walk begins after the response has started, a failure it finds cannot choose an HTTP status and terminates the connection instead.
 
-`Size` is a bound, not a hint. `WriteTo` never writes more than the advertised length, and fails `transfer_failed` if the source delivers fewer bytes, because a short body reported as success would match no `Content-Length` already on the wire and would pass silently through any abort-on-error defense. `WriteTo` is once-only; a second call fails `transfer_failed` rather than reporting a no-op as success. A context deadline that expires is `transfer_failed`, not `cancelled` -- only a real cancellation is `cancelled`.
+`Size` is a bound, not a hint, whenever it is known. A directory reports `(0, false)` and writes an archive whose length is unknowable until the last entry is compressed, so no length bounds it and the server performs no delivered-length recheck; the payload alone is responsible for reporting truncation, and it does so by returning a non-nil error from `WriteTo`, which is the only signal available once headers are on the wire. For a known length `WriteTo` never writes more than the advertised length, and fails `transfer_failed` if the source delivers fewer bytes, because a short body reported as success would match no `Content-Length` already on the wire and would pass silently through any abort-on-error defense. `WriteTo` is once-only; a second call fails `transfer_failed` rather than reporting a no-op as success. A context deadline that expires is `transfer_failed`, not `cancelled` -- only a real cancellation is `cancelled`.
 
 `DownloadName` is sanitized by the payload, not by the server. It is a bare basename with no separator, no `..`, no control or Unicode format character, and none of the delimiters that terminate or extend the `filename` parameter. The server places the value in the header as given.
 
@@ -251,9 +268,12 @@ func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
 func (a *App) CancelTransfer() error
 func (a *App) SelectFile() (string, error)
 func (a *App) SelectDirectory() (string, error)
+func (a *App) CopyToClipboard(text string) error
 ```
 
 `SelectFile` and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. A cancelled native dialog returns an empty selection without emitting a transfer error. The frontend validates that native drop arrays contain exactly one path before calling `StageTransfer`.
+
+`CopyToClipboard` writes through the Wails Go runtime. The frontend never relies on `navigator.clipboard`, because the macOS Wails webview is not a secure context.
 
 Wails command failures use `options.App.ErrorFormatter` to serialize `PublicError` as a JSON string. The generated runtime rejects with `Error.message` containing that JSON; frontend `parseCommandError` parses and validates `{code,message}`, falling back to `transfer_failed` for malformed/unknown errors. `main_test.go` pins the formatter option.
 

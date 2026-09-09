@@ -76,7 +76,7 @@ FR24: After a terminal outcome, preserve the same visible Done or Error content 
 
 ### NonFunctional Requirements
 
-NFR1: Transfer memory remains O(buffer) in payload size; no whole-file read, payload-sized index, or staged ZIP is permitted.
+NFR1: Transfer memory remains O(buffer) in payload bytes; no whole-file read, payload-sized index, or staged ZIP is permitted. A streamed ZIP may retain only the per-entry central-directory record the format requires (~250 bytes per entry), never a second per-entry index.
 
 NFR2: FairDrop persists no runtime product data: no database, settings, telemetry, persistent logs, cloud service, or payload archive.
 
@@ -207,7 +207,7 @@ A sender can share a directory through the established transfer workflow, and th
 
 ### Epic 3: Run FairDrop Reliably on Supported Desktops
 
-Maintainers can verify and ship a single-instance FairDrop application through reproducible native Windows and macOS builds.
+Maintainers can verify and ship a single-instance FairDrop application through reproducible native Windows and macOS builds. Nine stories after the 2026-09-08 re-plan: 3.1-3.5 as originally scoped but narrowed, plus 3.6 lost-event visibility, 3.7 the native platform test matrix, 3.8 directory-stream hardening, and 3.9 human release evidence.
 
 **FRs covered:** FR22, plus CAP-7 and release/verification NFRs
 
@@ -926,6 +926,8 @@ So that I can download it in a browser without the sender creating a temporary a
 
 Maintainers can verify and ship a single-instance FairDrop application through reproducible native Windows and macOS builds.
 
+> **Re-planned 2026-09-08, after the Epic 2 retrospective.** The original five stories had absorbed 47 deferred findings between three of them, and Story 3.3 mixed release work a workflow can perform with evidence only a person on a real device can collect. There are now nine stories. Each lists the `deferred-work.md` ids it must close (`D-NNN`); **a story is not done while any id it names is still open**, and a session that cannot close one must re-own it explicitly rather than leave it. Stories 3.1-3.5 keep their sprint keys; 3.6-3.9 are new.
+
 ### Story 3.1: Enforce One Running FairDrop Instance
 
 As a sender,
@@ -960,90 +962,72 @@ As a maintainer,
 I want every change verified on native supported runners from locked toolchains,
 So that the repository cannot silently drift away from a buildable, race-safe release.
 
+**Scope:** the CI pipeline itself. Executing platform-specific tests on native runners is Story 3.7; release artifacts are Story 3.3.
+
+**Closes:** D-005, D-009, D-016, D-038, D-045, D-050, D-054, D-063, D-072.
+
 **Acceptance Criteria:**
 
 **Given** the GitHub repository
 **When** CI is added under `.github/workflows/`
 **Then** pull requests and protected-branch pushes run native Windows and macOS jobs with concurrency cancellation for superseded runs
-**And** no job claims Linux or cross-compilation as release proof.
+**And** no job claims Linux or cross-compilation as release proof (D-005).
 
 **Given** CI toolchain setup
 **When** dependencies are installed
-**Then** Go honors the module floor and the architecture-verified toolchain policy, Wails CLI is exactly v2.15.0, Node is pinned to 24 LTS, and npm uses the committed lockfile through `npm ci`
-**And** dev dependencies remain installed because TypeScript, Vite, Vitest, and Wails frontend builds require them.
+**Then** Go honors the module floor and the architecture-verified toolchain policy, Wails CLI is exactly v2.15.0, Node is pinned to 24 LTS, and npm uses the committed lockfile through `npm ci` with dev dependencies installed
+**And** the build fails on `npm ci --omit=dev`, an unpinned Wails CLI, or default UPX compression (D-009).
 
-**Given** a fresh checkout whose generated Wails bindings may be stale or incomplete
+**Given** a fresh checkout whose generated Wails bindings may be stale
 **When** the verification sequence runs
-**Then** a Wails build or binding-generation step occurs before the standalone frontend TypeScript build that imports those bindings
-**And** `frontend/dist/.gitkeep` remains available for clean-clone Go embedding and is recreated by the existing postbuild hook.
-
-**Given** each native CI job
-**When** verification runs
-**Then** it executes Go tests, vet, frontend tests, frontend build, and `wails build` using the repository scripts and documented PATH requirements
-**And** failures stop the job with retained test/build diagnostics but no uploaded source paths, tokens, or payload data.
+**Then** `wails build` or binding generation precedes the standalone frontend build, `frontend/dist/.gitkeep` survives for clean-clone embedding, and the frontend suite, Go tests, vet, `gofmt -l`, and `wails build` all run on every job using the documented PATH requirements (D-050, D-054)
+**And** the frontend suite and `wails build` never run concurrently, because the install step rewrites `node_modules` underneath Vitest.
 
 **Given** a native runner with the required C toolchain
 **When** race verification runs
-**Then** `go test -race ./...` covers coordinator, network, server, and streaming packages
-**And** the workflow documents why the race job is native and C-toolchain-dependent rather than assuming every local Windows shell can run it.
+**Then** `go test -race ./...` runs and the job fails loudly if cgo is unavailable, rather than reporting clean
+**And** the workflow states why the race job is native and C-toolchain-dependent.
 
-**Given** dependency or toolchain changes
-**When** lockfiles or pinned versions drift
-**Then** CI uses deterministic clean installation and fails on incompatible Go, Node, TypeScript, Vite, Vitest, Wails, or generated-binding state
-**And** no workflow silently substitutes `npm install`, `npm ci --omit=dev`, an unpinned Wails CLI, or default UPX compression.
+**Given** the repository's own hygiene debts
+**When** the story closes
+**Then** `staticcheck` (or an equivalent the `//nolint` directives name) runs in CI (D-016), line endings are normalised by `.gitattributes` and checked (D-063), and the recorded test-quality items are fixed or explicitly accepted with reasons (D-038, D-045, D-072).
 
 ### Story 3.3: Produce and Smoke-Test Native Release Artifacts
 
 As a maintainer,
-I want native FairDrop artifacts built and exercised on each supported operating system,
-So that users receive a desktop application whose actual transfer journey has been verified on its target platform.
+I want native FairDrop artifacts built and checked on each supported operating system,
+So that a release candidate is a real build of the real code, correctly named, with its known platform gaps decided.
+
+**Scope:** what a workflow can build and verify without a person. Human-collected evidence -- browser matrix, screen readers, first-launch firewall behaviour -- is Story 3.9 and is *required* before release; this story produces the artifacts 3.9 exercises.
+
+**Closes:** D-018, D-055, D-064.
 
 **Acceptance Criteria:**
 
 **Given** a versioned release candidate
 **When** the release workflow runs on native Windows and macOS runners
-**Then** each runner builds its own FairDrop artifact through Wails with locked Go and npm dependencies
-**And** the workflow does not present cross-compiled output as equivalent native verification.
+**Then** each runner builds its own artifact through Wails with locked Go and npm dependencies, runs the full verification gate first, and publishes the artifact with its checksum
+**And** the workflow does not present cross-compiled output as native verification.
 
 **Given** produced release artifacts
 **When** they are named and inspected
-**Then** product name, executable/output name, window title, version metadata, and platform identity consistently use FairDrop
-**And** no stale DeadDrop name or inactive QR dependency remains in shipped metadata or documentation.
+**Then** product name, executable name, window title, version metadata, and platform identity consistently use FairDrop, and no stale DeadDrop name or inactive QR dependency remains in shipped metadata or documentation.
 
 **Given** release compression settings
 **When** artifacts are built
-**Then** UPX is opt-in rather than default because of documented Apple Silicon and Windows antivirus risks
-**And** disabling UPX does not change functional acceptance.
+**Then** UPX is opt-in because of documented Apple Silicon and Windows antivirus risks, and disabling it does not change functional acceptance.
 
-**Given** the native smoke matrix
-**When** a release candidate is exercised
-**Then** it covers first launch and firewall guidance, native drop and browse, single-instance restoration, one exact file download, one valid directory ZIP download, progress, cancellation, terminal reset, retained terminal outcome with Dismiss and next-Stage clearing, and clean shutdown
-**And** Windows path classes and macOS filesystem behavior are checked where the runner supports them.
-
-**Given** the sender-to-receiver compatibility matrix in `EXPERIENCE.md`
-**When** a supported-browser claim is evaluated
-**Then** each combination — Windows sender to current iPhone Safari, Mac sender to current Windows Edge, Windows sender to current Mac Safari, and Mac sender to current iPhone Safari — records sender OS and version, receiver OS and version, browser and version, artifact version or checksum, date, reviewer, and pass/fail, covering QR scan, exact file bytes and name, a valid folder ZIP the receiver can open, first-opener behavior, and observed 404/423/410 responses
-**And** "supported modern browser" is claimed only for combinations whose row passes, while link-preview consumption of a V1 link is recorded as the disclosed accepted limitation rather than reinterpreted as a protected link.
-
-**Given** the native accessibility evidence gate in `EXPERIENCE.md`
-**When** a release candidate is exercised on each platform
-**Then** Windows records keyboard, Narrator, and NVDA results and macOS records Full Keyboard Access and VoiceOver results across both browse actions, dialog cancel, invalid drop, the Stage/Start/progress/Cancel/Done/Error/reset order, retained outcome, the five-second progress-speech throttle, firewall allow and deny, forced colors or Increase Contrast, Reduce Motion, 320 CSS pixels at 200% text with text-spacing overrides, second-instance restoration, and the absence of duplicate listeners or duplicated speech
-**And** the OS firewall prompt's accessible name, buttons, and focus-return order are recorded rather than assumed.
-
-**Given** each required native smoke scenario
-**When** release evidence is collected
-**Then** the scenario is backed either by an automated CI result or a recorded manual result naming the platform and OS version, artifact version or checksum, date, reviewer, and pass/fail outcome
-**And** a missing, ambiguous, stale, or failed result blocks release rather than being summarized as an unverified manual check.
+**Given** the three receiver-facing platform gaps this story owns
+**When** the story closes
+**Then** the CORS, `Accept-Ranges`, and `Access-Control-Expose-Headers` decision is made and, if headers change, the frozen HTTP matrix in `docs/fairdrop-contracts.md` is amended with them (D-018); the native window background matches both themes so neither flashes (D-055); and the macOS non-secure-context limitation is either closed by routing the affected APIs through Go or recorded in `EXPERIENCE.md` as a platform limit (D-064).
 
 **Given** product and release copy
-**When** trusted-LAN behavior is described
-**Then** it states that the capability URL reduces blind discovery but plain HTTP does not protect against a LAN observer
-**And** it makes no end-to-end encryption, hostile-network, cloud relay, signing, notarization, auto-update, Linux packaging, resume, or multi-receiver claim.
+**When** trusted-LAN behaviour is described
+**Then** it states that the capability URL reduces blind discovery but plain HTTP does not protect against a LAN observer, and makes no end-to-end encryption, hostile-network, cloud relay, signing, notarization, auto-update, Linux packaging, resume, or multi-receiver claim.
 
-**Given** a release candidate that fails a native build, automated check, or required smoke scenario
+**Given** a release candidate that fails a native build or any automated check
 **When** release readiness is evaluated
-**Then** the release is blocked with the failing platform and scenario recorded
-**And** architecture or contract changes discovered during release feed back into the spec, architecture decision log and documents, relevant story, tests, and managed agent context before retry.
+**Then** the release is blocked with the failing platform and check recorded, and a contract or architecture change discovered during release feeds back into the spec, the architecture documents, the relevant story, its tests, and `AGENTS.md` before retry.
 
 ### Story 3.4: Bound Every Lifecycle Wait and Prove Quiescence
 
@@ -1051,32 +1035,32 @@ As a sender,
 I want FairDrop to always finish shutting a transfer down,
 So that a stuck adapter cannot leave the window unusable with no way out.
 
+**Scope:** the waits the coordinator and server perform. Making dropped or malformed *events* visible is Story 3.6.
+
+**Closes:** D-017, D-019, D-022, D-024, D-027, D-030, D-032, D-036, D-037.
+
 **Acceptance Criteria:**
 
 **Given** every wait the coordinator and server perform while holding a lock or lease
 **When** the awaited party never returns
 **Then** the wait ends on a documented bound and the caller reports a coded failure rather than blocking forever
-**And** the bound is asserted by a test that drives an adapter which deliberately never returns, for each of: `unwind` on the drainer, the claim's `StopBeacon`, `AuthorizeClaim` as seen by `Stop`, and the two waits Story 1.6 added.
+**And** a test drives an adapter that deliberately never returns for each of: `unwind` on the drainer (D-027), the claim's `StopBeacon` (D-024), `AuthorizeClaim` as seen by `Stop` (D-019), and the two waits Story 1.6 added (D-032).
 
 **Given** `ServerPort.Stop` blocking while it holds the server mutex
 **When** a later `Start` is attempted
-**Then** neither deadlocks the other
-**And** restart after `Stop` has a specified, tested contract rather than being merely possible.
+**Then** neither deadlocks the other (D-017), and restart after `Stop` has a specified, tested contract rather than being merely possible (D-022).
 
-**Given** an `Observer.Publish` that panics or blocks
-**When** the coordinator next runs a lifecycle command
-**Then** the operation lease is released on every path and the coordinator remains usable
-**And** a test drives both a panicking and a blocking observer through a full lifecycle.
+**Given** `Cancel` and `Shutdown`
+**When** a Wails command needs to abandon one
+**Then** both take a context and honour it, with a test for each (D-036).
 
-**Given** an event lane that closes while the session is STAGED or CLAIMING
-**When** the drainer observes the close
-**Then** the coordinator synthesizes a terminal outcome rather than holding a dead session
-**And** the UI is never left waiting on an event that cannot arrive.
+**Given** `armReset`'s window between creating the reset timer and re-checking the session
+**When** a Cancel lands inside it
+**Then** exactly one outcome is armed and a test forces the window rather than relying on scheduling (D-037).
 
-**Given** the dropped-event counter the Wails boundary maintains
-**When** a lifecycle event cannot be delivered
-**Then** the condition reaches a surface a user or a test can observe rather than an inert field
-**And** a lost terminal event no longer strands the window with no control.
+**Given** `NetworkPort`
+**When** its contract is read
+**Then** it states that `StartBeacon` requires a prior successful `GetLocalIP`, and a test pins the refusal (D-030).
 
 ### Story 3.5: Reconcile Public Error Copy with the States It Describes
 
@@ -1084,19 +1068,142 @@ As a sender,
 I want the message I am shown to describe what actually happened,
 So that I am not told a transfer stopped when none ever started.
 
+**Closes:** D-012, D-015, D-025, D-029, D-044, D-047, D-053, plus Epic 1 retrospective item 6 (pin all twelve public messages cross-language or delete Go's display-dead copies).
+
 **Acceptance Criteria:**
 
 **Given** the fixed error copy registry in `EXPERIENCE.md`
 **When** every producer of a coded failure is enumerated
 **Then** each state that currently borrows `transfer_failed` or `busy` is listed with the message a user sees and whether that message is true of it
-**And** the audit names at least the pre-startup refusals, a CSPRNG failure during Stage, a Prepare-time deadline, a malformed Stage acknowledgement, and `Stage` during the three-second terminal lease.
+**And** the audit names at least the pre-startup refusals (D-047), a CSPRNG failure during Stage (D-025), a Prepare-time deadline (D-012), a malformed Stage acknowledgement (D-053), `AuthorizeClaim` returning `transfer_failed` (D-029), a `SourcePort` error passed through `Prepare` verbatim (D-015), and `Stage` during the three-second terminal lease (D-044).
 
 **Given** states that no existing code truthfully describes
 **When** the copy contract is revised
 **Then** `EXPERIENCE.md` gains the codes and exact strings they need, and the binding registry, the Go table, and the TypeScript mirror move together
-**And** the cross-language pin fails if any of the four places drifts.
+**And** the cross-language pin fails if any of the four places drifts, covering all twelve messages.
 
 **Given** the revised registry
 **When** a user reaches each affected state
-**Then** the visible message describes that state and offers a recovery that applies to it
-**And** no state is described as an interrupted transfer unless a transfer began.
+**Then** the visible message describes that state and offers a recovery that applies to it, and no state is described as an interrupted transfer unless a transfer began.
+
+### Story 3.6: Make Lost and Malformed Events Visible
+
+As a sender,
+I want every dropped, malformed, or unroutable lifecycle event to reach a surface I can see,
+So that a transfer that silently stops is never mistaken for one I cancelled.
+
+**Why a separate story:** Epic 1's retrospective found a successful transfer that could be announced as "Transfer canceled", and Epic 2's live run found a failure that left no trace at all. Both are the same class of defect -- an event was lost and nothing said so -- and it had been buried among Story 3.4's timing work.
+
+**Closes:** D-020, D-021, D-031, D-034, D-035, D-039, D-042, D-043, D-048, D-049, D-059, plus Epic 1 retrospective items 2, 3, 4 and 7.
+
+**Acceptance Criteria:**
+
+**Given** a `transfer-complete` the reducer refuses, or a `ServerComplete` carrying no snapshot
+**When** it occurs
+**Then** the window shows a failure, never the cancel-won summary, and a test drives both shapes (D-035, retrospective item 2).
+
+**Given** an `Observer.Publish` that panics or blocks
+**When** the coordinator next runs a lifecycle command
+**Then** the operation lease is released on every path and the coordinator remains usable, with a test for each (D-034, D-043).
+
+**Given** an event lane that closes while the session is STAGED or CLAIMING
+**When** the drainer observes the close
+**Then** a terminal outcome is synthesized and the UI is never left waiting (D-042).
+
+**Given** the `undelivered` counter and the stderr lifecycle log `app.go` writes
+**When** a lifecycle event cannot be delivered
+**Then** the drop is logged and reaches a surface a test can observe (D-049), and a terminal outcome always carries a control so a lost `transfer-reset` cannot strand the window (D-059).
+
+**Given** `Warning.Code`, the discovery warning, and progress coherence
+**When** the story closes
+**Then** `Warning.Code` is constrained at the boundary or covered by the cross-language pin (retrospective item 3); the beacon warning reaches a screen reader through a reachable trigger or an announced region (retrospective item 4); and progress is validated by one strategy with Stage metadata parsed once (retrospective item 7).
+
+**Given** the smaller visibility gaps
+**When** the story closes
+**Then** a repeated `Stop` keeps its first diagnostic (D-020), `ErrorLog` no longer swallows handler panics (D-021), `diagnosticSink` marks overflow instead of dropping silently (D-031), `sanitizeProgress` checks the known/unknown invariant (D-039), and the pre-startup command and dialog paths agree (D-048) -- each with a named test.
+
+### Story 3.7: Execute the Native Platform Test Matrix
+
+As a maintainer,
+I want the tests that can only run on a native operating system executed there,
+So that "it cross-compiles" is never mistaken for "it was verified".
+
+**Scope:** running and extending tests on the native runners Story 3.2 provides. This story adds no product behaviour.
+
+**Closes:** D-007, D-014, D-065, D-068, D-074, D-076, D-078, D-084.
+
+**Acceptance Criteria:**
+
+**Given** native Linux and macOS runners
+**When** the source package's platform tests run
+**Then** the production no-follow, search-only-ancestor, non-reading special-file, `O_PATH`/`O_EVTONLY`, FIFO, and content-open `O_NONBLOCK`-plus-`fstat` guards execute and pass natively rather than only cross-compiling (D-074, D-076).
+
+**Given** the path classes the product claims
+**When** they run on Windows and macOS
+**Then** spaces, non-ASCII, paths over 260 characters, UNC shares, symlinks, and zero-path drops are each exercised end to end (D-007), and archive-name predicates are proven on both hosts, including a Windows-shaped name produced on a POSIX sender (D-084).
+
+**Given** archive integrity at scale
+**When** the story closes
+**Then** a large-entry-count archive is read back and validated, the ZIP64 thresholds are covered, and `WriteTo`'s once-only guard is exercised concurrently under `-race` (D-078, D-014).
+
+**Given** the accessibility and QR evidence `DESIGN.md` gates on native observation
+**When** the story closes
+**Then** what a runner can capture (rendered layout at 320 CSS px and 200% text, forced-colors rendering of the QR substrate) is captured there (D-065, D-068), and what needs a person is handed to Story 3.9's evidence template with the exact rows it requires.
+
+### Story 3.8: Harden the Directory Stream
+
+As a sender,
+I want the folder stream to fail safely under the conditions Epic 2 deferred,
+So that a deep tree, a swapped root, or a misused reader cannot break a live download.
+
+**Closes:** D-077, D-079, D-080, D-081, D-082, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
+
+**Acceptance Criteria:**
+
+**Given** a tree nested deeper than the process can hold handles for
+**When** it is walked
+**Then** traversal refuses at a documented depth bound with `path_unsupported`, before the response starts where possible, and a test drives the bound (D-077).
+
+**Given** the selected root is replaced between `Prepare` and `WriteTo`
+**When** streaming begins
+**Then** the stream either pins the root's identity and refuses the replacement, or the contract records exactly why it does not, and a test pins whichever is chosen (D-082).
+
+**Given** a visitor that hands the borrowed reader to another goroutine
+**When** the visit returns
+**Then** the reader reports `fs.ErrClosed` cleanly under `-race` rather than racing (D-080).
+
+**Given** entry names and modes
+**When** an archive is produced
+**Then** entry-name hardening matches the download-name sanitizer or the difference is documented (D-079), and archive entries carry a decided file mode (D-081).
+
+**Given** the three copy loops in `internal/stream`
+**When** the story closes
+**Then** `archive.drain` carries the empty-read guard or its absence is justified in a comment and a test (retrospective item 4).
+
+### Story 3.9: Record Human Release Evidence
+
+As a release operator,
+I want a checklist that a person completes on real devices,
+So that supported-browser and accessibility claims rest on recorded results rather than assumptions.
+
+**Why a separate story:** a model can build a release candidate and produce the template; it cannot scan a QR with an iPhone, run NVDA, or watch the Windows firewall prompt. Mixing those into an automatable story guaranteed the story could never be closed by the agent executing it.
+
+**Closes:** D-073, and the smoke, browser-matrix, and accessibility gates removed from Story 3.3.
+
+**Acceptance Criteria:**
+
+**Given** the sender-to-receiver compatibility matrix and native accessibility gate in `EXPERIENCE.md`
+**When** the story closes
+**Then** `_bmad-output/implementation-artifacts/release-evidence.md` exists with one row per required scenario -- first launch and firewall guidance, native drop and both browse actions, single-instance restoration, one exact file download, one valid folder ZIP download that opens on the receiver, progress, cancellation, terminal reset, retained outcome with Dismiss, clean shutdown, each browser combination `EXPERIENCE.md` names, and the Windows (keyboard, Narrator, NVDA) and macOS (Full Keyboard Access, VoiceOver) checks -- and every row records platform and OS version, artifact version or checksum, date, reviewer, and pass/fail.
+
+**Given** a row
+**When** an agent works on this story
+**Then** the agent produces or maintains the template and records results a person supplies; it never fills in a pass itself, and a missing, ambiguous, stale, or failed row blocks release rather than being summarised as an unverified manual check.
+
+**Given** the Epic 2 live folder download
+**When** the first evidence is recorded
+**Then** its result -- including the receiver's OS and browser and what the sender window showed -- is the first row, whichever way it went.
+
+**Given** `DESIGN.md`'s contrast evidence
+**When** the story closes
+**Then** the nine contrast pairs added as prose are moved into the table that holds the others, with a note that `styles.test.ts` now owns the figures (D-073).

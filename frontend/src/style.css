@@ -312,23 +312,43 @@ body {
 }
 
 /*
-  `:focus-visible` throughout, including the nodes the routing table focuses.
+  `:focus-visible`, scoped to the two controls a keyboard can Tab to.
 
-  Those nodes carry `tabindex="-1"` so the table can reach them, which also
-  makes them click-focusable -- and a plain `:focus` ring then stays painted
-  after a mouse click, so an outcome panel or a heading reads as selected long
-  after the click that focused it.
+  `.fd-button` and `.fd-url` sit in the ordinary tab order, so `:focus-visible`
+  is exactly the rule Epic 1 chose it for: a plain `:focus` ring stayed painted
+  after a mouse click, and `:focus-visible` still fires for a keyboard user
+  because the engine keeps the modality of the last real interaction.
 
-  `:focus-visible` still fires for the case that matters. When focus is moved by
-  script, the engine keeps the modality of the last real interaction: a keyboard
-  user gets the ring on the programmatic move, and a mouse user -- who is
-  already looking at the view that changed -- does not.
+  The routed landing targets below (`[data-focus-target]`) are deliberately not
+  in this rule any more -- see the comment there.
 */
 .fd-button:focus-visible,
-.fd-url:focus-visible,
-[data-focus-target]:focus-visible {
+.fd-url:focus-visible {
     outline: var(--focus-ring-width) solid var(--color-focus);
     outline-offset: var(--focus-ring-offset);
+}
+
+/*
+  Landing targets: no ring, on purpose, not merely an omitted rule.
+
+  These nodes -- headings, the cancel summary, the outcome panel -- carry
+  `tabindex="-1"` so the announcement routing table can move focus to them, but
+  a keyboard user can never Tab to one; WCAG 2.4.7's visible-focus requirement
+  is scoped to keyboard-operable components, which these are not.
+
+  Epic 1's `:focus-visible` fix assumed a script-triggered focus move inherits
+  the modality of "the last real interaction." That holds for a click handler
+  that focuses its own target, but not here: a transfer that finishes on its
+  own has no recent interaction to inherit at all, so every engine falls back
+  to treating the move as focus-visible regardless of whether the user is on a
+  mouse or a keyboard -- reported live as the Done panel reading as stuck
+  "selected". `outline: none` is required, not just an absent rule: the
+  browser's own default focus-visible outline would otherwise still paint.
+  The panel's glyph and heading, and the pending/staged/transferring headings
+  in turn, already say where the user landed without a ring.
+*/
+[data-focus-target]:focus-visible {
+    outline: none;
 }
 
 /*
@@ -402,7 +422,6 @@ body {
 }
 
 .fd-drop-zone {
-    cursor: pointer;
     display: grid;
     min-block-size: 200px;
     place-items: center;

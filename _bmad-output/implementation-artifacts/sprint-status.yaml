@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-01-2026 22:24
+last_updated: 09-08-2026 20:58
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -48,10 +48,10 @@ development_status:
   1-10-meet-the-accessibility-and-recovery-contract: done
   epic-1-retrospective: done
 
-  epic-2: backlog
-  2-1-validate-and-stage-one-directory: backlog
-  2-2-stream-a-safe-directory-zip: backlog
-  epic-2-retrospective: optional
+  epic-2: done
+  2-1-validate-and-stage-one-directory: done
+  2-2-stream-a-safe-directory-zip: done
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-enforce-one-running-fairdrop-instance: backlog
@@ -59,6 +59,10 @@ development_status:
   3-3-produce-and-smoke-test-native-release-artifacts: backlog
   3-4-bound-every-lifecycle-wait-and-prove-quiescence: backlog
   3-5-reconcile-public-error-copy-with-its-states: backlog
+  3-6-make-lost-and-malformed-events-visible: backlog
+  3-7-execute-the-native-platform-test-matrix: backlog
+  3-8-harden-the-directory-stream: backlog
+  3-9-record-human-release-evidence: backlog
   epic-3-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
@@ -67,34 +71,34 @@ action_items:
       and the folder wording until Epic 2, or state the limit in copy the spine registers.
       Needs an EXPERIENCE.md decision."
     owner: "Epic 2 / UX owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-2-make-a-dropped-or-unparsed-transfer-comp"
     epic: 1
     action: "Make a dropped or unparsed transfer-complete fail visibly instead of
       rendering as a cancellation, and give the undelivered counter a surface."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-6-make-lost-and-malformed-events-visible"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-3-constrain-warning-code-at-the-boundary-o"
     epic: 1
     action: "Constrain Warning.Code at the boundary, or widen the cross-language pin
       to cover warning codes."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-6-make-lost-and-malformed-events-visible"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-4-make-the-discovery-warning-reach-a-scree"
     epic: 1
     action: "Make the discovery warning reach a screen reader: give the beacon-warning
       row a reachable trigger or move the banner inside the announced region."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-6-make-lost-and-malformed-events-visible"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-5-rename-internal-stream-archiver-go-to-ma"
     epic: 1
     action: "Rename internal/stream/archiver.go to match what it does."
     owner: "2-2-stream-a-safe-directory-zip"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
   - id: "epic-1-retro-item-6-pin-all-twelve-public-error-messages-cro"
     epic: 1
@@ -107,6 +111,36 @@ action_items:
     epic: 1
     action: "Settle progress coherence on one strategy, and stop parsing Stage metadata
       twice."
-    owner: "3-4-bound-every-lifecycle-wait-and-prove-quiescence"
+    owner: "3-6-make-lost-and-malformed-events-visible"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-01.md"
+  - id: "epic-2-retro-item-8-stage-a-real-folder-and-download-it-as-a"
+    epic: 2
+    action: "Stage a real folder and download it as a ZIP from a phone browser on
+      the same Wi-Fi, then record what was observed. This is the epic's own stated
+      acceptance evidence and the only claim still unverified."
+    owner: "Epic 2 / human"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
+  - id: "epic-2-retro-item-9-restore-the-dropped-agents-md-pitfalls-a"
+    epic: 2
+    action: "Restore the dropped AGENTS.md pitfalls, above all that -race without
+      cgo skips silently rather than failing, and note that a context refresh must
+      diff what it removes."
+    owner: "3-2-automate-reproducible-cross-platform-verification"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
+  - id: "epic-2-retro-item-10-drive-the-server-handler-with-a-director"
+    epic: 2
+    action: "Drive the server handler with a directory payload so the omitted Content-Length
+      and the unknown-total snapshot are proved where the requirement is phrased."
+    owner: "3-2-automate-reproducible-cross-platform-verification"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
+  - id: "epic-2-retro-item-11-give-archive-drain-the-stall-guard-its-t"
+    epic: 2
+    action: "Give archive.drain the stall guard its two sibling loops carry, or record
+      why it does not need one."
+    owner: "3-8-harden-the-directory-stream"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"

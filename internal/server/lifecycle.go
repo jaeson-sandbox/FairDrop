@@ -35,6 +35,15 @@ const (
 	// body, so this is a ceiling on pathological clients, not on the transfer.
 	// There is deliberately no WriteTimeout: a write deadline would cap the
 	// transfer itself, killing a large file over a slow link mid-stream.
+	//
+	// Verified rather than assumed, because it is easy to read net/http the
+	// other way: the server keeps a read deadline armed while a request is
+	// being read, but startBackgroundRead clears it before the background
+	// disconnect-detection read begins, so for a bodiless GET the deadline is
+	// spent by the time the handler runs and never cancels request.Context().
+	// TestATransferLongerThanEveryTimeoutStillCompletes streams a body longer
+	// than every deadline through a real listener; it fails the moment a
+	// WriteTimeout is added, and was used to disprove the read-deadline theory.
 	readTimeout = 20 * time.Second
 
 	// idleTimeout reaps a connection that claims nothing. Keep-alives are
@@ -57,9 +66,24 @@ type Server struct {
 	payloads PayloadPort
 	listen   listenFunc
 	now      clock
+	// timeouts is a seam so a test can shrink every net/http deadline and prove
+	// a transfer that outlives all of them still completes. Production is
+	// always defaultTimeouts.
+	timeouts serverTimeouts
 
 	mu     sync.Mutex
 	active *run
+}
+
+// serverTimeouts are the net/http deadlines one server applies.
+type serverTimeouts struct {
+	readHeader time.Duration
+	read       time.Duration
+	idle       time.Duration
+}
+
+func defaultTimeouts() serverTimeouts {
+	return serverTimeouts{readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout}
 }
 
 var _ transfer.ServerPort = (*Server)(nil)
@@ -74,7 +98,8 @@ func New(payloads PayloadPort) *Server {
 			var config net.ListenConfig
 			return config.Listen(ctx, "tcp", address)
 		},
-		now: time.Now,
+		now:      time.Now,
+		timeouts: defaultTimeouts(),
 	}
 }
 
@@ -203,9 +228,9 @@ func (s *Server) Start(
 
 	active.http = &http.Server{
 		Handler:           http.HandlerFunc(active.route),
-		ReadHeaderTimeout: readHeaderTimeout,
-		ReadTimeout:       readTimeout,
-		IdleTimeout:       idleTimeout,
+		ReadHeaderTimeout: s.timeouts.readHeader,
+		ReadTimeout:       s.timeouts.read,
+		IdleTimeout:       s.timeouts.idle,
 		MaxHeaderBytes:    maxHeaderBytes,
 		ConnState:         active.trackConnection,
 		// net/http logs connection and panic diagnostics that can quote a

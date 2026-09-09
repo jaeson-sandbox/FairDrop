@@ -1,8 +1,10 @@
 # Comprehensive Project Specification: DeadDrop
 
+> **SUPERSEDED -- retained for traceability only.** The canonical contract is `_bmad-output/specs/spec-fairdrop/SPEC.md` with its companions `docs/fairdrop-contracts.md`, `docs/fairdrop-architecture.md`, and the architecture spine. Do not plan or implement from this file. Where it disagrees with those documents, it is wrong; the corrections below are the known disagreements, not an exhaustive list.
+
 ## Phase 1 Corrections (verified against Wails v2.15.0)
 
-Phase 1 implementation proved four instructions in this document wrong, and Epic 1 has since superseded three more. **Follow the corrections below, not the original text.** Each is also flagged inline at the spot it affects. Everything else in this document stands as written.
+Phase 1 implementation proved four instructions in this document wrong, and Epic 1 has since superseded three more. **Follow the corrections below, not the original text.** Each is also flagged inline at the spot it affects. Nothing else in this document is authoritative: consult the canonical contract named in the banner above for anything not covered by a correction.
 
 1. **File drop is not a top-level option.** `options.App` has no `EnableFileDrop` field. The real form is the nested struct `DragAndDrop: &options.DragAndDrop{EnableFileDrop: true}` (evidence: `pkg/options/options.go:201-216`). *Affects §6 Module D, §10 Phase 1.*
 2. **There is no `wails_file_drop` event.** The runtime event is `wails:file-drop`, and the supported API is the helper pair `OnFileDrop(callback, useDropTarget)` / `OnFileDropOff()` imported from `../wailsjs/runtime/runtime`. Drops are gated on the inherited CSS custom property `--wails-drop-target: drop` -- not a class, not a DOM handler (evidence: `internal/frontend/runtime/desktop/draganddrop.js`). *Affects §6 Module D, §10 Phase 6.*

@@ -1,10 +1,10 @@
 # FairDrop Architecture and Design
 
 Status: Final  
-Updated: 2026-08-22  
+Updated: 2026-09-01
 Binding companions: `_bmad-output/planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md` and `docs/fairdrop-contracts.md`
 
-This is the durable technical handoff for humans and implementation agents. The architecture spine is the terse source of binding invariants; this document explains how those invariants fit together and why. Product behavior comes from `docs/fairdrop-spec.md`, with its Phase 1 Corrections applied first. Where this document explicitly supersedes implementation guidance in that older spec, this document wins.
+This is the durable technical handoff for humans and implementation agents. The architecture spine is the terse source of binding invariants; this document explains how those invariants fit together and why. Product behavior comes from `_bmad-output/specs/spec-fairdrop/SPEC.md` and its binding companions. The corrected `docs/fairdrop-spec.md` is historical narrative only where it does not conflict.
 
 ## Goals
 
@@ -22,16 +22,16 @@ FairDrop uses ports and adapters around a single `internal/transfer.Coordinator`
 
 | Component | Responsibility | Must not own |
 | --- | --- | --- |
-| `main.go` | Construct concrete adapters, configure Wails, enforce one process | Transfer state or business rules |
+| `main.go` | Construct concrete adapters and configure Wails; Story 3.1 adds single-instance enforcement | Transfer state or business rules |
 | `app.go` | Translate Wails commands and coordinator notifications | HTTP handlers, filesystem traversal, lifecycle truth |
 | `internal/transfer` | Validate Stage intent, own state/session, coordinate setup and teardown | Wails runtime calls or concrete network/HTTP code |
 | `internal/network` | Select a LAN IPv4 address and own `_fairdrop._tcp` registration | Transfer state or UI events |
 | `internal/server` | Own listener, one-shot HTTP claim, headers, progress, and queued terminal events | Wails events or mDNS |
-| `internal/stream` | Copy a file or stream a directory ZIP with cancellation | Listener lifecycle or frontend state |
-| `internal/qrcode` | Encode the capability URL to an in-memory PNG | Filesystem output |
+| `internal/stream` | Copy a file with cancellation; Story 2.2 adds directory ZIP streaming | Listener lifecycle or frontend state |
+| `internal/qr` | Encode the capability URL to an in-memory PNG | Filesystem output |
 | React transfer reducer | Render backend-authoritative snapshots/events | Server or transfer lifecycle decisions |
 
-Interfaces belong to the package that consumes them. The three Phase 1 provider-owned interfaces are compile-only transitional scaffolding, not settled locations: before its first implementation, move the network/server lifecycle ports to `internal/transfer` and the streaming port to `internal/server`, then remove rather than duplicate the old public interface. Concrete constructors remain in `internal/network`, `internal/server`, and `internal/stream`. Context-aware Start/Stream behavior remains mandatory; Stop is idempotent and quiescent on every return; the server reports progress and terminal outcomes through the binding event stream.
+Interfaces belong to the package that consumes them. `SourcePort`, `NetworkPort`, `QRPort`, and `ServerPort` live in `internal/transfer`; `PayloadPort` and `PreparedPayload` live in `internal/server` and are implemented by `internal/stream`. The retired provider-owned interfaces must not be recreated as duplicate or conversion-only shadow types. Concrete constructors remain in their adapter packages. Context-aware Start/Stream behavior remains mandatory; Stop is idempotent and quiescent on every return; the server reports progress and terminal outcomes through the binding event stream.
 
 ## Transfer lifecycle
 
@@ -124,9 +124,13 @@ mDNS advertises `_fairdrop._tcp` with a unique, non-sensitive instance name and 
 
 ## Filesystem and streaming rules
 
-Single files are opened at transfer time, re-statted, and copied through a context-aware bounded buffer. `Content-Length` comes from the open file descriptor, not only stale Stage metadata.
+Single files are opened at transfer time, re-statted, and copied through a context-aware bounded buffer. `Content-Length` comes from the open file descriptor, not only stale Stage metadata. Before any network resource is acquired, the coordinator refuses a file or directory logical size outside JavaScript's exact integer range `0..9007199254740991`.
 
-Directory staging and streaming reject symbolic links and non-regular special files. ZIP entry names are computed relative to the selected root, converted with `filepath.ToSlash`, and rejected if absolute or traversal-bearing. The archive contains one top-level directory. Streaming uses `io.Pipe`; all exit paths close both ends, and `zip.Writer.Close()` precedes pipe-writer closure so the central directory is emitted.
+Directory staging anchors at a validated POSIX root, Windows drive root, or UNC share and walks components through native no-follow handles. Metadata opens request attribute rights only; lexical ancestor handles request search/traverse rights; list/read rights are acquired only for a selected or nested directory that will be enumerated. Child metadata and directory opens are relative to the already-open parent, and the inspected and enumeration-handle identities must match before the first literal `ReadDir(1)`. Windows opens retain `FILE_OPEN_REPARSE_POINT`; unsupported namespaces, alternate streams, and non-local components are rejected before an NT call. Active-ancestor identity checks refuse cycles with only the depth stack. Traversal sums non-negative regular-file sizes with checked `int64` arithmetic, closes every owned handle even after an earlier failure, and retains no entry index. The returned source path preserves the caller's spelling; dot components operate on the validated handle stack instead of cleaning or reconstructing paths.
+
+Directory streaming reaches the tree through `SourcePort.Walk`, which owns every descriptor: the stream package receives a per-entry reader borrowed for one visitor call and never holds a handle it cannot unwind. Handle rights stay separated -- attribute-only metadata, search-only ancestors, list rights for enumeration, and read rights only for a regular file actually being archived, opened parent-relative and no-follow. POSIX opens file content non-blocking and rejects a non-regular descriptor by `fstat` before clearing the flag, so a FIFO cannot block the response.
+
+Directory staging and streaming reject symbolic links, junctions/reparse points, and non-regular special files. ZIP entry names are computed relative to the selected root, converted with `filepath.ToSlash`, and rejected if absolute or traversal-bearing. The archive contains one top-level directory. Streaming uses `io.Pipe`; all exit paths close both ends, and `zip.Writer.Close()` precedes pipe-writer closure so the central directory is emitted. On failure that ordering is kept but the underlying writer is halted first, so the close still runs and still runs first while every byte it produces is refused: a failed stream must never hand the receiver a readable archive that silently omits whatever failed. The worker is joined before `WriteTo` returns on every exit path.
 
 Spaces, Unicode, Windows paths longer than 260 characters, and UNC paths are supported wherever the host filesystem and Go `os` APIs support them. Paths are passed as values—never interpolated into a shell command or destructively rewritten. A native platform that cannot open a path returns a stable typed path error. Native-runner tests cover each supported class; symlinks remain an explicit rejection.
 
@@ -134,7 +138,7 @@ After claim authorization, a payload-preparation failure returns a generic `410 
 
 After `Prepare` succeeds, the server owns exactly one payload `Close`. It cancels the data-plane context and closes the HTTP destination, waits for `WriteTo` and workers, then calls `Close`; `Close` never races `WriteTo`.
 
-Buffer size and per-entry ZIP compression are Phase 3 benchmark choices. They may change without architecture review if payload memory remains O(buffer), cancellation remains prompt, and archive compatibility tests remain green.
+Buffer size and per-entry ZIP compression are Phase 3 benchmark choices. They may change without architecture review if payload memory remains O(buffer) in payload bytes (plus the ZIP format's own per-entry central-directory record, and nothing more per entry), cancellation remains prompt, and archive compatibility tests remain green.
 
 ## Network selection
 
@@ -186,7 +190,7 @@ Required pre-merge checks grow to include Go tests/vet, frontend tests/build, an
 1. Multi-path drops are rejected in v1; the first path is never selected silently.
 2. Progress adds `totalKnown`; directory wire progress is indeterminate instead of dividing by zero or pretending uncompressed size equals response size.
 3. `FileMetadata` adds `sessionId` and warnings; lifecycle events add session ID, sequence, and `transfer-reset` so the backend remains authoritative.
-4. The Phase 1 provider-owned interfaces are replaced before first implementation by the consumer-owned ports in `docs/fairdrop-contracts.md`; context-aware behavior and adapter package responsibilities remain.
+4. The Phase 1 provider-owned interfaces were replaced by the consumer-owned ports in `docs/fairdrop-contracts.md`; context-aware behavior and adapter package responsibilities remain.
 5. `Stop` is idempotent and waits for owned work to finish.
 6. Mid-stream errors force an aborted response after notifying the coordinator.
 7. Capability URLs, trusted-LAN limits, and non-sensitive mDNS metadata define the previously missing security envelope.
