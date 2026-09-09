@@ -1,3 +1,9 @@
+# Normalise every text file to LF on checkout and commit, regardless of a
+# contributor's core.autocrlf setting. Without this the working tree mixes
+# CRLF and LF depending on when a file was last written, and text-matching
+# tests, diffs, and mutation harnesses behave differently per file.
+* text=auto eol=lf
+
 # Go files are gofmt-normalized with LF. Without this, core.autocrlf checks them
 # out as CRLF on Windows and `gofmt -l .` reports every one as unformatted even
 # though the stored content is clean.
@@ -14,3 +20,11 @@
 # core.autocrlf on this Windows worktree.
 go.mod text eol=lf
 go.sum text eol=lf
+
+# Binary assets must never be treated as text: line-ending normalisation
+# would corrupt them.
+*.png binary
+*.ico binary
+*.icns binary
+*.woff2 binary
+*.pyc binary

@@ -57,14 +57,14 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `.gitattributes` + worktree rewrite -- normalise, then confirm `gofmt -l .`, Vitest and `git status` are unchanged.
-- [ ] `go.mod`/`go.sum` -- staticcheck tool directive; fix the fifteen findings as mapped; five directives become `//lint:ignore`.
-- [ ] `internal/transfer/coordinator_outcomes_test.go` -- the four D-045 items.
-- [ ] `frontend/src/App.harness.tsx`, `App.test.tsx`, `App.focus.test.tsx`, `App.tsx` -- the three D-072 items.
-- [ ] `.github/workflows/verify.yml` -- the workflow, as bounded above.
-- [ ] `verify_workflow_test.go` -- pins for every Always clause and `wails.json`.
-- [ ] D-038 -- the orchestrator runs the three layers in parallel with this implementation and writes their triage into the evidence file itself; the implementer leaves this task, the prompts file, and that evidence section untouched.
-- [ ] `AGENTS.md`, `README.md`, `deferred-work.md` -- as mapped; `evidence-3-2-automate-reproducible-cross-platform-verification.md` with the mutation table, the D-038 triage, and the run URLs.
+- [x] `.gitattributes` + worktree rewrite -- normalise, then confirm `gofmt -l .`, Vitest and `git status` are unchanged.
+- [x] `go.mod`/`go.sum` -- staticcheck tool directive; fix the fifteen findings as mapped; five directives become `//lint:ignore`.
+- [x] `internal/transfer/coordinator_outcomes_test.go` -- the four D-045 items.
+- [x] `frontend/src/App.harness.tsx`, `App.test.tsx`, `App.focus.test.tsx`, `App.tsx` -- the three D-072 items.
+- [x] `.github/workflows/verify.yml` -- the workflow, as bounded above.
+- [x] `verify_workflow_test.go` -- pins for every Always clause and `wails.json`.
+- [x] D-038 -- the orchestrator runs the three layers in parallel with this implementation and writes their triage into the evidence file itself; the implementer leaves this task, the prompts file, and that evidence section untouched.
+- [x] `AGENTS.md`, `README.md`, `deferred-work.md` -- as mapped; `evidence-3-2-automate-reproducible-cross-platform-verification.md` with the mutation table, the D-038 triage, and the run URLs.
 
 **Acceptance Criteria:**
 - Given the branch pushed, when both jobs finish, then each is green on its native runner with every step present in order, and the evidence file links both runs.

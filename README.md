@@ -31,6 +31,11 @@ The project is built by a sequence of agents, so the documents are the memory. I
 
 ## Build, run, verify
 
+`.github/workflows/verify.yml` is the canonical gate: it runs natively on `windows-latest`
+and `macos-latest` for every pull request and every push to `main`/`epic-*`, in the fixed
+order below, and `verify_workflow_test.go` fails, naming the break, if a step or a pin is
+removed. Run the same commands locally, in the same order, before pushing.
+
 Go and the Wails CLI are not on the default PATH here, and `-race` needs a C toolchain — see
 "Environment and verification pitfalls" in `AGENTS.md` before running these.
 
@@ -39,6 +44,7 @@ wails build                          # builds frontend + Go, emits build/bin/fai
 ./build/bin/fairdrop.exe             # run from a shell to see the stderr lifecycle log
 
 gofmt -l . && go vet ./...           # must be clean
+go tool staticcheck ./...            # must be clean; go.mod tool directive, not golangci-lint
 go test -count=1 ./...               # Go suite
 go test -count=1 -race ./...         # requires cgo; see AGENTS.md
 cd frontend && npm test && npm run build

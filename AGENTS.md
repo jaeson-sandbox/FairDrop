@@ -31,11 +31,28 @@ as historical narrative and apply all corrections and supersessions before using
 
 ## Running and verifying
 
+- `.github/workflows/verify.yml` is the canonical gate, run natively on
+  `windows-latest` and `macos-latest` for every pull request and every push to
+  `main`/`epic-*`. It runs, in order: `wails build`, a bindings-drift and
+  `.gitkeep` check, `gofmt -l .`, `go vet ./...`, `go tool staticcheck ./...`,
+  `go test -count=1 ./...`, an explicit cgo check, `go test -count=1 -race
+  ./...`, the frontend suite, and the line-ending check.
+  `verify_workflow_test.go` pins every one of those lines and fails, naming
+  the break, if a pin is loosened. Run the same commands locally, in the same
+  order, before pushing.
 - After changing the exported `App` command surface, run `wails build` before
   standalone frontend checks so `frontend/wailsjs/` is regenerated. Never edit
   generated bindings by hand.
 - Run `frontend/npm test` separately: `wails build` compiles the frontend but does
-  not run Vitest. CI coverage for this remains owned by Story 3.2.
+  not run Vitest. CI now runs it too, via the workflow above.
+- `go tool staticcheck ./...` is the fixed linter, run from the `go.mod` tool
+  directive (`go get -tool honnef.co/go/tools/cmd/staticcheck@v0.8.1`) rather
+  than a separately installed binary, so it resolves reproducibly from
+  `go.sum` instead of whatever `@latest` picks on a given day. Its ignore
+  directive is `//lint:ignore SA1012 <reason>` on the line **above** the
+  finding -- `//nolint:staticcheck` is golangci-lint syntax and staticcheck
+  does not read it, so a `//nolint:staticcheck` comment left in place is
+  decoration, not a suppression.
 - BMAD Python scripts need `PYTHONIOENCODING=utf-8` outside the configured Claude
   environment because the Windows default encoding is cp1252.
 

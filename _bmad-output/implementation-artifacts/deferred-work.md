@@ -18,6 +18,27 @@ being anyone's problem.
 > `TestATransferLongerThanEveryTimeoutStillCompletes`, which streams an unknown-length payload through
 > a real listener and asserts the omitted `Content-Length` and the unknown-total terminal snapshot.
 
+> **Discharged (Story 3.2):** eight of the nine ids Epic 3's re-plan named for
+> this story are closed here. `.github/workflows/verify.yml` runs the whole
+> gate natively on `windows-latest` and `macos-latest` for every pull request
+> and every push to `main`/`epic-*`, closing D-005; its "Frontend suite" step
+> runs `npm test` after `wails build`'s full `npm ci`, closing D-050 and
+> D-054. `go.mod`'s `tool honnef.co/go/tools/cmd/staticcheck` directive backs
+> the fifteen findings the linter used to be decoration for -- five of them
+> were `//nolint:staticcheck` comments, which is golangci-lint syntax that
+> staticcheck never read -- closing D-016. `.gitattributes` now normalises
+> every text file to LF (`* text=auto eol=lf`, explicit `binary` for image,
+> font and `.pyc` extensions) and the worktree was rewritten once to match
+> the already-LF index, closing D-063. The four D-045 test-quality findings
+> and the three D-072 frontend-harness findings were fixed directly in their
+> own files. D-009 is `accepted` rather than discharged: `npm run build`
+> genuinely cannot run against a dev-omitting install, since `tsc` and Vite
+> are both devDependencies, so the finding stays true by construction --
+> `verify_workflow_test.go` and `wails.json`'s `"frontend:install": "npm ci"`
+> pin the full install rather than "fixing" a tension that cannot be fixed
+> away. D-038 is not among the eight above: its three review layers and
+> their triage are recorded separately in this story's evidence file.
+
 > **Discharged (Story 2.2):** three entries below that named this story are
 > closed. `SourcePort.Walk` re-validates every entry from the descriptor it is
 > about to read rather than from a path, closing the TOCTOU layering entry, and
@@ -105,7 +126,7 @@ being anyone's problem.
 - source_spec: `spec-phase-1-wails-scaffold.md`
   id: D-005
   summary: No CI runs the verification commands, so the verified state decays from the next commit.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: discharged
   evidence: No `.github/`, Makefile, or task runner exists. The spec's six verification commands are hand-run only. A clean-clone CI job would have caught the `go:embed` gap on the very first push.
 
 - source_spec: `spec-phase-1-wails-scaffold.md`
@@ -129,7 +150,7 @@ being anyone's problem.
 - source_spec: `spec-phase-1-wails-scaffold.md`
   id: D-009
   summary: `npm ci --omit=dev` would break `tsc` because test files are inside the build's type-check scope.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: accepted
   evidence: `tsconfig.json` includes all of `src`, which now contains `App.test.tsx` importing `vitest` and `@testing-library/react` (both devDependencies). Not currently reachable — `wails.json` runs plain `npm install` — but a production-flavored CI install would fail the build.
 
 - source_spec: `spec-1-1-validate-and-describe-one-file-selection.md`
@@ -171,7 +192,7 @@ being anyone's problem.
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
   id: D-016
   summary: `internal/stream/archiver.go` no longer archives anything, and no linter backs the `//nolint:staticcheck` directives in its tests.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: discharged
   evidence: `StreamZip` and the zip logic are gone; the file now holds the single-file payload adapter, and Epic 2 will reintroduce directories behind the same port. Renaming to `payload.go` is a Code Map decision for whoever opens Epic 2. Separately, Verification runs build, vet, test, race, gofmt and greps but no staticcheck, so those directives are unenforced decoration.
 
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
@@ -303,7 +324,7 @@ being anyone's problem.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-038
   summary: The three step-04 review layers never ran for this story, so its only adversarial coverage is self-review plus mutation.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: discharged
   evidence: Blind Hunter, Edge Case Hunter and Verification Gap were all launched together and all three terminated on an Anthropic session rate limit (HTTP 429) before returning findings. Their exact child prompts are preserved in `review-layer-prompts-1-6.md` so they can be run in a separate session, ideally on a different model. Twenty-four mutations stood in for them and found three real verification gaps, which are fixed, but mutation only tests guarantees somebody already thought to encode -- it cannot find a missing requirement, which is precisely what the Blind Hunter layer is for.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -345,7 +366,7 @@ being anyone's problem.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-045
   summary: Four smaller test-quality findings from the review layers are recorded but not yet fixed.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: discharged
   evidence: `TestServerFailureCodedCancelledIsPublishedAsATransferFailure` asserts the published code is `transfer_failed` and then asserts the message is not the cancellation copy, but `PublicErrorOf` sources the message from the code, so the second assertion cannot fail independently -- it is now redundant with `TestATerminalFailureOnlyPublishesCodesThatDescribeIt`, which pins the whole table. `TestLaneClosureDuringATeardownIsSilent` asserts `got == stateError` rather than pinning the state to TRANSFERRING, never checks the `server.Stop` count, and ends with a dangling `_ = metadata`. `TestProgressIsRefusedOutsideAMatchingTransfer`'s STAGED case emits two snapshots but the shared assertion only looks for the second, so forwarding the first pre-claim snapshot would pass. And no test emits events on a second session, so `seq` restarting at 1 with a new session id -- load-bearing for the frontend's discard rule -- is unproven; `assertEventGrammar` would need to filter per session to check it.
 
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
@@ -375,7 +396,7 @@ being anyone's problem.
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
   id: D-050
   summary: Nothing runs the frontend test suite automatically, and there is no CI at all.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: discharged
   evidence: `wails.json` wires `frontend:build` to `npm run build` (`tsc && vite build`) and never `npm test`, there is no `.github/workflows` directory, and `frontend/tsconfig.json` includes only `src`, so `frontend/wailsjs` is not type-checked on its own. `errors.test.ts` runs only when someone types `npm test`. Story 3.2 owns reproducible cross-platform verification; this is the concrete list of what it has to pick up.
 
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
@@ -399,7 +420,7 @@ being anyone's problem.
 - source_spec: `spec-1-8-manage-session-scoped-frontend-state-and-events.md`
   id: D-054
   summary: The frontend suite still runs only when someone types `npm test`, one story after the same finding.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: discharged
   evidence: `wails build` regenerates bindings and compiles the frontend without running a single Vitest file, and there is still no `.github/workflows`. Story 1.8 raised the frontend suite from 35 tests to 164 and made it the only executable evidence for the forged-event defence, which raises the cost of the gap rather than changing it. Restated here so Story 3.2 sees that it grew.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
@@ -453,7 +474,7 @@ being anyone's problem.
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   id: D-063
   summary: The working tree holds mixed line endings, so text-matching tests and diffs behave differently per file.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: discharged
   evidence: `TransferringView.tsx` and `StagedView.tsx` are CRLF on disk while `useTransfer.ts` and `style.css` are LF, because only `*.go` was pinned before this story. Two review mutations silently matched nothing for that reason and had to be re-run against normalized text -- a harness that reports "anchor matched 0" rather than a failure is exactly how a mutation pass overstates its own coverage. `.gitattributes` now pins `*.css`, `*.ts` and `*.tsx` to LF, so git renormalizes them on the next write, but nothing has rewritten the existing files and no check fails while they disagree.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
@@ -517,7 +538,7 @@ being anyone's problem.
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
   id: D-072
   summary: Three test-quality items from the review that are real but did not change behaviour.
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  owner: discharged
   evidence: `App.focus.test.tsx` redefines `mountWith`, `transitionTo` and the controller stub that `App.test.tsx` already has, with a different signature, so the two drift as the controller gains methods. The StrictMode describe is named for effect replay but only its first test exercises it -- React double-invokes effects on mount only, so the rest are ordinary updates. And `data-transfer-phase` can disagree with `data-phase-view` (a terminal `error` carrying `cancelled` renders the Idle body while the shell still advertises `error`); both are test and styling surfaces and nothing says which is authoritative.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
@@ -621,3 +642,21 @@ being anyone's problem.
   summary: On macOS a lock file that cannot be opened for any reason but contention makes the launching process exit silently, so FairDrop never opens.
   owner: 3-7-execute-the-native-platform-test-matrix
   evidence: `darwin/single_instance.go` treats every `createLockFile` failure as "another instance holds it", sends the second-instance data, and `os.Exit(0)`s. A read-only or full temp directory therefore makes FairDrop refuse to launch with no message. Needs the native macOS runner to confirm and to decide between a pre-flight check and a documented limit.
+
+- source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
+  id: D-090
+  summary: Two coordinator waits are unbounded by design, and nothing decides what happens when the port postcondition they rest on is violated.
+  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  evidence: Raised by the Edge Case Hunter layer while discharging D-038, and verified against HEAD. `joinDrainer` waits forever on `live.drainerDone`, and `awaitLease` waits forever on the lease; both are deliberate, and the comments say why -- a watchdog would let Cancel report success while a publication was still in flight. The unexamined case is the one the layer named: `ServerPort.Stop` is documented as quiescent on every return, so an adapter that returns an error *and* leaves the event lane open makes Cancel and Shutdown hang and the app unclosable. Either the port's postcondition is enough and the story records that reasoning, or the waits need the documented bound with a coded failure that this story's own charter asks for. `stopServer` currently records a diagnostic and continues either way.
+
+- source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
+  id: D-091
+  summary: An event lane that closes while the session is STAGED synthesises no terminal outcome, so the sender keeps looking at a QR code for a server that is gone.
+  owner: 3-6-make-lost-and-malformed-events-visible
+  evidence: Raised by the Edge Case Hunter layer while discharging D-038, and verified against HEAD. `drain`'s post-loop synthesis calls `acceptTerminal`, which is refused by `drainerMayActLocked` for anything but `stateTransferring`. `TestStagedServerEventsAreDrainedWhileStaged` (`coordinator_stage_test.go:612`) closes the lane at STAGED and asserts only that the drainer exits, so the gap is covered by a passing test that never asks the question. Epic 3's requirement for this story says an event lane closing mid-session synthesises a terminal outcome; STAGED is mid-session.
+
+- source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
+  id: D-092
+  summary: A transfer failure's original cause is rewritten to fixed public copy and never recorded, so a real failure leaves no internal trail.
+  owner: 3-6-make-lost-and-malformed-events-visible
+  evidence: Raised by the Blind Hunter layer while discharging D-038, and verified against HEAD. `acceptTerminal` passes `event.Err` to `terminalPublicError`, which maps it onto the twelve-message registry; the adapter's own error text is then discarded. `outcomes.go`'s three `recordDiagnostic` calls cover an unrecognized event kind, a snapshot-less progress event and a nil stop function -- not the failure itself. Adjacent code does record adapter errors as diagnostics (`stopServer`, `StopBeacon`), and `TestStagedSessionNeverDisclosesTheTokenOrThePath` already pins that diagnostics disclose neither the token nor the path, so the disclosure rule is not the obstacle. Deferred rather than fixed in 3.2 because it is a production change outside that story's stated boundary.

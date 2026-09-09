@@ -1,0 +1,170 @@
+# The reproducible cross-platform verification gate for FairDrop.
+#
+# This is the whole gate, run natively on both platforms FairDrop ships to.
+# There is no Linux job: a cross-compiled or emulated result is not release
+# proof, and internal/*_windows.go / internal/*_darwin.go are only analysed,
+# built, and tested on the job whose OS actually compiles them. Toolchains
+# are pinned so the verified state does not silently drift between runs.
+#
+# verify_workflow_test.go pins every load-bearing line below and fails,
+# naming the break, if a pin is loosened.
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'epic-*'
+
+# A new push or PR update supersedes any run already in flight for the same
+# ref, so stale results never race a newer commit to green.
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Wails CLI is not resolved from go.mod (it is a separate `go install`),
+  # so its version is pinned here rather than left to whatever `@latest`
+  # resolves to on a given day.
+  WAILS_VERSION: 'v2.15.0'
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.7'
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # actions/setup-go does not guarantee $(go env GOPATH)/bin is on PATH
+      # for every step shell on every platform, and that is where `go
+      # install` puts the Wails CLI -- so add it explicitly rather than
+      # trust an implicit default.
+      - name: Add GOPATH/bin to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Cache the Wails CLI
+        id: cache-wails
+        uses: actions/cache@v6
+        with:
+          path: ~/go/bin/wails*
+          key: wails-${{ env.WAILS_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install the Wails CLI
+        if: steps.cache-wails.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      # An unpinned or drifted CLI must fail before any build runs, not
+      # produce a build from whichever version happened to be cached or
+      # resolved.
+      - name: Assert the Wails CLI is pinned
+        run: |
+          got="$(wails version | head -n1 | tr -d '\r')"
+          if [ "$got" != "$WAILS_VERSION" ]; then
+            echo "wails version reported '$got', want '$WAILS_VERSION'" >&2
+            exit 1
+          fi
+
+      # wails build runs `frontend:install` (a full `npm ci`, dev
+      # dependencies included: `npm run build` needs the devDependency-only
+      # Vite and tsc, so a production-flavored install can never build) and
+      # regenerates frontend/wailsjs before compiling Go.
+      - name: wails build
+        run: wails build
+
+      # A regenerated-but-uncommitted frontend/wailsjs means the committed
+      # bindings are stale, and a missing frontend/dist/.gitkeep would break
+      # embedding on the next clean clone.
+      - name: Check for bindings drift and a restored .gitkeep
+        run: |
+          if [ ! -f frontend/dist/.gitkeep ]; then
+            echo "frontend/dist/.gitkeep is missing after wails build" >&2
+            exit 1
+          fi
+          if ! git diff --quiet -- frontend/wailsjs; then
+            echo "wails build changed frontend/wailsjs -- the committed bindings are stale:" >&2
+            git diff -- frontend/wailsjs >&2
+            exit 1
+          fi
+
+      - name: gofmt -l
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt found unformatted files:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: staticcheck
+        run: go tool staticcheck ./...
+
+      - name: go test
+        run: go test -count=1 ./...
+
+      # go test -race silently reports clean when cgo is unavailable rather
+      # than failing, so confirm both the flag and a working C toolchain
+      # before trusting the race step that follows.
+      - name: Confirm cgo is enabled
+        run: |
+          enabled="$(go env CGO_ENABLED)"
+          if [ "$enabled" != "1" ]; then
+            echo "CGO_ENABLED=$enabled, want 1: no C toolchain was detected for this runner" >&2
+            exit 1
+          fi
+          probe="$RUNNER_TEMP/fairdrop_cgo_probe.go"
+          cat > "$probe" <<'EOF'
+          package main
+
+          // #include <stdio.h>
+          import "C"
+
+          func main() {}
+          EOF
+          if ! go run "$probe"; then
+            echo "CGO_ENABLED=1 but a trivial cgo program failed to build and run: the C toolchain is broken or missing" >&2
+            exit 1
+          fi
+
+      # Native windows-latest and macos-latest runners ship a working C
+      # toolchain (MSYS2 gcc on Windows, Xcode command line tools on macOS),
+      # so -race is expected to run for real here; the step above is what
+      # makes a silent regression to a cgo-less runner fail loudly instead
+      # of reporting a clean race run that never actually detected anything.
+      - name: go test -race
+        run: go test -count=1 -race ./...
+
+      - name: Frontend suite
+        working-directory: frontend
+        run: npm test
+
+      - name: Line-ending check
+        run: |
+          bad="$(git ls-files --eol | grep -E '(i|w)/(crlf|mixed)' || true)"
+          if [ -n "$bad" ]; then
+            echo "non-LF line endings found:" >&2
+            echo "$bad" >&2
+            exit 1
+          fi
