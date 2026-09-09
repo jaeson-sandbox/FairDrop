@@ -295,26 +295,34 @@ describe('reduced motion', () => {
 })
 
 describe('the focus indicator', () => {
-    it('draws one ring from the focus token for controls and routed targets alike', () => {
+    it('draws one ring from the focus token for the two Tab-reachable controls', () => {
         expect(stylesheet).toMatch(
-            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\[data-focus-target\]:focus-visible \{\s*/,
+            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible \{\s*/,
         )
         expect(stylesheet).toContain('outline: var(--focus-ring-width) solid var(--color-focus);')
         expect(stylesheet).toContain('outline-offset: var(--focus-ring-offset);')
         expect(stylesheet).toContain('--focus-ring-width: 3px;')
     })
 
-    it('rings the routed nodes only when focus is visible, never after a click', () => {
+    it('never rings a routed landing target, even when focus on it is visible', () => {
         /*
           These nodes carry tabindex="-1" so the routing table can reach them,
-          which also makes them click-focusable. Under a plain `:focus` rule the
-          ring stayed painted after a mouse click and an outcome panel read as
-          selected -- reported from the running app. `:focus-visible` still
-          fires for a scripted move made while the user is on the keyboard,
-          which is the case a visible ring exists for.
+          which also makes them click- and script-focusable, but a keyboard
+          user can never Tab to one. A shared `:focus-visible` rule painted the
+          ring on every scripted focus move regardless of input modality --
+          there is no "last real interaction" for `:focus-visible` to inherit
+          from when a transfer completes on its own -- so the Done panel read
+          as stuck "selected" long after the transfer finished, reported from
+          the running app. The fix is an explicit `outline: none` rather than a
+          removed rule, because an omitted rule would leave the browser's own
+          default focus-visible outline in place.
         */
         expect(stylesheet).toContain('[data-focus-target]:focus-visible {')
+        expect(stylesheet).toMatch(/\[data-focus-target\]:focus-visible \{\s*outline: none;\s*\}/)
         expect(stylesheet).not.toMatch(/\[data-focus-target\]:focus \{/)
+        // Not folded into the controls' ring rule: a shared selector list is
+        // exactly the regression this pins.
+        expect(stylesheet).not.toMatch(/\.fd-button:focus-visible,[^{]*\[data-focus-target\]/)
     })
 })
 
