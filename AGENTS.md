@@ -56,7 +56,10 @@ as historical narrative and apply all corrections and supersessions before using
 - BMAD Python scripts need `PYTHONIOENCODING=utf-8` outside the configured Claude
   environment because the Windows default encoding is cp1252.
 - Before pushing, type-check the platform files this machine never compiles:
-  `GOOS=darwin GOARCH=arm64 go build ./...` and `GOOS=linux GOARCH=amd64 go build ./...`.
+  `GOOS=darwin GOARCH=arm64 go build ./...` and `GOOS=linux GOARCH=amd64 go build ./...`,
+  plus `GOOS=darwin GOARCH=arm64 staticcheck ./...` -- note the bare binary, because
+  `go tool staticcheck` under a foreign `GOOS` tries to build the *tool* for that OS
+  and fails before analysing anything.
   This is a pre-flight, not release proof -- the macOS job is the proof, and the
   workflow deliberately contains no cross-build. It exists because the first CI
   run found two darwin-only compile errors in `handle_posix.go` that had sat in

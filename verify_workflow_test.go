@@ -421,8 +421,10 @@ func TestVerifyWorkflowChecksBindingsDriftAndGitkeep(t *testing.T) {
 	// also runs `git diff -- frontend/wailsjs` inside its failure branch to
 	// print what drifted, so a check for the substring alone stays green when
 	// the guarding condition itself is deleted.
-	if !strings.Contains(block, "git diff --quiet -- frontend/wailsjs") {
-		t.Error("the bindings-drift step does not run `git diff --quiet -- frontend/wailsjs` as its condition")
+	if !strings.Contains(block, "git -c core.fileMode=false diff --quiet -- frontend/wailsjs") {
+		t.Error("the bindings-drift step does not run `git -c core.fileMode=false diff --quiet -- " +
+			"frontend/wailsjs` as its condition: without core.fileMode=false every macOS run fails on " +
+			"the 0644-to-0755 mode change the darwin generator makes")
 	}
 }
 

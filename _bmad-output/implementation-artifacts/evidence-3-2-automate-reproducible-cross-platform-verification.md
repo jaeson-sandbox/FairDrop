@@ -391,6 +391,28 @@ Fixed by converting at the two call sites, leaving the parameter an `int` to mat
 Verified locally with `GOOS=darwin GOARCH=arm64`, `GOOS=darwin GOARCH=amd64` and
 `GOOS=linux GOARCH=amd64` builds plus a darwin `go vet`, all clean, and then on the real runner.
 
+Run 2 -- https://github.com/jaeson-sandbox/FairDrop/actions/runs/34311027850 -- commit `a76d4ce`.
+Windows green; macOS got past the build and failed one step later, on the bindings-drift check:
+
+```
+wails build changed frontend/wailsjs -- the committed bindings are stale:
+ frontend/wailsjs/go/main/App.d.ts  old mode 100644  new mode 100755
+ frontend/wailsjs/go/main/App.js    old mode 100644  new mode 100755
+ frontend/wailsjs/go/models.ts      old mode 100644  new mode 100755
+```
+
+Not drift: the darwin binding generator writes the files executable, and they are committed `0644`
+from Windows, where git does not track the bit at all. The check now runs under
+`git -c core.fileMode=false`, because what it exists to catch is stale generated *content*, not a
+permission bit that differs by the platform that ran the generator. The pin moved with it, and two
+mutations confirm it: deleting the guard while leaving the reporting `git diff` in place, and dropping
+`core.fileMode=false` to reintroduce the macOS failure, both fail the test.
+
+Also pre-flighted before this push, to spend one round trip instead of three:
+`GOOS=darwin GOARCH=arm64 staticcheck ./...` and the linux equivalent, both clean. Note the bare
+binary -- `go tool staticcheck` under a foreign `GOOS` tries to build the tool itself for that OS and
+dies before analysing anything, which looks like a broken toolchain rather than a misuse.
+
 Two process notes, both recorded in `AGENTS.md`:
 
 - **`gh run watch --exit-status` exited 0 on this failed run**, after printing the compile errors it

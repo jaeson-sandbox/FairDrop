@@ -94,15 +94,19 @@ jobs:
       # A regenerated-but-uncommitted frontend/wailsjs means the committed
       # bindings are stale, and a missing frontend/dist/.gitkeep would break
       # embedding on the next clean clone.
+      #
+      # core.fileMode=false because the macOS generator writes the binding
+      # files 0755 while they are committed 0644, so every macOS run reports
+      # a mode-only diff. A permission bit is not stale bindings; content is.
       - name: Check for bindings drift and a restored .gitkeep
         run: |
           if [ ! -f frontend/dist/.gitkeep ]; then
             echo "frontend/dist/.gitkeep is missing after wails build" >&2
             exit 1
           fi
-          if ! git diff --quiet -- frontend/wailsjs; then
+          if ! git -c core.fileMode=false diff --quiet -- frontend/wailsjs; then
             echo "wails build changed frontend/wailsjs -- the committed bindings are stale:" >&2
-            git diff -- frontend/wailsjs >&2
+            git -c core.fileMode=false diff -- frontend/wailsjs >&2
             exit 1
           fi
 
