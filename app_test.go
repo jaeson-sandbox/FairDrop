@@ -1213,6 +1213,43 @@ func TestRestoreWindowUnminimisesThenShowsExactlyOnceWithTheApplicationLifetimeC
 // double-click on a file compete with a live transfer exactly the way this
 // story exists to prevent. restoreWindow's behavior must be identical whether
 // or not the second launch carried arguments.
+/*
+	A second launch racing startup is the case the callback exists for.
+
+	Wails invokes OnSecondInstanceLaunch from a goroutine it never synchronises
+	with OnStartup, so the callback and the context install can run at the same
+	moment. The two sequential tests above pin what each ordering must do; this
+	one runs both at once under the race detector and asserts only the
+	invariant, never which side won: the runtime is called either zero times or
+	exactly twice, in order, with the installed context, and never with nil.
+	It exists so that reading a.ctx directly -- which is a data race the
+	sequential tests can never see -- fails under -race by name.
+*/
+func TestRestoreWindowRacingStartupNeverCallsTheRuntimeWithANilContext(t *testing.T) {
+	for round := 0; round < 200; round++ {
+		h := newUnstartedHarness(t)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); h.app.startup(h.ctx) }()
+		go func() { defer wg.Done(); h.app.restoreWindow(options.SecondInstanceData{}) }()
+		wg.Wait()
+
+		got := h.windowActionsLogged()
+		switch len(got) {
+		case 0:
+			if h.app.undelivered.Load() != 1 {
+				t.Fatalf("round %d: no runtime call and undelivered = %d, want 1", round, h.app.undelivered.Load())
+			}
+		case 2:
+			if got[0].name != "unminimise" || got[1].name != "show" || got[0].ctx != h.ctx || got[1].ctx != h.ctx {
+				t.Fatalf("round %d: runtime calls %+v, want unminimise then show with the installed context", round, got)
+			}
+		default:
+			t.Fatalf("round %d: runtime called %d times: %+v", round, len(got), got)
+		}
+	}
+}
+
 func TestRestoreWindowIgnoresTheSecondLaunchsArguments(t *testing.T) {
 	h := newHarness(t)
 

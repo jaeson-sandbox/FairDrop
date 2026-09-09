@@ -78,3 +78,24 @@ named there, and no additional test needed adjustment to catch it.
   pending placeholder was added to `release-evidence.md` for a person to fill in.
 - `docs/fairdrop-architecture.md` item 10 is updated in place to record this story as the
   delivery, per the epic's contract-change rule.
+
+## Independent Verification Round (2026-09-08)
+
+The implementer's six mutations were rerun and five further ones added, hunting what the recorded
+table did not cover. Four were caught by name: the `undelivered` increment removed
+(`TestRestoreWindowBeforeStartupCountsUndeliveredAndLogsWithoutCallingTheRuntime`); `show`
+dropped rather than swapped (`TestRestoreWindowUnminimisesThenShowsExactlyOnceWithTheApplicationLifetimeContext`);
+the runtime called with `context.Background()` instead of the stored context (same test); and the
+two seam defaults swapped in `NewApp` (`TestNewAppWiresTheRealWailsRuntime`).
+
+One survived: reading `a.ctx` directly instead of through `runtimeContext()` passed every test,
+including under `-race`, because nothing drove `startup` and `restoreWindow` at the same time --
+and that concurrency is the story's whole premise, since Wails delivers the callback on a
+goroutine it never synchronises with `OnStartup`. `TestRestoreWindowRacingStartupNeverCallsTheRuntimeWithANilContext`
+now runs the two together two hundred times under the race detector and asserts only the
+invariant (zero or exactly two calls, in order, with the installed context, never nil), never
+which side won. With it in place the same mutation fails by name under `-race`.
+
+Matrix audit: every row maps to an executed test except "First launch -- lock held", which is
+Wails' own guarantee once `SingleInstanceLock` is configured; `TestAppOptionsEnforcesSingleInstance`
+pins the configuration, and the lock itself is Story 3.9's native evidence row.
