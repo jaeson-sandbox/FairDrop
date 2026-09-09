@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-08-2026 20:49
+last_updated: 09-08-2026 20:58
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -48,7 +48,7 @@ development_status:
   1-10-meet-the-accessibility-and-recovery-contract: done
   epic-1-retrospective: done
 
-  epic-2: in-progress
+  epic-2: done
   2-1-validate-and-stage-one-directory: done
   2-2-stream-a-safe-directory-zip: done
   epic-2-retrospective: done
