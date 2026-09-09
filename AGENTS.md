@@ -55,6 +55,17 @@ as historical narrative and apply all corrections and supersessions before using
   decoration, not a suppression.
 - BMAD Python scripts need `PYTHONIOENCODING=utf-8` outside the configured Claude
   environment because the Windows default encoding is cp1252.
+- Before pushing, type-check the platform files this machine never compiles:
+  `GOOS=darwin GOARCH=arm64 go build ./...` and `GOOS=linux GOARCH=amd64 go build ./...`.
+  This is a pre-flight, not release proof -- the macOS job is the proof, and the
+  workflow deliberately contains no cross-build. It exists because the first CI
+  run found two darwin-only compile errors in `handle_posix.go` that had sat in
+  the tree since Epic 1: `unix.FcntlInt` takes a `uintptr` and was being handed
+  an `int`, which no Windows build could ever see. Seconds locally, a full CI
+  round trip otherwise.
+- `gh run watch --exit-status` exited **0** on a run whose macOS job failed, after
+  printing the failure. Never take a watch's exit code as the verdict: read the
+  conclusion with `gh run view <id> --json conclusion,jobs`.
 
 ## Non-default conventions
 

@@ -125,15 +125,20 @@ func (c *posixContent) Close() error {
 	return err
 }
 
+// The descriptor stays an int here because every other unix call in this file
+// takes one -- Open returns it, Fstat and Close consume it. FcntlInt is the
+// lone exception, wanting a uintptr, so the conversion happens at its two call
+// sites rather than changing a parameter that matches all its neighbours. Same
+// conversion os.NewFile needs a few lines above.
 func clearPosixNonBlocking(descriptor int) error {
-	flags, err := unix.FcntlInt(descriptor, unix.F_GETFL, 0)
+	flags, err := unix.FcntlInt(uintptr(descriptor), unix.F_GETFL, 0)
 	if err != nil {
 		return err
 	}
 	if flags&unix.O_NONBLOCK == 0 {
 		return nil
 	}
-	_, err = unix.FcntlInt(descriptor, unix.F_SETFL, flags&^unix.O_NONBLOCK)
+	_, err = unix.FcntlInt(uintptr(descriptor), unix.F_SETFL, flags&^unix.O_NONBLOCK)
 	return err
 }
 

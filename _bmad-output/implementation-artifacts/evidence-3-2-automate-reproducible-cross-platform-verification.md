@@ -361,7 +361,48 @@ header said a new controller member becomes "a type error in this one place". It
 both suites' `commands` objects. The real improvement is silent-to-compile-error, not
 two-places-to-one, and the comment now says that.
 
-## 7. Left incomplete / risks
+## 7. The first CI run, and what it found
+
+Run 1 -- https://github.com/jaeson-sandbox/FairDrop/actions/runs/34310588517 -- commit `1eeeec4`.
+
+| Job | Conclusion | Link |
+|---|---|---|
+| verify (windows-latest) | success | https://github.com/jaeson-sandbox/FairDrop/actions/runs/34310588517/job/102336256196 |
+| verify (macos-latest) | **failure**, at `wails build` | https://github.com/jaeson-sandbox/FairDrop/actions/runs/34310588517/job/102336255937 |
+
+```
+internal/source/handle_posix.go:129:30: cannot use descriptor (variable of type int) as uintptr value in argument to unix.FcntlInt
+internal/source/handle_posix.go:136:25: cannot use descriptor (variable of type int) as uintptr value in argument to unix.FcntlInt
+```
+
+`handle_posix.go` is `//go:build linux || darwin`. It has never been compiled by anything in this
+project: every gate to date ran on this one Windows machine, where the file is excluded before the
+type-checker ever sees it. `unix.FcntlInt` takes a `uintptr` file descriptor; `clearPosixNonBlocking`
+was handing it the `int` that every neighbouring call in the file uses. The code has been in the tree
+since Epic 1, was reviewed, and shipped inside two "green" epics.
+
+This is the epic's own premise, demonstrated on the first run rather than argued: *"it cross-compiles"
+never stands in for "it was verified"* -- and here it did not even cross-compile, because nobody had
+ever asked it to. D-005 said a clean-clone CI job would have caught the `go:embed` gap on the very
+first push; the same is now true of this.
+
+Fixed by converting at the two call sites, leaving the parameter an `int` to match `Open`, `Fstat` and
+`Close` beside it, exactly as `os.NewFile(uintptr(descriptor), name)` already does four lines above.
+Verified locally with `GOOS=darwin GOARCH=arm64`, `GOOS=darwin GOARCH=amd64` and
+`GOOS=linux GOARCH=amd64` builds plus a darwin `go vet`, all clean, and then on the real runner.
+
+Two process notes, both recorded in `AGENTS.md`:
+
+- **`gh run watch --exit-status` exited 0 on this failed run**, after printing the compile errors it
+  had just watched fail. The exit code is not the verdict; `gh run view <id> --json conclusion,jobs`
+  is. Had the exit code been trusted, this story would have been closed with a red macOS job and the
+  defect still in the tree -- a green signal over a failed run, which is the exact failure shape this
+  project keeps finding in its own tests.
+- **A local cross-platform type-check is now a pre-flight step.** It is not release proof and no
+  workflow step does it; the macOS job remains the proof. It costs seconds and would have caught this
+  before the push.
+
+## 8. Left incomplete / risks
 
 - **No CI run yet.** This session did not commit or push, per its explicit
   instructions, so `.github/workflows/verify.yml` has never executed on

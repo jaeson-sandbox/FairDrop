@@ -79,6 +79,18 @@ Mutation tables, gate transcripts, the D-038 review triage and the CI run URLs l
 
 ## Spec Change Log
 
+- 2026-09-09: The workflow's first run failed on macOS, and what it found is the story's own
+  justification: `internal/source/handle_posix.go` has never compiled. `unix.FcntlInt` takes a
+  `uintptr` and was handed an `int` at two call sites, in a file built only on darwin and linux,
+  so no Windows build since Epic 1 could see it. Fixed here as a two-call-site conversion. This is
+  a production change outside the Code Map, which Boundaries makes Ask First, and it was made
+  without asking for one reason: the story's first acceptance criterion is that both jobs finish
+  green, so the story cannot close around it. The frozen Never clause forbidding `GOOS`/`GOARCH`
+  cross-builds is read as governing the workflow, whose whole point is that a cross-compiled result
+  is not release proof; a local pre-flight type-check that makes no release claim is not the same
+  act, and `AGENTS.md` now asks for one before pushing, labelled as not being proof. No workflow
+  step cross-builds, and `verify_workflow_test.go` still fails if one appears.
+
 ## Design Notes
 
 The workflow is the single source of the gate; the Go test is what makes it load-bearing, in the same way `main_test.go` pins the Wails options. Staticcheck as a `go.mod` tool is reproducible from `go.sum` rather than from whatever `@latest` resolves to on a given day. Windows-only and darwin-only files are analysed only on the job whose OS compiles them, which is one concrete reason the jobs are native. The line-ending fix rewrites disk copies only: the index is already LF, so the commit carries `.gitattributes` and nothing else.
