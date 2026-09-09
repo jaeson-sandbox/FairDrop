@@ -337,6 +337,7 @@ func TestStartBeaconRequiresSelectionAndLiveContext(t *testing.T) {
 	if err := manager.StartBeacon(context.Background(), validBeaconRequest()); transfer.ErrorCodeOf(err) != transfer.ErrBeaconWarning {
 		t.Fatalf("unselected StartBeacon() code = %q, want %q", transfer.ErrorCodeOf(err), transfer.ErrBeaconWarning)
 	}
+	//lint:ignore SA1012 the nil context is the case under test
 	if err := manager.StartBeacon(nil, validBeaconRequest()); transfer.ErrorCodeOf(err) != transfer.ErrBeaconWarning {
 		t.Fatalf("nil-context StartBeacon() code = %q, want %q", transfer.ErrorCodeOf(err), transfer.ErrBeaconWarning)
 	}

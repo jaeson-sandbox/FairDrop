@@ -477,7 +477,7 @@ func TestPrepareRejectsNilContextWithoutTouchingTheFilesystem(t *testing.T) {
 		},
 	}
 
-	//nolint:staticcheck // the nil context is the boundary under test.
+	//lint:ignore SA1012 the nil context is the boundary under test.
 	prepared, err := adapter.Prepare(nil, fabricatedItem(t, "no-context.bin", 3))
 	assertNoPayload(t, prepared, err, transfer.ErrTransferFailed)
 }
@@ -602,8 +602,8 @@ func TestDownloadNameIsReducedToASafeBasename(t *testing.T) {
 		"bare-quote":     {name: `re"port.pdf`, want: "report.pdf"},
 		// U+202E RIGHT-TO-LEFT OVERRIDE reverses the rendered tail so an
 		// executable reads as an image. unicode.IsControl does not catch it.
-		"rtl-override-spoof": {name: "evil‮gnp.exe", want: "evilgnp.exe"},
-		"zero-width-space":   {name: "evil​.exe", want: "evil.exe"},
+		"rtl-override-spoof": {name: "evil\u202egnp.exe", want: "evilgnp.exe"},
+		"zero-width-space":   {name: "evil\u200b.exe", want: "evil.exe"},
 		"drive-relative":     {name: `C:evil.exe`, want: "Cevil.exe"},
 		"alternate-data-stream": {
 			name: "report.pdf:payload",
@@ -1145,7 +1145,7 @@ func TestWriteToRejectsMissingContextOrDestination(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = prepared.Close() })
 
-	//nolint:staticcheck // the nil context is the boundary under test.
+	//lint:ignore SA1012 the nil context is the boundary under test.
 	assertCode(t, prepared.WriteTo(nil, io.Discard), transfer.ErrTransferFailed)
 	assertCode(t, prepared.WriteTo(context.Background(), nil), transfer.ErrTransferFailed)
 }

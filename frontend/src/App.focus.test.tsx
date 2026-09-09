@@ -1,6 +1,10 @@
-import {act, cleanup, render, screen} from '@testing-library/react'
+import {cleanup, screen} from '@testing-library/react'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import App from './App'
+import {
+    mountWith as harnessMountWith,
+    transitionTo as harnessTransitionTo,
+    type ControllerCommands,
+} from './App.harness'
 import type {TransferState} from './transfer/state'
 import type {Announcement} from './ui/announce'
 
@@ -44,31 +48,25 @@ function idle(): TransferState {
     return {phase: 'idle', retainedOutcome: null, commandError: null}
 }
 
+// The mock functions live here; App.harness.tsx only shapes and mounts
+// whatever controller it is handed, typed so a new TransferController member
+// is a type error in that one shared place rather than a silent gap here.
+const commands: ControllerCommands = {
+    stage: mocks.noop,
+    selectFile: mocks.noop,
+    selectDirectory: mocks.noop,
+    cancel: mocks.noop,
+    rejectSelection: mocks.noop,
+    dismissRetained: mocks.noop,
+}
+
 function mountWith(state: TransferState) {
-    mocks.useTransfer.mockReturnValue({
-        state,
-        stage: mocks.noop,
-        selectFile: mocks.noop,
-        selectDirectory: mocks.noop,
-        cancel: mocks.noop,
-        rejectSelection: mocks.noop,
-        dismissRetained: mocks.noop,
-    })
-    return render(<App/>)
+    return harnessMountWith(mocks.useTransfer, state, commands)
 }
 
 function transitionTo(view: ReturnType<typeof mountWith>, state: TransferState, routed: Announcement | null) {
     mocks.route.mockReturnValue(routed)
-    mocks.useTransfer.mockReturnValue({
-        state,
-        stage: mocks.noop,
-        selectFile: mocks.noop,
-        selectDirectory: mocks.noop,
-        cancel: mocks.noop,
-        rejectSelection: mocks.noop,
-        dismissRetained: mocks.noop,
-    })
-    act(() => view.rerender(<App/>))
+    harnessTransitionTo(mocks.useTransfer, view, state, commands)
 }
 
 beforeEach(() => {

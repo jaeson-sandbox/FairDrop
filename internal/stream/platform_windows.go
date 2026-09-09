@@ -18,7 +18,7 @@ import (
 // silently passes when it cannot run is indistinguishable from no check.
 func reparsePoint(info fs.FileInfo) (bool, error) {
 	if info == nil {
-		return false, errors.New("Windows file metadata is nil")
+		return false, errors.New("windows file metadata is nil")
 	}
 	data, ok := info.Sys().(*syscall.Win32FileAttributeData)
 	if ok && data != nil {

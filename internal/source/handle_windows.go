@@ -266,7 +266,7 @@ func openWindowsFile(locator windowsLocator, access, options uint32) (*os.File, 
 	file := os.NewFile(uintptr(handle), displayName)
 	if file == nil {
 		_ = windows.CloseHandle(handle)
-		return nil, errors.New("Windows handle could not be wrapped")
+		return nil, errors.New("windows handle could not be wrapped")
 	}
 	return file, nil
 }

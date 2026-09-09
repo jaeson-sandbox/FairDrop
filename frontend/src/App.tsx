@@ -158,6 +158,17 @@ function App() {
     const outcome = selectOutcome(transfer.state)
     const terminal = transfer.state.phase === 'done' || transfer.state.phase === 'error'
 
+    // data-transfer-phase (below) mirrors the reducer's own `state.phase`
+    // verbatim; data-phase-view (IdleView, OutcomePanel, StagedView,
+    // StagePendingCard, TransferringView) names whichever body actually
+    // rendered. style.css reads neither -- both are test and diagnostic
+    // surfaces only. They agree everywhere except one legitimate case: a
+    // terminal `error` phase whose outcome carries `cancelled` renders the
+    // Idle body (see phaseBody's 'done'/'error' case and EXPERIENCE.md's
+    // "never render as Error" rule), so the shell still reports
+    // data-transfer-phase="error" while data-phase-view="idle". Pinned in
+    // App.test.tsx's "returns to Idle rather than showing a cancellation as
+    // an Error".
     return (
         <main className="fd-app" data-transfer-phase={transfer.state.phase} ref={rootRef}>
             {outcome === null ? null : (

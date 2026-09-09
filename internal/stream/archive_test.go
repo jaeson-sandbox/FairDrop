@@ -383,7 +383,8 @@ func TestWriteToRejectsMissingContextOrDestinationForADirectory(t *testing.T) {
 	t.Parallel()
 
 	payload := newTestArchive(t, &scriptedSource{}, "folder")
-	assertCode(t, payload.WriteTo(nil, io.Discard), transfer.ErrTransferFailed) //nolint:staticcheck // the nil context is the case under test
+	//lint:ignore SA1012 the nil context is the case under test
+	assertCode(t, payload.WriteTo(nil, io.Discard), transfer.ErrTransferFailed)
 	assertCode(t, payload.WriteTo(context.Background(), nil), transfer.ErrTransferFailed)
 }
 

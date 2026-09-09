@@ -301,6 +301,7 @@ func TestGetLocalIPCancellationNeverCachesCandidate(t *testing.T) {
 		{
 			name: "nil context",
 			run: func(manager *Manager) error {
+				//lint:ignore SA1012 the nil context is the case under test
 				_, err := manager.GetLocalIP(nil)
 				if transfer.ErrorCodeOf(err) != transfer.ErrTransferFailed {
 					t.Fatalf("nil context code = %q, want %q", transfer.ErrorCodeOf(err), transfer.ErrTransferFailed)
