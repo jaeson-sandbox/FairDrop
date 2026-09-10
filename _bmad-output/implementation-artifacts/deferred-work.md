@@ -11,6 +11,16 @@ so read the owner before reading the evidence as open work.
 owner or names a story that does not exist, so a finding cannot quietly stop
 being anyone's problem.
 
+Naming a live story is necessary and was not sufficient. A build session reads
+its story's acceptance criteria in `epics.md`, so an open entry whose id appears
+in no `**Closes:**` line is invisible to the only session that would ever
+resolve it -- five entries were in exactly that state when the check was
+written, added here and never added there.
+`TestEveryOpenDeferredEntryIsCitedByItsOwningStory` now fails on that, and on an
+entry left open under a story already marked `done`. Adding an entry therefore
+means two edits: the entry here, and its id on the owning story's `**Closes:**`
+line.
+
 > **Every entry now carries a stable `id:` (D-001 … D-085, file order).** Story acceptance criteria in
 > `epics.md` cite these ids, so a build session knows exactly which entries its story must close.
 > Epic 3 was re-planned on 2026-09-08 into nine stories; owners below were re-homed accordingly.
@@ -219,7 +229,7 @@ being anyone's problem.
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   id: D-018
   summary: CORS is configured for the 200 only, and the receiver page cannot read the filename it was encoded to carry.
-  owner: 3-3-produce-and-smoke-test-native-release-artifacts
+  owner: 3-10-settle-the-release-blocking-platform-decisions
   evidence: `Access-Control-Allow-Origin: *` is set in `writeDownloadHeaders` but not by `writeStatus`, so a cross-origin receiver sees an opaque failure instead of 404/410/423. There is no `Access-Control-Expose-Headers: Content-Disposition`, so that page cannot read the name, and no `Accept-Ranges: none`, so a download manager may attempt a range retry against a consumed capability. The frozen matrix fixes the exact header set, so adding any of these is an Ask First change.
 
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
@@ -441,7 +451,7 @@ being anyone's problem.
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   id: D-055
   summary: The native window paints a single background colour, so one of the two themes still gets a one-frame flash.
-  owner: 3-3-produce-and-smoke-test-native-release-artifacts
+  owner: 3-10-settle-the-release-blocking-platform-decisions
   evidence: `main.go` takes one `options.RGBA` and Wails offers no per-theme value, so the constant now tracks the light `--color-canvas` and a dark-mode OS gets one light frame before the webview paints. Before this story it tracked a Tailwind class the story deleted, so light mode flashed slate-900 on every launch and nothing failed -- `main_test.go` now pins the constant to the token and names the coupling. Closing the residual means reading the OS theme in Go before building the options: on Windows that is one `golang.org/x/sys/windows/registry` read of `AppsUseLightTheme` (already an indirect dependency), with a build-tag sibling for macOS. That is platform code Story 1.9 was not scoped for, and Story 3.3's release evidence is where a first-paint check belongs.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
@@ -495,7 +505,7 @@ being anyone's problem.
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   id: D-064
   summary: Wails' custom `wails://` scheme is not a secure context, so every browser API gated on one is unavailable on macOS.
-  owner: 3-3-produce-and-smoke-test-native-release-artifacts
+  owner: 3-10-settle-the-release-blocking-platform-decisions
   evidence: WKWebView loads `wails://wails/` through `setURLSchemeHandler:`, and Wails 2.15.0 registers no secure scheme anywhere in its darwin frontend; WebView2 loads `http://wails.localhost/`, which Chromium treats as trustworthy. The clipboard hit this first and is fixed by routing through `runtime.ClipboardSetText`, but the asymmetry is general: `crypto.subtle`, `navigator.geolocation`, media capture and service workers are gated the same way, and a frontend feature that works in `wails dev` on Windows can be inert on macOS with no error. Worth a line in the project's agent instructions before another story reaches for a browser API, and worth confirming on a real Mac during Story 3.3's release evidence.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
@@ -649,7 +659,7 @@ being anyone's problem.
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
   id: D-088
   summary: Wails' Windows lock falls through to a full second instance when the mutex exists but cannot be used, and the mutex is session-local.
-  owner: 3-3-produce-and-smoke-test-native-release-artifacts
+  owner: 3-10-settle-the-release-blocking-platform-decisions
   evidence: `SetupSingleInstance` treats any `CreateMutex` error other than `ERROR_ALREADY_EXISTS` as "no other instance" (an elevated first instance is the common case), and returns without exiting when `FindWindowW` finds no event window (a tight double-launch), so two coordinators, listeners and beacons can run. Separately the mutex lives in the logon session, so two logged-in Windows users each get an instance. An app-owned backstop lock under `os.UserConfigDir` is the candidate fix; it is a release-platform decision, not this story's.
 
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`

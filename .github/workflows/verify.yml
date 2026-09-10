@@ -10,12 +10,23 @@
 # naming the break, if a pin is loosened.
 name: Verify
 
+# Read-only, stated rather than inherited. This workflow runs on every pull
+# request, including from a fork, and is reused as the release gate -- so the
+# token it hands those runs must not depend on a repository setting a person
+# can change in a web form.
+permissions:
+  contents: read
+
 on:
   pull_request:
   push:
     branches:
       - main
       - 'epic-*'
+  # Lets release.yml reuse this exact gate with `uses: ./.github/workflows/verify.yml`
+  # rather than copying it -- a copied gate drifts. No inputs or secrets: the
+  # release job runs on the same triggering ref and needs nothing passed in.
+  workflow_call:
 
 # A new push or PR update supersedes any run already in flight for the same
 # ref, so stale results never race a newer commit to green.
@@ -36,6 +47,9 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    # A hung npm ci or wails build otherwise burns the multi-hour default
+    # before GitHub kills it. The full gate takes about four minutes.
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash

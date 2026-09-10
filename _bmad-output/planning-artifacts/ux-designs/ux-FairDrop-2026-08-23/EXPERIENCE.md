@@ -105,7 +105,7 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 
 `copy.done.heading` means sender-observed response-stream completion only. It never asserts where the browser saved the item, that iOS Files contains it, or that the receiver opened it.
 
-Use **file**, **folder**, **download**, **ZIP**, **same local network**, **plain HTTP**, and **not encrypted**. **Cloud** and **upload** are allowed only in the truthful negated disclosure above. Do not use **secure**, **private**, **pair**, **sync**, “AirDrop for any device,” “works with every device,” or any claim of receiver identity, storage completion, or universal compatibility.
+Use **file**, **folder**, **download**, **ZIP**, **same local network**, **plain HTTP**, and **not encrypted**. **Cloud** and **upload** are allowed only in the truthful negated disclosure above. Do not use **secure**, **private**, **pair**, **sync**, “AirDrop for any device,” “works with every device,” or any claim of receiver identity, storage completion, or universal compatibility. Release copy additionally never claims **signed**, **notarized**, **auto-update**, or **Linux** support.
 
 ### Stable public error and warning copy
 
@@ -252,6 +252,7 @@ Recovery remains available from Idle and Staged:
 - Done is limited to sender-observed transport completion. Browser saving, filename prompts, Files integration, ZIP opening, and subsequent storage are receiver-owned actions.
 - Generic receiver failures remain canonical. Sender-side troubleshooting and new-link guidance are the V1 recovery experience.
 - No cloud fallback or queue exists. After correcting network/firewall/preview issues, Cancel and prepare the item again to create a fresh capability link.
+- Release artifacts and their copy make no signing, notarization, auto-update, or Linux-packaging claim. The macOS build carries only an ad-hoc signature (`codesign --sign -`) so the OS will launch it unsigned by a developer identity; that is not notarization and must never be described as one.
 
 ## Accessibility Floor
 

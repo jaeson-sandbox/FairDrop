@@ -1,0 +1,270 @@
+# Produces and checksums FairDrop's native release artifacts.
+#
+# This never builds anything itself until the Story 3.2 gate -- reused here
+# through `workflow_call` rather than copied, so the two cannot drift apart --
+# has passed on both native runners. Each platform then builds its own
+# artifact through Wails (no GOOS/GOARCH cross-build, ever), checksums it, and
+# uploads it. A tag additionally collects both into a draft release; a manual
+# dispatch stops after uploading, because publishing a release is a human act
+# on this public repository. UPX is off by default and reachable only through
+# an explicit workflow input, matching the Story 3.2 workflow's own ban on
+# default compression.
+#
+# release_identity_test.go pins the tag-to-version rule this workflow
+# enforces; verify_workflow_test.go pins the gate this workflow reuses.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      upx:
+        description: 'Pass -upx to wails build (Apple Silicon and Windows antivirus risk; opt-in only)'
+        type: boolean
+        default: false
+
+# Read-only by default, stated here rather than inherited. The repository's
+# current default for a workflow token is read, but that is a repository
+# setting a person can change; declaring it makes every job below read-only
+# regardless, so only the one job that must write a release can.
+permissions:
+  contents: read
+
+# One release run per ref at a time. Unlike verify.yml this never cancels the
+# run already in flight: a superseded verification is worth nothing, but a
+# half-finished publish is worth avoiding, so a second run waits instead.
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Kept identical to verify.yml's pin: a release built with a different CLI
+  # than the gate just verified is not the build the gate approved.
+  WAILS_VERSION: 'v2.15.0'
+
+jobs:
+  # The whole Story 3.2 gate, native on both platforms, reused rather than
+  # restated. `needs: gate` on the job below means nothing here builds until
+  # every job inside this reused workflow has passed.
+  gate:
+    uses: ./.github/workflows/verify.yml
+
+  build:
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.7'
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # actions/setup-go does not guarantee $(go env GOPATH)/bin is on PATH
+      # for every step shell on every platform, and that is where `go
+      # install` puts the Wails CLI -- so add it explicitly rather than
+      # trust an implicit default. Matches verify.yml.
+      - name: Add GOPATH/bin to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # Deliberately uncached, unlike verify.yml. A cache entry is written by
+      # whichever run gets there first, including a pull request run, and this
+      # job produces the binary people download. Paying thirty seconds to
+      # build the CLI from the pinned module means the release toolchain comes
+      # from go.sum's verification rather than from a cache any run could
+      # populate. The `wails version` assertion below cannot tell a tampered
+      # binary that reports the right string from a genuine one.
+      - name: Install the Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      # An unpinned or drifted CLI must fail before any build runs, not
+      # produce a release artifact from whichever version happened to be
+      # cached or resolved.
+      - name: Assert the Wails CLI is pinned
+        run: |
+          got="$(wails version | head -n1 | tr -d '\r')"
+          if [ "$got" != "$WAILS_VERSION" ]; then
+            echo "wails version reported '$got', want '$WAILS_VERSION'" >&2
+            exit 1
+          fi
+
+      # A tag names the release; wails.json's productVersion names the build
+      # that ships inside it. If they disagree, the artifact's own version
+      # metadata would lie about which tag it was built from, so this fails
+      # before any artifact is built, naming both values. A workflow_dispatch
+      # run carries no tag to compare, so it is skipped there.
+      - name: Assert the tag matches wails.json's productVersion
+        if: github.event_name == 'push'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          productVersion="$(jq -r '.info.productVersion' wails.json)"
+          if [ "$tag" != "$productVersion" ]; then
+            echo "tag $GITHUB_REF_NAME (version $tag) does not match wails.json's productVersion $productVersion" >&2
+            exit 1
+          fi
+
+      # UPX is opt-in only: Apple Silicon and Windows antivirus false-positive
+      # risk. The default (unset, or dispatched false) builds without it, and
+      # a dispatched true is the only way `-upx` ever reaches this command.
+      - name: wails build
+        env:
+          # Through the environment rather than expanded into the script.
+          # A typed boolean cannot carry shell metacharacters today, but the
+          # pattern is the one that becomes an injection the moment an input
+          # changes type, and it is what static analysis flags.
+          UPX: ${{ inputs.upx }}
+        run: |
+          if [ "$UPX" = "true" ]; then
+            echo "building with -upx (explicit workflow input)"
+            wails build -upx
+          else
+            wails build
+          fi
+
+      # macOS: zip with ditto, not a generic zip tool -- a plain zip can
+      # flatten or mangle the .app bundle's resource fork and extended
+      # attributes, and ditto is what Apple's own tooling uses to round-trip
+      # a bundle intact.
+      - name: Package the macOS bundle
+        if: runner.os == 'macOS'
+        run: |
+          cd build/bin
+          ditto -c -k --sequesterRsrc --keepParent fairdrop.app fairdrop-macos.zip
+          shasum -a 256 fairdrop-macos.zip > fairdrop-macos.zip.sha256
+          cat fairdrop-macos.zip.sha256
+
+      - name: Checksum the Windows artifact
+        if: runner.os == 'Windows'
+        run: |
+          cd build/bin
+          sha256sum fairdrop.exe > fairdrop.exe.sha256
+          cat fairdrop.exe.sha256
+
+      - name: Upload the Windows artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: fairdrop-windows
+          path: |
+            build/bin/fairdrop.exe
+            build/bin/fairdrop.exe.sha256
+          if-no-files-found: error
+
+      - name: Upload the macOS artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v7
+        with:
+          name: fairdrop-macos
+          path: |
+            build/bin/fairdrop-macos.zip
+            build/bin/fairdrop-macos.zip.sha256
+          if-no-files-found: error
+
+  # Only for a tag push: workflow_dispatch stops after `build` uploads its
+  # artifacts, with no release created. Runs `gh release create` from the
+  # checked-out repo rather than a third-party release action, so nothing
+  # outside the pinned first-party action set is ever handed the token.
+  release:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Download the Windows artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: fairdrop-windows
+          path: dist/windows
+
+      - name: Download the macOS artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: fairdrop-macos
+          path: dist/macos
+
+      # Draft, never published: this repository is public, so making a
+      # release visible is an outward-facing act that stays a human's to
+      # perform. The notes restate the trust model and the capability
+      # boundary this story is not allowed to widen -- no signing, no
+      # notarization (the macOS binary is only ad-hoc signed so it will
+      # launch), no auto-update, no Linux packaging. Built with `echo`/`>>`
+      # rather than a heredoc: a heredoc's closing delimiter must sit at
+      # column zero, which a YAML block scalar indented for readability
+      # cannot give it without ending the block early.
+      # The checksums were computed on the runner that built each artifact.
+      # Re-checking them here, after they have crossed the artifact store,
+      # is what makes the published checksum a statement about the published
+      # file rather than about a file that was once identical to it.
+      - name: Re-verify the checksums before publishing
+        run: |
+          cd dist/windows && sha256sum --check fairdrop.exe.sha256 && cd ../..
+          cd dist/macos && sha256sum --check fairdrop-macos.zip.sha256
+
+      - name: Create a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # A tag name is not restricted from shell metacharacters, and
+          # expanding one directly into a script is the standard Actions
+          # injection. The build job already reads $GITHUB_REF_NAME this way;
+          # this step used to be the one place that did not.
+          TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo "FairDrop is plain HTTP on a trusted LAN. The single-use capability URL"
+            echo "reduces blind discovery of a transfer; it does not protect against an"
+            echo "observer on the same network. There is no end-to-end encryption, no"
+            echo "hostile-network safety, no cloud relay, no resume, and no multiple-receiver"
+            echo "support."
+            echo ""
+            echo "These native artifacts are unsigned beyond the macOS build's ad-hoc"
+            echo "signature (codesign --sign -, required only so the app will launch) --"
+            echo "there is no notarization, no auto-update, and no Linux packaging."
+            echo ""
+            echo "Each download has a SHA-256 checksum beside it. Checking it proves the"
+            echo "file arrived intact. It is not a signature: the checksum is produced by the"
+            echo "same pipeline as the binary, so it says nothing about whether that pipeline"
+            echo "or this release was tampered with."
+          } > release-notes.md
+
+          # Re-runnable. `gh release create` fails outright when a release for
+          # the tag already exists, which turns any post-publish step failure
+          # into "a human must delete the draft before retrying".
+          assets=(
+            dist/windows/fairdrop.exe
+            dist/windows/fairdrop.exe.sha256
+            dist/macos/fairdrop-macos.zip
+            dist/macos/fairdrop-macos.zip.sha256
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "a release already exists for $TAG; replacing its assets"
+            gh release upload "$TAG" --clobber "${assets[@]}"
+          else
+            gh release create "$TAG" \
+              --draft \
+              --title "FairDrop $TAG" \
+              --notes-file release-notes.md \
+              "${assets[@]}"
+          fi

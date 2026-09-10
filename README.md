@@ -72,3 +72,7 @@ V1 is plain HTTP on a trusted LAN. The single-use capability URL prevents blind 
 transfer; it does not protect against an observer on the same network. There is no encryption,
 no authentication, no relay, and no receiver app — a modern browser on the same Wi-Fi is the
 receiver.
+
+Release artifacts match that limit: no code signing, no notarization, no auto-update, and no
+Linux packaging. The macOS build carries only Wails' ad-hoc `codesign --sign -`, present so the
+OS will launch it, not a developer-identity signature or notarization.
