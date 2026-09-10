@@ -477,3 +477,24 @@ test that would have caught them simply never ran -- the filter did not match th
 harness that prints "SURVIVED" having silently executed nothing is a vacuous pass about vacuous
 passes. It now runs the whole package.
 
+## Re-verifying the pipeline after the hardening
+
+The review round changed the release workflow substantially -- the toolchain is no longer cached, the
+compression input and the tag both travel through the environment, publishing became re-runnable, and
+concurrency and timeouts were added -- so the pipeline was exercised again rather than assumed still
+to work.
+
+**https://github.com/jaeson-sandbox/FairDrop/actions/runs/34434678866**, a `workflow_dispatch` on the
+epic branch: `gate / verify (windows-latest)` and `gate / verify (macos-latest)` green, `build
+(windows-latest)` and `build (macos-latest)` green, `release` **skipped**. That is the whole build
+path under the new configuration, including the uncached CLI install and the environment-passed
+input, plus a live confirmation that a manual run publishes nothing.
+
+**Not yet exercised on a runner:** the publish job's changed logic -- the environment-passed tag, the
+checksum re-verification, and the "a release already exists, replace its assets" branch. It runs only
+on a tag push. The earlier tagged run (34431788901) exercised the *old* publish step, and the new one
+is pinned by tests but has not executed. Re-pointing `v0.1.0` at the current commit would exercise it
+and would rewrite a published tag on a public repository, so it is a human's call rather than a thing
+to do while tidying up. Recorded here so the next release knows that step is running for the first
+time.
+

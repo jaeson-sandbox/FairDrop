@@ -2,7 +2,7 @@
 title: 'Story 3.3: Produce and Smoke-Test Native Release Artifacts'
 type: 'feature'
 created: '2026-09-09'
-status: 'in-progress'
+status: 'in-review'
 review_loop_iteration: 0
 baseline_commit: 'c6016c8c72086d2dbc1e3b969d9c87fffe2488cf'
 context:
