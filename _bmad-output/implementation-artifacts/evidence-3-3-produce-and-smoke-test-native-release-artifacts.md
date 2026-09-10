@@ -521,3 +521,29 @@ Three things ran for the first time on a runner, all three previously test-only:
 Published at https://github.com/jaeson-sandbox/FairDrop/releases/tag/v0.1.0 -- no longer a draft. This
 is the first FairDrop release, and it is unsigned and unnotarized, which the release notes say plainly.
 
+### Independent check of what was actually published
+
+Both artifacts were downloaded from the public release page and verified against the checksums
+published beside them: `fairdrop.exe: OK` and `fairdrop-macos.zip: OK`. This is the check the release
+notes tell a downloader to run, performed the way a downloader would.
+
+The macOS archive unpacks to a real bundle -- `fairdrop.app/Contents/` with `MacOS/fairdrop`,
+`Resources/iconfile.icns`, and a `_CodeSignature/` directory, which is the ad-hoc signature the notes
+describe. Its `Info.plist`, read out of the shipped zip rather than from the template, resolves to:
+
+| Key | Value |
+|---|---|
+| CFBundleName | FairDrop |
+| CFBundleIdentifier | com.fairdrop.fairdrop |
+| CFBundleExecutable | fairdrop |
+| CFBundleShortVersionString | 0.1.0 |
+
+So the identifier fix reached the shipped artifact, not just the template the test reads. The bundle
+directory itself is `fairdrop.app`, lowercase, exactly as the Code Map predicted from Wails' packager
+using the project name rather than the product name -- Finder shows `CFBundleName`, so users see
+FairDrop. Renaming the bundle directory remains Ask First because it moves the identifier with it.
+
+Not claimed: that the published binaries were built reproducibly. Go builds are not bit-identical by
+default, so a local rebuild of the same commit produces a different hash, and the checksum proves
+delivery rather than provenance -- which is what the notes say.
+
