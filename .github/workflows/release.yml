@@ -25,6 +25,13 @@ on:
         type: boolean
         default: false
 
+# Read-only by default, stated here rather than inherited. The repository's
+# current default for a workflow token is read, but that is a repository
+# setting a person can change; declaring it makes every job below read-only
+# regardless, so only the one job that must write a release can.
+permissions:
+  contents: read
+
 env:
   # Kept identical to verify.yml's pin: a release built with a different CLI
   # than the gate just verified is not the build the gate approved.
@@ -193,6 +200,15 @@ jobs:
       # rather than a heredoc: a heredoc's closing delimiter must sit at
       # column zero, which a YAML block scalar indented for readability
       # cannot give it without ending the block early.
+      # The checksums were computed on the runner that built each artifact.
+      # Re-checking them here, after they have crossed the artifact store,
+      # is what makes the published checksum a statement about the published
+      # file rather than about a file that was once identical to it.
+      - name: Re-verify the checksums before publishing
+        run: |
+          cd dist/windows && sha256sum --check fairdrop.exe.sha256 && cd ../..
+          cd dist/macos && sha256sum --check fairdrop-macos.zip.sha256
+
       - name: Create a draft release
         env:
           GH_TOKEN: ${{ github.token }}

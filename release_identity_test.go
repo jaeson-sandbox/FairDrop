@@ -519,3 +519,52 @@ func TestTheVersionIsStatedOnceAndFollowedEverywhere(t *testing.T) {
 			"about what this build is", pkgPath, pkg.Version, wails.Info.ProductVersion)
 	}
 }
+
+// TestReleaseWorkflowHoldsTheSmallestTokenAndChecksWhatItPublishes pins two
+// properties of the only job in this repository that is ever handed a
+// write-capable token.
+//
+// The first is least privilege stated rather than inherited. The repository's
+// default workflow token is currently read-only, so every job here would be
+// read-only even without the declaration -- but that default is a repository
+// setting a person can change in a web form, silently granting write to every
+// job in every workflow. Declaring it in the file means only the job that must
+// write a release can.
+//
+// The second is that the checksum published beside an artifact describes the
+// artifact that was published, not one that was identical to it before it
+// crossed the artifact store. Computing a checksum on the build runner and
+// then shipping both without re-checking makes the checksum a claim about a
+// file that is no longer the one anybody downloads.
+func TestReleaseWorkflowHoldsTheSmallestTokenAndChecksWhatItPublishes(t *testing.T) {
+	release := readTextFile(t, filepath.Join(".github", "workflows", "release.yml"))
+
+	preamble, _, found := strings.Cut(release, "\njobs:")
+	if !found {
+		t.Fatal("release.yml has no jobs: block, so this test would pass vacuously")
+	}
+	if !strings.Contains(preamble, "permissions:") || !strings.Contains(preamble, "contents: read") {
+		t.Error("release.yml declares no workflow-level `permissions: contents: read`: " +
+			"every job would then inherit whatever the repository default happens to be, " +
+			"which a person can change without touching this file")
+	}
+
+	releaseJob := jobBlock(t, release, "release", "")
+	if !strings.Contains(releaseJob, "contents: write") {
+		t.Error("the release job does not elevate to contents: write, so it cannot create a release")
+	}
+
+	verifyIdx := strings.Index(releaseJob, "sha256sum --check")
+	publishIdx := strings.Index(releaseJob, "gh release create")
+	if verifyIdx < 0 {
+		t.Error("the release job never re-checks a downloaded checksum: the published checksum " +
+			"would describe the artifact as it was before it crossed the artifact store")
+	}
+	if publishIdx < 0 {
+		t.Fatal("the release job does not run `gh release create`, so ordering cannot be checked")
+	}
+	if verifyIdx >= 0 && verifyIdx > publishIdx {
+		t.Error("the checksum re-check runs after `gh release create`: a corrupted artifact " +
+			"would already be published by the time it failed")
+	}
+}
