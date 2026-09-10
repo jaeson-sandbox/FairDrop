@@ -57,12 +57,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `.github/workflows/verify.yml` — add `workflow_call`; confirm every 3.2 pin still passes.
-- [ ] `.github/workflows/release.yml` — gate, per-platform build, checksums, uploads, draft release.
-- [ ] `build/darwin/Info.plist` — bundle identifier that names FairDrop rather than Wails.
-- [ ] `release_identity_test.go` — pin name, output filename, product name, version and identifier across `wails.json`, both templates and `main.go`; pin the tag-to-version rule; pin that no shipped surface says `DeadDrop`, with the historical spec exempt by name.
-- [ ] `README.md`, `EXPERIENCE.md` — trusted-LAN sentence and the banned-claim list, including no signing or notarization despite the ad-hoc signature.
-- [ ] `evidence-3-3-produce-and-smoke-test-native-release-artifacts.md` — mutation table, gate transcript, and the run URL of a real tagged build.
+- [x] `.github/workflows/verify.yml` — add `workflow_call`; confirm every 3.2 pin still passes.
+- [x] `.github/workflows/release.yml` — gate, per-platform build, checksums, uploads, draft release.
+- [x] `build/darwin/Info.plist` — bundle identifier that names FairDrop rather than Wails.
+- [x] `release_identity_test.go` — pin name, output filename, product name, version and identifier across `wails.json`, both templates and `main.go`; pin the tag-to-version rule; pin that no shipped surface says `DeadDrop`, with the historical spec exempt by name.
+- [x] `README.md`, `EXPERIENCE.md` — trusted-LAN sentence and the banned-claim list, including no signing or notarization despite the ad-hoc signature.
+- [x] `evidence-3-3-produce-and-smoke-test-native-release-artifacts.md` — mutation table, gate transcript, and the run URL of a real tagged build.
 
 **Acceptance Criteria:**
 - Given a version tag, when the release workflow runs, then both runners pass the full gate before building, each produces its own native artifact with a SHA-256 checksum, and no step cross-compiles.

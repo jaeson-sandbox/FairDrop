@@ -56,7 +56,7 @@ development_status:
   epic-3: in-progress
   3-1-enforce-one-running-fairdrop-instance: done
   3-2-automate-reproducible-cross-platform-verification: done
-  3-3-produce-and-smoke-test-native-release-artifacts: in-progress
+  3-3-produce-and-smoke-test-native-release-artifacts: done
   3-4-bound-every-lifecycle-wait-and-prove-quiescence: backlog
   3-5-reconcile-public-error-copy-with-its-states: backlog
   3-6-make-lost-and-malformed-events-visible: backlog
