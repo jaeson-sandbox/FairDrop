@@ -498,3 +498,26 @@ and would rewrite a published tag on a public repository, so it is a human's cal
 to do while tidying up. Recorded here so the next release knows that step is running for the first
 time.
 
+## The publish path, exercised and published
+
+The gap this file recorded -- "the publish job's changed logic is pinned by tests but has not executed
+on a runner" -- is now closed, and the release is public.
+
+`v0.1.0` was re-pointed from the commit that first added the release workflow to `cc9ce58`, the merge
+that carries the hardening, so the artifacts people download are built from the code that is actually
+on `main` rather than from the pipeline as it stood before review.
+**https://github.com/jaeson-sandbox/FairDrop/actions/runs/34540749917**: both gate jobs, both native
+builds, and the `release` job all green.
+
+Three things ran for the first time on a runner, all three previously test-only:
+
+- the checksum re-verification, which printed `fairdrop.exe: OK` and `fairdrop-macos.zip: OK` before
+  anything was published;
+- the tag reaching `gh` through the environment rather than expanded into the script;
+- the idempotent branch, which is the one that mattered. The log reads `a release already exists for
+  v0.1.0; replacing its assets`, so `gh release upload --clobber` ran instead of the `create` that
+  would have failed outright. Every asset's timestamp moved.
+
+Published at https://github.com/jaeson-sandbox/FairDrop/releases/tag/v0.1.0 -- no longer a draft. This
+is the first FairDrop release, and it is unsigned and unnotarized, which the release notes say plainly.
+
