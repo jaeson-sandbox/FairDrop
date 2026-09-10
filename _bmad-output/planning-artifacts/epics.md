@@ -1000,7 +1000,9 @@ So that a release candidate is a real build of the real code, correctly named, w
 
 **Scope:** what a workflow can build and verify without a person. Human-collected evidence -- browser matrix, screen readers, first-launch firewall behaviour -- is Story 3.9 and is *required* before release; this story produces the artifacts 3.9 exercises.
 
-**Closes:** D-018, D-055, D-064, D-088.
+**Narrowed 2026-09-09:** the four platform and contract decisions this story used to carry -- the HTTP header set (D-018), the window theme flash (D-055), the macOS non-secure-context limit (D-064), and the Windows single-instance fallthrough (D-088) -- moved to Story 3.10. Each is independently reviewable, three change product behaviour, and none is needed to build and identify an artifact. They remain release-blocking: **Story 3.10 must close before Story 3.9 can record release evidence**, whatever the numbering suggests.
+
+**Closes:** nothing directly; the four ids it used to carry moved to Story 3.10.
 
 **Acceptance Criteria:**
 
@@ -1016,10 +1018,6 @@ So that a release candidate is a real build of the real code, correctly named, w
 **Given** release compression settings
 **When** artifacts are built
 **Then** UPX is opt-in because of documented Apple Silicon and Windows antivirus risks, and disabling it does not change functional acceptance.
-
-**Given** the three receiver-facing platform gaps this story owns
-**When** the story closes
-**Then** the CORS, `Accept-Ranges`, and `Access-Control-Expose-Headers` decision is made and, if headers change, the frozen HTTP matrix in `docs/fairdrop-contracts.md` is amended with them (D-018); the native window background matches both themes so neither flashes (D-055); and the macOS non-secure-context limitation is either closed by routing the affected APIs through Go or recorded in `EXPERIENCE.md` as a platform limit (D-064).
 
 **Given** product and release copy
 **When** trusted-LAN behaviour is described
@@ -1207,3 +1205,40 @@ So that supported-browser and accessibility claims rest on recorded results rath
 **Given** `DESIGN.md`'s contrast evidence
 **When** the story closes
 **Then** the nine contrast pairs added as prose are moved into the table that holds the others, with a note that `styles.test.ts` now owns the figures (D-073).
+
+### Story 3.10: Settle the Release-Blocking Platform Decisions
+
+As a maintainer,
+I want the four platform and contract questions release depends on decided and implemented,
+So that a release candidate is not blocked by open questions nobody has answered.
+
+**Why a separate story:** these were bundled into Story 3.3, whose goal is producing and identifying an artifact. Each of the four is independently reviewable and mergeable, three change product behaviour, and none is needed to build an artifact -- so carrying them made 3.3 a spec no single session could hold. Split out on 2026-09-09.
+
+**Ordering:** numbered last, required before Story 3.9. Release evidence cannot record a pass against a header set, a first-paint behaviour, or a single-instance guarantee that has not been decided.
+
+**Closes:** D-018, D-055, D-064, D-088.
+
+**Acceptance Criteria:**
+
+**Given** the frozen HTTP header matrix in `docs/fairdrop-contracts.md`
+**When** the CORS, `Accept-Ranges`, and `Access-Control-Expose-Headers` question is decided
+**Then** the decision is recorded with its reasoning, and if any header changes the frozen matrix, the matching architecture decision, the affected specs, and the tests are amended together, never a private adapter compatibility rule (D-018)
+**And** an error response reachable cross-origin carries the same origin policy as the success response, so a receiver page sees a coded failure rather than an opaque one.
+
+**Given** a machine whose OS theme is dark
+**When** FairDrop launches
+**Then** the native window background matches that theme before the webview paints, so neither theme shows a one-frame flash of the other, with the OS theme read in Go and a build-tagged implementation per platform (D-055)
+**And** the existing options pin still fails if the background stops tracking the canvas token.
+
+**Given** the macOS webview's non-secure custom scheme
+**When** the limitation is settled
+**Then** every browser API the product depends on that is gated on a secure context is either routed through Go or recorded in `EXPERIENCE.md` as a platform limit with what it costs the user, and the project's agent instructions warn against reaching for such an API before another story does (D-064).
+
+**Given** Wails' Windows single-instance lock
+**When** its two fallthrough paths are addressed
+**Then** a first instance that cannot be detected -- an elevated owner, a tight double launch, or a second logged-in user -- either cannot start a competing coordinator, listener and beacon, or the residual case is recorded with what a user would observe (D-088)
+**And** whatever is chosen keeps the existing single-instance pins in `main_test.go` green.
+
+**Given** any of these four decisions
+**When** it changes a contract or an architecture decision
+**Then** the spec, the architecture documents, the owning story, its tests, and `AGENTS.md` are updated together before the story closes.
