@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -311,29 +312,7 @@ func TestEveryDeferredEntryHasALiveOwner(t *testing.T) {
 		t.Fatalf("read sprint-status.yaml: %v", err)
 	}
 
-	// Story keys are the indented `key: status` lines inside development_status,
-	// and only those: reading every indented line in the file would let an
-	// unrelated key satisfy an owner, and would leave the vacuity guard below
-	// unable to fire when the block itself is renamed away.
-	stories := map[string]bool{}
-	inBlock := false
-	for _, line := range strings.Split(strings.ReplaceAll(string(sprint), "\r\n", "\n"), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(line, " ") && trimmed != "" {
-			inBlock = trimmed == "development_status:"
-			continue
-		}
-		if !inBlock || trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		key, _, found := strings.Cut(trimmed, ":")
-		if found && key != "" {
-			stories[key] = true
-		}
-	}
-	if len(stories) == 0 {
-		t.Fatal("no story keys parsed from sprint-status.yaml, so this test would pass vacuously")
-	}
+	stories := storyStatuses(t, sprint)
 
 	var summaries, owners int
 	for _, line := range strings.Split(strings.ReplaceAll(string(deferred), "\r\n", "\n"), "\n") {
@@ -345,7 +324,7 @@ func TestEveryDeferredEntryHasALiveOwner(t *testing.T) {
 			owner := strings.TrimSpace(strings.TrimPrefix(line, "  owner:"))
 			switch {
 			case owner == "discharged" || owner == "accepted":
-			case stories[owner]:
+			case stories[owner] != "":
 			default:
 				t.Errorf("deferred entry %d is owned by %q, which is not a sprint-status story: "+
 					"the finding has no story that will resolve it", owners, owner)
@@ -360,4 +339,150 @@ func TestEveryDeferredEntryHasALiveOwner(t *testing.T) {
 		t.Errorf("%d deferred entries carry %d owners: %d finding(s) belong to nobody",
 			summaries, owners, summaries-owners)
 	}
+}
+
+// deferredIDPattern matches the stable ids deferred-work.md assigns and
+// epics.md cites.
+var deferredIDPattern = regexp.MustCompile(`D-\d{3}`)
+
+// splitLines normalises CRLF so a Windows checkout parses the same as a macOS
+// one. The workflow's line-ending check keeps the repository LF, and this makes
+// these tests independent of that check rather than quietly dependent on it.
+func splitLines(content []byte) []string {
+	return strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n")
+}
+
+// storyStatuses reads the `key: status` lines inside development_status, and
+// only those: reading every indented line in the file would let an unrelated
+// key satisfy an owner, and would leave the vacuity guards in both callers
+// unable to fire when the block itself is renamed away.
+func storyStatuses(t *testing.T, sprint []byte) map[string]string {
+	t.Helper()
+
+	statuses := map[string]string{}
+	inBlock := false
+	for _, line := range splitLines(sprint) {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(line, " ") && trimmed != "" {
+			inBlock = trimmed == "development_status:"
+			continue
+		}
+		if !inBlock || trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		key, value, found := strings.Cut(trimmed, ":")
+		if found && key != "" {
+			statuses[key] = strings.TrimSpace(value)
+		}
+	}
+	if len(statuses) == 0 {
+		t.Fatal("no story keys parsed from sprint-status.yaml, so the caller would pass vacuously")
+	}
+	return statuses
+}
+
+// TestEveryOpenDeferredEntryIsCitedByItsOwningStory closes the gap that
+// TestEveryDeferredEntryHasALiveOwner leaves open.
+//
+// That test proves an entry names a story that exists. It cannot prove the
+// story knows. A build session reads its story's acceptance criteria in
+// epics.md, and the house rule is that the D-ids named there are in scope --
+// so an entry owned by Story 3.4 whose id appears nowhere in Story 3.4's
+// Closes line is invisible to the only session that would ever resolve it.
+// Five entries were in exactly that state when this test was written, all
+// added in the same session that added them to deferred-work.md and forgot
+// epics.md. The failure mode is silence: nothing breaks, the work is simply
+// never done.
+//
+// The second half is the same loss from the other end. An entry still open
+// while the story that owns it is already done belongs to nobody, and no
+// future session has a reason to look at it.
+func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
+	artifacts := filepath.Join("_bmad-output", "implementation-artifacts")
+
+	deferred, err := os.ReadFile(filepath.Join(artifacts, "deferred-work.md"))
+	if err != nil {
+		t.Fatalf("read deferred-work.md: %v", err)
+	}
+	epics, err := os.ReadFile(filepath.Join("_bmad-output", "planning-artifacts", "epics.md"))
+	if err != nil {
+		t.Fatalf("read epics.md: %v", err)
+	}
+	sprint, err := os.ReadFile(filepath.Join(artifacts, "sprint-status.yaml"))
+	if err != nil {
+		t.Fatalf("read sprint-status.yaml: %v", err)
+	}
+
+	status := storyStatuses(t, sprint)
+
+	// Story {epic}-{number} -> the ids its Closes line names. Keyed by the
+	// numeric prefix because that is all a story key and a story heading share.
+	cited := map[string]map[string]bool{}
+	var heading string
+	for _, line := range splitLines(epics) {
+		if rest, found := strings.CutPrefix(line, "### Story "); found {
+			number, _, ok := strings.Cut(rest, ":")
+			if ok {
+				heading = strings.ReplaceAll(strings.TrimSpace(number), ".", "-")
+			}
+			continue
+		}
+		if heading == "" || !strings.HasPrefix(line, "**Closes:**") {
+			continue
+		}
+		if cited[heading] == nil {
+			cited[heading] = map[string]bool{}
+		}
+		for _, id := range deferredIDPattern.FindAllString(line, -1) {
+			cited[heading][id] = true
+		}
+	}
+	if len(cited) == 0 {
+		t.Fatal("no Closes lines parsed from epics.md, so this test would pass vacuously")
+	}
+
+	var open int
+	var id string
+	for _, line := range splitLines(deferred) {
+		if rest, found := strings.CutPrefix(line, "  id:"); found {
+			id = strings.TrimSpace(rest)
+			continue
+		}
+		rest, found := strings.CutPrefix(line, "  owner:")
+		if !found {
+			continue
+		}
+		owner := strings.TrimSpace(rest)
+		if id == "" || owner == "discharged" || owner == "accepted" {
+			id = ""
+			continue
+		}
+		open++
+
+		prefix := storyPrefix(owner)
+		if !cited[prefix][id] {
+			t.Errorf("%s is owned by %q, but Story %s's Closes line in epics.md does not name it: "+
+				"the session that builds that story reads its acceptance criteria and would never "+
+				"learn this entry exists", id, owner, strings.ReplaceAll(prefix, "-", "."))
+		}
+		if status[owner] == "done" {
+			t.Errorf("%s is still open but its owner %q is already done: "+
+				"the finding belongs to nobody", id, owner)
+		}
+		id = ""
+	}
+
+	if open == 0 {
+		t.Fatal("no open deferred entries parsed, so this test would pass vacuously")
+	}
+}
+
+// storyPrefix reduces a sprint-status story key to the {epic}-{number} pair it
+// shares with an epics.md heading: 3-4-bound-every-... becomes 3-4.
+func storyPrefix(key string) string {
+	parts := strings.SplitN(key, "-", 3)
+	if len(parts) < 2 {
+		return key
+	}
+	return parts[0] + "-" + parts[1]
 }

@@ -93,6 +93,11 @@ as historical narrative and apply all corrections and supersessions before using
   `discharged`/`accepted`, and carries a stable `id:` (D-NNN) that story acceptance criteria
   cite. Evidence (mutation tables, triage, gate transcripts) lives in `evidence-<slug>.md`
   beside each spec, never in the spec itself; see `_bmad/custom/bmad-build.toml`.
+- Adding a deferred entry is two edits, not one: the entry in `deferred-work.md`,
+  and its `D-NNN` id on the owning story's `**Closes:**` line in `epics.md`. A build
+  session reads the story's acceptance criteria, so an uncited entry is invisible to
+  the only session that would resolve it. `TestEveryOpenDeferredEntryIsCitedByItsOwningStory`
+  fails on both that and an entry left open under a story already `done`.
 
 ## Known pitfalls
 

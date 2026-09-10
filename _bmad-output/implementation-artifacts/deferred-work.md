@@ -11,6 +11,16 @@ so read the owner before reading the evidence as open work.
 owner or names a story that does not exist, so a finding cannot quietly stop
 being anyone's problem.
 
+Naming a live story is necessary and was not sufficient. A build session reads
+its story's acceptance criteria in `epics.md`, so an open entry whose id appears
+in no `**Closes:**` line is invisible to the only session that would ever
+resolve it -- five entries were in exactly that state when the check was
+written, added here and never added there.
+`TestEveryOpenDeferredEntryIsCitedByItsOwningStory` now fails on that, and on an
+entry left open under a story already marked `done`. Adding an entry therefore
+means two edits: the entry here, and its id on the owning story's `**Closes:**`
+line.
+
 > **Every entry now carries a stable `id:` (D-001 … D-085, file order).** Story acceptance criteria in
 > `epics.md` cite these ids, so a build session knows exactly which entries its story must close.
 > Epic 3 was re-planned on 2026-09-08 into nine stories; owners below were re-homed accordingly.
