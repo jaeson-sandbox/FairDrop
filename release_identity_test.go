@@ -450,3 +450,72 @@ func TestQRDependencyIsLiveNotInactive(t *testing.T) {
 		t.Errorf("%s mentions \"qr\": QR encoding is Go-only (internal/qr), so a frontend QR package would be an inactive duplicate", pkgPath)
 	}
 }
+
+// TestVerifyWorkflowStaysReusableByTheReleaseWorkflow pins the other half of
+// the gate reuse.
+//
+// TestReleaseWorkflowGatesBeforeBuildingAndNeverCrossCompiles proves
+// release.yml asks for verify.yml through workflow_call. Nothing proved
+// verify.yml still offers it. Removing that one line from verify.yml left
+// every test in this repository green while making every future release fail
+// at run time, with an error about an invalid workflow reference rather than
+// about the trigger somebody deleted -- found by mutation after the
+// implementation reported it as a known gap.
+func TestVerifyWorkflowStaysReusableByTheReleaseWorkflow(t *testing.T) {
+	verify := readTextFile(t, filepath.Join(".github", "workflows", "verify.yml"))
+
+	triggers, _, found := strings.Cut(verify, "\njobs:")
+	if !found {
+		t.Fatal("verify.yml has no jobs: block, so this test would pass vacuously")
+	}
+	if !strings.Contains(triggers, "workflow_call:") {
+		t.Error("verify.yml no longer declares workflow_call: release.yml reuses it as its gate, " +
+			"and without that trigger every release fails at run time complaining about an " +
+			"invalid workflow reference rather than about the deleted trigger")
+	}
+}
+
+// TestTheVersionIsStatedOnceAndFollowedEverywhere pins the second copy of the
+// product version.
+//
+// wails.json's productVersion is what both platform templates resolve, so
+// changing it alone cannot make those two disagree -- correctly, since bumping
+// it is exactly what a maintainer does before tagging. frontend/package.json
+// carries its own "version" that nothing resolves and nothing shipped reads,
+// which is precisely why it drifts unnoticed: it looks authoritative and is
+// not. Pinning the two together makes a version bump one coherent act rather
+// than a thing to remember twice.
+func TestTheVersionIsStatedOnceAndFollowedEverywhere(t *testing.T) {
+	var wails struct {
+		Info struct {
+			ProductVersion string `json:"productVersion"`
+		} `json:"info"`
+	}
+	raw, err := os.ReadFile("wails.json")
+	if err != nil {
+		t.Fatalf("read wails.json: %v", err)
+	}
+	if err := json.Unmarshal(raw, &wails); err != nil {
+		t.Fatalf("decode wails.json: %v", err)
+	}
+	if wails.Info.ProductVersion == "" {
+		t.Fatal("wails.json declares no productVersion, so this test would pass vacuously")
+	}
+
+	var pkg struct {
+		Version string `json:"version"`
+	}
+	pkgPath := filepath.Join("frontend", "package.json")
+	raw, err = os.ReadFile(pkgPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", pkgPath, err)
+	}
+	if err := json.Unmarshal(raw, &pkg); err != nil {
+		t.Fatalf("decode %s: %v", pkgPath, err)
+	}
+	if pkg.Version != wails.Info.ProductVersion {
+		t.Errorf("%s says version %q but wails.json says productVersion %q: "+
+			"the version is stated twice and these two disagree, so one of them is wrong "+
+			"about what this build is", pkgPath, pkg.Version, wails.Info.ProductVersion)
+	}
+}

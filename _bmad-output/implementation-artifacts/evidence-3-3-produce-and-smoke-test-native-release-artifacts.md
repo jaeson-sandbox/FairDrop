@@ -410,3 +410,41 @@ the URL above.
   text pin, not by a produced, smoke-tested compressed artifact. Low risk --
   `-upx` is Wails' own documented flag, exercised by many other Wails
   projects' CI -- but not this session's own executed evidence.
+
+## Orchestrator mutation pass
+
+Run against the implementation before accepting it, per the standing rule that a subagent's report is
+a claim until a mutation kills the test it names. Nine mutations; seven died immediately.
+
+| # | Mutation | Result |
+|---|---|---|
+| M32 | Remove `workflow_call:` from `verify.yml` | **survived**, then fixed |
+| M33 | Bump `productVersion` in `wails.json` alone | **survived**, then fixed |
+| M34 | Restore the Wails default bundle identifier | killed |
+| M35 | Drop `--draft`, so a tag would publish a real release | killed |
+| M36 | Add a ubuntu runner to the build matrix | killed |
+| M37 | Build before asserting the tag matches the version | killed |
+| M38 | Let `DeadDrop` back into a shipped surface | killed |
+| M39 | Drop `needs: gate`, so a build could run unverified | killed |
+| M40 | Swap `gh release create` for a third-party action | killed |
+
+**M32** is the gap the implementation reported honestly as a known one, and it is worth the entry
+because of its shape: `release.yml` was pinned to *ask* for the gate, and nothing pinned `verify.yml`
+to still *offer* it. Deleting one line from `verify.yml` left every test in the repository green while
+making every future release fail at run time -- complaining about an invalid workflow reference, not
+about the trigger somebody deleted. `TestVerifyWorkflowStaysReusableByTheReleaseWorkflow` closes it.
+
+**M33** was not a defect and turned out to reveal one. Bumping `wails.json`'s `productVersion` alone
+*should* pass -- both platform templates resolve `{{.Info.ProductVersion}}`, so they cannot disagree
+with it, and bumping it is exactly what a maintainer does before tagging. But `frontend/package.json`
+carries its own `"version"` that nothing resolves and nothing shipped reads, which is precisely why it
+drifts: it looks authoritative and is not. `TestTheVersionIsStatedOnceAndFollowedEverywhere` now pins
+the two together, so a version bump is one coherent act rather than a thing to remember twice.
+
+One note on the harness itself, recorded because it is the same failure class this project keeps
+finding: the first re-run reported M33 as still surviving. The mutation was applied correctly and the
+new test was correct -- the harness's own `-run` filter did not match the new test's name, so the test
+that would have caught it never executed. A mutation harness that reports "survived" when it silently
+ran nothing is exactly the vacuous-pass shape the suite exists to catch, and it applies to the tooling
+as readily as to the code.
+
