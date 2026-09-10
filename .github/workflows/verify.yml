@@ -16,6 +16,10 @@ on:
     branches:
       - main
       - 'epic-*'
+  # Lets release.yml reuse this exact gate with `uses: ./.github/workflows/verify.yml`
+  # rather than copying it -- a copied gate drifts. No inputs or secrets: the
+  # release job runs on the same triggering ref and needs nothing passed in.
+  workflow_call:
 
 # A new push or PR update supersedes any run already in flight for the same
 # ref, so stale results never race a newer commit to green.
