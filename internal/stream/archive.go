@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -371,16 +370,32 @@ func archiveEntryName(root, relative string) (string, error) {
 	if relative == "" ||
 		strings.ContainsAny(relative, "\\\x00") ||
 		strings.HasPrefix(relative, "/") ||
-		strings.HasSuffix(relative, "/") ||
-		filepath.VolumeName(relative) != "" {
+		strings.HasSuffix(relative, "/") {
 		return "", unsafeArchiveEntryName()
 	}
 	for _, segment := range strings.Split(relative, "/") {
-		if segment == "" || segment == "." || segment == ".." {
+		if segment == "" || segment == "." || segment == ".." || volumeQualified(segment) {
 			return "", unsafeArchiveEntryName()
 		}
 	}
 	return root + "/" + relative, nil
+}
+
+// volumeQualified reports whether a segment begins with a Windows volume
+// prefix such as "C:".
+//
+// filepath.VolumeName cannot answer this, and used to be asked: it is a no-op
+// on POSIX, so the identical entry name was refused when the sender ran Windows
+// and accepted when it ran macOS or Linux. The risk is entirely receiver-side
+// -- whoever extracts the archive may well be on Windows -- so the sender's
+// platform must not decide it. A directory named "C:" is perfectly legal on
+// macOS and Linux, which is what makes this reachable rather than theoretical.
+func volumeQualified(segment string) bool {
+	if len(segment) < 2 || segment[1] != ':' {
+		return false
+	}
+	letter := segment[0]
+	return (letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')
 }
 
 // unsafeArchiveEntryName names no path: the entry name is derived from the

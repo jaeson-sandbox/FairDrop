@@ -21,7 +21,7 @@ import (
 
 func TestInspectProductionDefaultSafeTreesAndFiles(t *testing.T) {
 	t.Parallel()
-	root := filepath.Join(t.TempDir(), "safe tree ü")
+	root := filepath.Join(fixtureDir(t), "safe tree ü")
 	empty := filepath.Join(root, "empty")
 	nested := filepath.Join(root, "nested")
 	if err := os.MkdirAll(empty, 0o700); err != nil {
@@ -62,7 +62,7 @@ func TestInspectProductionDefaultSafeTreesAndFiles(t *testing.T) {
 
 func TestInspectProductionDefaultZeroByteFile(t *testing.T) {
 	t.Parallel()
-	path := filepath.Join(t.TempDir(), "empty.bin")
+	path := filepath.Join(fixtureDir(t), "empty.bin")
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestInspectProductionDefaultZeroByteFile(t *testing.T) {
 
 func TestInspectProductionDefaultEmptyAndTrailingDirectory(t *testing.T) {
 	t.Parallel()
-	root := filepath.Join(t.TempDir(), "empty")
+	root := filepath.Join(fixtureDir(t), "empty")
 	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestInspectProductionDefaultEmptyAndTrailingDirectory(t *testing.T) {
 
 func TestInspectProductionDefaultDotDotPreservesCallerPath(t *testing.T) {
 	t.Parallel()
-	base := t.TempDir()
+	base := fixtureDir(t)
 	root := filepath.Join(base, "chosen")
 	child := filepath.Join(root, "child")
 	if err := os.MkdirAll(child, 0o700); err != nil {
@@ -452,7 +452,7 @@ flag could be removed without a failure.
 */
 func TestInspectRejectsTrailingSeparatorOnRegularFile(t *testing.T) {
 	t.Parallel()
-	path := filepath.Join(t.TempDir(), "note.txt")
+	path := filepath.Join(fixtureDir(t), "note.txt")
 	if err := os.WriteFile(path, []byte("hi"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -685,7 +685,7 @@ func TestInspectPrimaryErrorSurvivesCleanupFailure(t *testing.T) {
 func TestFilesystemRootLabelsAreSeparatorFree(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
-		volume := filepath.VolumeName(t.TempDir())
+		volume := filepath.VolumeName(fixtureDir(t))
 		plan, err := (nativeHandleFactory{}).Parse(volume + string(os.PathSeparator))
 		if err != nil {
 			t.Fatalf("Parse(drive root) error = %v", err)
@@ -696,12 +696,31 @@ func TestFilesystemRootLabelsAreSeparatorFree(t *testing.T) {
 		}
 		return
 	}
-	item, err := New().Inspect(context.Background(), "/")
+	// Symmetric with the Windows branch above: the subject is the label Parse
+	// derives for a filesystem root, not a traversal.
+	//
+	// This used to inspect "/" for real, which cannot work on a POSIX machine
+	// and never ran on one until Story 3.2 put macOS in CI. Inspecting a
+	// directory reads its entries; this package refuses a link-like entry
+	// anywhere in a selection by design; and the root of a live macOS install
+	// holds several, since /var, /tmp and /etc are all symlinks. The refusal is
+	// correct behaviour, so the test was asking a question the platform cannot
+	// answer rather than finding a defect.
+	plan, err := (nativeHandleFactory{}).Parse("/")
 	if err != nil {
-		t.Fatalf("Inspect(/) error = %v", err)
+		t.Fatalf("Parse(/) error = %v", err)
 	}
-	if item.Name != "root" {
-		t.Fatalf("root label = %q, want literal root", item.Name)
+	if plan.rootLabel != "root" || strings.ContainsAny(plan.rootLabel, "/\\:") {
+		t.Fatalf("root label = %q, want literal root without punctuation", plan.rootLabel)
+	}
+	// And the label survives a real inspection, on a root this package can
+	// actually traverse.
+	item, err := New().Inspect(context.Background(), fixtureDir(t))
+	if err != nil {
+		t.Fatalf("Inspect(fixture root) error = %v", err)
+	}
+	if strings.ContainsAny(item.Name, "/\\:") {
+		t.Fatalf("inspected root name = %q, want no separator punctuation", item.Name)
 	}
 }
 

@@ -89,10 +89,20 @@ func TestProgressIsRefusedOutsideAMatchingTransfer(t *testing.T) {
 	}{
 		{
 			name: "before the transfer is claimed",
-			run: func(_ *testing.T, h *harness) SessionID {
+			run: func(t *testing.T, h *harness) SessionID {
 				metadata := h.stageSuccessfully()
 				h.emit(progressEvent(metadata.SessionID, testProgress(1024, 25)))
 				h.emit(progressEvent(metadata.SessionID, testProgress(2048, 50)))
+				// emit blocks until each event is handled, so both refusals are
+				// already resolved here. The shared check below only looks for
+				// the second snapshot's BytesSent, which would still pass if the
+				// first (1024) snapshot leaked through -- assert no progress
+				// event reached the observer at all.
+				for _, event := range h.observer.published() {
+					if event.Kind == TransferProgress {
+						t.Errorf("a pre-claim snapshot was published: %+v", event)
+					}
+				}
 				return metadata.SessionID
 			},
 		},
@@ -299,9 +309,11 @@ func TestServerFailureCodedCancelledIsPublishedAsATransferFailure(t *testing.T) 
 	if failure.Error == nil || failure.Error.Code != ErrTransferFailed {
 		t.Fatalf("error is %+v, want %q", failure.Error, ErrTransferFailed)
 	}
-	if want := "Transfer canceled."; failure.Error.Message == want {
-		t.Errorf("the error event carries cancellation copy %q", want)
-	}
+	// No separate message assertion here: PublicErrorOf sources the message
+	// from the code alone, so a check that the message is not the cancellation
+	// copy cannot fail independently of the code check above -- it is already
+	// redundant with TestATerminalFailureOnlyPublishesCodesThatDescribeIt's
+	// "a cancellation" case, which pins the whole code-to-copy table.
 	if got := h.state(); got != stateError {
 		t.Errorf("state is %q, want %q", got, stateError)
 	}
@@ -397,21 +409,31 @@ func TestLaneClosureDuringATeardownIsSilent(t *testing.T) {
 	h := newHarness(t)
 	metadata := h.transferring()
 
-	h.coordinator.cancelSession()
-	h.server.closeEvents()
+	// Cancel is the real teardown that asks for the Stop: its own unwind calls
+	// ServerPort.Stop, which is what closes the lane here -- there is no
+	// separate h.server.closeEvents() because that call is exactly the one
+	// under test. The drainer notices the same closure concurrently and must
+	// find the session already cancelled and stay silent rather than
+	// synthesizing a second outcome.
+	if err := h.coordinator.Cancel(); err != nil {
+		t.Fatalf("Cancel returned %v, want success", err)
+	}
 	h.awaitDrainer()
 
 	events := h.observer.published()
-	if len(events) != 1 || events[0].Kind != TransferStarted {
-		t.Fatalf("published %+v, want the started event and nothing else", events)
+	if !slices.Equal(kindsOf(events), []EventKind{TransferStarted, TransferReset}) {
+		t.Fatalf("published %v, want exactly [started, reset] -- a synthesized failure would mean the lane closure was not silent", kindsOf(events))
 	}
-	if got := h.state(); got == stateError {
-		t.Error("a cancelled session synthesized a transfer failure")
+	assertEventGrammar(t, metadata.SessionID, events)
+	if got := h.state(); got != stateIdle {
+		t.Errorf("state is %q, want %q", got, stateIdle)
+	}
+	if got := h.calls.count("server.Stop"); got != 1 {
+		t.Errorf("server.Stop ran %d times, want exactly one -- the drainer's own closure handling must call it none", got)
 	}
 	if h.timer.armed() != 0 {
 		t.Errorf("%d resets are armed, want none for a cancelled session", h.timer.armed())
 	}
-	_ = metadata
 }
 
 // The producing adapter owes finite, clamped values. This is the boundary that
@@ -445,6 +467,13 @@ func TestProgressValuesAreForcedIntoTheirContractRange(t *testing.T) {
 	}
 	if got := events[2].Progress.Percent; got != 100 {
 		t.Errorf("a percent of 150 published as %v, want the clamp at 100", got)
+	}
+	// The positive-infinity arm of the same clamp. Without this the only thing
+	// standing between +Inf and the UI is the json.Marshal loop below, which
+	// fails on any infinity and so cannot tell a clamped value from an
+	// unclamped one that happens to marshal.
+	if got := events[2].Progress.SpeedBytesPerSec; got != math.MaxFloat64 {
+		t.Errorf("an infinite speed published as %v, want the clamp at %v", got, math.MaxFloat64)
 	}
 	for _, event := range events {
 		if _, err := json.Marshal(event); err != nil {
@@ -768,5 +797,95 @@ func TestUnusableServerEventsAreDiscardedWithADiagnostic(t *testing.T) {
 				t.Errorf("%d diagnostics recorded, want one more than the %d before", got, before)
 			}
 		})
+	}
+}
+
+// eventsFor filters a published stream down to one session's events, in
+// order. assertEventGrammar pins seq to start at 1 and never gap for whatever
+// slice it is given, so this is what lets a second session's own grammar be
+// checked in isolation from the first session's events still sitting in the
+// same observer log.
+func eventsFor(id SessionID, events []Event) []Event {
+	var filtered []Event
+	for _, event := range events {
+		if event.SessionID == id {
+			filtered = append(filtered, event)
+		}
+	}
+	return filtered
+}
+
+// The frontend's discard rule treats seq as scoped to one session: a lower or
+// equal seq than the last one seen is dropped, and a session id change is
+// exactly what tells it to stop comparing against the old high-water mark. No
+// other test in this file ever emits on a second session, so seq restarting
+// at 1 under a new id -- the other half of that contract -- was unproven.
+func TestASecondSessionsSequenceRestartsAtOneUnderItsOwnId(t *testing.T) {
+	h := newHarness(t)
+
+	first := h.transferring()
+	h.emit(completeEvent(first.SessionID, testProgress(testSize, 100)))
+	h.awaitDrainer()
+	h.timer.fire()
+
+	firstEvents := eventsFor(first.SessionID, h.observer.published())
+	assertEventGrammar(t, first.SessionID, firstEvents)
+	if len(firstEvents) != 4 {
+		t.Fatalf("first session published %+v, want started, progress, complete and reset", firstEvents)
+	}
+
+	// The reset returned the coordinator to IDLE and closed the first
+	// session's lane; a fresh lane is what a real second Stage gets from
+	// ServerPort.Start.
+	h.server.events = make(chan ServerEvent)
+	h.server.closed = false
+
+	second := h.transferring()
+	if second.SessionID == first.SessionID {
+		t.Fatal("the second session reused the first session's id -- seq restarting at 1 would prove nothing")
+	}
+	h.emit(progressEvent(second.SessionID, testProgress(1024, 25)))
+	secondEvents := eventsFor(second.SessionID, h.awaitEvents(len(firstEvents)+2))
+	if len(secondEvents) != 2 {
+		t.Fatalf("second session published %+v, want started and one progress event", secondEvents)
+	}
+	assertEventGrammar(t, second.SessionID, secondEvents)
+	if secondEvents[0].Seq != 1 {
+		t.Errorf("the second session's started event has seq %d, want 1 -- seq is scoped per session", secondEvents[0].Seq)
+	}
+
+	// The first session's own events are untouched by the second session
+	// existing: no event was renumbered, relabeled or duplicated across them.
+	if got := eventsFor(first.SessionID, h.observer.published()); !slices.Equal(got, firstEvents) {
+		t.Errorf("the first session's events changed after the second session ran: got %+v, want %+v", got, firstEvents)
+	}
+}
+
+// terminalSnapshot's Complete arm is documented as refusing to downgrade a
+// success: a Complete with no snapshot is a port defect, the bytes did arrive,
+// and the outcome must still be DONE carrying the unknown-total zero snapshot.
+// completeEvent always builds a snapshot, so no test ever drove that arm.
+func TestACompleteCarryingNoSnapshotStillSucceeds(t *testing.T) {
+	h := newHarness(t)
+	metadata := h.transferring()
+
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerComplete})
+	h.awaitDrainer()
+
+	events := h.observer.published()
+	if !slices.Equal(kindsOf(events), []EventKind{TransferStarted, TransferComplete}) {
+		t.Fatalf("published %v, want exactly [started, complete] -- a missing snapshot must not add a progress event", kindsOf(events))
+	}
+	assertEventGrammar(t, metadata.SessionID, events)
+
+	final := events[1].Progress
+	if final == nil {
+		t.Fatal("the complete event carries no progress payload; the contract's payload table requires one")
+	}
+	if final.TotalKnown || final.TotalBytes != 0 || final.BytesSent != 0 || final.Percent != 0 {
+		t.Errorf("the complete event reports %+v, want the unknown-total zero snapshot", *final)
+	}
+	if got := h.state(); got != stateDone {
+		t.Errorf("state is %q, want %q -- a port defect must not downgrade a success", got, stateDone)
 	}
 }

@@ -137,7 +137,7 @@ func TestEncodePNGHonoursCancellation(t *testing.T) {
 func TestEncodePNGRejectsNilContext(t *testing.T) {
 	t.Parallel()
 
-	//nolint:staticcheck // the nil context is the boundary under test
+	//lint:ignore SA1012 the nil context is the boundary under test
 	rendered, err := New().EncodePNG(nil, capabilityURL)
 	assertNoImage(t, rendered, err, transfer.ErrTransferFailed)
 }

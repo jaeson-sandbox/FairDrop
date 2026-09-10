@@ -3,6 +3,12 @@ import type {ReactElement} from 'react'
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import App from './App'
+import {
+    controllerFor as harnessControllerFor,
+    mountWith as harnessMountWith,
+    transitionTo as harnessTransitionTo,
+    type ControllerCommands,
+} from './App.harness'
 import type {TransferState} from './transfer/state'
 import {progressSpeechIntervalMs} from './ui/progressSpeech'
 
@@ -171,17 +177,20 @@ const metadata = {
     warnings: [],
 }
 
+// The mock functions live here; App.harness.tsx only shapes and mounts
+// whatever controller it is handed, typed so a new TransferController member
+// is a type error in that one shared place rather than a silent gap here.
+const commands: ControllerCommands = {
+    stage: mocks.stage,
+    selectFile: mocks.selectFile,
+    selectDirectory: mocks.selectDirectory,
+    cancel: mocks.cancel,
+    rejectSelection: mocks.rejectSelection,
+    dismissRetained: mocks.dismissRetained,
+}
+
 function mountWith(state: TransferState) {
-    mocks.useTransfer.mockReturnValue({
-        state,
-        stage: mocks.stage,
-        selectFile: mocks.selectFile,
-        selectDirectory: mocks.selectDirectory,
-        cancel: mocks.cancel,
-        rejectSelection: mocks.rejectSelection,
-        dismissRetained: mocks.dismissRetained,
-    })
-    return render(<App/>)
+    return harnessMountWith(mocks.useTransfer, state, commands)
 }
 
 function phaseViews(): string[] {
@@ -267,6 +276,10 @@ describe('one view per phase', () => {
         expect(screen.queryByText('Transfer canceled.')).toBeNull()
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Drop one file or folder.')
         expect(document.querySelector('[data-outcome]')).toBeNull()
+        // The one legitimate disagreement between the two phase-naming
+        // attributes: the shell still mirrors the reducer's `error` phase
+        // verbatim even though the rendered body is Idle's.
+        expect(screen.getByRole('main').getAttribute('data-transfer-phase')).toBe('error')
     })
 
     it('pre-mounts one atomic polite status region in every phase', () => {
@@ -337,20 +350,11 @@ describe('controller wiring', () => {
 */
 
 function controllerFor(state: TransferState) {
-    return {
-        state,
-        stage: mocks.stage,
-        selectFile: mocks.selectFile,
-        selectDirectory: mocks.selectDirectory,
-        cancel: mocks.cancel,
-        rejectSelection: mocks.rejectSelection,
-        dismissRetained: mocks.dismissRetained,
-    }
+    return harnessControllerFor(state, commands)
 }
 
 function transitionTo(view: {rerender: (ui: ReactElement) => void}, state: TransferState) {
-    mocks.useTransfer.mockReturnValue(controllerFor(state))
-    act(() => view.rerender(<App/>))
+    harnessTransitionTo(mocks.useTransfer, view, state, commands)
 }
 
 function announcer(): HTMLElement {
@@ -771,28 +775,37 @@ describe('progress speech across two transfers', () => {
     })
 })
 
+// main.tsx wraps App in StrictMode, so every effect runs mount, cleanup, mount
+// in development. The routing effect has no dependency array and no cleanup:
+// what stops it re-announcing is the previous-state ref it writes before it
+// does anything else. Shared by both describe blocks below, only one of which
+// actually exercises the double-mount replay: React only double-invokes
+// effects on mount, never on an ordinary update, so strictTransitionTo's
+// rerender is not a replay even though it runs inside a StrictMode tree.
+function strictly(state: TransferState) {
+    mocks.useTransfer.mockReturnValue(controllerFor(state))
+    return render(<StrictMode><App/></StrictMode>)
+}
+
+function strictTransitionTo(view: {rerender: (ui: ReactElement) => void}, state: TransferState) {
+    mocks.useTransfer.mockReturnValue(controllerFor(state))
+    act(() => view.rerender(<StrictMode><App/></StrictMode>))
+}
+
 describe('the routing table under StrictMode effect replay', () => {
-    // main.tsx wraps App in StrictMode, so every effect runs mount, cleanup,
-    // mount in development. The routing effect has no dependency array and no
-    // cleanup: what stops it re-announcing is the previous-state ref it writes
-    // before it does anything else.
-    function strictly(state: TransferState) {
-        mocks.useTransfer.mockReturnValue(controllerFor(state))
-        return render(<StrictMode><App/></StrictMode>)
-    }
-
-    function strictTransitionTo(view: {rerender: (ui: ReactElement) => void}, state: TransferState) {
-        mocks.useTransfer.mockReturnValue(controllerFor(state))
-        act(() => view.rerender(<StrictMode><App/></StrictMode>))
-    }
-
     it('announces nothing and moves no focus on the first mount', () => {
         strictly(idleState)
 
         expect(announcer().textContent).toBe('')
         expect(focused()).toBeNull()
     })
+})
 
+// These two rerender an already-mounted StrictMode tree rather than mounting
+// a fresh one, so -- unlike the test above -- neither one exercises effect
+// replay: they only confirm the routing table's ordinary behaviour still
+// holds inside a StrictMode tree.
+describe('the routing table still works after mounting under StrictMode', () => {
     it('still makes exactly one focus move for a focus-owned transition', () => {
         const view = strictly(idleState)
 

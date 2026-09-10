@@ -192,7 +192,7 @@ func TestPrepareRejectsDescriptorSwappedAfterValidation(t *testing.T) {
 func TestPrepareRejectsReplacementThatForgesKindSizeAndModtime(t *testing.T) {
 	t.Parallel()
 
-	directory := t.TempDir()
+	directory := fixtureDir(t)
 	path := filepath.Join(directory, "original.bin")
 	if err := os.WriteFile(path, []byte("original"), 0o600); err != nil {
 		t.Fatal(err)
@@ -260,7 +260,7 @@ func TestPrepareComparesThePinnedIdentityAgainstTheDescriptor(t *testing.T) {
 func TestPrepareRejectsSourceThatBecameLinkLike(t *testing.T) {
 	t.Parallel()
 
-	directory := t.TempDir()
+	directory := fixtureDir(t)
 	path := filepath.Join(directory, "linked.bin")
 	if err := os.WriteFile(path, []byte("original"), 0o600); err != nil {
 		t.Fatal(err)
@@ -327,7 +327,7 @@ func TestPrepareRejectsAnItemKindItDoesNotStream(t *testing.T) {
 		},
 	}
 	staged := transfer.StagedItem{
-		Path: filepath.Join(t.TempDir(), "thing"),
+		Path: filepath.Join(fixtureDir(t), "thing"),
 		Name: "thing",
 		Kind: transfer.ItemKind("device"),
 	}
@@ -477,7 +477,7 @@ func TestPrepareRejectsNilContextWithoutTouchingTheFilesystem(t *testing.T) {
 		},
 	}
 
-	//nolint:staticcheck // the nil context is the boundary under test.
+	//lint:ignore SA1012 the nil context is the boundary under test.
 	prepared, err := adapter.Prepare(nil, fabricatedItem(t, "no-context.bin", 3))
 	assertNoPayload(t, prepared, err, transfer.ErrTransferFailed)
 }
@@ -488,7 +488,7 @@ func TestPrepareRejectsNilContextWithoutTouchingTheFilesystem(t *testing.T) {
 func TestPrepareValidatesPinsAndOpensTheSameByteIdenticalPath(t *testing.T) {
 	t.Parallel()
 
-	directory := t.TempDir()
+	directory := fixtureDir(t)
 	separator := string(os.PathSeparator)
 	if err := os.Mkdir(filepath.Join(directory, "sub"), 0o700); err != nil {
 		t.Fatal(err)
@@ -545,7 +545,7 @@ func TestPrepareValidatesPinsAndOpensTheSameByteIdenticalPath(t *testing.T) {
 func TestPrepareAndStreamSupportLongPaths(t *testing.T) {
 	t.Parallel()
 
-	directory := t.TempDir()
+	directory := fixtureDir(t)
 	for len(directory) < 280 {
 		directory = filepath.Join(directory, strings.Repeat("deep-ünïcode", 3))
 	}
@@ -583,7 +583,7 @@ func TestPrepareAndStreamSupportLongPaths(t *testing.T) {
 func TestDownloadNameIsReducedToASafeBasename(t *testing.T) {
 	t.Parallel()
 
-	sourcePath := filepath.Join(t.TempDir(), "actual name.bin")
+	sourcePath := filepath.Join(fixtureDir(t), "actual name.bin")
 	tests := map[string]struct {
 		name string
 		want string
@@ -602,8 +602,8 @@ func TestDownloadNameIsReducedToASafeBasename(t *testing.T) {
 		"bare-quote":     {name: `re"port.pdf`, want: "report.pdf"},
 		// U+202E RIGHT-TO-LEFT OVERRIDE reverses the rendered tail so an
 		// executable reads as an image. unicode.IsControl does not catch it.
-		"rtl-override-spoof": {name: "evil‮gnp.exe", want: "evilgnp.exe"},
-		"zero-width-space":   {name: "evil​.exe", want: "evil.exe"},
+		"rtl-override-spoof": {name: "evil\u202egnp.exe", want: "evilgnp.exe"},
+		"zero-width-space":   {name: "evil\u200b.exe", want: "evil.exe"},
 		"drive-relative":     {name: `C:evil.exe`, want: "Cevil.exe"},
 		"alternate-data-stream": {
 			name: "report.pdf:payload",
@@ -1145,7 +1145,7 @@ func TestWriteToRejectsMissingContextOrDestination(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = prepared.Close() })
 
-	//nolint:staticcheck // the nil context is the boundary under test.
+	//lint:ignore SA1012 the nil context is the boundary under test.
 	assertCode(t, prepared.WriteTo(nil, io.Discard), transfer.ErrTransferFailed)
 	assertCode(t, prepared.WriteTo(context.Background(), nil), transfer.ErrTransferFailed)
 }
@@ -1340,7 +1340,7 @@ func TestStreamingLeavesNoGoroutineBehind(t *testing.T) {
 
 func writeFile(t *testing.T, name string, contents []byte) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), name)
+	path := filepath.Join(fixtureDir(t), name)
 	if err := os.WriteFile(path, contents, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -1361,7 +1361,7 @@ func stage(t *testing.T, path string) transfer.StagedItem {
 func fabricatedItem(t *testing.T, name string, size int64) transfer.StagedItem {
 	t.Helper()
 	return transfer.StagedItem{
-		Path:        filepath.Join(t.TempDir(), name),
+		Path:        filepath.Join(fixtureDir(t), name),
 		Name:        name,
 		Kind:        transfer.ItemFile,
 		LogicalSize: size,

@@ -1000,7 +1000,7 @@ So that a release candidate is a real build of the real code, correctly named, w
 
 **Scope:** what a workflow can build and verify without a person. Human-collected evidence -- browser matrix, screen readers, first-launch firewall behaviour -- is Story 3.9 and is *required* before release; this story produces the artifacts 3.9 exercises.
 
-**Closes:** D-018, D-055, D-064.
+**Closes:** D-018, D-055, D-064, D-088.
 
 **Acceptance Criteria:**
 
@@ -1037,7 +1037,7 @@ So that a stuck adapter cannot leave the window unusable with no way out.
 
 **Scope:** the waits the coordinator and server perform. Making dropped or malformed *events* visible is Story 3.6.
 
-**Closes:** D-017, D-019, D-022, D-024, D-027, D-030, D-032, D-036, D-037.
+**Closes:** D-017, D-019, D-022, D-024, D-027, D-030, D-032, D-036, D-037, D-087.
 
 **Acceptance Criteria:**
 
@@ -1130,7 +1130,7 @@ So that "it cross-compiles" is never mistaken for "it was verified".
 
 **Scope:** running and extending tests on the native runners Story 3.2 provides. This story adds no product behaviour.
 
-**Closes:** D-007, D-014, D-065, D-068, D-074, D-076, D-078, D-084.
+**Closes:** D-007, D-014, D-065, D-068, D-074, D-076, D-078, D-084, D-089.
 
 **Acceptance Criteria:**
 
@@ -1188,7 +1188,7 @@ So that supported-browser and accessibility claims rest on recorded results rath
 
 **Why a separate story:** a model can build a release candidate and produce the template; it cannot scan a QR with an iPhone, run NVDA, or watch the Windows firewall prompt. Mixing those into an automatable story guaranteed the story could never be closed by the agent executing it.
 
-**Closes:** D-073, and the smoke, browser-matrix, and accessibility gates removed from Story 3.3.
+**Closes:** D-073, and the smoke, browser-matrix, and accessibility gates removed from Story 3.3, D-086.
 
 **Acceptance Criteria:**
 

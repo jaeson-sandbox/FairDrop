@@ -26,7 +26,7 @@ import (
 func TestPrepareDirectoryIsLazyAndReportsAnUnknownLength(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	writeTree(t, root, map[string]string{"a.txt": "a", "nested/b.txt": "b"})
 	staged := stage(t, root)
 
@@ -59,7 +59,7 @@ func TestPrepareDirectoryIsLazyAndReportsAnUnknownLength(t *testing.T) {
 func TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	writeTree(t, root, map[string]string{
 		"readme.txt":            "hello folder",
 		"empty.txt":             "",
@@ -98,11 +98,11 @@ func TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory(t *testing.T) 
 func TestStreamedArchiveOpensWithASecondImplementation(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	writeTree(t, root, map[string]string{"one.txt": "first", "two/three.txt": "third"})
 	body := streamArchive(t, root)
 
-	archivePath := filepath.Join(t.TempDir(), "streamed.zip")
+	archivePath := filepath.Join(fixtureDir(t), "streamed.zip")
 	if err := os.WriteFile(archivePath, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestStreamedArchiveOpensWithASecondImplementation(t *testing.T) {
 func TestWriteToArchivesAnEmptyRootAsAFolder(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	body := streamArchive(t, root)
 	reader := openArchive(t, body)
 
@@ -200,7 +200,7 @@ func TestWriteToPropagatesAWalkFailureWithoutAppendingToTheBody(t *testing.T) {
 }
 
 func TestWriteToJoinsItsWorkerOnEveryExit(t *testing.T) {
-	root := t.TempDir()
+	root := fixtureDir(t)
 	writeTree(t, root, map[string]string{
 		"a.bin": strings.Repeat("a", 512*1024),
 		"b.bin": strings.Repeat("b", 512*1024),
@@ -262,7 +262,7 @@ func TestWriteToJoinsItsWorkerOnEveryExit(t *testing.T) {
 func TestWriteToClosesEveryBorrowedEntryBeforeReturning(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	writeTree(t, root, map[string]string{"a.txt": "aa", "b.txt": "bb", "nested/c.txt": "cc"})
 
 	tracker := &borrowTracker{inner: source.New()}
@@ -288,7 +288,7 @@ func TestWriteToClosesEveryBorrowedEntryBeforeReturning(t *testing.T) {
 func TestWriteToRefusesASecondCallAndACallAfterClose(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	writeTree(t, root, map[string]string{"a.txt": "a"})
 	staged := stage(t, root)
 
@@ -323,7 +323,7 @@ func TestWriteToRefusesASecondCallAndACallAfterClose(t *testing.T) {
 func TestCloseIsSafeConcurrentlyForADirectoryPayload(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	writeTree(t, root, map[string]string{"a.txt": "a"})
 	staged := stage(t, root)
 	prepared, err := New(source.New()).Prepare(context.Background(), staged)
@@ -351,7 +351,7 @@ func TestCloseIsSafeConcurrentlyForADirectoryPayload(t *testing.T) {
 func TestWriteToStopsPromptlyWhenTheReceiverDisconnects(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	files := map[string]string{}
 	for index := range 24 {
 		files[string(rune('a'+index))+".bin"] = strings.Repeat("x", 128*1024)
@@ -383,7 +383,8 @@ func TestWriteToRejectsMissingContextOrDestinationForADirectory(t *testing.T) {
 	t.Parallel()
 
 	payload := newTestArchive(t, &scriptedSource{}, "folder")
-	assertCode(t, payload.WriteTo(nil, io.Discard), transfer.ErrTransferFailed) //nolint:staticcheck // the nil context is the case under test
+	//lint:ignore SA1012 the nil context is the case under test
+	assertCode(t, payload.WriteTo(nil, io.Discard), transfer.ErrTransferFailed)
 	assertCode(t, payload.WriteTo(context.Background(), nil), transfer.ErrTransferFailed)
 }
 
@@ -488,7 +489,7 @@ func TestArchiveDownloadNameIsCappedAfterTheExtensionIsAppended(t *testing.T) {
 func TestPrepareRejectsARootThatIsNoLongerADirectory(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	staged := stage(t, root)
 	if err := os.Remove(root); err != nil {
 		t.Fatal(err)
@@ -505,7 +506,7 @@ func TestPrepareRejectsARootThatIsNoLongerADirectory(t *testing.T) {
 func TestPrepareRejectsARootThatDisappeared(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	staged := stage(t, root)
 	if err := os.Remove(root); err != nil {
 		t.Fatal(err)
@@ -531,7 +532,7 @@ func TestPrepareRejectsALinkLikeRootWithPathUnsupported(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			staged := transfer.StagedItem{
-				Path: filepath.Join(t.TempDir(), "folder"),
+				Path: filepath.Join(fixtureDir(t), "folder"),
 				Name: "folder",
 				Kind: transfer.ItemDirectory,
 			}
@@ -582,7 +583,7 @@ func TestPrepareRejectsALinkLikeFileRootWithPathUnsupported(t *testing.T) {
 func TestPrepareHonorsCancellationForADirectory(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	staged := stage(t, root)
 	prepared, err := New(source.New()).Prepare(cancelledContext(), staged)
 	assertNoPayload(t, prepared, err, transfer.ErrCancelled)
@@ -591,7 +592,7 @@ func TestPrepareHonorsCancellationForADirectory(t *testing.T) {
 func TestArchiveStreamingErrorsDoNotDiscloseTheSourcePath(t *testing.T) {
 	t.Parallel()
 
-	root := filepath.Join(t.TempDir(), "private folder name")
+	root := filepath.Join(fixtureDir(t), "private folder name")
 	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -726,7 +727,7 @@ func newTestArchive(t *testing.T, port transfer.SourcePort, root string) *archiv
 	return &archive{
 		name:       root + archiveExtension,
 		root:       root,
-		path:       filepath.Join(t.TempDir(), root),
+		path:       filepath.Join(fixtureDir(t), root),
 		modTime:    time.Unix(1_700_000_000, 0),
 		source:     port,
 		bufferSize: defaultBufferSize,

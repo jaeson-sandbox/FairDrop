@@ -546,10 +546,18 @@ func TestRequestArrivingDuringStopIsRefused(t *testing.T) {
 func TestServerImplementsThePort(t *testing.T) {
 	t.Parallel()
 
-	var port transfer.ServerPort = New(&stubPayloads{})
-	if port == nil {
+	// New returns *Server, so assigning it straight into the transfer.ServerPort
+	// interface variable makes every comparison against nil impossible to fail:
+	// a non-nil interface wrapping a nil *Server is still a non-nil interface.
+	// Compare the concrete pointer, which can actually be nil, and let the
+	// package-level `var _ transfer.ServerPort = (*Server)(nil)` assertion in
+	// lifecycle.go keep proving the interface is implemented.
+	server := New(&stubPayloads{})
+	if server == nil {
 		t.Fatal("New returned nothing")
 	}
+	var port transfer.ServerPort = server
+	_ = port
 }
 
 func assertStartFailed(t *testing.T, handle transfer.ServerHandle, err error) {

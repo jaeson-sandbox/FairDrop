@@ -80,6 +80,74 @@ func TestAppOptionsRegistersLifecycleHooks(t *testing.T) {
 	}
 }
 
+// Exactly one FairDrop process may run: a second launch must recognize the
+// first rather than starting a competing coordinator, listener and beacon.
+// The UniqueId is spelled out as a literal, not a reference to the constant
+// under test, so a build that quietly changed the UUID fails here rather than
+// only inside main.go, and OnSecondInstanceLaunch is asserted present so a
+// second launch always has somewhere to hand its window off to.
+func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
+	opts := appOptions(NewApp())
+
+	if opts.SingleInstanceLock == nil {
+		t.Fatal("SingleInstanceLock is nil: a second launch would start a competing coordinator, listener and beacon")
+	}
+
+	const want = "d1766c78-45cf-4e6d-9f04-c3700ab32024"
+	if opts.SingleInstanceLock.UniqueId != want {
+		t.Errorf("SingleInstanceLock.UniqueId = %q, want %q", opts.SingleInstanceLock.UniqueId, want)
+	}
+	if opts.SingleInstanceLock.OnSecondInstanceLaunch == nil {
+		t.Fatal("OnSecondInstanceLaunch is nil: a second launch would have nothing to hand the window to")
+	}
+}
+
+// The non-nil check above is satisfied by any callback, including a stub
+// func(options.SecondInstanceData) {} that restores nothing -- appOptions
+// could swap in one and every test would stay green. This drives the callback
+// appOptions actually wires, through the options value itself, so only the
+// real restoreWindow -- with the real fake seams a harness installed on this
+// App -- can pass.
+func TestAppOptionsSecondInstanceCallbackRestoresTheWindow(t *testing.T) {
+	h := newHarness(t)
+	opts := appOptions(h.app)
+
+	opts.SingleInstanceLock.OnSecondInstanceLaunch(options.SecondInstanceData{Args: []string{testPath}})
+
+	got := h.windowActionsLogged()
+	if len(got) != 2 || got[0].name != "unminimise" || got[1].name != "show" {
+		t.Fatalf("the callback produced %+v, want exactly [unminimise, show]", got)
+	}
+	if got[0].ctx != h.ctx || got[1].ctx != h.ctx {
+		t.Error("the callback did not use the stored application-lifetime context")
+	}
+	if calls := h.coordinator.log(); len(calls) != 0 {
+		t.Errorf("the callback reached the coordinator: %v", calls)
+	}
+	if events := h.emitted(); len(events) != 0 {
+		t.Errorf("the callback emitted %+v", events)
+	}
+}
+
+// The pre-startup half of the same proof, so a stub could not pass this path
+// either by, say, answering "" or panicking instead of counting the drop.
+func TestAppOptionsSecondInstanceCallbackBeforeStartupIsSafe(t *testing.T) {
+	h := newUnstartedHarness(t)
+	opts := appOptions(h.app)
+
+	opts.SingleInstanceLock.OnSecondInstanceLaunch(options.SecondInstanceData{})
+
+	if got := h.windowActionsLogged(); len(got) != 0 {
+		t.Errorf("the callback called the runtime before startup: %+v", got)
+	}
+	if got := h.app.undelivered.Load(); got != 1 {
+		t.Errorf("undelivered = %d, want 1", got)
+	}
+	if lines := h.logged(); len(lines) != 1 {
+		t.Errorf("logged %d lines, want exactly 1: %q", len(lines), lines)
+	}
+}
+
 // The formatter is what turns a command failure into something the frontend
 // can act on. Without it Wails sends err.Error() -- raw adapter text with no
 // stable code -- and every rejection collapses into one indistinguishable

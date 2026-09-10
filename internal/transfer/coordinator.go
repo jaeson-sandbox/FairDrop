@@ -782,5 +782,5 @@ func capabilityURL(address netip.Addr, port int, token CapabilityToken) string {
 // adapter text can reach the UI through it.
 func beaconWarning() Warning {
 	public := PublicErrorOf(NewError(ErrBeaconWarning, "device discovery is unavailable"))
-	return Warning{Code: public.Code, Message: public.Message}
+	return Warning(public)
 }

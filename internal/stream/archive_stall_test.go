@@ -34,7 +34,7 @@ response goroutine until the receiver gave up.
 func TestArchiveFailsASourceThatNeverProgresses(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	staged := transfer.StagedItem{Path: root, Name: "root", Kind: transfer.ItemDirectory}
 	reader := &stallingReader{}
 

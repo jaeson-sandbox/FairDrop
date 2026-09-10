@@ -3,6 +3,7 @@
 package source
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"strings"
@@ -51,8 +52,33 @@ func (n *posixNode) Stat() (fs.FileInfo, error) {
 	return n.file.Stat()
 }
 
+// OpenChildMetadata acquires a no-read handle on one child, whose kind is not
+// known until after the open.
+//
+// The retry exists for one case that is not an error: a directory carrying
+// execute permission but not read permission. It is traversable, and a
+// selection inside it must stay inspectable -- pinned by
+// TestPOSIXInspectUsesSearchOnlyAncestorRights. Linux gets that from O_PATH in
+// a single open and declines the fallback; darwin's metadata flags are refused
+// EACCES there and only O_SEARCH will open it. When the retry fails the first
+// refusal is reported, not the second, because for anything that is not a
+// directory the retry can only answer ENOTDIR, which would describe the wrong
+// problem.
 func (n *posixNode) OpenChildMetadata(name string) (metadataHandle, error) {
-	return openPosixNode(posixLocator{parent: n, name: name}, nativeMetadataFlags(), false)
+	locator := posixLocator{parent: n, name: name}
+	node, err := openPosixNode(locator, nativeMetadataFlags(), false)
+	if err == nil || !errors.Is(err, unix.EACCES) {
+		return node, err
+	}
+	fallbackFlags, hasFallback := nativeMetadataFallbackFlags()
+	if !hasFallback {
+		return node, err
+	}
+	retried, retryErr := openPosixNode(locator, fallbackFlags, false)
+	if retryErr != nil {
+		return node, err
+	}
+	return retried, nil
 }
 
 func (n *posixNode) OpenSearch() (metadataHandle, error) {
@@ -125,15 +151,20 @@ func (c *posixContent) Close() error {
 	return err
 }
 
+// The descriptor stays an int here because every other unix call in this file
+// takes one -- Open returns it, Fstat and Close consume it. FcntlInt is the
+// lone exception, wanting a uintptr, so the conversion happens at its two call
+// sites rather than changing a parameter that matches all its neighbours. Same
+// conversion os.NewFile needs a few lines above.
 func clearPosixNonBlocking(descriptor int) error {
-	flags, err := unix.FcntlInt(descriptor, unix.F_GETFL, 0)
+	flags, err := unix.FcntlInt(uintptr(descriptor), unix.F_GETFL, 0)
 	if err != nil {
 		return err
 	}
 	if flags&unix.O_NONBLOCK == 0 {
 		return nil
 	}
-	_, err = unix.FcntlInt(descriptor, unix.F_SETFL, flags&^unix.O_NONBLOCK)
+	_, err = unix.FcntlInt(uintptr(descriptor), unix.F_SETFL, flags&^unix.O_NONBLOCK)
 	return err
 }
 

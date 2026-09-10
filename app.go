@@ -10,6 +10,7 @@ import (
 
 	"fairdrop/internal/transfer"
 
+	"github.com/wailsapp/wails/v2/pkg/options"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -47,6 +48,11 @@ type emitFunc func(ctx context.Context, eventName string, optionalData ...interf
 // clipboardFunc is the shape of the Wails runtime clipboard write.
 type clipboardFunc func(ctx context.Context, text string) error
 
+// windowActionFunc is the shape both window-restoration seams share:
+// WindowUnminimise and WindowShow in the real Wails runtime each take only
+// the application-lifetime context.
+type windowActionFunc func(ctx context.Context)
+
 // App is FairDrop's Wails boundary: it translates the five bound commands into
 // coordinator calls, translates coordinator lifecycle events into runtime
 // emissions, and owns nothing else. Every decision about what a transfer is,
@@ -60,10 +66,12 @@ type App struct {
 	ctx       context.Context
 	transfers transferCoordinator
 
-	// undelivered counts lifecycle events the window could not be told about.
-	// The recovered panic value is deliberately dropped rather than logged: a
-	// value that escapes an adapter is adapter text, and adapter text is
-	// exactly where an absolute path or a capability token would be.
+	// undelivered counts lifecycle events the window could not be told about,
+	// plus a second-instance restoration that arrived before startup had
+	// installed a window to restore. The recovered panic value is deliberately
+	// dropped rather than logged: a value that escapes an adapter is adapter
+	// text, and adapter text is exactly where an absolute path or a capability
+	// token would be.
 	//
 	// Nothing in production reads this counter yet -- it is assertable in
 	// tests and otherwise inert. It is kept because a drop is exactly the
@@ -71,25 +79,30 @@ type App struct {
 	// where a degraded-state surface would consume it.
 	undelivered atomic.Uint64
 
-	// The three Wails runtime seams, set once at construction and never
-	// written again. They exist because the real ones cannot run under `go
-	// test`: EventsEmit and both dialogs call log.Fatalf -- not panic -- when
-	// the context did not come from a running window, which would take the
-	// test binary down with it.
+	// The Wails runtime seams, set once at construction and never written
+	// again. They exist because the real ones cannot run under `go test`:
+	// EventsEmit, both dialogs, the clipboard write, and both window-restoration
+	// calls answer a context that did not come from a running window with
+	// log.Fatalf -- not panic -- which would take the test binary down with it.
 	emit          emitFunc
 	openFile      dialogFunc
 	openDirectory dialogFunc
 	setClipboard  clipboardFunc
+	unminimise    windowActionFunc
+	show          windowActionFunc
 
 	// logf is the diagnostic seam. A transfer otherwise leaves no record at
 	// all -- FairDrop persists nothing, by contract -- so this is the one place
 	// a live failure can be explained afterwards: one stderr line per
-	// lifecycle event, visible when the app is launched from a shell. It
-	// carries the kind, sequence, session id, byte count and error code, and
-	// never the capability token, the selected name, or a path, which AD-9
-	// keeps out of diagnostics. Progress is not logged; at four a second it
-	// would bury the lines that matter, and the terminal events carry the
-	// final count.
+	// lifecycle event, visible when the app is launched from a shell, plus one
+	// fixed line if a second launch's restoration arrives before startup --
+	// that line is not a lifecycle event and carries no kind, sequence or
+	// session, only the fixed drop message. Every line carries only a fixed
+	// word, a number, or a value the contract already allows on the wire, and
+	// never the capability token, the selected name, a path, or the second
+	// launch's Args/WorkingDirectory, which AD-9 keeps out of diagnostics.
+	// Progress is not logged; at four a second it would bury the lines that
+	// matter, and the terminal events carry the final count.
 	logf func(format string, args ...any)
 
 	// homeDir is where a chooser opens. It is a seam for the same reason the
@@ -133,6 +146,8 @@ func NewApp() *App {
 		openFile:      wailsruntime.OpenFileDialog,
 		openDirectory: wailsruntime.OpenDirectoryDialog,
 		setClipboard:  wailsruntime.ClipboardSetText,
+		unminimise:    wailsruntime.WindowUnminimise,
+		show:          wailsruntime.WindowShow,
 		homeDir:       os.UserHomeDir,
 		logf:          log.Printf,
 	}
@@ -378,8 +393,9 @@ func (a *App) logEvent(what string, event transfer.Event) {
 }
 
 // startup is called when the app starts. The context is saved so the Wails
-// runtime methods -- EventsEmit and the two dialogs -- can be called later.
-// This is the application-lifetime context and the only one the App stores.
+// runtime methods -- EventsEmit, the two dialogs, the clipboard write, and
+// window restoration -- can be called later. This is the application-lifetime
+// context and the only one the App stores.
 func (a *App) startup(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -402,6 +418,55 @@ func (a *App) shutdown(_ context.Context) {
 	// Shutdown is idempotent and reports cleanup diagnostics it has already
 	// made safe; there is no UI left to tell, and no caller above this one.
 	_ = coordinator.Shutdown()
+}
+
+// restoreWindow is the Wails OnSecondInstanceLaunch callback: a second launch
+// -- a double-click, "Open with", a stale shortcut -- hands the already-running
+// process this instead of running its own listener and beacon.
+//
+// A second launch does still compose. main() builds a second coordinator,
+// network manager, server and QR encoder before wails.Run ever reaches the
+// lock check, because composition happens in main() and the lock lives inside
+// Wails' Frontend.Run -- see singleInstanceLockUniqueID's comment in main.go
+// for the construction path and why it is inert. Nothing that construction
+// built is ever started: this callback never calls the coordinator and emits
+// no lifecycle event, so the window's session, retained outcome and focus are
+// left exactly as they were, and the coordinator's operation lease, which a
+// live transfer may hold, is never waited on.
+//
+// It reaches the window through the same two runtime seams NewApp wires to
+// WindowUnminimise and WindowShow. Unminimise precedes show because that
+// ordering is the one platform where it matters: on macOS, WindowShow is
+// makeKeyAndOrderFront:, which cannot bring a miniaturized window forward, so
+// calling it alone would leave the window minimised; WindowUnminimise is
+// deminiaturize: and must run first. Windows does not need the ordering --
+// its WindowShow already restores a minimised window itself
+// (IsWindowMinimised -> RestoreWindow, else ShowWindow, then
+// SetForegroundWindow/SetFocus, all inside mainWindow.Invoke) -- but calling
+// both, in this order, is correct and harmless there too, so the callback
+// does not special-case the platform.
+//
+// The second launch's Args and WorkingDirectory are ignored: nothing here
+// stages a path, so a second launch pointed at a file cannot compete with a
+// live transfer.
+//
+// Wails invokes this from a goroutine of its own that OnStartup never
+// synchronises with, so a second launch can win the race before a.ctx is
+// installed. The nil-context guard is not defensive: the real runtime
+// functions answer a context that never came from a window with log.Fatalf,
+// not an error, so calling them here would take the whole process down
+// instead of just failing this restoration.
+func (a *App) restoreWindow(_ options.SecondInstanceData) {
+	ctx := a.runtimeContext()
+	if ctx == nil {
+		a.undelivered.Add(1)
+		if a.logf != nil {
+			a.logf("fairdrop: undelivered (second instance before startup)")
+		}
+		return
+	}
+	a.unminimise(ctx)
+	a.show(ctx)
 }
 
 // delegate reads the two fields a command needs. The context is the

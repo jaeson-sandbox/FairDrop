@@ -196,7 +196,7 @@ Required pre-merge checks grow to include Go tests/vet, frontend tests/build, an
 7. Capability URLs, trusted-LAN limits, and non-sensitive mDNS metadata define the previously missing security envelope.
 8. `boombuler/barcode` replaces `skip2/go-qrcode`.
 9. Release builds run on native OS runners; `-upx` is not the default recommendation.
-10. Wails single-instance locking is a new architecture requirement and must be added to `appOptions()` and pinned in `main_test.go` alongside the already-settled frame, drop, and lifecycle-hook options.
+10. Wails single-instance locking is a new architecture requirement and must be added to `appOptions()` and pinned in `main_test.go` alongside the already-settled frame, drop, and lifecycle-hook options. Delivered in Story 3.1: `appOptions()` sets `SingleInstanceLock` to the fixed UUID `d1766c78-45cf-4e6d-9f04-c3700ab32024` with `App.restoreWindow` as `OnSecondInstanceLaunch`, both pinned in `main_test.go`.
 
 ## Maintenance rule
 

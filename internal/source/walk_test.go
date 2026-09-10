@@ -183,7 +183,8 @@ func TestWalkRequiresAVisitorAndAContext(t *testing.T) {
 	inspector := &Inspector{handles: factory, sameFile: sameFakeFile}
 
 	assertCode(t, inspector.Walk(context.Background(), "original", nil), transfer.ErrTransferFailed)
-	assertCode(t, inspector.Walk(nil, "original", func(transfer.SourceEntry, io.Reader) error { return nil }), transfer.ErrTransferFailed) //nolint:staticcheck // the nil context is the case under test
+	//lint:ignore SA1012 the nil context is the case under test
+	assertCode(t, inspector.Walk(nil, "original", func(transfer.SourceEntry, io.Reader) error { return nil }), transfer.ErrTransferFailed)
 	if len(factory.ops) != 0 {
 		t.Fatalf("ops = %v, want no adapter call for a refused walk", factory.ops)
 	}

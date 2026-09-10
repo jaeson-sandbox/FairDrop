@@ -8,6 +8,13 @@ func nativeMetadataFlags() int {
 	return unix.O_PATH | unix.O_NOFOLLOW | unix.O_CLOEXEC
 }
 
+// nativeMetadataFallbackFlags reports that Linux needs no second attempt.
+// O_PATH already opens a directory carrying execute permission but not read
+// permission, which is the case darwin needs a fallback for.
+func nativeMetadataFallbackFlags() (int, bool) {
+	return 0, false
+}
+
 func nativeSearchFlags() int {
 	return unix.O_PATH | unix.O_NOFOLLOW | unix.O_CLOEXEC | unix.O_DIRECTORY
 }

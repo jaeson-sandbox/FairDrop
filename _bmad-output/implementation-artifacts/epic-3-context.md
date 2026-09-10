@@ -1,0 +1,56 @@
+# Epic 3 Context: Run FairDrop Reliably on Supported Desktops
+
+<!-- Compiled from planning artifacts. Edit freely. Regenerate with compile-epic-context if planning docs change. -->
+
+## Goal
+
+Make FairDrop shippable: every change is verified on native Windows and macOS runners from locked toolchains, release artifacts are built on those same runners, one running instance restores its window on a second launch, and the browser and accessibility claims the product makes are recorded by a person on real devices. Re-planned on 2026-09-08 after the Epic 2 retrospective: the original five stories were narrowed and four added so that lost-event visibility, the native-only test matrix, directory-stream hardening, and human release evidence are each closable on their own. The epic owns the release and verification capability and every review finding Epics 1 and 2 routed here. "It cross-compiles" never stands in for "it was verified", and the completed file and folder journeys must not regress.
+
+## Stories
+
+- Story 3.1: Enforce One Running FairDrop Instance
+- Story 3.2: Automate Reproducible Cross-Platform Verification
+- Story 3.3: Produce and Smoke-Test Native Release Artifacts
+- Story 3.4: Bound Every Lifecycle Wait and Prove Quiescence
+- Story 3.5: Reconcile Public Error Copy with the States It Describes
+- Story 3.6: Make Lost and Malformed Events Visible
+- Story 3.7: Execute the Native Platform Test Matrix
+- Story 3.8: Harden the Directory Stream
+- Story 3.9: Record Human Release Evidence
+
+## Requirements & Constraints
+
+- Exactly one FairDrop process runs. A second launch restores the existing window (unminimise, then show) with its session and focus intact, starts no competing coordinator, listener, or beacon, and closing still shuts the coordinator down exactly once. The existing Wails options contract (native drop, standard frame, start state, dimensions, lifecycle hooks, bindings, error formatter) is unchanged and its assertions must fail if the single-instance ID or restoration callback changes.
+- Verification runs as native Windows and macOS jobs on pull requests and protected-branch pushes, cancelling superseded runs; Linux jobs and cross-compiled output are never release proof. Every job runs the frontend suite, Go tests, vet, `gofmt -l`, and `wails build` sequentially, plus static analysis and a line-ending check. The race run needs a cgo-capable native runner and must fail loudly when cgo is absent rather than report clean.
+- Toolchains are locked: the Go module floor and verified toolchain policy, Wails CLI exactly v2.15.0, Node 24 LTS, `npm ci` with dev dependencies from the committed lockfile. `npm ci --omit=dev`, an unpinned Wails CLI, and default UPX compression are build failures; UPX is opt-in (Apple Silicon and Windows antivirus risk) and disabling it changes no acceptance.
+- Each native runner builds its own artifact through Wails after the full gate and publishes it with a checksum. Product name, executable, window title, version metadata, and platform identity all say FairDrop; no stale DeadDrop name or inactive QR dependency survives in shipped metadata or docs. A failing native build or check blocks the release with the platform and check recorded, and any contract or architecture change found during release feeds back into spec, architecture documents, owning story, tests, and `AGENTS.md` before retry.
+- Product and release copy call V1 a trusted-LAN plain-HTTP transfer whose capability URL reduces blind discovery but does not protect against a LAN observer. No claim of end-to-end encryption, hostile-network safety, cloud relay, signing, notarization, auto-update, Linux packaging, resume, or multiple receivers; banned vocabulary stays out.
+- Every wait the coordinator or server performs while holding a lock or lease ends on a documented bound with a coded failure. Stop and Start never deadlock each other, restart after Stop is a specified and tested contract, Cancel and Shutdown accept a context, and timing windows are forced deterministically in tests rather than left to scheduling.
+- A dropped, malformed, refused, or unroutable lifecycle event always reaches a visible surface: a refused terminal event renders as failure, never as the cancel-won summary; a panicking or blocking observer cannot hold the operation lease; an event lane closing mid-session synthesises a terminal outcome; undelivered events are logged where a test can observe them; every terminal outcome carries a control so a lost reset cannot strand the window.
+- The twelve fixed public messages must describe the state they appear in and offer a recovery that applies; no state reads as an interrupted transfer unless one began. Registry, binding table, Go table, and TypeScript mirror move together under a cross-language pin that fails when any drifts.
+- Platform-only guarantees (no-follow opens, special-file guards, the claimed path classes, archive-name predicates on both hosts, ZIP64 thresholds and large-entry archives, once-only writes under race) execute on the native OS they concern. The directory stream refuses at a documented depth bound, pins or documents root replacement between prepare and write, survives a misused borrowed reader under race, and hardens entry names and modes.
+- Human evidence is a release gate: one row per required scenario (first launch and firewall, every input path, single-instance restoration, an exact file download, a folder ZIP that opens on the receiver, progress, cancel, terminal reset, retained outcome with Dismiss, clean shutdown, each named browser combination, and the Windows and macOS assistive-technology checks), each recording platform and OS version, artifact version or checksum, date, reviewer, and pass/fail. A missing, ambiguous, stale, or failed row blocks release and is never summarised as an unverified manual check.
+
+## Technical Decisions
+
+- `docs/fairdrop-contracts.md` and `docs/fairdrop-architecture.md` are binding for domain values, error codes, port postconditions, the command/state table, event grammar, the frozen HTTP header matrix, and teardown guarantees. Any change evidence forces, including the pending CORS, `Accept-Ranges`, and `Access-Control-Expose-Headers` decision, amends contract, matching architecture decision, memlog, design guidance, spec, and tests together; a private adapter compatibility rule is never acceptable.
+- Single-instance locking passes Wails one fixed project UUID, stable across builds and launches, with the second-launch callback wired to the runtime unminimise and show calls; both are pinned in the existing options test beside the frame, drop, and lifecycle assertions.
+- The stack stays put: Wails v2 with no major migration, locked Go and npm dependency sets, `moduleResolution: "Bundler"` in both TypeScript projects. `wails build` regenerates the frontend bindings, so it precedes a standalone frontend build in a fresh tree and never runs concurrently with the frontend suite.
+- Coordinator invariants hold through every fix: no external port is called under the state mutex; one per-session operation lease performs Start, Stop, and unwind; Stop is idempotent, force-closing, and quiescent on every return; a dedicated drainer keeps server events from blocking teardown; the emission lane numbers events from 1 under the fixed success, failure, and cancellation grammars.
+- The native window background tracks the canvas token in both themes so neither flashes at launch. Secure-context browser APIs are absent in the macOS webview: route them through Go or record the gap as a platform limit in the UX contract.
+- Deferred-work rule: the deferred-work ids a story's acceptance criteria name are in its scope. A story is not done while any id it names is open; closing one cites it in the story's evidence file and sets its owner to discharged or accepted, and a session that cannot close one re-owns it explicitly rather than leaving it.
+- Evidence placement: mutation tables, matrix audits, review triage, loop evidence, and gate transcripts live in `evidence-<slug>.md` beside each spec, never in the spec, which links to it once.
+- Release evidence: `release-evidence.md` is written by a person. An agent creates and maintains the template and records results a person supplies; it never fills in a pass itself.
+
+## UX & Interaction Patterns
+
+- Second-instance restoration shows the existing window with its current state and focus; it neither resets nor duplicates any announcement.
+- Firewall preflight and platform recovery copy stay in Idle ahead of the selection controls and reachable from Staged. FairDrop never predicts, restyles, or duplicates the OS prompt; native verification records the prompt's accessible name, buttons, and focus-return order.
+- Each public error code has a fixed heading, exact message, sole announcement owner, and recovery. `cancelled` never renders as Error; the discovery warning is a Warning and must reach a screen reader through a reachable trigger or an announced region. New codes or strings enter the UX copy registry by stable key before any code emits them.
+- Theme follows the OS with no control and no opposite-theme flash; forced colors supersede the palette, and only the tested QR substrate may opt out, after native scan evidence.
+- WCAG 2.2 AA is a release gate: unrounded token contrast published in the design spine and recomputed by test, one-dimensional reflow at 320 CSS px, 200% text with text-spacing overrides, 44 px targets, one announcement owner per transition. What a runner can capture (layout at 320 px and 200%, forced-colors QR rendering) is captured in CI; the rest is a human evidence row.
+- "Supported modern browser" is a gated claim: four sender-to-receiver combinations each need their named scenarios recorded before the support promise. Link-preview consumption of the single-use link is an accepted, disclosed limitation, never reinterpreted as protection. Done describes only sender-observed sending; receiver saving, opening, and Files integration are never claimed.
+
+## Cross-Story Dependencies
+
+Story 3.2 supplies the native runners and gate that 3.3 runs before building and that 3.7 executes the platform matrix on; 3.7 adds no product behaviour and hands the rows only a person can fill to 3.9. Story 3.3 produces the artifacts 3.9 exercises, and 3.9 is required before any release; 3.1's launch-twice smoke check is both a native-runner check and a 3.9 row. Stories 3.4 and 3.6 split one former story (bounded waits versus visible lost events), and 3.5 and 3.6 both touch the fixed public error surface, so the cross-language pin must cover any code either introduces. Story 3.8 hardens the Epic 2 stream adapter that 3.7's archive-scale and predicate checks exercise natively. Open Epic 1 retrospective items belong to 3.5 and 3.6, the open Epic 2 item to 3.8, and the Epic 2 live folder download is 3.9's first evidence row. A header-matrix change from 3.3 follows the contract update rule before the affected story retries.

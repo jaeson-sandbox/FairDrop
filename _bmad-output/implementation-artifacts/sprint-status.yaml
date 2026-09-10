@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-08-2026 20:58
+last_updated: 2026-09-08
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -53,9 +53,9 @@ development_status:
   2-2-stream-a-safe-directory-zip: done
   epic-2-retrospective: done
 
-  epic-3: backlog
-  3-1-enforce-one-running-fairdrop-instance: backlog
-  3-2-automate-reproducible-cross-platform-verification: backlog
+  epic-3: in-progress
+  3-1-enforce-one-running-fairdrop-instance: done
+  3-2-automate-reproducible-cross-platform-verification: done
   3-3-produce-and-smoke-test-native-release-artifacts: backlog
   3-4-bound-every-lifecycle-wait-and-prove-quiescence: backlog
   3-5-reconcile-public-error-copy-with-its-states: backlog

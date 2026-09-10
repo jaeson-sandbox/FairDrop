@@ -31,13 +31,53 @@ as historical narrative and apply all corrections and supersessions before using
 
 ## Running and verifying
 
+- `.github/workflows/verify.yml` is the canonical gate, run natively on
+  `windows-latest` and `macos-latest` for every pull request and every push to
+  `main`/`epic-*`. It runs, in order: `wails build`, a bindings-drift and
+  `.gitkeep` check, `gofmt -l .`, `go vet ./...`, `go tool staticcheck ./...`,
+  `go test -count=1 ./...`, an explicit cgo check, `go test -count=1 -race
+  ./...`, the frontend suite, and the line-ending check.
+  `verify_workflow_test.go` pins every one of those lines and fails, naming
+  the break, if a pin is loosened. Run the same commands locally, in the same
+  order, before pushing.
 - After changing the exported `App` command surface, run `wails build` before
   standalone frontend checks so `frontend/wailsjs/` is regenerated. Never edit
   generated bindings by hand.
 - Run `frontend/npm test` separately: `wails build` compiles the frontend but does
-  not run Vitest. CI coverage for this remains owned by Story 3.2.
+  not run Vitest. CI now runs it too, via the workflow above.
+- `go tool staticcheck ./...` is the fixed linter, run from the `go.mod` tool
+  directive (`go get -tool honnef.co/go/tools/cmd/staticcheck@v0.8.1`) rather
+  than a separately installed binary, so it resolves reproducibly from
+  `go.sum` instead of whatever `@latest` picks on a given day. Its ignore
+  directive is `//lint:ignore SA1012 <reason>` on the line **above** the
+  finding -- `//nolint:staticcheck` is golangci-lint syntax and staticcheck
+  does not read it, so a `//nolint:staticcheck` comment left in place is
+  decoration, not a suppression.
 - BMAD Python scripts need `PYTHONIOENCODING=utf-8` outside the configured Claude
   environment because the Windows default encoding is cp1252.
+- Before pushing, type-check the platform files this machine never compiles:
+  `GOOS=darwin GOARCH=arm64 go build ./...` and `GOOS=linux GOARCH=amd64 go build ./...`,
+  plus `GOOS=darwin GOARCH=arm64 staticcheck ./...` -- note the bare binary, because
+  `go tool staticcheck` under a foreign `GOOS` tries to build the *tool* for that OS
+  and fails before analysing anything.
+  This is a pre-flight, not release proof -- the macOS job is the proof, and the
+  workflow deliberately contains no cross-build. It exists because the first CI
+  run found two darwin-only compile errors in `handle_posix.go` that had sat in
+  the tree since Epic 1: `unix.FcntlInt` takes a `uintptr` and was being handed
+  an `int`, which no Windows build could ever see. Seconds locally, a full CI
+  round trip otherwise.
+- **Never use `t.TempDir()` directly in `internal/source` or `internal/stream`.** Use each
+  package's `fixtureDir(t)` helper. macOS puts the per-user temp tree under `/var`, which is a
+  symlink, and those packages refuse a link-like component anywhere in a selection by design --
+  so a raw `t.TempDir()` hands macOS a path the code is *required* to refuse, and roughly forty
+  tests fail for a reason unrelated to what they check.
+- A guard that delegates to a platform API can be a silent no-op elsewhere. `filepath.VolumeName`
+  does nothing on POSIX, so an unsafe archive entry name was refused from a Windows sender and
+  accepted from a macOS one, while the risk was receiver-side. Prefer a check whose behaviour does
+  not depend on the host when the consequence does not either.
+- `gh run watch --exit-status` exited **0** on a run whose macOS job failed, after
+  printing the failure. Never take a watch's exit code as the verdict: read the
+  conclusion with `gh run view <id> --json conclusion,jobs`.
 
 ## Non-default conventions
 

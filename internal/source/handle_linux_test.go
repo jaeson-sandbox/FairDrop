@@ -15,7 +15,7 @@ import (
 )
 
 func TestLinuxMetadataHandleUsesOPathWithoutReadAccess(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "metadata-only.bin")
+	path := filepath.Join(fixtureDir(t), "metadata-only.bin")
 	if err := os.WriteFile(path, []byte("metadata"), 0o000); err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestLinuxMetadataHandleUsesOPathWithoutReadAccess(t *testing.T) {
 }
 
 func TestLinuxInspectRejectsFIFOWithoutOpeningForRead(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "named-pipe")
+	path := filepath.Join(fixtureDir(t), "named-pipe")
 	if err := unix.Mkfifo(path, 0o600); err != nil {
 		t.Fatal(err)
 	}

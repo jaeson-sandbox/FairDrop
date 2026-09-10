@@ -11,7 +11,7 @@ import (
 
 func platformReparsePoint(info fs.FileInfo) (bool, error) {
 	if info == nil {
-		return false, errors.New("Windows file metadata is nil")
+		return false, errors.New("windows file metadata is nil")
 	}
 	data, ok := info.Sys().(*syscall.Win32FileAttributeData)
 	if ok && data != nil {

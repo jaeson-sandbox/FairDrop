@@ -23,7 +23,7 @@ func TestPOSIXReopenRefusesPostMetadataSymlinkSubstitution(t *testing.T) {
 		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			base := t.TempDir()
+			base := fixtureDir(t)
 			selected := filepath.Join(base, "selected")
 			target := filepath.Join(base, "target")
 			if err := os.Mkdir(selected, 0o700); err != nil {
@@ -65,7 +65,7 @@ func TestPOSIXReopenRefusesPostMetadataSymlinkSubstitution(t *testing.T) {
 }
 
 func TestPOSIXInspectUsesSearchOnlyAncestorRights(t *testing.T) {
-	ancestor := filepath.Join(t.TempDir(), "search-only")
+	ancestor := filepath.Join(fixtureDir(t), "search-only")
 	if err := os.Mkdir(ancestor, 0o700); err != nil {
 		t.Fatal(err)
 	}
