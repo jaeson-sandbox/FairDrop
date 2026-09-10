@@ -66,6 +66,15 @@ as historical narrative and apply all corrections and supersessions before using
   the tree since Epic 1: `unix.FcntlInt` takes a `uintptr` and was being handed
   an `int`, which no Windows build could ever see. Seconds locally, a full CI
   round trip otherwise.
+- **Never use `t.TempDir()` directly in `internal/source` or `internal/stream`.** Use each
+  package's `fixtureDir(t)` helper. macOS puts the per-user temp tree under `/var`, which is a
+  symlink, and those packages refuse a link-like component anywhere in a selection by design --
+  so a raw `t.TempDir()` hands macOS a path the code is *required* to refuse, and roughly forty
+  tests fail for a reason unrelated to what they check.
+- A guard that delegates to a platform API can be a silent no-op elsewhere. `filepath.VolumeName`
+  does nothing on POSIX, so an unsafe archive entry name was refused from a Windows sender and
+  accepted from a macOS one, while the risk was receiver-side. Prefer a check whose behaviour does
+  not depend on the host when the consequence does not either.
 - `gh run watch --exit-status` exited **0** on a run whose macOS job failed, after
   printing the failure. Never take a watch's exit code as the verdict: read the
   conclusion with `gh run view <id> --json conclusion,jobs`.

@@ -18,6 +18,21 @@ being anyone's problem.
 > `TestATransferLongerThanEveryTimeoutStillCompletes`, which streams an unknown-length payload through
 > a real listener and asserts the omitted `Content-Length` and the unknown-total terminal snapshot.
 
+> **Discharged (Story 3.2, macOS):** `D-093` is closed. The POSIX adapter now
+> builds, tests and race-tests green on `macos-latest`
+> (https://github.com/jaeson-sandbox/FairDrop/actions/runs/34428026493). Three
+> distinct causes hid behind one errno. `O_EVTONLY` is not darwin's `O_PATH` --
+> it cannot open a directory that carries execute permission but not read
+> permission, so `O_SEARCH` (which `x/sys/unix` does not export) is now the
+> search flag, with an `EACCES` fallback on the metadata open. macOS puts the
+> per-user temp tree under `/var`, a symlink, and this package refuses a
+> link-like component by design, so fifty fixtures now resolve their path
+> first. And `archiveEntryName` asked `filepath.VolumeName` whether an entry
+> was volume qualified, which is a no-op off Windows, so the same unsafe name
+> was refused from a Windows sender and accepted from a macOS one while the
+> risk is receiver-side. Two new entries, `D-094` and `D-095`, record what this
+> deliberately did **not** change.
+
 > **Discharged (Story 3.2):** eight of the nine ids Epic 3's re-plan named for
 > this story are closed here. `.github/workflows/verify.yml` runs the whole
 > gate natively on `windows-latest` and `macos-latest` for every pull request
@@ -660,3 +675,21 @@ being anyone's problem.
   summary: A transfer failure's original cause is rewritten to fixed public copy and never recorded, so a real failure leaves no internal trail.
   owner: 3-6-make-lost-and-malformed-events-visible
   evidence: Raised by the Blind Hunter layer while discharging D-038, and verified against HEAD. `acceptTerminal` passes `event.Err` to `terminalPublicError`, which maps it onto the twelve-message registry; the adapter's own error text is then discarded. `outcomes.go`'s three `recordDiagnostic` calls cover an unrecognized event kind, a snapshot-less progress event and a nil stop function -- not the failure itself. Adjacent code does record adapter errors as diagnostics (`stopServer`, `StopBeacon`), and `TestStagedSessionNeverDisclosesTheTokenOrThePath` already pins that diagnostics disclose neither the token nor the path, so the disclosure rule is not the obstacle. Deferred rather than fixed in 3.2 because it is a production change outside that story's stated boundary.
+
+- source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
+  id: D-093
+  summary: FairDrop's POSIX source adapter has never run, and macOS cannot stage a file or a folder at all.
+  owner: discharged
+  evidence: Found by this story's first CI runs. `handle_posix.go` (`//go:build linux || darwin`) did not compile until commit `a76d4ce`, so no gate in the project's history had ever type-checked it, let alone run it. With it compiling, run 3 (https://github.com/jaeson-sandbox/FairDrop/actions/runs/34311314866) fails 40-odd tests across `internal/source` and `internal/stream` on `macos-latest` from one root cause: every `Inspect` returns `path_unsupported: selection metadata could not be read`, and every `internal/stream` test that stages a fixture fails behind it. `TestPOSIXInspectUsesSearchOnlyAncestorRights` and `TestPOSIXReopenRefusesPostMetadataSymlinkSubstitution` fail directly, the latter with a raw `ELOOP`. The likely root cause, unconfirmed without a Mac to iterate on: darwin's `nativeMetadataFlags`/`nativeSearchFlags` use `O_EVTONLY`, which is not Linux's `O_PATH` -- an `O_EVTONLY` descriptor is a notification handle and does not grant the relative-lookup rights `openat` needs from a base directory, so the whole parent-descriptor traversal collapses on the first hop. Fixing it means choosing darwin's replacement for the no-read-access metadata handle, which is an architecture decision (AD-level: the metadata open must not grant read access), not a flag swap. Windows is unaffected and green.
+
+- source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
+  id: D-094
+  summary: On macOS a selection anywhere under /tmp, /var or /etc is refused, because each is a symlink and the traversal refuses link-like components.
+  owner: 3-7-execute-the-native-platform-test-matrix
+  evidence: Established while discharging D-093. `rejectUnsupportedInfo` refuses a link-like component anywhere in a selection, which `TestInspectRejectsLinksSpecialsAndStopsBeforeLaterEntries` pins as intended behaviour, and macOS ships `/var`, `/tmp` and `/etc` as symlinks to `/private/*`. So a user who picks a file under any of them gets `path_unsupported` rather than a transfer, and inspecting `/` itself always fails because the root's own entries include those symlinks. Normal selections under `/Users/...` are unaffected, which is why the test fixtures were the only thing this broke. Left as-is deliberately: whether the picker should resolve the path before handing it over, or the copy should explain the refusal, is a product decision for the story that owns the native platform matrix, not a change to make while chasing a green build. Note Linux has the same shape wherever `/bin` or `/home` is a symlink.
+
+- source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
+  id: D-095
+  summary: The POSIX adapter is verified on macOS only; the Linux half of the same file is still compile-checked and never executed.
+  owner: 3-7-execute-the-native-platform-test-matrix
+  evidence: `handle_posix.go` is `//go:build linux || darwin` and `handle_linux.go` supplies the `O_PATH` flag sets. Story 3.2's workflow runs Windows and macOS only, and the frozen boundary makes a Linux job Ask First -- correctly, since the epic's requirement is that a Linux job never stand in for release proof of a supported platform. But that leaves the Linux branch of a shared file in the same position darwin was in before this story: type-checked by `GOOS=linux go vet` and never run. The `O_PATH` path is the better-established of the two and the fallback seam declines on Linux, so the risk is lower than darwin's was -- and darwin's was assumed low too, right up until the first run failed forty tests. Deciding whether FairDrop wants a Linux job for adapter verification only, clearly not release proof, belongs to the platform-matrix story.

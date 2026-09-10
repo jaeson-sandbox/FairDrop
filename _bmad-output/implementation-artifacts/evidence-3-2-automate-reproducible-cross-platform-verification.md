@@ -413,6 +413,17 @@ Also pre-flighted before this push, to spend one round trip instead of three:
 binary -- `go tool staticcheck` under a foreign `GOOS` tries to build the tool itself for that OS and
 dies before analysing anything, which looks like a broken toolchain rather than a misuse.
 
+Run 3 -- https://github.com/jaeson-sandbox/FairDrop/actions/runs/34311314866 -- commit `ea2b229`.
+Windows green. macOS cleared the build, the bindings check, gofmt, vet and staticcheck, then failed
+at `go test`: roughly forty tests across `internal/source` and `internal/stream`, all from one root
+cause. Every `Inspect` returns `path_unsupported: selection metadata could not be read`, and every
+`internal/stream` test that stages a fixture fails behind it.
+
+This is bigger than the story and is recorded as `D-093`. FairDrop's POSIX source adapter has never
+run anywhere: the file did not compile until two commits ago, so no gate in this project's history
+type-checked it. macOS cannot currently stage a file or a folder -- the product's core path -- and
+nothing before this workflow could have said so. Windows is unaffected.
+
 Two process notes, both recorded in `AGENTS.md`:
 
 - **`gh run watch --exit-status` exited 0 on this failed run**, after printing the compile errors it
@@ -424,7 +435,47 @@ Two process notes, both recorded in `AGENTS.md`:
   workflow step does it; the macOS job remains the proof. It costs seconds and would have caught this
   before the push.
 
-## 8. Left incomplete / risks
+## 8. Making macOS actually pass
+
+Runs 4 through 6 are the fix, and the method is worth recording because this project has no Mac.
+Rather than guess and spend a round trip per guess, a temporary probe on a scratch branch
+(`epic-3-macos-probe`, since the workflow triggers on `epic-*`) asked the runner directly and failed
+on purpose so `go test` would print its table.
+
+Probe round 1 swept every open flag combination and disproved the first hypothesis outright: every
+open, every `openat` through every base, and directory enumeration all worked, including `O_EVTONLY`
+as a lookup base. Round 2 drove the production `Inspect` and printed the unwrapped error, which named
+the real cause in one line -- every failure was `ELOOP`, and `Inspect` on the same fixture through its
+`EvalSymlinks`-resolved path succeeded.
+
+Three separate causes, one symptom:
+
+| # | Cause | Kind | Fix |
+|---|---|---|---|
+| 1 | `O_EVTONLY` is not darwin's `O_PATH`. Opening a mode `0o100` directory with it is refused `EACCES`, so a selection inside a traversable-but-unreadable directory could not be inspected -- exactly what `TestPOSIXInspectUsesSearchOnlyAncestorRights` requires | **product defect** | `O_SEARCH` (`O_EXEC|O_DIRECTORY`, exported by neither `x/sys/unix` nor spelled anywhere in Go, which is the likely reason it was never used) is now the search flag, and a metadata open refused `EACCES` retries with it. The retry can only answer `ENOTDIR` for a non-directory, so the first refusal is what gets reported |
+| 2 | macOS puts the per-user temp tree under `/var`, a symlink, and this package refuses a link-like component anywhere in a selection by design | **fixtures** | fifty `t.TempDir()` call sites now resolve the path first, via one `fixtureDir` helper per package. Identical path on Windows and Linux |
+| 3 | `archiveEntryName` asked `filepath.VolumeName` whether an entry was volume qualified, which is a no-op off Windows | **product defect** | a drive-letter test applied to every segment. Mutating it to never fire now fails the table on Windows too, where the platform used to cover for it |
+
+Cause 3 is the one worth dwelling on. The same entry name was refused when the sender ran Windows and
+accepted when it ran macOS or Linux, while the risk is entirely receiver-side and the receiver
+extracting the archive may well be on Windows. A directory named `C:` is legal on macOS and Linux, so
+this was reachable rather than theoretical. It is also a shape worth remembering: a guard that
+delegates to a platform API can be a silent no-op on every other platform, and a suite that only ever
+runs on one of them cannot tell.
+
+Two things this deliberately did not change, recorded as `D-094` and `D-095`: a macOS user selecting
+anything under `/tmp`, `/var` or `/etc` still gets a refusal, because those are symlinks and refusing
+them is the documented security model rather than a bug to quietly relax; and the Linux half of the
+same shared file is still compile-checked and never executed, which is precisely the position darwin
+was in before this story.
+
+**Run 6 -- https://github.com/jaeson-sandbox/FairDrop/actions/runs/34428026493 -- commit `377535d`:
+both jobs green.** Every step passed on `macos-latest`: the pinned Wails CLI, `wails build`, the
+bindings and `.gitkeep` checks, `gofmt`, `go vet`, `staticcheck`, `go test`, the cgo probe,
+`go test -race`, the frontend suite, and the line-ending check. Windows the same. This is the first
+time in the project's history that FairDrop has been built and tested on a second platform.
+
+## 9. Left incomplete / risks
 
 - **No CI run yet.** This session did not commit or push, per its explicit
   instructions, so `.github/workflows/verify.yml` has never executed on

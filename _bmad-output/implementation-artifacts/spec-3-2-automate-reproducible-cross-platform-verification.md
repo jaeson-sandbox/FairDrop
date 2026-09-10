@@ -79,6 +79,20 @@ Mutation tables, gate transcripts, the D-038 review triage and the CI run URLs l
 
 ## Spec Change Log
 
+- 2026-09-09 (later): The macOS job's remaining failures were worked through to green over three
+  runs. Two were product defects the workflow existed to find and neither is in this story's Code
+  Map, so both were fixed under the same reasoning as the compile error above: the first acceptance
+  criterion is that both jobs finish green, and the story cannot close around a red job. `O_EVTONLY`
+  cannot open a directory that carries execute permission but not read permission, so darwin's
+  search handle is now `O_SEARCH` with an `EACCES` fallback on the metadata open; and
+  `archiveEntryName` delegated its volume-qualified check to `filepath.VolumeName`, which is a no-op
+  off Windows, so the same unsafe name was refused from a Windows sender and accepted from a macOS
+  one while the risk is receiver-side. The remaining failures were fixtures, not product: fifty
+  `t.TempDir()` sites now resolve symlinks, because macOS's temp tree lives under `/var`. What was
+  deliberately not changed is recorded as `D-094` (a macOS user selecting under `/tmp`, `/var` or
+  `/etc` is still refused, which is the documented security model) and `D-095` (the Linux half of
+  the same shared file is still compile-checked and never executed).
+
 - 2026-09-09: The workflow's first run failed on macOS, and what it found is the story's own
   justification: `internal/source/handle_posix.go` has never compiled. `unix.FcntlInt` takes a
   `uintptr` and was handed an `int` at two call sites, in a file built only on darwin and linux,
