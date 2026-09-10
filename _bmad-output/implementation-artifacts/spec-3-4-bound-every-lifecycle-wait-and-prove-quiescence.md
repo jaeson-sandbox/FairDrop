@@ -2,8 +2,9 @@
 title: 'Story 3.4: Bound Every Lifecycle Wait and Prove Quiescence'
 type: 'feature'
 created: '2026-09-10'
-status: 'draft'
+status: 'in-progress'
 review_loop_iteration: 0
+baseline_commit: '68db281f82840a98f48c5b29c0009780c9287e90'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-3-context.md'
   - '{project-root}/docs/fairdrop-contracts.md'
