@@ -448,3 +448,32 @@ that would have caught it never executed. A mutation harness that reports "survi
 ran nothing is exactly the vacuous-pass shape the suite exists to catch, and it applies to the tooling
 as readily as to the code.
 
+## Review layers and the second hardening round
+
+Two context-free layers ran on the story's diff, on a different model than wrote it. Between them they
+raised sixteen findings; ten were real and are fixed here, and the rest were already closed by the
+orchestrator's first mutation pass or were correct as they stood.
+
+What the layers found that mutation had not:
+
+| Finding | Why it mattered |
+|---|---|
+| The tag was expanded straight into a shell script | A tag name is not restricted from shell metacharacters, which is the standard Actions injection. The build job already read it safely through the environment; the publish step was the one place that did not |
+| The `upx` input was expanded the same way | A typed boolean cannot carry metacharacters today. The pattern becomes an injection the moment someone widens the input's type |
+| `release.yml` re-declared the Wails CLI pin, and nothing compared it to `verify.yml`'s | The build job does not reuse `verify.yml`'s steps, only the gate job does. Drifting that second literal is self-consistent: each file's own assertion still passes, and the artifact people download is built by a toolchain the gate never verified -- the one thing the comment above the literal promises cannot happen |
+| The release notes' safety claims had no assertion at all | Deleting "no notarization", or inverting it, left every test green. These are the claims a downloader reads before running an unsigned binary |
+| The release job consumed a Wails CLI cache shared with pull-request runs | A cache entry is written by whichever run gets there first. The release job now always installs from the pinned module, so its toolchain comes from `go.sum` rather than from a cache any run could populate |
+| `gh release create` fails outright when a release exists | Any failure after publishing turned a retry into "a person must delete the draft first" |
+| No concurrency group, no job timeouts | Two runs for one tag could race to publish; a hung install would burn the multi-hour default. The release group deliberately does **not** cancel a run in flight -- a superseded verification is worth nothing, a half-finished publish is worth waiting for |
+| `Info.dev.plist` still carried Wails' default bundle identifier | macOS keys per-app state, TCC grants included, to the bundle identifier. Two identifiers means the development build and the shipped build are different applications to the OS. The implementation had scoped this out deliberately; it is cheap and it is now consistent and pinned |
+| The matrix and upload assertions were unscoped substrings | `windows-latest` in a comment satisfied the matrix check, and one match satisfied a job with two upload steps |
+| The stale-name scan did not cover the workflows | `release.yml` writes the text on the page a downloader reads, and was not a scanned surface |
+
+Thirteen mutations against this round; all thirteen die.
+
+**One thing the harness got wrong twice, recorded because it is the same shape the suite exists to
+catch.** The mutation runner filtered tests by name. Two mutations were reported as survivors when the
+test that would have caught them simply never ran -- the filter did not match the new test's name. A
+harness that prints "SURVIVED" having silently executed nothing is a vacuous pass about vacuous
+passes. It now runs the whole package.
+

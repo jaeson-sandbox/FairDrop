@@ -68,6 +68,27 @@ func TestVerifyWorkflowTriggersOnPullRequestAndTheRightPushBranches(t *testing.T
 	}
 }
 
+// The token every run of this workflow is handed, stated in the file rather
+// than inherited. This runs on every pull request, including from a fork, and
+// is reused as the release gate. The repository's default is read-only today,
+// but that is a setting a person can change in a web form, silently widening
+// every job in every workflow at once.
+func TestVerifyWorkflowRunsWithAReadOnlyToken(t *testing.T) {
+	wf := readVerifyWorkflow(t)
+
+	preamble, _, found := strings.Cut(wf, "\njobs:")
+	if !found {
+		t.Fatal("verify.yml has no jobs: block, so this test would pass vacuously")
+	}
+	if !strings.Contains(preamble, "permissions:") || !strings.Contains(preamble, "contents: read") {
+		t.Error("verify.yml declares no `permissions: contents: read`: the token its jobs receive " +
+			"would then be whatever the repository default happens to be")
+	}
+	if strings.Contains(preamble, "contents: write") {
+		t.Error("verify.yml grants write: nothing it does needs to write to the repository")
+	}
+}
+
 // A superseded run must be cancelled, or a fast-follow push waits behind a
 // run whose result nobody will read.
 func TestVerifyWorkflowCancelsSupersededRuns(t *testing.T) {

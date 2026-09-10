@@ -32,6 +32,13 @@ on:
 permissions:
   contents: read
 
+# One release run per ref at a time. Unlike verify.yml this never cancels the
+# run already in flight: a superseded verification is worth nothing, but a
+# half-finished publish is worth avoiding, so a second run waits instead.
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   # Kept identical to verify.yml's pin: a release built with a different CLI
   # than the gate just verified is not the build the gate approved.
@@ -51,6 +58,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -77,15 +85,14 @@ jobs:
       - name: Add GOPATH/bin to PATH
         run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Cache the Wails CLI
-        id: cache-wails
-        uses: actions/cache@v6
-        with:
-          path: ~/go/bin/wails*
-          key: wails-${{ env.WAILS_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-
+      # Deliberately uncached, unlike verify.yml. A cache entry is written by
+      # whichever run gets there first, including a pull request run, and this
+      # job produces the binary people download. Paying thirty seconds to
+      # build the CLI from the pinned module means the release toolchain comes
+      # from go.sum's verification rather than from a cache any run could
+      # populate. The `wails version` assertion below cannot tell a tampered
+      # binary that reports the right string from a genuine one.
       - name: Install the Wails CLI
-        if: steps.cache-wails.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 
       # An unpinned or drifted CLI must fail before any build runs, not
@@ -118,8 +125,14 @@ jobs:
       # risk. The default (unset, or dispatched false) builds without it, and
       # a dispatched true is the only way `-upx` ever reaches this command.
       - name: wails build
+        env:
+          # Through the environment rather than expanded into the script.
+          # A typed boolean cannot carry shell metacharacters today, but the
+          # pattern is the one that becomes an injection the moment an input
+          # changes type, and it is what static analysis flags.
+          UPX: ${{ inputs.upx }}
         run: |
-          if [ "${{ inputs.upx }}" = "true" ]; then
+          if [ "$UPX" = "true" ]; then
             echo "building with -upx (explicit workflow input)"
             wails build -upx
           else
@@ -173,6 +186,7 @@ jobs:
     needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -212,6 +226,11 @@ jobs:
       - name: Create a draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          # A tag name is not restricted from shell metacharacters, and
+          # expanding one directly into a script is the standard Actions
+          # injection. The build job already reads $GITHUB_REF_NAME this way;
+          # this step used to be the one place that did not.
+          TAG: ${{ github.ref_name }}
         run: |
           {
             echo "FairDrop is plain HTTP on a trusted LAN. The single-use capability URL"
@@ -224,14 +243,28 @@ jobs:
             echo "signature (codesign --sign -, required only so the app will launch) --"
             echo "there is no notarization, no auto-update, and no Linux packaging."
             echo ""
-            echo "Verify the SHA-256 checksum next to each download before running it."
+            echo "Each download has a SHA-256 checksum beside it. Checking it proves the"
+            echo "file arrived intact. It is not a signature: the checksum is produced by the"
+            echo "same pipeline as the binary, so it says nothing about whether that pipeline"
+            echo "or this release was tampered with."
           } > release-notes.md
 
-          gh release create "${{ github.ref_name }}" \
-            --draft \
-            --title "FairDrop ${{ github.ref_name }}" \
-            --notes-file release-notes.md \
-            dist/windows/fairdrop.exe \
-            dist/windows/fairdrop.exe.sha256 \
-            dist/macos/fairdrop-macos.zip \
+          # Re-runnable. `gh release create` fails outright when a release for
+          # the tag already exists, which turns any post-publish step failure
+          # into "a human must delete the draft before retrying".
+          assets=(
+            dist/windows/fairdrop.exe
+            dist/windows/fairdrop.exe.sha256
+            dist/macos/fairdrop-macos.zip
             dist/macos/fairdrop-macos.zip.sha256
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "a release already exists for $TAG; replacing its assets"
+            gh release upload "$TAG" --clobber "${assets[@]}"
+          else
+            gh release create "$TAG" \
+              --draft \
+              --title "FairDrop $TAG" \
+              --notes-file release-notes.md \
+              "${assets[@]}"
+          fi

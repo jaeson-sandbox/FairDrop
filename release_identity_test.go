@@ -264,8 +264,10 @@ func TestReleaseWorkflowGatesBeforeBuildingAndNeverCrossCompiles(t *testing.T) {
 	if !strings.Contains(buildJob, "needs: gate") {
 		t.Error("release.yml's build job does not `needs: gate`: an artifact could build before the gate passes")
 	}
-	if !strings.Contains(buildJob, "windows-latest") || !strings.Contains(buildJob, "macos-latest") {
-		t.Error("release.yml's build matrix does not target both windows-latest and macos-latest")
+	// The matrix line itself, not the two names appearing anywhere in the job:
+	// a comment mentioning either would otherwise satisfy this.
+	if !strings.Contains(buildJob, "os: [windows-latest, macos-latest]") {
+		t.Error("release.yml's build matrix line does not read exactly `os: [windows-latest, macos-latest]`")
 	}
 	if strings.Contains(strings.ToLower(buildJob), "ubuntu") {
 		t.Error("release.yml's build job references a Linux runner: no artifact may be built on one")
@@ -279,8 +281,18 @@ func TestReleaseWorkflowGatesBeforeBuildingAndNeverCrossCompiles(t *testing.T) {
 	// UPX must be reachable only through the dispatch input, and off by
 	// default: an unconditional `-upx` anywhere in the build job would
 	// compress every release regardless of the input.
-	if !strings.Contains(buildJob, `if [ "${{ inputs.upx }}" = "true" ]`) {
+	if !strings.Contains(buildJob, "UPX: ${{ inputs.upx }}") {
+		t.Error("release.yml's build job does not carry the upx input into the step environment")
+	}
+	if !strings.Contains(buildJob, `if [ "$UPX" = "true" ]`) {
 		t.Error("release.yml's build job does not gate -upx behind the workflow_dispatch upx input")
+	}
+	// The input must reach the script through the environment, never expanded
+	// into it. A typed boolean cannot carry shell metacharacters today; the
+	// pattern becomes an injection the moment somebody widens the input's type,
+	// and it is what Actions static analysis flags.
+	if strings.Contains(buildJob, `[ "${{ inputs.upx }}"`) {
+		t.Error("release.yml expands the upx input directly into a shell condition rather than passing it through env")
 	}
 	if !strings.Contains(buildJob, "wails build -upx") {
 		t.Error("release.yml's build job never passes -upx, so the opt-in input would do nothing")
@@ -292,6 +304,11 @@ func TestReleaseWorkflowGatesBeforeBuildingAndNeverCrossCompiles(t *testing.T) {
 
 	if !strings.Contains(buildJob, "ditto -c -k --sequesterRsrc --keepParent fairdrop.app fairdrop-macos.zip") {
 		t.Error("release.yml does not zip the macOS bundle with ditto's resource-fork-preserving flags")
+	}
+	// Both upload steps, counted rather than matched once: the job has one per
+	// platform, and a single match cannot tell whether the other was changed.
+	if got := strings.Count(buildJob, "uses: actions/upload-artifact@v7"); got != 2 {
+		t.Errorf("release.yml's build job has %d pinned upload-artifact steps, want 2 (one per platform)", got)
 	}
 	if !strings.Contains(buildJob, "shasum -a 256 fairdrop-macos.zip") {
 		t.Error("release.yml does not SHA-256 checksum the macOS artifact")
@@ -356,6 +373,11 @@ func shippedSurfaceFiles(t *testing.T) []string {
 		filepath.Join("build", "darwin", "Info.plist"),
 		filepath.Join("build", "darwin", "Info.dev.plist"),
 		filepath.Join("build", "windows", "info.json"),
+		// The workflows are shipped surfaces too: release.yml writes the
+		// notes on the page a downloader reads, and names the artifacts.
+		filepath.Join(".github", "workflows", "release.yml"),
+		filepath.Join(".github", "workflows", "verify.yml"),
+		filepath.Join("frontend", "package.json"),
 		filepath.Join("docs", "fairdrop-architecture.md"),
 		filepath.Join("docs", "fairdrop-contracts.md"),
 		filepath.Join("_bmad-output", "specs", "spec-fairdrop", "SPEC.md"),
@@ -566,5 +588,148 @@ func TestReleaseWorkflowHoldsTheSmallestTokenAndChecksWhatItPublishes(t *testing
 	if verifyIdx >= 0 && verifyIdx > publishIdx {
 		t.Error("the checksum re-check runs after `gh release create`: a corrupted artifact " +
 			"would already be published by the time it failed")
+	}
+}
+
+// TestBothWorkflowsPinTheSameWailsCLI pins the invariant release.yml states
+// about itself and nothing enforced.
+//
+// The build job does not reuse verify.yml's steps -- only the gate job does,
+// through workflow_call -- so it re-declares its own Go, Node and Wails CLI
+// setup as independent text, including a second copy of the version literal.
+// Changing that copy alone drifts silently: the release job's own assertion
+// compares the installed CLI against its own literal, so the drift is
+// self-consistent and no check anywhere fails. The artifact people download
+// would then be built by a toolchain the gate never verified, which is the
+// one thing the comment above that literal promises cannot happen.
+func TestBothWorkflowsPinTheSameWailsCLI(t *testing.T) {
+	pin := regexp.MustCompile(`(?m)^\s*WAILS_VERSION:\s*'([^']+)'\s*$`)
+
+	versions := map[string]string{}
+	for _, name := range []string{"verify.yml", "release.yml"} {
+		workflow := readTextFile(t, filepath.Join(".github", "workflows", name))
+		match := pin.FindStringSubmatch(workflow)
+		if match == nil {
+			t.Fatalf("%s declares no WAILS_VERSION, so this test would pass vacuously", name)
+		}
+		versions[name] = match[1]
+	}
+
+	if versions["verify.yml"] != versions["release.yml"] {
+		t.Errorf("verify.yml pins the Wails CLI at %q and release.yml at %q: "+
+			"the release build job does not reuse verify.yml's steps, so a release would be "+
+			"built by a CLI the gate never verified, and each file's own assertion would still pass",
+			versions["verify.yml"], versions["release.yml"])
+	}
+}
+
+// TestTheDraftReleaseNotesStateWhatTheBuildIsNot pins the claims on the page a
+// downloader reads before running an unsigned binary.
+//
+// These are the same class of claim the project treats as load-bearing
+// everywhere else, and they were the one shipped surface no assertion touched:
+// deleting "no notarization", or inverting it, left every test green. The
+// checksum sentence matters too -- both the binary and its checksum come from
+// this one pipeline, so the checksum proves the download arrived intact and
+// nothing about whether the pipeline was tampered with, and the notes must not
+// imply otherwise.
+// TestBothDarwinPlistsShareOneBundleIdentity pins the dev bundle to the
+// release bundle.
+//
+// build/darwin/Info.dev.plist is what `wails dev` packages, and it carried
+// Wails' default com.wails.* identifier after the release plist was changed to
+// com.fairdrop.*. macOS keys per-app state -- TCC permission grants among it --
+// to the bundle identifier, so two identifiers means the development build and
+// the shipped build are different applications to the operating system, and a
+// permission granted while developing says nothing about the one users run.
+func TestBothDarwinPlistsShareOneBundleIdentity(t *testing.T) {
+	identifiers := map[string]string{}
+	for _, name := range []string{"Info.plist", "Info.dev.plist"} {
+		path := filepath.Join("build", "darwin", name)
+		identifier := plistKeyValue(t, readTextFile(t, path), path, "CFBundleIdentifier")
+		if identifier == "" {
+			t.Fatalf("%s declares no CFBundleIdentifier, so this test would pass vacuously", path)
+		}
+		identifiers[name] = identifier
+		if strings.Contains(strings.ToLower(identifier), "wails") {
+			t.Errorf("%s's CFBundleIdentifier is %q: the platform identity names the toolkit, not the product",
+				path, identifier)
+		}
+	}
+	if identifiers["Info.plist"] != identifiers["Info.dev.plist"] {
+		t.Errorf("the release bundle identifies as %q and the dev bundle as %q: macOS treats them as two "+
+			"different applications, so per-app state granted to one says nothing about the other",
+			identifiers["Info.plist"], identifiers["Info.dev.plist"])
+	}
+}
+
+func TestTheDraftReleaseNotesStateWhatTheBuildIsNot(t *testing.T) {
+	release := readTextFile(t, filepath.Join(".github", "workflows", "release.yml"))
+
+	notes := jobBlock(t, release, "release", "")
+	if !strings.Contains(notes, "release-notes.md") {
+		t.Fatal("the release job builds no release-notes.md, so this test would pass vacuously")
+	}
+
+	for _, required := range []struct{ phrase, why string }{
+		{"plain HTTP", "the transport is not encrypted and the notes must say so"},
+		{"does not protect against an", "the capability URL reduces discovery, it does not protect the payload"},
+		{"no end-to-end encryption", "the banned-claim list starts here"},
+		{"ad-hoc", "the macOS binary carries an ad-hoc signature and the notes must explain what that is"},
+		{"codesign --sign -", "naming the exact command is what stops \"signed\" reading as \"signed by an identity\""},
+		{"no notarization", "the macOS binary is ad-hoc signed only"},
+		{"no auto-update", "there is no update channel"},
+		{"no Linux packaging", "there is no Linux artifact"},
+		{"It is not a signature", "a checksum from the same pipeline proves delivery, not provenance"},
+	} {
+		if !strings.Contains(notes, required.phrase) {
+			t.Errorf("the draft release notes no longer say %q: %s", required.phrase, required.why)
+		}
+	}
+
+	// The inverse claims, which must never appear.
+	for _, forbidden := range []string{"is notarized", "is signed with", "auto-updates", "end-to-end encrypted"} {
+		if strings.Contains(notes, forbidden) {
+			t.Errorf("the draft release notes claim %q, which this build does not do", forbidden)
+		}
+	}
+}
+
+// TestTheReleaseWorkflowSurvivesARetryAndCannotRaceItself pins two properties
+// that only show up on the unhappy path.
+//
+// `gh release create` fails outright when a release already exists for the
+// tag, so without the existence check any failure after publishing turned a
+// retry into "a person must delete the draft first". And two runs for one tag
+// -- a re-pushed tag, or a dispatch overlapping a tag push -- had nothing
+// stopping them racing to publish. The concurrency group deliberately does not
+// cancel the run in flight: a superseded verification is worth nothing, but a
+// half-finished publish is worth waiting for.
+func TestTheReleaseWorkflowSurvivesARetryAndCannotRaceItself(t *testing.T) {
+	release := readTextFile(t, filepath.Join(".github", "workflows", "release.yml"))
+
+	preamble, _, found := strings.Cut(release, "\njobs:")
+	if !found {
+		t.Fatal("release.yml has no jobs: block, so this test would pass vacuously")
+	}
+	if !strings.Contains(preamble, "concurrency:") {
+		t.Error("release.yml declares no concurrency group: two runs for one tag could race to publish")
+	}
+	if !strings.Contains(preamble, "cancel-in-progress: false") {
+		t.Error("release.yml cancels a release run already in flight: a half-finished publish is worth waiting for, " +
+			"unlike a superseded verification")
+	}
+
+	releaseJob := jobBlock(t, release, "release", "")
+	if !strings.Contains(releaseJob, `gh release view "$TAG"`) {
+		t.Error("the release job does not check whether a release already exists: `gh release create` fails " +
+			"outright on a second run, so any retry would need a human to delete the draft first")
+	}
+	if !strings.Contains(releaseJob, "TAG: ${{ github.ref_name }}") {
+		t.Error("the release job does not carry the tag through the environment")
+	}
+	if strings.Contains(releaseJob, `create "${{ github.ref_name }}"`) {
+		t.Error("the release job expands the tag directly into a shell script: a tag name is not restricted " +
+			"from shell metacharacters, which is the standard Actions injection")
 	}
 }

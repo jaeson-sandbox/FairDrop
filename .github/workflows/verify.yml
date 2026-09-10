@@ -10,6 +10,13 @@
 # naming the break, if a pin is loosened.
 name: Verify
 
+# Read-only, stated rather than inherited. This workflow runs on every pull
+# request, including from a fork, and is reused as the release gate -- so the
+# token it hands those runs must not depend on a repository setting a person
+# can change in a web form.
+permissions:
+  contents: read
+
 on:
   pull_request:
   push:
@@ -40,6 +47,9 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    # A hung npm ci or wails build otherwise burns the multi-hour default
+    # before GitHub kills it. The full gate takes about four minutes.
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
