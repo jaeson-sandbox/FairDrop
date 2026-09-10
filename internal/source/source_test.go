@@ -696,12 +696,31 @@ func TestFilesystemRootLabelsAreSeparatorFree(t *testing.T) {
 		}
 		return
 	}
-	item, err := New().Inspect(context.Background(), "/")
+	// Symmetric with the Windows branch above: the subject is the label Parse
+	// derives for a filesystem root, not a traversal.
+	//
+	// This used to inspect "/" for real, which cannot work on a POSIX machine
+	// and never ran on one until Story 3.2 put macOS in CI. Inspecting a
+	// directory reads its entries; this package refuses a link-like entry
+	// anywhere in a selection by design; and the root of a live macOS install
+	// holds several, since /var, /tmp and /etc are all symlinks. The refusal is
+	// correct behaviour, so the test was asking a question the platform cannot
+	// answer rather than finding a defect.
+	plan, err := (nativeHandleFactory{}).Parse("/")
 	if err != nil {
-		t.Fatalf("Inspect(/) error = %v", err)
+		t.Fatalf("Parse(/) error = %v", err)
 	}
-	if item.Name != "root" {
-		t.Fatalf("root label = %q, want literal root", item.Name)
+	if plan.rootLabel != "root" || strings.ContainsAny(plan.rootLabel, "/\\:") {
+		t.Fatalf("root label = %q, want literal root without punctuation", plan.rootLabel)
+	}
+	// And the label survives a real inspection, on a root this package can
+	// actually traverse.
+	item, err := New().Inspect(context.Background(), fixtureDir(t))
+	if err != nil {
+		t.Fatalf("Inspect(fixture root) error = %v", err)
+	}
+	if strings.ContainsAny(item.Name, "/\\:") {
+		t.Fatalf("inspected root name = %q, want no separator punctuation", item.Name)
 	}
 }
 
