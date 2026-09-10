@@ -55,7 +55,7 @@ func TestWriteToAllocationsDoNotGrowWithPayloadSize(t *testing.T) {
 func measureWriteToAllocations(t *testing.T, size int) uint64 {
 	t.Helper()
 
-	path := filepath.Join(t.TempDir(), "bounded.bin")
+	path := filepath.Join(fixtureDir(t), "bounded.bin")
 	if err := os.WriteFile(path, bytes.Repeat([]byte("m"), size), 0o600); err != nil {
 		t.Fatal(err)
 	}

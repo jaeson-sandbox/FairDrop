@@ -153,7 +153,7 @@ func TestPlatformUnreachableNetworkErrorsOverrideNotExist(t *testing.T) {
 func TestInspectRejectsNativeJunctionAncestor(t *testing.T) {
 	t.Parallel()
 
-	base := t.TempDir()
+	base := fixtureDir(t)
 	target := filepath.Join(base, "target")
 	junction := filepath.Join(base, "junction")
 	if err := os.Mkdir(target, 0o700); err != nil {
@@ -178,7 +178,7 @@ func TestInspectRejectsNativeJunctionAncestor(t *testing.T) {
 func TestInspectRejectsNativeJunctionRootWithTrailingSeparator(t *testing.T) {
 	t.Parallel()
 
-	base := t.TempDir()
+	base := fixtureDir(t)
 	target := filepath.Join(base, "target")
 	junction := filepath.Join(base, "junction")
 	if err := os.Mkdir(target, 0o700); err != nil {
@@ -196,7 +196,7 @@ func TestInspectRejectsNativeJunctionRootWithTrailingSeparator(t *testing.T) {
 func TestInspectRejectsNativeNestedJunction(t *testing.T) {
 	t.Parallel()
 
-	base := t.TempDir()
+	base := fixtureDir(t)
 	root := filepath.Join(base, "selected")
 	target := filepath.Join(base, "target")
 	junction := filepath.Join(root, "nested-junction")
@@ -217,7 +217,7 @@ func TestInspectRejectsNativeNestedJunction(t *testing.T) {
 
 func TestInspectRejectsNativeSelectedSymlink(t *testing.T) {
 	t.Parallel()
-	base := t.TempDir()
+	base := fixtureDir(t)
 	target := filepath.Join(base, "target.txt")
 	link := filepath.Join(base, "selected-link.txt")
 	if err := os.WriteFile(target, []byte("target"), 0o600); err != nil {
@@ -231,7 +231,7 @@ func TestInspectRejectsNativeSelectedSymlink(t *testing.T) {
 
 func TestInspectRejectsNativeDanglingSymlink(t *testing.T) {
 	t.Parallel()
-	base := t.TempDir()
+	base := fixtureDir(t)
 	link := filepath.Join(base, "dangling-link.txt")
 	createNativeSymlinkOrSkip(t, filepath.Join(base, "missing.txt"), link)
 
@@ -241,7 +241,7 @@ func TestInspectRejectsNativeDanglingSymlink(t *testing.T) {
 
 func TestInspectRejectsNativeAncestorSymlink(t *testing.T) {
 	t.Parallel()
-	base := t.TempDir()
+	base := fixtureDir(t)
 	target := filepath.Join(base, "target")
 	link := filepath.Join(base, "ancestor-link")
 	if err := os.Mkdir(target, 0o700); err != nil {
@@ -259,7 +259,7 @@ func TestInspectRejectsNativeAncestorSymlink(t *testing.T) {
 func TestInspectRejectsNativeNULDevice(t *testing.T) {
 	t.Parallel()
 
-	volume := filepath.VolumeName(t.TempDir())
+	volume := filepath.VolumeName(fixtureDir(t))
 	path := volume + string(os.PathSeparator) + "NUL"
 	_, err := New().Inspect(context.Background(), path)
 	assertCode(t, err, transfer.ErrPathUnsupported)
@@ -268,7 +268,7 @@ func TestInspectRejectsNativeNULDevice(t *testing.T) {
 func TestInspectPreservesLongWindowsPath(t *testing.T) {
 	t.Parallel()
 
-	directory := t.TempDir()
+	directory := fixtureDir(t)
 	for len(directory) < 280 {
 		directory = filepath.Join(directory, "long-path-segment")
 	}
@@ -300,7 +300,7 @@ func TestInspectPreservesLongWindowsPath(t *testing.T) {
 func TestInspectPreservesExtendedLengthWindowsPath(t *testing.T) {
 	t.Parallel()
 
-	ordinary := filepath.Join(t.TempDir(), "extended.txt")
+	ordinary := filepath.Join(fixtureDir(t), "extended.txt")
 	if err := os.WriteFile(ordinary, []byte("extended"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +317,7 @@ func TestInspectPreservesExtendedLengthWindowsPath(t *testing.T) {
 		t.Fatalf("Path = %q, want byte-identical %q", item.Path, extended)
 	}
 
-	ordinaryDirectory := filepath.Join(t.TempDir(), "extended-directory")
+	ordinaryDirectory := filepath.Join(fixtureDir(t), "extended-directory")
 	if err := os.Mkdir(ordinaryDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +387,7 @@ func TestInspectPreservesReachableUNCDirectory(t *testing.T) {
 }
 
 func TestInspectLoopbackAdministrativeShareDirectory(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "unc-selected")
+	root := filepath.Join(fixtureDir(t), "unc-selected")
 	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +424,7 @@ func TestInspectLoopbackAdministrativeShareDirectory(t *testing.T) {
 }
 
 func TestNativeChildLookupStaysRelativeToOpenedParentAfterRename(t *testing.T) {
-	base := t.TempDir()
+	base := fixtureDir(t)
 	selected := filepath.Join(base, "selected")
 	if err := os.Mkdir(selected, 0o700); err != nil {
 		t.Fatal(err)
@@ -498,7 +498,7 @@ func TestInspectOrdinaryFileThroughTraverseOnlyAncestor(t *testing.T) {
 	if err != nil || account.Username == "" {
 		t.Skipf("current Windows account is unavailable: %v", err)
 	}
-	ancestor := filepath.Join(t.TempDir(), "traverse-only")
+	ancestor := filepath.Join(fixtureDir(t), "traverse-only")
 	if err := os.Mkdir(ancestor, 0o700); err != nil {
 		t.Fatal(err)
 	}

@@ -45,7 +45,7 @@ the one the format forces.
 func TestArchiveRetainedMemoryDoesNotGrowWithEntryCount(t *testing.T) {
 	const entries = 50000
 
-	root := t.TempDir()
+	root := fixtureDir(t)
 	staged := transfer.StagedItem{Path: root, Name: "root", Kind: transfer.ItemDirectory}
 	body := strings.Repeat("b", 64)
 
