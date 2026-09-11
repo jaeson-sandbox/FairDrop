@@ -335,3 +335,35 @@ before and after every entry.
 | Remove `NewCoordinator`'s missing-port/observer panic | `TestNewCoordinatorRefusesAMissingPortOrObserver` fails on all six sub-cases (no ports at all, and each of Source/Network/Server/QR/Observer missing alone) |
 
 Every mutation named at least one failing test; no mutation left the suite silently green.
+
+## Orchestrator mutation pass
+
+Ten mutations run against the implementation before accepting it. Nine died at once; one survived and
+was a real gap.
+
+| # | Mutation | Result |
+|---|---|---|
+| M76 | The new message edited in the Go table alone | killed |
+| M77 | The new message edited in the TypeScript mirror alone | killed |
+| M78 | The new message edited in the EXPERIENCE registry alone | killed |
+| M79 | The revised `busy` message reverted in the Go table alone | killed, by two tests |
+| M80 | The new code removed from the TypeScript code list alone | killed |
+| M81 | The new code removed from the binding contract alone | **survived**, then fixed |
+| M82 | The new code removed from the registry table alone | killed |
+| M83 | Entropy exhaustion reverted to `transfer_failed` | killed |
+| M84 | The pre-composition refusal reverted to `transfer_failed` | killed |
+| M85 | `NewCoordinator` accepts a missing port again | killed |
+
+The first four are the point of the story, and they are the ones the old pin could not make: before
+this, a message could be edited in one of three files and nothing would notice.
+
+**M81 is a document disagreeing with itself.** `docs/fairdrop-contracts.md` states the code set twice
+-- once as a prose table and once as a block of Go source restating the `ErrorCode` constants. The new
+pin read the table and not the block, so deleting a code from the constant block left the suite green
+while the contract contradicted itself inside one file. Both are now pinned, and removing a code from
+either fails.
+
+That is the same shape as the story itself. Four files restating one fact drift because nothing
+compares them; a single file restating one fact twice drifts for exactly the same reason, and is
+easier to miss because it looks like one source rather than two.
+

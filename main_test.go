@@ -253,6 +253,7 @@ func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 		t.Fatalf("read fairdrop-contracts.md: %v", err)
 	}
 	contractTable := tableSection(t, string(contract), "Stable domain error codes are:", "\n## ")
+	contractConstants := tableSection(t, string(contract), "type ErrorCode string", "\n)")
 
 	mirror, err := os.ReadFile(filepath.Join("frontend", "src", "transfer", "errors.ts"))
 	if err != nil {
@@ -278,6 +279,13 @@ func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 			// docs/fairdrop-contracts.md's binding code list: codes only.
 			if !strings.Contains(contractTable, "`"+entry.code+"`") {
 				t.Errorf("docs/fairdrop-contracts.md's stable domain error codes table does not list %q", entry.code)
+			}
+			// The same document restates the ErrorCode constants as Go source,
+			// which is a second statement of the same fact. Removing a code
+			// from that block alone left this test green, so the contract
+			// could disagree with itself inside one file.
+			if !strings.Contains(contractConstants, `"`+entry.code+`"`) {
+				t.Errorf("docs/fairdrop-contracts.md's ErrorCode constant block does not declare %q", entry.code)
 			}
 
 			// frontend/src/transfer/errors.ts: the code list, inside the
