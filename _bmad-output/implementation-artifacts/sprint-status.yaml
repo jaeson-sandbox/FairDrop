@@ -64,6 +64,7 @@ development_status:
   3-8-harden-the-directory-stream: backlog
   3-9-record-human-release-evidence: backlog
   3-10-settle-the-release-blocking-platform-decisions: backlog
+  3-11-close-the-residual-contract-and-copy-gaps: backlog
   epic-3-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"

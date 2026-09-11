@@ -1092,7 +1092,9 @@ So that a transfer that silently stops is never mistaken for one I cancelled.
 
 **Why a separate story:** Epic 1's retrospective found a successful transfer that could be announced as "Transfer canceled", and Epic 2's live run found a failure that left no trace at all. Both are the same class of defect -- an event was lost and nothing said so -- and it had been buried among Story 3.4's timing work.
 
-**Closes:** D-020, D-021, D-031, D-034, D-035, D-039, D-042, D-043, D-048, D-049, D-059, D-091, D-092, D-097, D-098, D-100, D-103, D-104, D-106, plus Epic 1 retrospective items 2, 3, 4 and 7.
+**Narrowed 2026-09-11:** this story had accumulated nineteen deferred ids, more than any story yet built. Twelve of them are one goal -- a failure that nobody can see -- and are kept here. The other seven are contract shapes and leftover copy, which share no mechanism with them, and moved to Story 3.11.
+
+**Closes:** D-020, D-021, D-031, D-034, D-042, D-043, D-049, D-059, D-091, D-092, D-098, D-100, plus Epic 1 retrospective items 2, 3, 4 and 7.
 
 **Acceptance Criteria:**
 
@@ -1242,3 +1244,35 @@ So that a release candidate is not blocked by open questions nobody has answered
 **Given** any of these four decisions
 **When** it changes a contract or an architecture decision
 **Then** the spec, the architecture documents, the owning story, its tests, and `AGENTS.md` are updated together before the story closes.
+
+### Story 3.11: Close the Residual Contract and Copy Gaps
+
+As a sender,
+I want the last few states that report the wrong thing to report the right thing,
+So that the contract describes what the code does and the copy describes what happened.
+
+**Why a separate story:** these seven were left on Story 3.6 when it was narrowed. They are real and they are small, and they share no mechanism with each other or with 3.6's observability work -- two are progress-shape contract rows, two are contexts fabricated or never cancellable, three are error copy that survived Story 3.5. Grouping them by size rather than by theme is deliberate: each is a short, self-contained correction, and carrying them on a story about something else is how they went unfixed twice already.
+
+**Ordering:** numbered last, required before Story 3.9. Three of the seven change what a user reads, so release evidence cannot record a pass against copy that is still wrong.
+
+**Closes:** D-035, D-039, D-048, D-097, D-103, D-104, D-106.
+
+**Acceptance Criteria:**
+
+**Given** a `ServerComplete` that carries no snapshot, and `sanitizeProgress`'s known/unknown total invariant
+**When** the contract is read
+**Then** the payload table has a row for the snapshot-less shape and says what the coordinator publishes for it (D-035), and the invariant `sanitizeProgress` trusts is either enforced there like the values beside it or documented as the producer's to keep (D-039).
+
+**Given** the contexts the app hands the coordinator
+**When** a command must be abandoned
+**Then** no command fabricates a background context while a sibling refuses (D-048), and the context `Cancel` and `Shutdown` receive is one that can actually be cancelled rather than the runtime's permanently-open one (D-097)
+**And** a test proves cancelling it ends the wait, rather than proving only that the parameter is passed.
+
+**Given** the three states Story 3.5 could not settle without wording
+**When** each is reached
+**Then** a `Cancel` against a staged-but-never-claimed session, a `Cancel` on a missing coordinator, and a clipboard write failure each report copy that describes what happened (D-103, D-104, D-106)
+**And** any new code or string enters `EXPERIENCE.md` by stable key first and moves the registry, the contract, the Go table and the TypeScript mirror together, as Story 3.5 established.
+
+**Given** a malformed Stage acknowledgement whose cleanup call fails
+**When** the user is told nothing was sent
+**Then** either the cleanup is guaranteed or the failure is surfaced, so the next Stage cannot be refused `busy` for a session the user was told did not exist (D-106).

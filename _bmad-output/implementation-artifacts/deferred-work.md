@@ -391,7 +391,7 @@ line.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-035
   summary: A `ServerComplete` carrying no snapshot publishes a zero-value one, and no contract row covers that shape.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: 3-11-close-the-residual-contract-and-copy-gaps
   evidence: The payload table makes `progress` required on `transfer-complete`, and the port says Complete always carries the authoritative snapshot, so a nil there is a port defect with no defined outcome. `acceptTerminal` reports the unknown-total zero snapshot rather than downgrading a success the receiver actually got, and publishes no separate final-progress event. The alternative -- treating it as `transfer_failed` -- would lie about a transfer that completed. Worth a contract sentence either way, since the current behaviour is a coordinator choice rather than a stated rule.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -415,7 +415,7 @@ line.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-039
   summary: `sanitizeProgress` distrusts NaN but trusts the known/unknown total invariant it sits next to.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: 3-11-close-the-residual-contract-and-copy-gaps
   evidence: The function's own comment says this is "the boundary that cannot afford to trust" the producing adapter, and it clamps `Percent` and `SpeedBytesPerSec` accordingly. It does not enforce the rest of the contract's progress rules: a snapshot with `TotalKnown=false` and a non-zero `Percent`, or a negative `BytesSent`, passes through unchanged, though the contract fixes unknown totals at `TotalBytes=0, Percent=0`. `internal/server`'s meter complies today, so this is defense-in-depth rather than a live defect, but the asymmetry means the comment overstates what the function does.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -469,7 +469,7 @@ line.
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
   id: D-048
   summary: `StageTransfer` and `CancelTransfer` fabricate a background context before startup while the dialogs refuse, so the two halves of the boundary disagree about "no window yet".
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: 3-11-close-the-residual-contract-and-copy-gaps
   evidence: `delegate()` defaults a nil `a.ctx` to `context.Background()`, so a pre-startup Stage would bind a listener and start a beacon whose every lifecycle event `publish` then drops -- handing the UI a session it can never hear from. `chooseWith` refuses instead, because the real dialog would `log.Fatalf`. Unreachable today for the same reason as the entry above. Settling it means choosing whether a command may run before the window exists at all, which is a contract question rather than an adapter one.
 
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
@@ -773,7 +773,7 @@ line.
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-097
   summary: Cancel and Shutdown honour a caller's context, but the context production hands them can never be cancelled, so the feature is unreachable in the shipped app.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: 3-11-close-the-residual-contract-and-copy-gaps
   evidence: Raised by the Blind Hunter layer reviewing Story 3.4 and verified against the vendored Wails v2.15.0. `app.go`'s `CancelTransfer` and `shutdown` pass their Wails context straight through, which is what D-036 asked for and what the new tests exercise. But Wails builds that context once from `context.Background()` plus `WithValue` and never wraps it in `WithCancel` or `WithTimeout`, so `ctx.Done()` never fires in a running FairDrop: both commands are bounded in production only by the internal `leaseBound`. The same dead context is Stage's only escape from a setup-phase adapter that ignores cancellation -- `Inspect`, `GetLocalIP`, `Server.Start`, `EncodePNG`, `StartBeacon` got no `callBounded` wrap -- so a hung setup call leaves `StageTransfer` unable to return at all. Closing it means the app owning a cancellable context of its own rather than borrowing the runtime's, which is an `app.go` design change rather than a coordinator one.
 
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
@@ -809,13 +809,13 @@ line.
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
   id: D-103
   summary: A `Cancel` against a STAGED-but-never-claimed session can render `transfer_failed`'s "the transfer stopped" copy if Story 3.4's bounded teardown wait elapses, even though no transfer ever began.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: 3-11-close-the-residual-contract-and-copy-gaps
   evidence: Found while auditing every phase-before-a-transfer-began producer for Story 3.5. `internal/transfer/lifecycle.go`'s `retire` (called by both `Cancel` and `Shutdown`) returns `unwind`'s first bound failure directly as its own error (`return unwindErr`). `unwind`'s bound failures are coded `ErrTransferFailed` (`coordinator.go:656,727,743`, Story 3.4). A `Cancel` issued against a session that reached STAGED but never had `AuthorizeClaim` commit it -- no `transfer-started` was ever published, no byte was ever sent -- that then hits one of those *rare, adapter-misbehavior-only* bounds while stopping the server/beacon or joining the drainer would show the user "The transfer stopped before FairDrop finished sending", the same false-interruption shape Story 3.5's seven named states fixed. Not fixed by that story because it is not one of its seven named states and introducing a message for it is an Ask First change the reviewer has not seen; recorded here instead. `busy`'s revised copy (Story 3.5) does not cover it either -- this is a `Cancel` failing outright, not a `Stage` refusal. See `evidence-3-5-reconcile-public-error-copy-with-its-states.md`'s audit for the full trace.
 
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
   id: D-104
   summary: `Cancel` on a nil coordinator, and `CopyToClipboard` failures, still report copy that describes a transfer that stopped midway.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: 3-11-close-the-residual-contract-and-copy-gaps
   evidence: Raised by the adversarial layer reviewing Story 3.5 and verified against HEAD. `lifecycle.go`'s `Cancel` answers a nil receiver with `ErrTransferFailed` and a comment that is now stale -- it says Stage and AuthorizeClaim answer a missing coordinator the same way, which stopped being true when 3.5 routed them through `ready()` and the construction guard. `app.go`'s three `CopyToClipboard` sites do the same for a clipboard write failure, which is reachable only from a staged session so it is not a "no transfer began" miscode, but "the transfer stopped before FairDrop finished sending" still misdescribes a clipboard that would not accept text. Neither was fixed in 3.5: `setup_failed`'s copy ("couldn't prepare that item... Choose it again") does not fit a cancel or a clipboard write either, so both want wording the reviewer has not confirmed, and inventing it unreviewed is what the story's Ask First forbids.
 
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
@@ -827,7 +827,7 @@ line.
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
   id: D-106
   summary: A malformed Stage acknowledgement tells the user nothing was sent while the backend may still hold a live staged session.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: 3-11-close-the-residual-contract-and-copy-gaps
   evidence: Raised by the adversarial layer reviewing Story 3.5. When `StageTransfer` resolves but `parseFileMetadata` fails, the backend has already committed a STAGED session with a listener and a capability URL. `useTransfer.ts` makes a best-effort `CancelTransfer()` and swallows its own failure in a bare `catch {}`, then reports `setup_failed` -- "Nothing was sent. Choose it again." If that cleanup call failed, nothing was sent but plenty was *started*, and the user's next Stage is refused `busy` for a session they were told did not exist. The copy is right about bytes and wrong about state; making it right means either surfacing the cleanup failure or guaranteeing the cleanup, which is this story's charter rather than 3.5's.
 
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
