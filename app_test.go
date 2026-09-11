@@ -77,10 +77,12 @@ type fakeCoordinator struct {
 	stageCtx      context.Context
 
 	cancelErr error
+	cancelCtx context.Context
 
 	// shutdownGate, when non-nil, holds Shutdown until it is closed. It is how
 	// the blocking hook is proven to block.
 	shutdownGate chan struct{}
+	shutdownCtx  context.Context
 }
 
 func (f *fakeCoordinator) Stage(ctx context.Context, absolutePath string) (transfer.FileMetadata, error) {
@@ -92,13 +94,19 @@ func (f *fakeCoordinator) Stage(ctx context.Context, absolutePath string) (trans
 	return f.stageMetadata, f.stageErr
 }
 
-func (f *fakeCoordinator) Cancel() error {
+func (f *fakeCoordinator) Cancel(ctx context.Context) error {
 	f.record("Cancel")
+	f.mu.Lock()
+	f.cancelCtx = ctx
+	f.mu.Unlock()
 	return f.cancelErr
 }
 
-func (f *fakeCoordinator) Shutdown() error {
+func (f *fakeCoordinator) Shutdown(ctx context.Context) error {
 	f.record("Shutdown")
+	f.mu.Lock()
+	f.shutdownCtx = ctx
+	f.mu.Unlock()
 	if f.shutdownGate != nil {
 		<-f.shutdownGate
 	}
@@ -668,6 +676,13 @@ func TestCancelTransferDelegatesAndReturnsQuietly(t *testing.T) {
 	if got := h.emitted(); len(got) != 0 {
 		t.Errorf("CancelTransfer emitted %+v itself", got)
 	}
+	// D-036: Cancel now takes a context, and CancelTransfer hands it the
+	// stored application-lifetime one -- the same context every other
+	// delegated command uses -- rather than a fabricated one the coordinator
+	// would have nothing real to honour.
+	if h.coordinator.cancelCtx != h.ctx {
+		t.Error("CancelTransfer did not hand Cancel the application-lifetime context")
+	}
 }
 
 func TestCancelTransferAfterShutdownIsRefusedWithShuttingDown(t *testing.T) {
@@ -1100,9 +1115,12 @@ func TestShutdownDelegatesAndBlocksUntilQuiescent(t *testing.T) {
 	release := make(chan struct{})
 	h.coordinator.shutdownGate = release
 
+	hookCtx, cancelHookCtx := context.WithCancel(context.Background())
+	defer cancelHookCtx()
+
 	returned := make(chan struct{})
 	go func() {
-		h.app.shutdown(context.Background())
+		h.app.shutdown(hookCtx)
 		close(returned)
 	}()
 
@@ -1121,6 +1139,13 @@ func TestShutdownDelegatesAndBlocksUntilQuiescent(t *testing.T) {
 
 	if calls := h.coordinator.log(); !reflect.DeepEqual(calls, []string{"Shutdown"}) {
 		t.Errorf("the shutdown hook produced the call log %v, want exactly [Shutdown]", calls)
+	}
+	// D-036: the hook's own context is passed straight through to Shutdown,
+	// which is the context that must be honoured if the hook needs to give up
+	// early -- not the stored application-lifetime one, and not a fabricated
+	// background one.
+	if h.coordinator.shutdownCtx != hookCtx {
+		t.Error("shutdown did not hand Shutdown the hook's own context")
 	}
 }
 

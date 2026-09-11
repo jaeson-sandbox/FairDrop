@@ -2,7 +2,7 @@
 title: 'Story 3.4: Bound Every Lifecycle Wait and Prove Quiescence'
 type: 'feature'
 created: '2026-09-10'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '68db281f82840a98f48c5b29c0009780c9287e90'
 context:
@@ -58,14 +58,14 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/server/lifecycle.go` — a teardown bound beside the existing timeouts; the handler and connection waits become selectable; `Stop` releases `s.mu` so a bounded teardown cannot deadlock a later `Start`; the restart contract stated (D-017, D-019, D-022).
-- [ ] `internal/transfer/coordinator.go`, `lifecycle.go` — bounded lease, drainer join and adapter calls, each with a coded failure and a diagnostic naming the port; `Cancel`/`Shutdown` take a context (D-024, D-027, D-032, D-036, D-087, D-090).
-- [ ] `internal/transfer/ports.go` — the `StartBeacon` precondition (D-030).
-- [ ] `app.go` — pass a context from `CancelTransfer` and `shutdown`; a shutdown-entry log line so a relaunch swallowed during shutdown is diagnosable (D-087).
-- [ ] Tests — one deliberately unresponsive adapter per wait, driven through the timer seam; the `armReset` window forced deterministically (D-037); the beacon-ordering refusal; restart after Stop.
-- [ ] `docs/fairdrop-contracts.md`, `docs/fairdrop-architecture.md`, `AGENTS.md` — the amended postcondition and the decision behind it.
-- [ ] `deferred-work.md` — all eleven ids closed or re-owned with `epics.md` updated to match.
-- [ ] `evidence-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md` — mutation table, gate transcript, and the reasoning for each bound's value.
+- [x] `internal/server/lifecycle.go` — a teardown bound beside the existing timeouts; the handler and connection waits become selectable; `Stop` releases `s.mu` so a bounded teardown cannot deadlock a later `Start`; the restart contract stated (D-017, D-019, D-022).
+- [x] `internal/transfer/coordinator.go`, `lifecycle.go` — bounded lease, drainer join and adapter calls, each with a coded failure and a diagnostic naming the port; `Cancel`/`Shutdown` take a context (D-024, D-027, D-032, D-036, D-087, D-090).
+- [x] `internal/transfer/ports.go` — the `StartBeacon` precondition (D-030).
+- [x] `app.go` — pass a context from `CancelTransfer` and `shutdown`; a shutdown-entry log line so a relaunch swallowed during shutdown is diagnosable (D-087).
+- [x] Tests — one deliberately unresponsive adapter per wait, driven through the timer seam; the `armReset` window forced deterministically (D-037); the beacon-ordering refusal; restart after Stop.
+- [x] `docs/fairdrop-contracts.md`, `docs/fairdrop-architecture.md`, `AGENTS.md` — the amended postcondition and the decision behind it.
+- [x] `deferred-work.md` — all eleven ids closed or re-owned with `epics.md` updated to match.
+- [x] `evidence-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md` — mutation table, gate transcript, and the reasoning for each bound's value.
 
 **Acceptance Criteria:**
 - Given an adapter that never returns, for each bounded wait, when the bound elapses, then the caller returns a coded failure naming the port and the coordinator reaches a usable state rather than holding the lease forever.
@@ -79,6 +79,24 @@ Mutation tables, gate transcripts and the bound-value reasoning live in
 [evidence-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md](evidence-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md), created with the implementation.
 
 ## Spec Change Log
+
+- The Code Map's "the bounds seam should follow [`afterFunc`'s] pattern" is implemented as a **second**
+  seam (`Dependencies.BoundTimer` / `Coordinator.boundTimer`, driven in tests by a second `*fakeTimer`
+  instance, `h.bounds`, distinct from the existing `h.timer`), not a shared use of `afterFunc` itself.
+  Reusing `afterFunc` directly would have made every quiescence-wait bound (the lease, the drainer
+  join, and the bounded `ServerPort.Stop`/`NetworkPort.StopBeacon` calls) arm and fire through the same
+  seam as the three-second terminal reset, which the existing suite asserts exact counts and orderings
+  against (`h.timer.armed()`, `h.timer.stops()`, `TestCancelStopsTheArmedReset`, and others). A shared
+  seam would have made those assertions either wrong (an unrelated lease wait incrementing "resets
+  armed") or unable to distinguish a genuine reset-timer regression from a bounds-seam call. The two
+  seams share the same `func(delay, run) StopTimer` shape and the same fake type, so `fakeTimer.fire()`
+  still drives every timeout deterministically with no sleeping — just on whichever of the two harness
+  fields (`h.timer` for the reset, `h.bounds` for everything this story adds) owns the wait being
+  forced. `internal/server`'s bound uses a plain `time.Duration` seam (`serverTimeouts.teardown`)
+  instead, following that file's existing pattern (`readHeader`/`read`/`idle`) rather than adopting the
+  coordinator's callback-based seam, since `internal/server` has no equivalent to `afterFunc` already
+  and a fourth bare duration fits its established shape more directly than introducing a new callback
+  seam would.
 
 ## Design Notes
 

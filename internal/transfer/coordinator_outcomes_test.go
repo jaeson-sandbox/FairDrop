@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -415,7 +416,7 @@ func TestLaneClosureDuringATeardownIsSilent(t *testing.T) {
 	// under test. The drainer notices the same closure concurrently and must
 	// find the session already cancelled and stay silent rather than
 	// synthesizing a second outcome.
-	if err := h.coordinator.Cancel(); err != nil {
+	if err := h.coordinator.Cancel(context.Background()); err != nil {
 		t.Fatalf("Cancel returned %v, want success", err)
 	}
 	h.awaitDrainer()

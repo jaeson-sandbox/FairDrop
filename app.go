@@ -23,8 +23,8 @@ import (
 // the real one and is the only file that names it.
 type transferCoordinator interface {
 	Stage(ctx context.Context, absolutePath string) (transfer.FileMetadata, error)
-	Cancel() error
-	Shutdown() error
+	Cancel(ctx context.Context) error
+	Shutdown(ctx context.Context) error
 }
 
 // emittableKinds is the closed set of lifecycle events this adapter knows how
@@ -188,17 +188,21 @@ func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
 
 // CancelTransfer abandons whatever transfer is in flight.
 //
-// Cancel takes no context on purpose: it returns only once the listener,
-// beacon, drainer and session context are quiescent, so a caller-supplied
-// deadline would be a parameter it had to ignore. A cleanup diagnostic never
+// The bound Wails command still takes no parameter -- the contract fixes the
+// public API at four zero/one-argument commands -- so the context Cancel now
+// honours is the stored application-lifetime one, the same context every
+// other command delegates through. That is enough to give Cancel something
+// to honour: if the application itself is on its way out, an abandoned
+// Cancel returns promptly with a coded failure rather than waiting out its
+// full bound. On the healthy path nothing changes: a cleanup diagnostic never
 // becomes a command failure -- the coordinator already decided that -- so
 // there is nothing to translate on the success path.
 func (a *App) CancelTransfer() error {
-	_, coordinator := a.delegate()
+	ctx, coordinator := a.delegate()
 	if coordinator == nil {
 		return errNotComposed()
 	}
-	return coordinator.Cancel()
+	return coordinator.Cancel(ctx)
 }
 
 // SelectFile opens the native file chooser and returns the chosen path.
@@ -403,21 +407,32 @@ func (a *App) startup(ctx context.Context) {
 }
 
 // shutdown is called when the app terminates. It blocks until every resource
-// the coordinator owns is gone, which is the intended trade: the alternative
-// is a process that exits while its listener is still accepting connections.
+// the coordinator owns is gone or its bound elapses, which is the intended
+// trade: the alternative is a process that exits while its listener is still
+// accepting connections.
 //
-// The hook's own context is discarded rather than stored. Wails hands
-// OnShutdown a shutting-down context, and installing it over the
-// application-lifetime one would leave the App holding a context it could
-// never emit through again.
-func (a *App) shutdown(_ context.Context) {
+// The hook's own context is passed straight through to Shutdown rather than
+// stored: Wails hands OnShutdown a shutting-down context, and installing it
+// over the application-lifetime one would leave the App holding a context it
+// could never emit through again, but it is still the right bound for this
+// one blocking call.
+//
+// The log line exists because a second launch arriving while this is blocked
+// on a live transfer's lease is otherwise swallowed without a trace (D-087):
+// the lock and listener stay alive, no window returns, and nothing in the
+// process explains why. This is the one place that window can be diagnosed.
+func (a *App) shutdown(ctx context.Context) {
+	a.logf("fairdrop: shutdown begin")
 	_, coordinator := a.delegate()
 	if coordinator == nil {
 		return
 	}
 	// Shutdown is idempotent and reports cleanup diagnostics it has already
 	// made safe; there is no UI left to tell, and no caller above this one.
-	_ = coordinator.Shutdown()
+	// A bound-elapsed failure is likewise nothing this hook can act on -- it
+	// has already done everything it can by handing Shutdown a context to
+	// honour -- so it is discarded here too, for the same reason.
+	_ = coordinator.Shutdown(ctx)
 }
 
 // restoreWindow is the Wails OnSecondInstanceLaunch callback: a second launch

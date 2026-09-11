@@ -125,8 +125,11 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent) {
 	// Resources go first. The UI must never be told a transfer finished while
 	// its listener is still accepting connections or its beacon is still
 	// advertising. This is the unwind variant that does not join the drainer,
-	// because this code is the drainer.
-	c.releaseAcquired(live)
+	// because this code is the drainer. A bound hit here is already a
+	// recorded diagnostic; there is no command caller to report it to, and
+	// the outcome still settles -- a stuck adapter costs its own resource's
+	// proven quiescence, never the UI's ability to see the transfer end.
+	_ = c.releaseAcquired(live)
 
 	// Shutdown can raise the closing flag after this outcome took the lease,
 	// and it then waits for that lease before retiring the session. Without
@@ -237,6 +240,13 @@ func (c *Coordinator) armReset(live *session) {
 
 	// Scheduled without the mutex, like every other injected seam.
 	stop := c.afterFunc(resetDelay, func() { c.fireReset(live) })
+
+	// Test-only: forces D-037's window -- between arming this timer and the
+	// re-check below -- deterministically, by running a hook (typically a
+	// concurrent Cancel) exactly here. Nil in production.
+	if c.afterArm != nil {
+		c.afterArm()
+	}
 
 	if stop == nil {
 		// A seam that schedules without handing back a way to stop leaves the

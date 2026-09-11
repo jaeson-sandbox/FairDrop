@@ -28,7 +28,7 @@ func TestCancelFromEveryState(t *testing.T) {
 		{
 			name: "IDLE",
 			run: func(_ *testing.T, h *harness) error {
-				return h.coordinator.Cancel()
+				return h.coordinator.Cancel(context.Background())
 			},
 			wantResets: 0,
 			wantEvents: nil,
@@ -40,7 +40,7 @@ func TestCancelFromEveryState(t *testing.T) {
 				// The QR step is an unlocked setup step, so a cancellation can
 				// land between it and the revalidation that follows it.
 				h.qr.encode = func(context.Context, string) ([]byte, error) {
-					go func() { cancelled <- h.coordinator.Cancel() }()
+					go func() { cancelled <- h.coordinator.Cancel(context.Background()) }()
 					h.awaitCancelled()
 					return append([]byte(nil), testPNG...), nil
 				}
@@ -61,7 +61,7 @@ func TestCancelFromEveryState(t *testing.T) {
 			name: "STAGED",
 			run: func(_ *testing.T, h *harness) error {
 				h.stageSuccessfully()
-				return h.coordinator.Cancel()
+				return h.coordinator.Cancel(context.Background())
 			},
 			wantResets:  1,
 			wantEvents:  []EventKind{TransferReset},
@@ -77,7 +77,7 @@ func TestCancelFromEveryState(t *testing.T) {
 				// this lands the cancellation after CLAIMING and before the
 				// TRANSFERRING commit -- the state Story 1.5 could not leave.
 				h.network.stopBeacon = func() error {
-					go func() { cancelled <- h.coordinator.Cancel() }()
+					go func() { cancelled <- h.coordinator.Cancel(context.Background()) }()
 					h.awaitCancelled()
 					return nil
 				}
@@ -99,7 +99,7 @@ func TestCancelFromEveryState(t *testing.T) {
 				metadata := h.transferring()
 				h.emit(progressEvent(metadata.SessionID, testProgress(1024, 25)))
 				h.awaitEvents(2)
-				return h.coordinator.Cancel()
+				return h.coordinator.Cancel(context.Background())
 			},
 			wantResets:  1,
 			wantEvents:  []EventKind{TransferStarted, TransferProgress, TransferReset},
@@ -112,7 +112,7 @@ func TestCancelFromEveryState(t *testing.T) {
 				metadata := h.transferring()
 				h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
 				h.awaitDrainer()
-				return h.coordinator.Cancel()
+				return h.coordinator.Cancel(context.Background())
 			},
 			wantResets: 1,
 			wantEvents: []EventKind{
@@ -127,7 +127,7 @@ func TestCancelFromEveryState(t *testing.T) {
 				metadata := h.transferring()
 				h.emit(failedEvent(metadata.SessionID, nil, NewError(ErrTransferFailed, "the stream broke")))
 				h.awaitDrainer()
-				return h.coordinator.Cancel()
+				return h.coordinator.Cancel(context.Background())
 			},
 			wantResets:  1,
 			wantEvents:  []EventKind{TransferStarted, TransferError, TransferReset},
@@ -196,7 +196,7 @@ func TestCancelDiscardsAnOutcomeThatRacesIt(t *testing.T) {
 	h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
 	h.emit(progressEvent(metadata.SessionID, testProgress(2048, 50)))
 
-	if err := h.coordinator.Cancel(); err != nil {
+	if err := h.coordinator.Cancel(context.Background()); err != nil {
 		t.Fatalf("Cancel returned %v", err)
 	}
 
@@ -226,7 +226,7 @@ func TestCancelStopsTheArmedReset(t *testing.T) {
 		t.Fatalf("%d resets are armed before Cancel, want one", h.timer.armed())
 	}
 
-	if err := h.coordinator.Cancel(); err != nil {
+	if err := h.coordinator.Cancel(context.Background()); err != nil {
 		t.Fatalf("Cancel returned %v", err)
 	}
 
@@ -302,7 +302,7 @@ func TestAStaleResetTimerPublishesNothingAndMutatesNothing(t *testing.T) {
 				metadata := h.transferring()
 				h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
 				h.awaitDrainer()
-				if err := h.coordinator.Cancel(); err != nil {
+				if err := h.coordinator.Cancel(context.Background()); err != nil {
 					t.Fatalf("Cancel returned %v", err)
 				}
 				return len(h.observer.published())
@@ -314,7 +314,7 @@ func TestAStaleResetTimerPublishesNothingAndMutatesNothing(t *testing.T) {
 				metadata := h.transferring()
 				h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
 				h.awaitDrainer()
-				if err := h.coordinator.Cancel(); err != nil {
+				if err := h.coordinator.Cancel(context.Background()); err != nil {
 					t.Fatalf("Cancel returned %v", err)
 				}
 				// A second session takes the coordinator back out of IDLE, so
@@ -382,7 +382,7 @@ func TestTheResetTimerAndCancelProduceExactlyOneReset(t *testing.T) {
 			go func() {
 				defer running.Done()
 				<-ready
-				cancelErr = h.coordinator.Cancel()
+				cancelErr = h.coordinator.Cancel(context.Background())
 			}()
 			close(ready)
 			running.Wait()
@@ -440,7 +440,7 @@ func TestShutdownQuiescesEverythingAndPublishesNothing(t *testing.T) {
 	live := h.liveSession()
 	before := len(h.observer.published())
 
-	if err := h.coordinator.Shutdown(); err != nil {
+	if err := h.coordinator.Shutdown(context.Background()); err != nil {
 		t.Fatalf("Shutdown returned %v", err)
 	}
 
@@ -473,7 +473,7 @@ func TestShutdownStopsAnArmedResetAndTheStaleTimerStaysSilent(t *testing.T) {
 	h.awaitDrainer()
 	before := len(h.observer.published())
 
-	if err := h.coordinator.Shutdown(); err != nil {
+	if err := h.coordinator.Shutdown(context.Background()); err != nil {
 		t.Fatalf("Shutdown returned %v", err)
 	}
 	if h.timer.stops() != 1 {
@@ -490,7 +490,7 @@ func TestShutdownStopsAnArmedResetAndTheStaleTimerStaysSilent(t *testing.T) {
 func TestCommandsAfterShutdownAreRefused(t *testing.T) {
 	h := newHarness(t)
 	h.stageSuccessfully()
-	if err := h.coordinator.Shutdown(); err != nil {
+	if err := h.coordinator.Shutdown(context.Background()); err != nil {
 		t.Fatalf("Shutdown returned %v", err)
 	}
 	callsBefore := portCalls(h)
@@ -498,7 +498,7 @@ func TestCommandsAfterShutdownAreRefused(t *testing.T) {
 	if _, err := h.stage(); ErrorCodeOf(err) != ErrShuttingDown {
 		t.Errorf("Stage returned %q, want %q", ErrorCodeOf(err), ErrShuttingDown)
 	}
-	if err := h.coordinator.Cancel(); ErrorCodeOf(err) != ErrShuttingDown {
+	if err := h.coordinator.Cancel(context.Background()); ErrorCodeOf(err) != ErrShuttingDown {
 		t.Errorf("Cancel returned %q, want %q", ErrorCodeOf(err), ErrShuttingDown)
 	}
 	if err := h.coordinator.AuthorizeClaim(context.Background(), testSessionID); ErrorCodeOf(err) != ErrShuttingDown {
@@ -522,13 +522,13 @@ func TestShutdownIsIdempotent(t *testing.T) {
 	h.emit(progressEvent(metadata.SessionID, testProgress(1024, 25)))
 	h.awaitEvents(2)
 
-	if err := h.coordinator.Shutdown(); err != nil {
+	if err := h.coordinator.Shutdown(context.Background()); err != nil {
 		t.Fatalf("the first Shutdown returned %v", err)
 	}
 	after := h.calls.snapshot()
 	events := len(h.observer.published())
 
-	if err := h.coordinator.Shutdown(); err != nil {
+	if err := h.coordinator.Shutdown(context.Background()); err != nil {
 		t.Fatalf("the second Shutdown returned %v", err)
 	}
 
@@ -546,7 +546,7 @@ func TestShutdownIsIdempotent(t *testing.T) {
 func TestShutdownFromIdleIsSafe(t *testing.T) {
 	h := newHarness(t)
 
-	if err := h.coordinator.Shutdown(); err != nil {
+	if err := h.coordinator.Shutdown(context.Background()); err != nil {
 		t.Fatalf("Shutdown returned %v", err)
 	}
 
@@ -597,7 +597,7 @@ func TestLifecycleContentionHoldsItsInvariants(t *testing.T) {
 			go func() {
 				defer running.Done()
 				<-ready
-				cancelErr = h.coordinator.Cancel()
+				cancelErr = h.coordinator.Cancel(context.Background())
 			}()
 			go func() {
 				defer running.Done()
@@ -659,6 +659,21 @@ func portCalls(h *harness) []string {
 	return out
 }
 
+// adapterCalls is the call log without the entropy draws or the bound-timer
+// seam. A wait that finds the lease already held arms and immediately stops
+// its own bound as a genuine part of waiting, not because it reached any
+// port -- so it is excluded here the same way portCalls excludes
+// entropy.Read.
+func adapterCalls(h *harness) []string {
+	var out []string
+	for _, call := range h.calls.snapshot() {
+		if call != "entropy.Read" && call != "timer.AfterFunc" {
+			out = append(out, call)
+		}
+	}
+	return out
+}
+
 // TestShutdownContendsWithEveryOtherActor adds Shutdown to the contention: the
 // drainer, a Cancel, a Shutdown and the reset timer all reach for one session
 // at once. The invariants weaken by exactly one -- a suppressed reset is a
@@ -691,12 +706,12 @@ func TestShutdownContendsWithEveryOtherActor(t *testing.T) {
 			go func() {
 				defer running.Done()
 				<-ready
-				cancelErr = h.coordinator.Cancel()
+				cancelErr = h.coordinator.Cancel(context.Background())
 			}()
 			go func() {
 				defer running.Done()
 				<-ready
-				shutdownErr = h.coordinator.Shutdown()
+				shutdownErr = h.coordinator.Shutdown(context.Background())
 			}()
 			go func() {
 				defer running.Done()
@@ -816,7 +831,7 @@ func TestShutdownWaitsForTheLeaseWithNothingStaged(t *testing.T) {
 	returned := make(chan struct{})
 	go func() {
 		defer close(returned)
-		if err := h.coordinator.Shutdown(); err != nil {
+		if err := h.coordinator.Shutdown(context.Background()); err != nil {
 			t.Errorf("Shutdown returned %v, want nil", err)
 		}
 	}()
@@ -867,7 +882,7 @@ func TestCancelInterruptsASetupStepRatherThanWaitingForIt(t *testing.T) {
 	}
 
 	cancelled := make(chan error, 1)
-	go func() { cancelled <- h.coordinator.Cancel() }()
+	go func() { cancelled <- h.coordinator.Cancel(context.Background()) }()
 
 	select {
 	case err := <-released:
@@ -988,7 +1003,7 @@ func TestAnOutcomeInFlightPublishesNothingOnceShutdownBegins(t *testing.T) {
 	// window: the outcome already owns the lease, and Shutdown is blocked on it.
 	shutdown := make(chan error, 1)
 	h.server.stop = func() error {
-		go func() { shutdown <- h.coordinator.Shutdown() }()
+		go func() { shutdown <- h.coordinator.Shutdown(context.Background()) }()
 		h.awaitClosing()
 		return nil
 	}
@@ -1035,7 +1050,7 @@ func TestCancelSucceedsThroughACleanupDiagnostic(t *testing.T) {
 		return WrapError(ErrBeaconWarning, "the advertisement lingered", errors.New("boom"))
 	}
 
-	if err := h.coordinator.Cancel(); err != nil {
+	if err := h.coordinator.Cancel(context.Background()); err != nil {
 		t.Fatalf("Cancel returned %v, want success once the state is quiescent", err)
 	}
 	if got := h.state(); got != stateIdle {
@@ -1053,10 +1068,10 @@ func TestCancelSucceedsThroughACleanupDiagnostic(t *testing.T) {
 // Neither command may panic where Stage and AuthorizeClaim answer with a code.
 func TestLifecycleCommandsSurviveAMissingCoordinator(t *testing.T) {
 	var absent *Coordinator
-	if got := ErrorCodeOf(absent.Cancel()); got != ErrTransferFailed {
+	if got := ErrorCodeOf(absent.Cancel(context.Background())); got != ErrTransferFailed {
 		t.Errorf("Cancel on a nil coordinator returned %q, want %q", got, ErrTransferFailed)
 	}
-	if err := absent.Shutdown(); err != nil {
+	if err := absent.Shutdown(context.Background()); err != nil {
 		t.Errorf("Shutdown on a nil coordinator returned %v, want nil -- nothing is running", err)
 	}
 }
@@ -1074,7 +1089,7 @@ func TestCancelFromIdleWaitsForAFinishingTeardown(t *testing.T) {
 	}
 
 	returned := make(chan error, 1)
-	go func() { returned <- h.coordinator.Cancel() }()
+	go func() { returned <- h.coordinator.Cancel(context.Background()) }()
 
 	select {
 	case <-returned:
@@ -1094,8 +1109,16 @@ func TestCancelFromIdleWaitsForAFinishingTeardown(t *testing.T) {
 	if h.coordinator.leaseHeld() {
 		t.Error("the lease is still held after Cancel returned")
 	}
-	if got := h.calls.snapshot(); len(got) != 0 {
+	// Cancel found the lease already held, so awaitLeaseBounded took its slow
+	// path and armed its own bound -- a legitimate part of the wait itself,
+	// not an adapter call, and excluded here the same way portCalls excludes
+	// entropy.Read.
+	if got := adapterCalls(h); len(got) != 0 {
 		t.Errorf("Cancel from IDLE called %v, want no adapter at all", got)
+	}
+	if h.bounds.armed() != 1 || h.bounds.stops() != 1 {
+		t.Errorf("the lease wait armed %d bound(s) and stopped %d, want exactly one armed and stopped",
+			h.bounds.armed(), h.bounds.stops())
 	}
 	if events := h.observer.published(); len(events) != 0 {
 		t.Errorf("Cancel from IDLE published %+v, want nothing", events)
@@ -1125,7 +1148,7 @@ func TestASchedulerThatWithholdsItsStopFunctionDoesNotKillTheDrainer(t *testing.
 	}
 	// The drainer survived: it closed its own done channel rather than dying
 	// mid-callback, which awaitDrainer above already proved by returning.
-	if err := h.coordinator.Cancel(); err != nil {
+	if err := h.coordinator.Cancel(context.Background()); err != nil {
 		t.Errorf("Cancel after the withheld stop returned %v, want nil", err)
 	}
 	if got := h.state(); got != stateIdle {
@@ -1151,16 +1174,254 @@ func TestACancelRacingTheResetArmingLeavesTheCoordinatorIdle(t *testing.T) {
 
 	h.observer.publish = func(event Event) {
 		if event.Kind == TransferComplete {
-			go h.coordinator.Cancel()
+			go h.coordinator.Cancel(context.Background())
 		}
 	}
 	h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
 	h.awaitDrainer()
 
-	if err := h.coordinator.Cancel(); err != nil {
+	if err := h.coordinator.Cancel(context.Background()); err != nil {
 		t.Errorf("Cancel after the withheld stop returned %v, want nil", err)
 	}
 	if got := h.state(); got != stateIdle {
 		t.Errorf("state is %q, want %q", got, stateIdle)
+	}
+}
+
+// --- Story 3.4: bounded waits and quiescence -------------------------------
+
+// TestCancelReportsACodedFailureWhenTheDrainerNeverEnds is D-027 and D-032:
+// ServerPort.Stop is documented to close its event channel on every return,
+// but this drives the one case that violates it -- Stop returns and the lane
+// stays open -- and proves the drainer join no longer waits on that promise
+// forever. The bound is forced deterministically through the bounds seam,
+// never by sleeping.
+func TestCancelReportsACodedFailureWhenTheDrainerNeverEnds(t *testing.T) {
+	h := newHarness(t)
+	h.transferring()
+	h.server.keepLaneOpenOnStop = true
+
+	cancelDone := make(chan error, 1)
+	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
+
+	// Two adapter calls precede the join (StopBeacon, then Stop) and settle
+	// almost instantly on this fake; the drainer join is the one that stays
+	// pending, which is exactly what awaitBoundsPending waits for.
+	h.awaitBoundsPending()
+	h.bounds.fire()
+
+	select {
+	case err := <-cancelDone:
+		if err == nil {
+			t.Fatal("Cancel succeeded, want a coded failure: the drainer never ended")
+		}
+		if code := ErrorCodeOf(err); code != ErrTransferFailed {
+			t.Errorf("Cancel error code = %q, want %q", code, ErrTransferFailed)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Cancel never returned")
+	}
+	if got := h.state(); got != stateIdle {
+		t.Errorf("state is %q, want %q -- the coordinator must reach a usable state despite the stuck drainer", got, stateIdle)
+	}
+	if h.coordinator.leaseHeld() {
+		t.Error("the lease is still held after Cancel returned")
+	}
+
+	// The lane was never actually closed by the fake Stop above; close it now
+	// so the leaked drainer goroutine finishes and the harness's own cleanup
+	// does not hang joining it.
+	h.server.closeEvents()
+}
+
+// TestAuthorizeClaimCommitsWhenStopBeaconNeverReturns is D-024: the claim
+// handshake calls StopBeacon synchronously while holding the lease, and this
+// is the one unlocked call inside it. An mDNS shutdown that never returns
+// must not hang the handshake -- the claim still commits, on its bound, with
+// a diagnostic recorded rather than a claim that hangs forever.
+func TestAuthorizeClaimCommitsWhenStopBeaconNeverReturns(t *testing.T) {
+	h := newHarness(t)
+	metadata := h.stageSuccessfully()
+	before := len(h.coordinator.diagnostics.snapshot())
+
+	blocked := make(chan struct{})
+	unblock := make(chan struct{})
+	var once sync.Once
+	h.network.stopBeacon = func() error {
+		once.Do(func() { close(blocked) })
+		<-unblock
+		return nil
+	}
+	t.Cleanup(func() { close(unblock) })
+
+	claimDone := make(chan error, 1)
+	go func() { claimDone <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
+
+	<-blocked
+	h.awaitBoundsPending()
+	h.bounds.fire()
+
+	select {
+	case err := <-claimDone:
+		if err != nil {
+			t.Fatalf("AuthorizeClaim returned %v, want success once the bound elapses", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AuthorizeClaim never returned")
+	}
+	if got := h.state(); got != stateTransferring {
+		t.Errorf("state is %q, want %q -- a stuck StopBeacon must not block the commit", got, stateTransferring)
+	}
+	events := h.observer.published()
+	if !slices.Equal(kindsOf(events), []EventKind{TransferStarted}) {
+		t.Errorf("published %v, want exactly [started]", kindsOf(events))
+	}
+	if got := len(h.coordinator.diagnostics.snapshot()); got <= before {
+		t.Errorf("%d diagnostics recorded, want more than the %d before: the bound timeout must leave a trace", got, before)
+	}
+}
+
+// TestCancelHonoursAnAbandonedCallerContext is D-036: Cancel now takes a
+// context and must honour it, not merely accept it. Cancel is made to
+// genuinely wait for a lease someone else holds, and the caller's own context
+// is cancelled mid-wait -- the case the contract calls "Cancel abandoned".
+// Cancel must return promptly with a coded failure rather than waiting out
+// its full bound.
+func TestCancelHonoursAnAbandonedCallerContext(t *testing.T) {
+	h := newHarness(t)
+
+	// Nothing staged, and somebody else owns the lease -- the IDLE branch of
+	// Cancel, which still has to wait for it.
+	<-h.coordinator.lease
+	t.Cleanup(func() {
+		select {
+		case h.coordinator.lease <- struct{}{}:
+		default:
+		}
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancelDone := make(chan error, 1)
+	go func() { cancelDone <- h.coordinator.Cancel(ctx) }()
+
+	h.awaitBoundsPending()
+	cancel()
+
+	select {
+	case err := <-cancelDone:
+		if err == nil {
+			t.Fatal("Cancel succeeded, want a coded failure: the caller's context was cancelled")
+		}
+		if code := ErrorCodeOf(err); code != ErrTransferFailed {
+			t.Errorf("Cancel error code = %q, want %q", code, ErrTransferFailed)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Cancel did not honour the cancelled context; it waited for the full bound instead")
+	}
+}
+
+// TestShutdownReportsACodedFailureWhenTheLeaseNeverFrees is the other half of
+// D-032 and D-036's "honour a context" requirement, proven through the fixed
+// bound rather than the caller's context this time: Shutdown must not wait
+// forever to join a teardown that never finishes, and on a timeout it must
+// not have taken ownership of a lease it never actually acquired.
+func TestShutdownReportsACodedFailureWhenTheLeaseNeverFrees(t *testing.T) {
+	h := newHarness(t)
+
+	<-h.coordinator.lease
+	t.Cleanup(func() {
+		select {
+		case h.coordinator.lease <- struct{}{}:
+		default:
+		}
+	})
+
+	shutdownDone := make(chan error, 1)
+	go func() { shutdownDone <- h.coordinator.Shutdown(context.Background()) }()
+
+	h.awaitBoundsPending()
+	h.bounds.fire()
+
+	select {
+	case err := <-shutdownDone:
+		if err == nil {
+			t.Fatal("Shutdown succeeded, want a coded failure: the lease never freed before its bound")
+		}
+		if code := ErrorCodeOf(err); code != ErrTransferFailed {
+			t.Errorf("Shutdown error code = %q, want %q", code, ErrTransferFailed)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown never returned")
+	}
+	// Shutdown never acquired the lease, so it must not have released one
+	// either -- releaseLease on a lease this call does not own would hand a
+	// phantom token to whoever asks next.
+	if !h.coordinator.leaseHeld() {
+		t.Error("the lease was released by a Shutdown that never acquired it")
+	}
+}
+
+// TestCancelInsideArmResetsWindowLeavesExactlyOneTimerStoppedNotLeaked is
+// D-037, forced deterministically through the afterArm test hook rather than
+// left to scheduling: a Cancel that marks the session cancelled between
+// armReset creating its own reset timer and re-checking the session must see
+// the mark on the re-check and stop the timer it just created, rather than
+// leaving a callback armed for a session that is already gone.
+func TestCancelInsideArmResetsWindowLeavesExactlyOneTimerStoppedNotLeaked(t *testing.T) {
+	h := newHarness(t)
+	metadata := h.transferring()
+	live := h.liveSession()
+
+	hookDone := make(chan struct{})
+	cancelDone := make(chan error, 1)
+	h.coordinator.afterArm = func() {
+		go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
+		// Proves Cancel reached the marker -- not that Cancel has returned,
+		// which cannot happen yet: Cancel's own unwind joins this very
+		// drainer goroutine, which is parked right here.
+		h.awaitCancelled()
+		close(hookDone)
+	}
+
+	h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
+
+	select {
+	case <-hookDone:
+	case <-time.After(mutexProbeTimeout):
+		t.Fatal("armReset's window hook never ran")
+	}
+
+	deadline := time.Now().Add(mutexProbeTimeout)
+	for h.timer.stops() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("armReset never stopped the timer it armed for an already-cancelled session")
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+
+	if got := h.timer.armed(); got != 1 {
+		t.Fatalf("%d resets were armed, want exactly one", got)
+	}
+	if got := h.timer.stops(); got != 1 {
+		t.Fatalf("%d armed resets were stopped, want exactly one", got)
+	}
+
+	// Let the drainer -- and therefore Cancel's own join -- finish, the same
+	// way a real Stop closing the lane would.
+	h.server.closeEvents()
+
+	select {
+	case err := <-cancelDone:
+		if err != nil {
+			t.Errorf("Cancel returned %v, want nil", err)
+		}
+	case <-time.After(mutexProbeTimeout):
+		t.Fatal("Cancel never returned")
+	}
+	if got := h.state(); got != stateIdle {
+		t.Errorf("state is %q, want %q", got, stateIdle)
+	}
+	if live.ctx.Err() == nil {
+		t.Error("Cancel left the session context uncancelled")
 	}
 }
