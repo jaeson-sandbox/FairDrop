@@ -1098,9 +1098,9 @@ So that a transfer that silently stops is never mistaken for one I cancelled.
 
 **Acceptance Criteria:**
 
-**Given** a `transfer-complete` the reducer refuses, or a `ServerComplete` carrying no snapshot
+**Given** a `transfer-complete` the reducer refuses
 **When** it occurs
-**Then** the window shows a failure, never the cancel-won summary, and a test drives both shapes (D-035, retrospective item 2).
+**Then** the window shows a failure, never the cancel-won summary, and a test drives that shape (Epic 1 retrospective item 2).
 
 **Given** an `Observer.Publish` that panics or blocks
 **When** the coordinator next runs a lifecycle command
@@ -1108,19 +1108,20 @@ So that a transfer that silently stops is never mistaken for one I cancelled.
 
 **Given** an event lane that closes while the session is STAGED or CLAIMING
 **When** the drainer observes the close
-**Then** a terminal outcome is synthesized and the UI is never left waiting (D-042).
+**Then** a terminal outcome is synthesized and the UI is never left waiting for a server that is gone (D-042, D-091).
 
-**Given** the `undelivered` counter and the stderr lifecycle log `app.go` writes
+**Given** every diagnostic the coordinator and server record
+**When** one is written in a shipped build
+**Then** it reaches a surface outside the process -- the same stderr lifecycle log `app.go` already writes -- rather than a sink only tests can read (D-098)
+**And** a transfer failure's original cause is recorded before it is rewritten to fixed public copy (D-092), a teardown that leaves two resources unaccounted reports both rather than the first (D-100), a repeated `Stop` keeps its first call's diagnostic (D-020), `ErrorLog` stops swallowing handler panics (D-021), and `diagnosticSink` marks an overflow instead of dropping silently (D-031) -- each with a named test.
+
+**Given** the `undelivered` counter
 **When** a lifecycle event cannot be delivered
-**Then** the drop is logged and reaches a surface a test can observe (D-049), and a terminal outcome always carries a control so a lost `transfer-reset` cannot strand the window (D-059).
+**Then** the drop is logged where a test can observe it (D-049), and a terminal outcome always carries a control so a lost `transfer-reset` cannot strand the window (D-059).
 
 **Given** `Warning.Code`, the discovery warning, and progress coherence
 **When** the story closes
 **Then** `Warning.Code` is constrained at the boundary or covered by the cross-language pin (retrospective item 3); the beacon warning reaches a screen reader through a reachable trigger or an announced region (retrospective item 4); and progress is validated by one strategy with Stage metadata parsed once (retrospective item 7).
-
-**Given** the smaller visibility gaps
-**When** the story closes
-**Then** a repeated `Stop` keeps its first diagnostic (D-020), `ErrorLog` no longer swallows handler panics (D-021), `diagnosticSink` marks overflow instead of dropping silently (D-031), `sanitizeProgress` checks the known/unknown invariant (D-039), and the pre-startup command and dialog paths agree (D-048) -- each with a named test.
 
 ### Story 3.7: Execute the Native Platform Test Matrix
 
