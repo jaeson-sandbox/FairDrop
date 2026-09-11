@@ -127,7 +127,7 @@ func TestVerifyWorkflowLinuxJobIsAdapterVerificationOnly(t *testing.T) {
 	for _, want := range []string{
 		"name: Linux adapter verification (not release proof)", "runs-on: ubuntu-latest",
 		"uses: actions/setup-go@v7", "go-version: '1.26.7'", "run: go vet ./...",
-		"run: go test -count=1 -v -timeout 240s ./...", "go test -count=1 -race -timeout 420s ./...",
+		"run: go test -count=1 -v -timeout 240s ./...", "go test -count=1 -race -timeout 1200s ./...",
 		`test "$(go env CGO_ENABLED)" = 1`,
 	} {
 		if !strings.Contains(linux, want) {
@@ -273,9 +273,8 @@ func TestVerifyWorkflowNeverInstallsProductionOnly(t *testing.T) {
 }
 
 // Never: -upx (Apple Silicon and Windows antivirus risk, opt-in only),
-// GOOS/GOARCH cross-builds (never release proof), a Linux job (covered by
-// the runner test above, restated here for completeness against the exact
-// forbidden strings).
+// GOOS/GOARCH cross-builds (never release proof). The separately approved
+// Linux adapter job is pinned above and is not a release build.
 func TestVerifyWorkflowNeverUsesAForbiddenFlag(t *testing.T) {
 	wf := readVerifyWorkflow(t)
 
@@ -393,7 +392,7 @@ func TestVerifyWorkflowRunsTheFixedGoCommands(t *testing.T) {
 		"go vet ./...",
 		"go tool staticcheck ./...",
 		"go test -count=1 -timeout 240s ./...",
-		"go test -count=1 -race -timeout 420s ./...",
+		"go test -count=1 -race -timeout 1200s ./...",
 	} {
 		if !strings.Contains(wf, want) {
 			t.Errorf("the workflow does not run %q", want)

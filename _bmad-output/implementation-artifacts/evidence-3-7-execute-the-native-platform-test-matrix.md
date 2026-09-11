@@ -73,6 +73,656 @@ results, full matrix acceptance and formal review.
 
 ## Resumption audit — 2026-09-11
 
+### Native CI first fix checkpoint: not accepted
+
+Before pushing the diagnostic/allowance correction, repeated the complete local
+gate in order: Wails build 4.884s; stable bindings/gitkeep; gofmt/vet/staticcheck;
+all seven ordinary Go packages (stream 10.405s); explicit cgo=1; all seven race
+packages with the 1200s limit (stream 218.936s); 17 frontend files / 498 tests;
+LF/diff checks and Darwin/Linux foreign preflights. All passed. The preceding
+local race run also passed at 223.013s; no test expectation or product deadline
+changed to accommodate the hosted-CPU cost.
+
+Windows job `103443628170` likewise exhausted 420 seconds, this time actively
+inflating the large entry during readback (after production writing completed).
+Its full failed race-step output is retained below with runner prefix/timestamps
+removed only. Final run conclusion and all three job conclusions were read as
+failure, not inferred from a watch exit. No functional assertion failed before the
+timeouts, but neither unfinished stream suite is counted as a pass.
+
+```text
+##[group]Run go test -count=1 -race -timeout 420s ./...
+^[[36;1mgo test -count=1 -race -timeout 420s ./...^[[0m
+shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+env:
+  WAILS_VERSION: v2.15.0
+  GOTOOLCHAIN: local
+  FAIRDROP_TEST_UNC_FILE: \\localhost\FairDropNativeMatrix\report.txt
+  FAIRDROP_TEST_UNC_DIRECTORY: \\localhost\FairDropNativeMatrix
+##[endgroup]
+ok  	fairdrop	3.520s
+ok  	fairdrop/internal/network	1.095s
+ok  	fairdrop/internal/qr	2.006s
+ok  	fairdrop/internal/server	4.266s
+ok  	fairdrop/internal/source	1.311s
+panic: test timed out after 7m0s
+	running tests:
+		TestArchiveZIP64FourGiBEntryAndTotalReadBack (6m37s)
+
+goroutine 61 [running]:
+testing.(*M).startAlarm.func1()
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2802 +0x605
+created by time.goFunc
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/time/sleep.go:215 +0x45
+
+goroutine 1 [chan receive, 6 minutes]:
+testing.(*T).Run(0xc000102000, {0x1404dccc4, 0x2c}, 0x1404e84e0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2109 +0xb56
+testing.runTests.func1(0xc000102000)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2585 +0x85
+testing.tRunner(0xc000102000, 0xc0000fbad0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+testing.runTests({0x1404cb33f, 0x8}, {0x1404d34e6, 0x18}, 0xc000096180, {0x14043f600, 0x4e, 0x4e}, {0xc2a13eca1f2dcf5c, 0x61ca4c03fd, ...})
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2583 +0x9f8
+testing.(*M).Run(0xc000092460)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2443 +0xf4c
+main.main()
+	_testmain.go:202 +0x165
+
+goroutine 50 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000102800)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestArchiveFailsASourceThatNeverProgresses(0xc000102800)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_stall_test.go:35 +0x3f
+testing.tRunner(0xc000102800, 0x1404e84b8)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 51 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000102a00)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestStreamPackageNeverWritesToDisk(0xc000102a00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_stall_test.go:91 +0x3f
+testing.tRunner(0xc000102a00, 0x1404e8628)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 52 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000102c00)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestPrepareDirectoryIsLazyAndReportsAnUnknownLength(0xc000102c00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:27 +0x3f
+testing.tRunner(0xc000102c00, 0x1404e8540)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 53 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000102e00)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory(0xc000102e00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:60 +0x3f
+testing.tRunner(0xc000102e00, 0x1404e86a8)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 54 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000103000)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestStreamedArchiveOpensWithASecondImplementation(0xc000103000)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:99 +0x3f
+testing.tRunner(0xc000103000, 0x1404e8630)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 55 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000103200)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestWriteToArchivesAnEmptyRootAsAFolder(0xc000103200)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:126 +0x3c
+testing.tRunner(0xc000103200, 0x1404e8660)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 56 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000103400)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestWriteToAbortsOnAnEntryThatBecomesUnsafeMidStream(0xc000103400)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:140 +0x3c
+testing.tRunner(0xc000103400, 0x1404e8648)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 57 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000103600)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestWriteToPropagatesAWalkFailureWithoutAppendingToTheBody(0xc000103600)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:178 +0x3f
+testing.tRunner(0xc000103600, 0x1404e86b0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 7 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001444000)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestWriteToClosesEveryBorrowedEntryBeforeReturning(0xc001444000)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:263 +0x3f
+testing.tRunner(0xc001444000, 0x1404e8670)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 8 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001444200)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestWriteToRefusesASecondCallAndACallAfterClose(0xc001444200)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:289 +0x3f
+testing.tRunner(0xc001444200, 0x1404e86c0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 9 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001444400)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestCloseIsSafeConcurrentlyForADirectoryPayload(0xc001444400)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:324 +0x3f
+testing.tRunner(0xc001444400, 0x1404e84e8)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 10 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001444600)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestWriteToStopsPromptlyWhenTheReceiverDisconnects(0xc001444600)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:352 +0x3f
+testing.tRunner(0xc001444600, 0x1404e8700)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 11 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001444800)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestWriteToRejectsMissingContextOrDestinationForADirectory(0xc001444800)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:383 +0x2f
+testing.tRunner(0xc001444800, 0x1404e86d0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 12 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001444a00)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestArchiveEntryNamesAreRelativeAndNeverEscapeTheRoot(0xc001444a00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:392 +0x3f
+testing.tRunner(0xc001444a00, 0x1404e84b0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 13 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001444c00)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestArchiveRefusesAnEntryNameTheSourceShouldNeverEmit(0xc001444c00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:427 +0x2f
+testing.tRunner(0xc001444c00, 0x1404e84c0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 14 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001444e00)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestArchiveDownloadNameIsCappedAfterTheExtensionIsAppended(0xc001444e00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:440 +0x3f
+testing.tRunner(0xc001444e00, 0x1404e84a8)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 15 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001445000)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestPrepareRejectsARootThatIsNoLongerADirectory(0xc001445000)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:490 +0x3f
+testing.tRunner(0xc001445000, 0x1404e85a8)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 16 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001445200)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestPrepareRejectsARootThatDisappeared(0xc001445200)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:507 +0x3f
+testing.tRunner(0xc001445200, 0x1404e85a0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 66 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001445400)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestPrepareRejectsALinkLikeRootWithPathUnsupported(0xc001445400)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:525 +0x3f
+testing.tRunner(0xc001445400, 0x1404e8598)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 67 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001445800)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestPrepareRejectsALinkLikeFileRootWithPathUnsupported(0xc001445800)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:557 +0x3f
+testing.tRunner(0xc001445800, 0x1404e8590)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 68 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001445a00)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestPrepareHonorsCancellationForADirectory(0xc001445a00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:584 +0x3f
+testing.tRunner(0xc001445a00, 0x1404e8570)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 69 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc001445c00)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:1803 +0x4ef
+fairdrop/internal/stream.TestArchiveStreamingErrorsDoNotDiscloseTheSourcePath(0xc001445c00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_test.go:593 +0x3f
+testing.tRunner(0xc001445c00, 0x1404e84d0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+
+goroutine 72 [runnable]:
+compress/flate.(*decompressor).huffSym(0xc00323c008, 0xc00323c038)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/compress/flate/inflate.go:708 +0x52a
+compress/flate.(*decompressor).huffmanBlock(0xc00323c008)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/compress/flate/inflate.go:495 +0x99
+compress/flate.(*decompressor).Read(0xc00323c008, {0xc00324e000, 0x8000, 0xc00324e000?})
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/compress/flate/inflate.go:348 +0xba
+archive/zip.(*pooledFlateReader).Read(0xc000be0018, {0xc00324e000, 0x8000, 0x8000})
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/archive/zip/register.go:89 +0x1cb
+archive/zip.(*checksumReader).Read(0xc0030d6000, {0xc00324e000, 0x8000, 0x8000})
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/archive/zip/reader.go:299 +0xad
+io.copyBuffer({0x1404ed1a0, 0x14075d120}, {0x47bd4b68, 0xc0030d6000}, {0x0, 0x0, 0x0})
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/io/io.go:429 +0x271
+io.Copy(...)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/io/io.go:388
+fairdrop/internal/stream.TestArchiveZIP64FourGiBEntryAndTotalReadBack(0xc000103c00)
+	D:/a/FairDrop/FairDrop/internal/stream/archive_zip64_test.go:119 +0x1130
+testing.tRunner(0xc000103c00, 0x1404e84e0)
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2036 +0x1cb
+created by testing.(*T).Run in goroutine 1
+	C:/hostedtoolcache/windows/go/1.26.7/x64/src/testing/testing.go:2101 +0xb2b
+FAIL	fairdrop/internal/stream	420.086s
+ok  	fairdrop/internal/transfer	1.509s
+FAIL
+##[error]Process completed with exit code 1.
+```
+
+Linux's race suite timed out at 420 seconds with its producer runnable inside
+`compress/flate.findMatch`, processing the real 4 GiB fixture. The first five
+packages and transfer passed; the stream suite did not finish and is not accepted.
+Increase only the test-process allowance to a bounded 1200 seconds under the
+existing 30-minute job limit; retain the real >4 GiB stream, content/CRC readback,
+race instrumentation and all assertions. Workflow literal pins and spec commands
+move together. Full failed-step output (timestamps stripped only):
+
+```text
+##[group]Run test "$(go env CGO_ENABLED)" = 1
+test "$(go env CGO_ENABLED)" = 1
+go test -count=1 -race -timeout 420s ./...
+shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+env:
+  WAILS_VERSION: v2.15.0
+  GOTOOLCHAIN: local
+##[endgroup]
+ok  	fairdrop	2.465s
+ok  	fairdrop/internal/network	1.018s
+ok  	fairdrop/internal/qr	1.808s
+ok  	fairdrop/internal/server	4.156s
+ok  	fairdrop/internal/source	1.120s
+panic: test timed out after 7m0s
+	running tests:
+		TestArchiveZIP64FourGiBEntryAndTotalReadBack (5m43s)
+
+goroutine 11 [running]:
+testing.(*M).startAlarm.func1()
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2802 +0x605
+created by time.goFunc
+	/opt/hostedtoolcache/go/1.26.7/x64/src/time/sleep.go:215 +0x45
+
+goroutine 1 [chan receive, 5 minutes]:
+testing.(*T).Run(0xc000146248, {0x82c28e, 0x2c}, 0x8375f8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2109 +0xb3e
+testing.runTests.func1(0xc000146248)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2585 +0x85
+testing.tRunner(0xc000146248, 0xc000153ad0)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+testing.runTests({0x81d25d, 0x8}, {0x823a70, 0x18}, 0xc000016108, {0xab3720, 0x4e, 0x4e}, {0xc2a13eb7d06ea157, 0x61ca00adb5, ...})
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2583 +0x9ea
+testing.(*M).Run(0xc000108460)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2443 +0xf4c
+main.main()
+	_testmain.go:202 +0x165
+
+goroutine 34 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0001466c8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestArchiveFailsASourceThatNeverProgresses(0xc0001466c8)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_stall_test.go:35 +0x3f
+testing.tRunner(0xc0001466c8, 0x8375d0)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 35 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000146908)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestStreamPackageNeverWritesToDisk(0xc000146908)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_stall_test.go:91 +0x3f
+testing.tRunner(0xc000146908, 0x837740)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 36 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000146b48)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestPrepareDirectoryIsLazyAndReportsAnUnknownLength(0xc000146b48)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:27 +0x3f
+testing.tRunner(0xc000146b48, 0x837658)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 37 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000146d88)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory(0xc000146d88)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:60 +0x3f
+testing.tRunner(0xc000146d88, 0x8377c0)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 38 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000146fc8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestStreamedArchiveOpensWithASecondImplementation(0xc000146fc8)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:99 +0x3f
+testing.tRunner(0xc000146fc8, 0x837748)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 39 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000147208)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestWriteToArchivesAnEmptyRootAsAFolder(0xc000147208)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:126 +0x3c
+testing.tRunner(0xc000147208, 0x837778)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 40 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000147448)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestWriteToAbortsOnAnEntryThatBecomesUnsafeMidStream(0xc000147448)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:140 +0x3c
+testing.tRunner(0xc000147448, 0x837760)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 41 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000147688)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestWriteToPropagatesAWalkFailureWithoutAppendingToTheBody(0xc000147688)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:178 +0x3f
+testing.tRunner(0xc000147688, 0x8377c8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 46 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000147b08)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestWriteToClosesEveryBorrowedEntryBeforeReturning(0xc000147b08)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:263 +0x3f
+testing.tRunner(0xc000147b08, 0x837788)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 47 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc000147d48)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestWriteToRefusesASecondCallAndACallAfterClose(0xc000147d48)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:289 +0x3f
+testing.tRunner(0xc000147d48, 0x8377d8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 48 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a2008)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestCloseIsSafeConcurrentlyForADirectoryPayload(0xc0011a2008)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:324 +0x3f
+testing.tRunner(0xc0011a2008, 0x837600)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 49 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a2248)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestWriteToStopsPromptlyWhenTheReceiverDisconnects(0xc0011a2248)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:352 +0x3f
+testing.tRunner(0xc0011a2248, 0x837818)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 50 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a2488)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestWriteToRejectsMissingContextOrDestinationForADirectory(0xc0011a2488)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:383 +0x2f
+testing.tRunner(0xc0011a2488, 0x8377e8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 51 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a26c8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestArchiveEntryNamesAreRelativeAndNeverEscapeTheRoot(0xc0011a26c8)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:392 +0x3f
+testing.tRunner(0xc0011a26c8, 0x8375c8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 52 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a2908)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestArchiveRefusesAnEntryNameTheSourceShouldNeverEmit(0xc0011a2908)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:427 +0x2f
+testing.tRunner(0xc0011a2908, 0x8375d8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 53 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a2b48)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestArchiveDownloadNameIsCappedAfterTheExtensionIsAppended(0xc0011a2b48)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:440 +0x3f
+testing.tRunner(0xc0011a2b48, 0x8375c0)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 54 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a2d88)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestPrepareRejectsARootThatIsNoLongerADirectory(0xc0011a2d88)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:490 +0x3f
+testing.tRunner(0xc0011a2d88, 0x8376c0)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 55 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a2fc8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestPrepareRejectsARootThatDisappeared(0xc0011a2fc8)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:507 +0x3f
+testing.tRunner(0xc0011a2fc8, 0x8376b8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 56 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a3208)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestPrepareRejectsALinkLikeRootWithPathUnsupported(0xc0011a3208)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:525 +0x3f
+testing.tRunner(0xc0011a3208, 0x8376b0)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 57 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a3448)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestPrepareRejectsALinkLikeFileRootWithPathUnsupported(0xc0011a3448)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:557 +0x3f
+testing.tRunner(0xc0011a3448, 0x8376a8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 58 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a3688)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestPrepareHonorsCancellationForADirectory(0xc0011a3688)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:584 +0x3f
+testing.tRunner(0xc0011a3688, 0x837688)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 59 [chan receive, 6 minutes]:
+testing.(*T).Parallel(0xc0011a38c8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:1803 +0x50c
+fairdrop/internal/stream.TestArchiveStreamingErrorsDoNotDiscloseTheSourcePath(0xc0011a38c8)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:593 +0x3f
+testing.tRunner(0xc0011a38c8, 0x8375e8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 21 [select]:
+io.(*pipe).read(0xc002b7d080, {0xc0001cc000, 0x20000, 0x4c3fc9?})
+	/opt/hostedtoolcache/go/1.26.7/x64/src/io/pipe.go:57 +0x145
+io.(*PipeReader).Read(0xc002b7d080, {0xc0001cc000, 0x20000, 0x20000})
+	/opt/hostedtoolcache/go/1.26.7/x64/src/io/pipe.go:134 +0x47
+fairdrop/internal/stream.(*archive).drain(0xc000148080, {0x83dbc0, 0xada440}, {0x83bd00, 0xc002967bc0}, {0x83be60, 0xc002b7d080})
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive.go:166 +0x151
+fairdrop/internal/stream.(*archive).WriteTo(0xc000148080, {0x83dbc0, 0xada440}, {0x83bd00, 0xc002967bc0})
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive.go:98 +0x487
+fairdrop/internal/stream.TestArchiveZIP64FourGiBEntryAndTotalReadBack(0xc0011a3d48)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_zip64_test.go:85 +0x15d
+testing.tRunner(0xc0011a3d48, 0x8375f8)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2036 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/opt/hostedtoolcache/go/1.26.7/x64/src/testing/testing.go:2101 +0xb13
+
+goroutine 22 [runnable]:
+compress/flate.(*compressor).findMatch(0xc00020c000, 0xea21, 0xea20, 0x3, 0x15df)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/compress/flate/deflate.go:233 +0x63d
+compress/flate.(*compressor).deflate(0xc00020c000)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/compress/flate/deflate.go:439 +0x7e5
+compress/flate.(*compressor).write(0xc00020c000, {0xc0001ec000, 0x20000, 0x20000})
+	/opt/hostedtoolcache/go/1.26.7/x64/src/compress/flate/deflate.go:547 +0xdd
+compress/flate.(*Writer).Write(...)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/compress/flate/deflate.go:709
+archive/zip.(*pooledFlateWriter).Write(0xc002a00020, {0xc0001ec000, 0x20000, 0x20000})
+	/opt/hostedtoolcache/go/1.26.7/x64/src/archive/zip/register.go:51 +0x1c5
+archive/zip.(*countWriter).Write(...)
+	/opt/hostedtoolcache/go/1.26.7/x64/src/archive/zip/writer.go:647
+archive/zip.(*fileWriter).Write(0xc00076e050, {0xc0001ec000, 0x20000, 0x20000})
+	/opt/hostedtoolcache/go/1.26.7/x64/src/archive/zip/writer.go:579 +0x202
+fairdrop/internal/stream.writeArchiveFile({0x83dbc0, 0xada440}, 0xc00076e000, {0xc002ad6032, 0xe}, {0xc00007b808?, 0xc002ac4048?, 0x0?}, {0x83baa0, 0xc002ac4048}, ...)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive.go:332 +0x4a6
+fairdrop/internal/stream.(*archive).writeEntries.func1({{0x81d859, 0x9}, {0x81c4b9, 0x4}, 0x100000001, {0x0, 0x0, 0x0}}, {0x83baa0, 0xc002ac4048})
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive.go:221 +0x1cf
+fairdrop/internal/stream.TestArchiveZIP64FourGiBEntryAndTotalReadBack.func1({0x40?, 0xc00001ab80?}, {0xc00001ab80?, 0xc0001c7e50?}, 0xc00001ab80)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_zip64_test.go:78 +0x138
+fairdrop/internal/stream.(*scriptedSource).Walk(0xc002b5e9e0, {0x83dbc0, 0xada440}, {0xc00002a140, 0x44}, 0xc00001ab80)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive_test.go:632 +0x90
+fairdrop/internal/stream.(*archive).writeEntries(0xc000148080, {0x83dbc0, 0xada440}, 0xc00076e000)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive.go:209 +0x327
+fairdrop/internal/stream.(*archive).produce(0xc000148080, {0x83dbc0, 0xada440}, 0xc002b7d080)
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive.go:138 +0x2f5
+fairdrop/internal/stream.(*archive).WriteTo.func1()
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive.go:96 +0x5e
+created by fairdrop/internal/stream.(*archive).WriteTo in goroutine 21
+	/home/runner/work/FairDrop/FairDrop/internal/stream/archive.go:96 +0x445
+FAIL	fairdrop/internal/stream	420.045s
+ok  	fairdrop/internal/transfer	1.423s
+FAIL
+##[error]Process completed with exit code 1.
+```
+
+Commit `092900b764322f3ae7dde5420fba9144a701ab41`, run
+`34654431420`, macOS job `103443628144` (macOS 26.6.2 / arm64) built successfully.
+The launch-smoke failed without its expected warning while the child stayed alive.
+Full failed-step output follows; this is not yet attributed to a product or fixture
+cause. The harness now verifies its TMPDIR with the same Foundation API before
+creating the lock blocker, and preserves blank-app startup output plus a bounded
+process sample on failure. No new product behavior or weakened assertion.
+
+```text
+##[group]Run bash scripts/smoke-darwin-unusable-lock.sh
+2026-09-11T22:33:32.5814480Z bash scripts/smoke-darwin-unusable-lock.sh
+2026-09-11T22:33:32.7168710Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-11T22:33:32.7169210Z env:
+2026-09-11T22:33:32.7169680Z   WAILS_VERSION: v2.15.0
+2026-09-11T22:33:32.7170060Z   GOTOOLCHAIN: local
+2026-09-11T22:33:32.7170290Z ##[endgroup]
+2026-09-11T22:33:52.7627910Z Native launch did not report the degraded-lock diagnostic
+2026-09-11T22:33:53.0314710Z ##[error]Process completed with exit code 1.
+2026-09-11T22:33:53.1302320Z
+```
+
+The always-run native coverage and mutation steps still executed: Darwin metadata
+permission/identity/no-follow/parent-relative/mode tests, POSIX guards and system
+alias transfers passed without capability skips. All twelve native mutations were
+killed by named test failures, including all four new Darwin metadata mutations.
+This is evidence for those guards, not acceptance of the failed macOS full gate.
+
+
 Baseline: `d43aa69db42c19324bae9f837b909649ca608099` on
 `epic-3-run-reliably-on-supported-desktops`, clean and matching origin before
 this audit. Main is `627191466ebd0a14b17aeddf5e576cf19a2e703d`.

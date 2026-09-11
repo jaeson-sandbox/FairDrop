@@ -191,7 +191,9 @@ jobs:
       # makes a silent regression to a cgo-less runner fail loudly instead
       # of reporting a clean race run that never actually detected anything.
       - name: go test -race
-        run: go test -count=1 -race -timeout 420s ./...
+        # The real 4 GiB ZIP64 fixture is CPU-heavy under race instrumentation.
+        # Linux CI exhausted 420s while actively deflating, not waiting on a lock.
+        run: go test -count=1 -race -timeout 1200s ./...
 
       - name: Frontend suite
         working-directory: frontend
@@ -236,6 +238,6 @@ jobs:
       - name: Execute adapter race suite
         run: |
           test "$(go env CGO_ENABLED)" = 1
-          go test -count=1 -race -timeout 420s ./...
+          go test -count=1 -race -timeout 1200s ./...
       - name: Prove native acceptance tests detect broken guards
         run: bash scripts/verify-native-mutations.sh

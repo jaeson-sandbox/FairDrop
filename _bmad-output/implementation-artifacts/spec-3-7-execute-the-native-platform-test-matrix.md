@@ -107,7 +107,7 @@ Audit, mutation tables and gate transcripts live in
 ## Verification
 
 **Commands:**
-- Follow AGENTS.md sequentially: `wails build`; bindings-drift and `.gitkeep` checks; `gofmt -l .`; `go vet ./...`; `go tool staticcheck ./...`; `go test -count=1 -timeout 240s ./...`; confirm `go env CGO_ENABLED` is `1`; `go test -count=1 -race -timeout 420s ./...`; frontend `npm test`; line-ending check. Do not overlap these gates.
+- Follow AGENTS.md sequentially: `wails build`; bindings-drift and `.gitkeep` checks; `gofmt -l .`; `go vet ./...`; `go tool staticcheck ./...`; `go test -count=1 -timeout 240s ./...`; confirm `go env CGO_ENABLED` is `1`; `go test -count=1 -race -timeout 1200s ./...`; frontend `npm test`; line-ending check. Do not overlap these gates. The race allowance covers the real 4 GiB ZIP64 fixture on hosted CPUs; no size or assertion is reduced.
 - Foreign-platform preflight: Darwin arm64 and Linux amd64 `go build ./...` and `go vet ./...`, plus Darwin arm64 bare `staticcheck ./...` (not `go tool staticcheck` under a foreign GOOS). These are type checks, not native proof.
 - The CI run itself, read with `gh run view --json conclusion,jobs` — never `gh run watch`, which has exited 0 on a failed run
 - Mutations: drop `O_NONBLOCK` from `nativeContentFlags`; drop the `S_IFREG` refusal; revert `childRelativeName` to `filepath.VolumeName`; resolve the leaf as well as the ancestors; remove the Linux job — each must fail a named test

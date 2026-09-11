@@ -4,6 +4,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 scratch="$(mktemp -d)"
+clang -framework Foundation scripts/native-temp-dir.m -o "$scratch/native-temp-dir"
+native_temp="$(TMPDIR="$scratch/" "$scratch/native-temp-dir")"
+if [[ ! -d "$native_temp" ]] || [[ "$(cd "$native_temp" && pwd -P)" != "$(cd "$scratch" && pwd -P)" ]]; then
+  echo "Foundation ignored the isolated TMPDIR; no native lock fixture was modified" >&2
+  exit 1
+fi
 mkdir "$scratch/d1766c78-45cf-4e6d-9f04-c3700ab32024.lock"
 binary="build/bin/fairdrop.app/Contents/MacOS/fairdrop"
 if [[ ! -x "$binary" ]]; then
@@ -40,4 +46,10 @@ for attempt in {1..100}; do
   sleep 0.1
 done
 echo "Native launch did not report the degraded-lock diagnostic" >&2
+# This is our blank CI application, with no selection or transfer. Retain its
+# full startup output and a bounded sample instead of losing the failure cause.
+echo "Controlled blank-app startup output:" >&2
+cat "$scratch/launch.log" >&2
+sample "$child" 1 -file "$scratch/sample.txt" >/dev/null 2>&1 || true
+if [[ -f "$scratch/sample.txt" ]]; then cat "$scratch/sample.txt" >&2; fi
 exit 1
