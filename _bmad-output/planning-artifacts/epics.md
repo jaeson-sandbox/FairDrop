@@ -1129,15 +1129,18 @@ As a maintainer,
 I want the tests that can only run on a native operating system executed there,
 So that "it cross-compiles" is never mistaken for "it was verified".
 
-**Scope:** running and extending tests on the native runners Story 3.2 provides. This story adds no product behaviour.
+**Scope:** running and extending tests on the native runners Story 3.2 provides, plus the two platform defects that only a native run can confirm.
 
-**Closes:** D-007, D-014, D-065, D-068, D-074, D-076, D-078, D-084, D-089, D-094, D-095, D-099, D-102.
+**Narrowed 2026-09-11:** this story had accumulated thirteen ids across four unrelated mechanisms. Nine are one goal -- a guarantee that only the native OS can prove -- and are kept here. `D-065` and `D-068` need a real browser rendering a layout in CI, which is a new dependency and a harness rather than a test run, and moved to Story 3.12. `D-099` and `D-102` are about the relationship between the coordinator's bound and the server's own, and about two teardown wordings no test drives; they carry no platform content and moved to Story 3.8, which already owns adapter hardening.
+
+**Closes:** D-007, D-014, D-074, D-076, D-078, D-084, D-089, D-094, D-095.
 
 **Acceptance Criteria:**
 
 **Given** native Linux and macOS runners
 **When** the source package's platform tests run
-**Then** the production no-follow, search-only-ancestor, non-reading special-file, `O_PATH`/`O_EVTONLY`, FIFO, and content-open `O_NONBLOCK`-plus-`fstat` guards execute and pass natively rather than only cross-compiling (D-074, D-076).
+**Then** the production no-follow, search-only-ancestor, non-reading special-file, `O_PATH`/`O_EVTONLY`, FIFO, and content-open `O_NONBLOCK`-plus-`fstat` guards execute and pass natively rather than only cross-compiling (D-074, D-076)
+**And** the workflow gains a Linux job that runs the Go suite for adapter verification only, labelled in the job itself as not release proof, so the `O_PATH` branch stops being type-checked and never executed (D-095).
 
 **Given** the path classes the product claims
 **When** they run on Windows and macOS
@@ -1147,9 +1150,14 @@ So that "it cross-compiles" is never mistaken for "it was verified".
 **When** the story closes
 **Then** a large-entry-count archive is read back and validated, the ZIP64 thresholds are covered, and `WriteTo`'s once-only guard is exercised concurrently under `-race` (D-078, D-014).
 
-**Given** the accessibility and QR evidence `DESIGN.md` gates on native observation
-**When** the story closes
-**Then** what a runner can capture (rendered layout at 320 CSS px and 200% text, forced-colors rendering of the QR substrate) is captured there (D-065, D-068), and what needs a person is handed to Story 3.9's evidence template with the exact rows it requires.
+**Given** a selection under a symlinked system directory -- `/tmp`, `/var` or `/etc` on macOS, `/bin` or `/home` on Linux
+**When** a user picks it
+**Then** the path is resolved where it enters the app, at the chooser and the native drop handler, before the coordinator ever sees it, so an ordinary file in an ordinary place transfers instead of being refused `path_unsupported` (D-094)
+**And** the traversal's own refusal of link-like components is unchanged and still pinned, with a test proving the resolution happens before `Inspect` rather than inside it.
+
+**Given** a macOS lock file that cannot be opened for any reason other than contention
+**When** FairDrop launches
+**Then** it does not treat that as another instance and exit silently, and the native runner confirms the behaviour (D-089).
 
 ### Story 3.8: Harden the Directory Stream
 
@@ -1157,7 +1165,7 @@ As a sender,
 I want the folder stream to fail safely under the conditions Epic 2 deferred,
 So that a deep tree, a swapped root, or a misused reader cannot break a live download.
 
-**Closes:** D-077, D-079, D-080, D-081, D-082, D-096, D-101, D-105, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
+**Closes:** D-077, D-079, D-080, D-081, D-082, D-096, D-099, D-101, D-102, D-105, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
 
 **Acceptance Criteria:**
 
@@ -1180,6 +1188,15 @@ So that a deep tree, a swapped root, or a misused reader cannot break a live dow
 **Given** the three copy loops in `internal/stream`
 **When** the story closes
 **Then** `archive.drain` carries the empty-read guard or its absence is justified in a comment and a test (retrospective item 4).
+
+**Given** the coordinator's bound on `ServerPort.Stop` and the server's own teardown bound
+**When** a teardown runs long
+**Then** the outer bound no longer equals the inner one, so the coordinator cannot report "the server did not confirm it stopped" over a `Stop` that was about to return the more specific failure naming which wait was outstanding (D-099)
+**And** whichever answer is taken -- a margin above what the server documents, or exported constants the root package can compare -- is pinned by a test that relates the two rather than each to its own literal.
+
+**Given** the three waits `teardownTimeoutError` names independently
+**When** each is the only one outstanding
+**Then** the accept loop and the tracked-connection branches are each driven by a test, as the handler branch already is, so all three wordings are proven rather than one (D-102).
 
 ### Story 3.9: Record Human Release Evidence
 
@@ -1277,3 +1294,30 @@ So that the contract describes what the code does and the copy describes what ha
 **Given** a malformed Stage acknowledgement whose cleanup call fails
 **When** the user is told nothing was sent
 **Then** either the cleanup is guaranteed or the failure is surfaced, so the next Stage cannot be refused `busy` for a session the user was told did not exist (D-106).
+
+### Story 3.12: Capture the Accessibility Evidence a Runner Can Produce
+
+As a maintainer,
+I want the accessibility claims a machine can check to be checked by a machine,
+So that the human evidence rows are the ones that genuinely need a person.
+
+**Why a separate story:** these two were left on Story 3.7 when it was narrowed. Every other id there is a Go test that needs a particular operating system; these two need a real browser engine performing layout and evaluating media queries, which jsdom does not do. That is a new CI dependency and a new harness, not another test run, and pairing it with the platform matrix would have made one story's success depend on two unrelated pieces of infrastructure.
+
+**Ordering:** numbered last, required before Story 3.9. What this story cannot capture becomes a row in the human release evidence, so 3.9 needs to know which rows are left.
+
+**Closes:** D-065, D-068.
+
+**Acceptance Criteria:**
+
+**Given** a headless browser rendering the built frontend
+**When** the accessibility checks run in CI
+**Then** Staged and Transferring render at 320 CSS pixels and at 200% text without a horizontal scrollbar or clipped content, the 44-pixel target floor is measured on rendered boxes rather than asserted as stylesheet text, and a failure names the element and the measurement (D-068).
+
+**Given** a forced-colors rendering
+**When** the QR panel is captured
+**Then** the substrate's `forced-color-adjust: none` exemption is shown to keep the bitmap and its quiet zone readable, and the capture is kept as the evidence `DESIGN.md` gates that exemption on (D-065)
+**And** the existing test that fails if a second selector takes the exemption still holds.
+
+**Given** what a runner still cannot do -- hear a screen reader, or point a phone camera at a screen
+**When** this story closes
+**Then** those are written into Story 3.9's evidence template as named rows with the platform, assistive technology and exact observation each requires, rather than left as an unverified manual check.

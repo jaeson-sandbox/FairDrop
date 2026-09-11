@@ -591,7 +591,7 @@ line.
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
   id: D-065
   summary: The QR substrate now opts out of forced colors, which `DESIGN.md` gates on native scan evidence that does not exist.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: 3-12-capture-the-accessibility-evidence-a-runner-can-produce
   evidence: `DESIGN.md` allows `forced-color-adjust: none` on the production QR bitmap and its quiet-zone substrate "only after native scan evidence confirms it remains readable", and the Compatibility and Evidence Gates record no such run. The alternative is worse -- without the opt-out the user agent repaints the quiet zone in the system palette and a scanner loses the code -- so the exemption is applied and scoped to `.fd-qr-panel, .fd-qr`, with a test that fails if a second selector ever takes it. What is missing is the evidence, not the rule: a real high-contrast Windows session and a phone camera, recorded like every other gate.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
@@ -609,7 +609,7 @@ line.
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
   id: D-068
   summary: The accessibility floor is proved against the stylesheet and the DOM, never against a rendered layout or a real screen reader.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: 3-12-capture-the-accessibility-evidence-a-runner-can-produce
   evidence: jsdom performs no layout and evaluates no media query, so 320-pixel reflow, the 44px target floor, 200% text, forced colors and reduced motion are all asserted as stylesheet text; and no automated check can hear what a screen reader says. The routing table, the throttle and every focus target are unit-proved, but "each transition is announced exactly once" is ultimately an observation about NVDA or VoiceOver. The spec's own manual checks -- one keyboard-only transfer with a screen reader running, and Staged at 320 CSS pixels with 200% text and forced colors on -- are still owed, and belong with the release evidence rather than in a story that cannot run them.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
@@ -805,7 +805,7 @@ line.
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-099
   summary: The coordinator's bound on ServerPort.Stop equals the server's own teardown bound, so the outer wait can give up on an inner one that was about to succeed.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: 3-8-harden-the-directory-stream
   evidence: Raised independently by the orchestrator and the Blind Hunter layer while reviewing Story 3.4. `adapterCallBound` is 10s in `internal/transfer/coordinator.go` and `teardownBound` is 10s in `internal/server/lifecycle.go`. The outer bound therefore races the inner one rather than outlasting it: the coordinator can report "the transfer server did not confirm it stopped" for a `Stop` that was about to return its own, more specific coded failure naming which wait was outstanding. Both values are now pinned by tests, but to their own literals -- nothing ties them to each other, because `internal/server` imports `internal/transfer` and the reverse import would be a cycle, and both constants are unexported. Fixing it means either exporting them for a root-package pin or giving the coordinator a margin above whatever the server documents. Harmless today in that both answers are honest failures; it costs the more precise message.
 
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
@@ -823,7 +823,7 @@ line.
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-102
   summary: Only one of the server teardown report's three named waits is ever driven by a test.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: 3-8-harden-the-directory-stream
   evidence: Raised by the verification-gap layer reviewing Story 3.4. `teardownTimeoutError` names the accept loop, a request handler, and a tracked connection independently, and only the handler branch is exercised (`TestStopReturnsACodedFailureWhenAHandlerNeverReturns`, `TestStopBoundsAHandlerStuckInAuthorizeClaim`). `assertQuiescent` verifies the other two on the healthy path, so they are not unverified, but no test isolates a timeout where only the accept loop or only a connection is still outstanding -- so the wording of those two branches is unproven.
 
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
