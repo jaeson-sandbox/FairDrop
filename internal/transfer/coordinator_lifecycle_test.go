@@ -1206,9 +1206,14 @@ func TestCancelReportsACodedFailureWhenTheDrainerNeverEnds(t *testing.T) {
 	cancelDone := make(chan error, 1)
 	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
 
-	// Two adapter calls precede the join (StopBeacon, then Stop) and settle
-	// almost instantly on this fake; the drainer join is the one that stays
-	// pending, which is exactly what awaitBoundsPending waits for.
+	// Both adapter calls must have *returned* before the bound is fired, not
+	// merely started. awaitBoundsPending returns the moment armed exceeds
+	// stops, which is already true while the first of the three bounds in this
+	// cascade is pending -- so firing then could hit StopBeacon's bound
+	// instead, leaving the drainer join pending forever and Cancel blocked.
+	// That is not hypothetical: it failed on a Windows CI runner under -race
+	// after passing twenty local iterations.
+	h.awaitCalls("network.StopBeacon", "server.Stop")
 	h.awaitBoundsPending()
 	h.bounds.fire()
 
@@ -1220,7 +1225,12 @@ func TestCancelReportsACodedFailureWhenTheDrainerNeverEnds(t *testing.T) {
 		if code := ErrorCodeOf(err); code != ErrTransferFailed {
 			t.Errorf("Cancel error code = %q, want %q", code, ErrTransferFailed)
 		}
-	case <-time.After(2 * time.Second):
+		// Named, not merely coded: all three bounds in this cascade carry the
+		// same public code, so without this the test passes on the wrong one.
+		if !strings.Contains(err.Error(), "drainer did not finish") {
+			t.Errorf("Cancel reported %q, want the failure to name the drainer join", err)
+		}
+	case <-time.After(10 * time.Second):
 		t.Fatal("Cancel never returned")
 	}
 	if got := h.state(); got != stateIdle {

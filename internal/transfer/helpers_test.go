@@ -938,6 +938,38 @@ func (h *harness) awaitClosing() {
 // has necessarily already resolved (they run sequentially on one goroutine),
 // so the pending one is the one fakeTimer.fire's "most recently armed" rule
 // will hit.
+// awaitCalls blocks until every named port call has appeared in the call log.
+//
+// awaitBoundsPending alone is not enough to say which bound is pending: it
+// returns the moment armed exceeds stops, which is true as soon as the first
+// bound in a cascade is armed. A test that then fires can hit the wrong one --
+// that is a real flake, caught on a Windows CI runner under -race after the
+// suite had passed twenty local iterations.
+func (h *harness) awaitCalls(names ...string) {
+	h.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		seen := map[string]bool{}
+		for _, call := range h.calls.snapshot() {
+			seen[call] = true
+		}
+		missing := ""
+		for _, name := range names {
+			if !seen[name] {
+				missing = name
+				break
+			}
+		}
+		if missing == "" {
+			return
+		}
+		if time.Now().After(deadline) {
+			h.t.Fatalf("%q never appeared in the call log: %v", missing, h.calls.snapshot())
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+}
+
 func (h *harness) awaitBoundsPending() {
 	h.t.Helper()
 	deadline := time.Now().Add(mutexProbeTimeout)

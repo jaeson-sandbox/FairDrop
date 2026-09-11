@@ -327,3 +327,30 @@ flagged independently); `unwind` reports only the first of two simultaneous boun
 and `callBounded` abandons one goroutine per timed-out call with no cap (`D-101`). Plus `D-102`, from
 the verification-gap layer: only one of the teardown report's three named waits is driven by a test.
 
+## A flake that only CI could find
+
+The merge to `main` failed on the Windows runner under `-race`, on the identical tree that had just
+passed on the epic branch and locally:
+`TestCancelReportsACodedFailureWhenTheDrainerNeverEnds` reported `Cancel never returned`. The
+implementation had run the new lifecycle tests twenty times under `-race` without a flake.
+
+The test was racy by construction, and its own comment recorded the wrong assumption: that the two
+adapter calls preceding the drainer join "settle almost instantly on this fake". `awaitBoundsPending`
+returns the moment `armed()` exceeds `stops()`, which is already true while the *first* bound of the
+three in that cascade is pending. Firing then can hit `StopBeacon`'s bound instead of the drainer
+join, which leaves the join pending forever and `Cancel` blocked until the test's own deadline.
+
+Two changes, and the second is what makes the first honest:
+
+- The test now waits for `network.StopBeacon` and `server.Stop` to appear in the call log -- to have
+  *returned*, not merely started -- before firing. A new `awaitCalls` harness helper does that, and
+  its comment records why `awaitBoundsPending` alone cannot.
+- The assertion now requires the failure to *name* the drainer. All three bounds in the cascade carry
+  the same public code, so a test that checks only the code passes on the wrong bound. Mutating the
+  drainer's message to a generic one kills it.
+
+Twenty iterations under `-race` after the fix, then three more full-package race runs. This is the
+second time in this story the same mistake appeared: the orchestrator's own server-stop test made it
+too, and needed the lane closed before the hang to isolate its branch. Firing one bound in a cascade
+of three and assuming you hit the one you meant is a trap this file now names twice.
+
