@@ -605,6 +605,16 @@ type finalizingConn struct {
 	terminal *transfer.ServerEvent
 }
 
+// net/http half-closes responses with unread bodies or oversized headers
+// before its final close, so the receiver can read the rejection before a
+// pending request body causes a reset. Embedding net.Conn hides TCP CloseWrite.
+func (c *finalizingConn) CloseWrite() error {
+	if half, ok := c.Conn.(interface{ CloseWrite() error }); ok {
+		return half.CloseWrite()
+	}
+	return nil
+}
+
 func (c *finalizingConn) Write(p []byte) (int, error) {
 	n, err := c.Conn.Write(p)
 	if err == nil && n != len(p) {

@@ -124,26 +124,38 @@ func (i *darwinFileInfo) Mode() fs.FileMode {
 // uses unix.Stat_t while os.File.Stat uses syscall.Stat_t; compare both forms
 // explicitly so the production snapshot-to-descriptor identity gate works.
 func nativeSameFile(first, second fs.FileInfo) bool {
-	firstDev, firstIno, firstOK := darwinIdentity(first)
-	secondDev, secondIno, secondOK := darwinIdentity(second)
-	return firstOK && secondOK && firstDev == secondDev && firstIno == secondIno
+	firstID, firstOK := darwinIdentity(first)
+	secondID, secondOK := darwinIdentity(second)
+	return firstOK && secondOK && firstID == secondID
 }
 
-func darwinIdentity(info fs.FileInfo) (int32, uint64, bool) {
+// A snapshot cannot pin an unlinked inode. Generation and birth time reject
+// recycled device/inode pairs without mistaking ordinary content changes for
+// replacement. Filesystems exposing identical/zero generation and birth fields
+// retain a residual fingerprint collision risk; this is not an inode lease.
+type darwinFileIdentity struct {
+	device       int32
+	inode        uint64
+	generation   uint32
+	birthSeconds int64
+	birthNanos   int64
+}
+
+func darwinIdentity(info fs.FileInfo) (darwinFileIdentity, bool) {
 	if info == nil {
-		return 0, 0, false
+		return darwinFileIdentity{}, false
 	}
 	switch status := info.Sys().(type) {
 	case *unix.Stat_t:
 		if status != nil {
-			return status.Dev, status.Ino, true
+			return darwinFileIdentity{status.Dev, status.Ino, status.Gen, status.Btim.Sec, status.Btim.Nsec}, true
 		}
 	case *syscall.Stat_t:
 		if status != nil {
-			return status.Dev, status.Ino, true
+			return darwinFileIdentity{status.Dev, status.Ino, status.Gen, status.Birthtimespec.Sec, status.Birthtimespec.Nsec}, true
 		}
 	}
-	return 0, 0, false
+	return darwinFileIdentity{}, false
 }
 
 // nativeSearchFlags opens a directory purely as a base for relative lookups.

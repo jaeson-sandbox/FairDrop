@@ -4,9 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -179,52 +177,13 @@ func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
 		return nil, errNotComposed()
 	}
 
-	metadata, err := coordinator.Stage(ctx, resolveSelectionAncestors(absolutePath))
+	metadata, err := coordinator.Stage(ctx, absolutePath)
 	if err != nil {
 		// No metadata on failure, and the coordinator's code is preserved for
 		// the error formatter to serialize.
 		return nil, err
 	}
 	return &metadata, nil
-}
-
-// Resolve only the ancestors at the selection boundary. In particular macOS
-// spells its temporary directory through /var, a symlink. Inspect and Walk
-// still refuse every link they encounter, including the selected leaf.
-func resolveSelectionAncestors(selection string) string {
-	if !filepath.IsAbs(selection) {
-		return selection // The source owns invalid/missing-path classifications.
-	}
-	if os.PathSeparator == '\\' {
-		// Device/extended namespaces have a stricter source grammar. Do not
-		// let EvalSymlinks turn a spelling the source refuses into a drive path.
-		lower := strings.ToLower(selection)
-		if strings.HasPrefix(lower, `\\.\`) || strings.HasPrefix(lower, `\??\`) || strings.HasPrefix(lower, `\\?\`) {
-			return selection
-		}
-	}
-	// A trailing separator must not turn the selected leaf into an ancestor.
-	leafPath := strings.TrimRightFunc(selection, func(r rune) bool { return r < 128 && os.IsPathSeparator(uint8(r)) })
-	if leafPath == "" || leafPath == filepath.VolumeName(selection) {
-		return selection
-	}
-	leaf := filepath.Base(leafPath)
-	if leaf == "." || leaf == ".." {
-		return selection // Preserve explicit dot traversal for the handle walker.
-	}
-	// Do not use filepath.Dir here: its lexical Clean can erase a link or a
-	// non-directory before '..' without ever asking the filesystem about it.
-	ancestorPath := leafPath[:len(leafPath)-len(leaf)]
-	trimmed := strings.TrimRightFunc(ancestorPath, func(r rune) bool { return r < 128 && os.IsPathSeparator(uint8(r)) })
-	if trimmed != "" && trimmed != filepath.VolumeName(ancestorPath) {
-		// Preserve root separators without lexically cleaning any component.
-		ancestorPath = trimmed
-	}
-	parent, err := filepath.EvalSymlinks(ancestorPath)
-	if err != nil {
-		return selection // Preserve the source's coded refusal; log no path.
-	}
-	return filepath.Join(parent, leaf) + selection[len(leafPath):]
 }
 
 // CancelTransfer abandons whatever transfer is in flight.

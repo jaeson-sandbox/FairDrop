@@ -1,12 +1,15 @@
 package server
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -228,4 +231,74 @@ func (c *gatedConn) Write(p []byte) (int, error) {
 func (c *gatedConn) Close() error {
 	c.closeOnce.Do(func() { close(c.closed) })
 	return c.Conn.Close()
+}
+
+type halfCloseListener struct {
+	net.Listener
+	called chan struct{}
+}
+
+func (l *halfCloseListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return &halfCloseConn{TCPConn: conn.(*net.TCPConn), called: l.called}, nil
+}
+
+type halfCloseConn struct {
+	*net.TCPConn
+	called chan struct{}
+}
+
+func (c *halfCloseConn) CloseWrite() error {
+	err := c.TCPConn.CloseWrite()
+	close(c.called)
+	return err
+}
+
+func TestHTTPRejectionsPreserveTCPHalfClose(t *testing.T) {
+	for _, scenario := range []string{"unread-body", "oversized-header"} {
+		t.Run(scenario, func(t *testing.T) {
+			server := newTestServer(t, payloadsReturning(&stubPayload{}))
+			called := make(chan struct{})
+			listen := server.listen
+			server.listen = func(ctx context.Context, address string) (net.Listener, error) {
+				listener, err := listen(ctx, address)
+				if err != nil {
+					return nil, err
+				}
+				return &halfCloseListener{Listener: listener, called: called}, nil
+			}
+			handle := startTestServer(t, server, &stubAuthorizer{})
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", handle.Port))
+			if err != nil {
+				t.Fatal("native TCP connection failed")
+			}
+			defer conn.Close()
+			_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+			request := "POST /missing HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1048576\r\n\r\n"
+			want := 404
+			if scenario == "oversized-header" {
+				request = "GET /missing HTTP/1.1\r\nHost: localhost\r\nX-Large: " + strings.Repeat("x", 20000) + "\r\n\r\n"
+				want = 431
+			}
+			if _, err := io.WriteString(conn, request); err != nil {
+				t.Fatal("native request write failed")
+			}
+			response, err := http.ReadResponse(bufio.NewReader(conn), nil)
+			if err != nil {
+				t.Fatal("HTTP rejection could not be read")
+			}
+			defer response.Body.Close()
+			if _, err := io.ReadAll(response.Body); err != nil || response.StatusCode != want {
+				t.Fatal("HTTP rejection truncated with an unread request")
+			}
+			select {
+			case <-called:
+			case <-time.After(time.Second):
+				t.Fatal("finalizing connection hid TCP CloseWrite")
+			}
+		})
+	}
 }

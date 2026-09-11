@@ -4,7 +4,7 @@ type: 'chore'
 created: '2026-09-11'
 status: 'in-progress'
 baseline_commit: 'd43aa69db42c19324bae9f837b909649ca608099'
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-3-context.md'
   - '{project-root}/AGENTS.md'
@@ -47,36 +47,30 @@ context:
 
 ## Code Map
 
-- `internal/transfer/coordinator_outcomes_test.go` — native Linux CI exposed a pre-existing observation/join race in `TestProgressPublishesContiguousSequences`. Force the observer-return window and use an unbuffered refused event as a drainer barrier before asserting lease return; retain the assertion and mutation proof. No production coordinator change.
-
-- `internal/server/{handler,lifecycle}.go` — success currently publishes Complete before ServeHTTP returns; coordinator then force-closes before net/http's finishRequest flushes body/framing. Fix actual finalization ordering, not a timing delay or handler-only Flush. Keep cancellation/failure force-close behavior. Test delayed final writes, final-write errors, early disconnect and cancellation deterministically through the listener/connection seam; real App/coordinator HTTP tests must pass repeatedly under race.
-- `internal/source/{handle,handle_posix,handle_darwin,source}.go` — replace Darwin O_EVTONLY with parent-relative `fstatat(AT_SYMLINK_NOFOLLOW)` metadata views, acquiring separate O_SEARCH/enumeration/content descriptors only when needed. Do not claim a stat snapshot pins a file descriptor. Go `os.SameFile` only accepts its own FileInfo implementation: provide and test a Darwin identity comparison for stat-derived metadata versus opened-descriptor metadata. Preserve cancellation, close ownership, mode classification, link refusal and replacement detection. No private entitlement or extra dependency.
-- Update SPEC, architecture spine/memlog, contracts, epic context, source comments and affected tests together for the approved metadata and HTTP guarantees. Parent handles personal-release policy/owner synchronization and the final full gates; implementer reports focused checks and all pending native evidence. Preserve the existing evidence file.
-
-- `.github/workflows/verify.yml:44` `verify` job, `matrix.os: [windows-latest, macos-latest]`, `runs-on: ${{ matrix.os }}`. A Linux job is a **second job**, not a matrix entry: the existing one runs `wails build`, `npm ci` and the frontend suite, none of which belong on Linux.
-- `verify_workflow_test.go:118` currently fails the build if the workflow mentions `ubuntu` at all — "a Linux job is Ask First and none was approved". That rule is now approved and narrowed; rewrite it rather than delete it.
-- `internal/source/handle_posix_test.go` (`//go:build linux || darwin`) — two tests, both with runner-capability skips at `:52` and `:81`. `handle_linux_test.go` — `O_PATH` and FIFO. Check what the skips do on the real runners; a skip that always fires is a vacuous pass. Baseline correction (2026-09-11): macOS already executes the shared POSIX tests in native CI; Linux execution and the additional guard coverage are missing. The frozen problem statement describes an older checkpoint, not current execution evidence.
-- `internal/source/handle_posix.go:100` `OpenChildContent` — the only read-granting open: `nativeContentFlags()`, `unix.Fstat`, the `S_IFMT != S_IFREG` refusal, then `clearPosixNonBlocking`. Nothing asserts any of it (D-076); every fixture entry is an ordinary file.
-- `internal/source/source.go:454` `childRelativeName` — still uses `filepath.IsAbs` and `filepath.VolumeName`, which are no-ops on a POSIX sender (D-084). `internal/stream/archive.go:393` `volumeQualified` is the host-independent shape to copy.
-- `app.go:174` `StageTransfer` — the single choke point every selection passes, chooser and native drop alike, before `coordinator.Stage`. `app.go:214` `SelectFile` / `:220` `SelectDirectory` are the chooser half.
-- `internal/stream/archive_memory_test.go:46` streams 50,000 entries to `io.Discard` and never reads one back (D-078). `internal/stream/archive.go:295` writes file entries with `zip.Deflate`, so a 4 GiB entry of repeating bytes costs CPU, not disk.
-- `internal/stream/payload.go:354` `p.streamed.CompareAndSwap` — driven only sequentially by `TestWriteToRefusesASecondCall` (D-014); `TestCloseIsSafeWhenCalledConcurrently:1415` is the concurrency shape to copy.
-- Wails v2.15.0 `internal/frontend/desktop/darwin/single_instance.go` `SetupSingleInstance` is upstream and treats every `createLockFile` error as contention, then `os.Exit(0)`. FairDrop cannot change it; it can decide whether to hand Wails the option (D-089).
+- `app.go`, `main.go`, new selection-source boundary adapter and `native_matrix_test.go`: Stage delegates unchanged; a coordinator-facing SourcePort decorator resolves lexical ancestors only after lifecycle admission, before the raw inspector. The stream adapter keeps the raw inspector and receives the canonical staged path. Preserve leaf/trailing/dot/namespace refusals. Resolution observes cancellation before/after and while waiting; at most one unresolved filesystem call per decorator may remain outstanding, retries refuse busy until it returns. Never hold a mutex across filesystem I/O or claim the OS call itself was cancelled. Test busy/shutdown admission, cancellation with a blocked resolver, and no late Inspect/network work.
+- `internal/server/{handler,lifecycle}.go`, `finalization_test.go`: observe actual final connection writes before natural Complete or pre-header 410 failure; retain force-close cancellation, write-error/short-write failure and producer quiescence. Preserve TCP CloseWrite through the wrapper, with a real unread-body/oversized-header path test. Handler return or Flush alone is insufficient.
+- `internal/source/{handle,handle_posix,handle_darwin,handle_linux,source}.go`: Darwin parent-relative no-follow stat snapshots, separate descriptors and identity checks across both stat representations; include generation/birth metadata to distinguish recycled device/inode pairs, native unlink/recreate coverage plus deterministic recycled-identity tests. Document residual fingerprint limitations honestly. Linux O_PATH and portable archive-name refusal remain. Snapshot Close never owns the borrowed parent.
+- `main.go`, `single_instance_darwin*.go`: probe Wails' exact Foundation lock path nonblocking/no-follow, require a regular descriptor before flock, preserve contention handoff and fixed private warning. Native FIFO/symlink fixtures must not hang. Options wiring tests control usability and separately test degraded behavior; keep production default wiring pinned. The CI smoke locks the runner-owned inode and restores its mode.
+- `internal/stream/{archive_zip64,payload_concurrent}_test.go`: retain full entry-count and real 4 GiB+1 CRC/readback and concurrent loser no-read/no-write assertions. Add a sparse/virtual-prefix ZIP64 offset-threshold test using the production entry writer and archive/zip.SetOffset; validate central-directory and subsequent-entry offsets above 32 bits and CRC. Distinguish synthetic offset coverage from the real compressed stream; no multi-GiB compressed-stream claim.
+- `.github/workflows/verify.yml`, `verify_workflow_test.go`, `scripts/`: native desktop full gates, Linux Go-only gate, explicit skips, native mutations and guarded process smoke. Pin the new gates within the correct jobs/platform conditions. Mutation verdicts require passing named baselines, mutation-specific assertion evidence and explicit rejection of timeout/build/setup failures; test the verdict helper. Keep 1200s race allowance and accurate comments.
+- `internal/transfer/coordinator_outcomes_test.go`: force the observer-return window and use an unbuffered refused event as a drainer barrier before asserting lease return. CI exposed a test scheduling assumption; production coordinator behavior is unchanged.
+- Canonical SPEC, architecture spine/memlog, contracts and epic context move together for metadata/finalization guarantees. `docs/release-policy.md` records the owner's optional-manual-check decision. Evidence, failures, mutation results and the ten deferred-id closures stay in the sibling evidence file.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/server` — close D-110 with deterministic framing/final-write tests and full-stack file/folder regression coverage.
-- [ ] `internal/source` — supported Darwin no-read metadata inspection with native permissions, identity, no-follow and content-read separation tests; retain Linux O_PATH.
-- [ ] `.github/workflows/verify.yml` — a Linux job running vet and the Go suite, labelled adapter verification and not release proof; no `wails build`, no frontend steps.
-- [ ] `verify_workflow_test.go` — replace the blanket ubuntu ban with the narrowed rule, and pin that the Linux job runs no `wails build`.
-- [ ] `internal/source/handle_posix_test.go`, `handle_linux_test.go` — assert the content-open guard (a FIFO substituted after metadata is refused without blocking), and make every capability skip report why, so a skip that always fires is visible.
-- [ ] `internal/source/source.go` — `childRelativeName` refuses a volume-qualified or absolute name by the same host-independent test `volumeQualified` uses.
-- [ ] `app.go` — resolve a selection's *ancestors* once, where it enters, before the coordinator sees it; the final component is never resolved.
-- [ ] `main.go` — on darwin, confirm the single-instance lock path is usable before handing Wails the option, and say so on stderr when it is not.
-- [ ] `internal/stream` — read a past-threshold archive back and validate it; cover the 4 GiB entry and total; drive `WriteTo` from concurrent callers under `-race`.
-- [ ] Path-class coverage for spaces, non-ASCII, >260 characters, UNC and zero-path drops, run on both native hosts.
-- [ ] `evidence-3-7-execute-the-native-platform-test-matrix.md`, and the ten ids (including D-110) closed with `epics.md` kept in step.
+- [ ] Review loop 1: implement the corrected admission, lock, identity, half-close, ZIP64-offset and CI-proof requirements above; full-stack matrix observes matching natural Complete before cleanup and tests Unicode/space leaf names, returned metadata, HTTP filename and ZIP entry names. Record independent review triage and new mutation/native results in evidence.
+- [x] `internal/server` — close D-110 with deterministic framing/final-write tests and full-stack file/folder regression coverage.
+- [x] `internal/source` — supported Darwin no-read metadata inspection with native permissions, identity, no-follow and content-read separation tests; retain Linux O_PATH.
+- [x] `.github/workflows/verify.yml` — a Linux job running vet and the Go suite, labelled adapter verification and not release proof; no `wails build`, no frontend steps.
+- [x] `verify_workflow_test.go` — replace the blanket ubuntu ban with the narrowed rule, and pin that the Linux job runs no `wails build`.
+- [x] `internal/source/handle_posix_test.go`, `handle_linux_test.go` — assert the content-open guard (a FIFO substituted after metadata is refused without blocking), and make every capability skip report why, so a skip that always fires is visible.
+- [x] `internal/source/source.go` — `childRelativeName` refuses a volume-qualified or absolute name by the same host-independent test `volumeQualified` uses.
+- [x] `selection_source.go` — resolve a selection's *ancestors* once after coordinator admission and before raw Inspect, with bounded outstanding work and cancellation-aware waiting; the final component is never resolved and `app.go` delegates unchanged.
+- [x] `main.go` — on darwin, confirm the single-instance lock path is usable before handing Wails the option, and say so on stderr when it is not.
+- [x] `internal/stream` — read a past-threshold archive back and validate it; cover the 4 GiB entry and total; drive `WriteTo` from concurrent callers under `-race`.
+- [x] Path-class coverage for spaces, non-ASCII, >260 characters, UNC and zero-path drops, run on both native hosts.
+- [x] `evidence-3-7-execute-the-native-platform-test-matrix.md`, and the ten ids (including D-110) closed with `epics.md` kept in step.
 
 **Acceptance Criteria:**
 - Given the POSIX and Linux platform tests, when CI runs, then they execute natively and a skip that fired is reported rather than silently counted as a pass.
@@ -91,6 +85,8 @@ Audit, mutation tables and gate transcripts live in
 [evidence-3-7-execute-the-native-platform-test-matrix.md](evidence-3-7-execute-the-native-platform-test-matrix.md), created with the implementation.
 
 ## Spec Change Log
+
+- 2026-09-11 (review loop 1, bad_spec): ancestor resolution before Stage bypassed lifecycle refusal and cancellation; non-frozen Code Map now places a bounded, cancellable selection decorator behind admission and before the raw inspector. Clarified snapshot reuse identity, nonblocking lock probing, preserved TCP half-close, ZIP64 offset proof and gate-verdict requirements. Frozen user intent is unchanged. KEEP: all verified implementation at adc492cfb656f888c9a284c89df445086a326ab7 except the identified flawed details; reconstruct from that Git checkpoint, not from historical interfaces. Preserve real HTTP finalization ordering/force-close cancellation, Darwin no-read/no-follow metadata, Linux O_PATH, native path/ZIP64/concurrency fixtures, fixed private diagnostics, optional manual policy, full failed logs and ten stable deferred IDs. Re-derive the code against this corrected map, with no dependency/public API/refusal-policy change. Other accepted review patches are carried into the same derivation.
 
 - 2026-09-11 (owner approval): "Lets fix them all" and "MacOS perms ... best option ... get the application to work" authorize bringing D-110 into 3.7 and replacing Darwin metadata acquisition. Owner also makes human release observations optional for personal development. Frozen intent/matrix amended explicitly on that approval, not weakened to match a test. Baseline is preserved. Prior paused-checkpoint notes below are historical.
 

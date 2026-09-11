@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/netip"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,7 +26,7 @@ import (
 	"fairdrop/internal/transfer"
 )
 
-type nativeMatrixNetwork struct{}
+type nativeMatrixNetwork struct{ calls *atomic.Int32 }
 
 func nativeMatrixDirectoryLink(t *testing.T, target, link string) {
 	t.Helper()
@@ -37,7 +39,10 @@ func nativeMatrixDirectoryLink(t *testing.T, target, link string) {
 	t.Skip("runner lacks directory symlink creation privilege; native CI requires this capability")
 }
 
-func (nativeMatrixNetwork) GetLocalIP(context.Context) (netip.Addr, error) {
+func (n nativeMatrixNetwork) GetLocalIP(context.Context) (netip.Addr, error) {
+	if n.calls != nil {
+		n.calls.Add(1)
+	}
 	return netip.MustParseAddr("127.0.0.1"), nil
 }
 func (nativeMatrixNetwork) StartBeacon(context.Context, transfer.BeaconRequest) error { return nil }
@@ -45,11 +50,16 @@ func (nativeMatrixNetwork) StopBeacon() error                                   
 
 type inspectedNativeSource struct {
 	transfer.SourcePort
-	mu    sync.Mutex
-	first string
+	mu           sync.Mutex
+	first        string
+	calls        atomic.Int32
+	networkCalls atomic.Int32
+	selection    *selectionSource
+	events       chan transfer.Event
 }
 
 func (s *inspectedNativeSource) Inspect(ctx context.Context, path string) (transfer.StagedItem, error) {
+	s.calls.Add(1)
 	s.mu.Lock()
 	if s.first == "" {
 		s.first = path
@@ -64,9 +74,12 @@ func nativeMatrixApp(t *testing.T) (*App, *inspectedNativeSource) {
 	t.Helper()
 	app := NewApp()
 	app.logf = func(string, ...any) {}
-	inspector := &inspectedNativeSource{SourcePort: source.New()}
+	inspector := &inspectedNativeSource{SourcePort: source.New(), events: make(chan transfer.Event, 32)}
+	inspector.selection = newSelectionSource(inspector)
+	app.emit = func(_ context.Context, _ string, args ...any) { inspector.events <- args[0].(transfer.Event) }
+	app.startup(context.Background())
 	coordinator := transfer.NewCoordinator(transfer.Dependencies{
-		Source: inspector, Network: nativeMatrixNetwork{}, Server: server.New(stream.New(inspector)),
+		Source: inspector.selection, Network: nativeMatrixNetwork{calls: &inspector.networkCalls}, Server: server.New(stream.New(inspector)),
 		QR: qr.New(), Observer: appObserver{app: app},
 	})
 	app.useCoordinator(coordinator)
@@ -80,10 +93,14 @@ func nativeMatrixApp(t *testing.T) (*App, *inspectedNativeSource) {
 
 func assertNativeDownload(t *testing.T, selected string, folder bool) {
 	t.Helper()
-	app, _ := nativeMatrixApp(t)
+	app, inspector := nativeMatrixApp(t)
 	metadata, err := app.StageTransfer(selected)
 	if err != nil {
 		t.Fatalf("native stage refused: code=%s", transfer.ErrorCodeOf(err))
+	}
+	name := filepath.Base(selected)
+	if metadata.Name != name || metadata.Size != 21 || metadata.IsDir != folder || metadata.SessionID == "" || metadata.QR == "" {
+		t.Fatal("native returned metadata differs from selected fixture")
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	response, err := client.Get(metadata.URL)
@@ -100,6 +117,14 @@ func assertNativeDownload(t *testing.T, selected string, folder bool) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("native download incomplete: status=%d", response.StatusCode)
 	}
+	wantDownload := name
+	if folder {
+		wantDownload += ".zip"
+	}
+	mediaType, disposition, err := mime.ParseMediaType(response.Header.Get("Content-Disposition"))
+	if err != nil || mediaType != "attachment" || disposition["filename"] != wantDownload {
+		t.Fatal("native HTTP filename differs from selected leaf")
+	}
 	if folder {
 		reader, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
 		if err != nil {
@@ -108,12 +133,18 @@ func assertNativeDownload(t *testing.T, selected string, folder bool) {
 		files := 0
 		for _, entry := range reader.File {
 			if entry.FileInfo().IsDir() {
+				if entry.Name != name+"/" {
+					t.Fatal("native ZIP root name differs from selected leaf")
+				}
 				continue
+			}
+			if entry.Name != name+"/"+nativeFixtureLeaf(selected) {
+				t.Fatal("native ZIP entry name differs from Unicode/space leaf")
 			}
 			files++
 			content, err := entry.Open()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("native fixture operation failed: %T", err)
 			}
 			got, err := io.ReadAll(content)
 			content.Close()
@@ -126,6 +157,39 @@ func assertNativeDownload(t *testing.T, selected string, folder bool) {
 		}
 	} else if string(body) != "native matrix payload" {
 		t.Fatal("native file content differs")
+	}
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	for {
+		select {
+		case event := <-inspector.events:
+			if event.SessionID != metadata.SessionID {
+				t.Fatal("native lifecycle session mismatch")
+			}
+			if event.Kind == transfer.TransferError || event.Kind == transfer.TransferReset {
+				t.Fatal("native lifecycle ended without natural Complete")
+			}
+			if event.Kind == transfer.TransferComplete {
+				if event.Progress == nil || event.Progress.BytesSent != int64(len(body)) {
+					t.Fatal("native Complete byte count differs from received response")
+				}
+				return
+			}
+		case <-deadline.C:
+			t.Fatal("native lifecycle omitted matching natural Complete before cleanup")
+		}
+	}
+}
+
+func nativeFixtureLeaf(directory string) string {
+	// The path-class fixtures choose the child name independently of the parent.
+	switch filepath.Base(directory) {
+	case "a folder with spaces":
+		return "a report with spaces.txt"
+	case "日本語 résumé 🌍":
+		return "报告 résumé 🌍.txt"
+	default:
+		return "report.txt"
 	}
 }
 
@@ -146,7 +210,7 @@ func TestNativePathClassesStageAndDownload(t *testing.T) {
 			if err := os.MkdirAll(base, 0o700); err != nil {
 				t.Fatal("native path fixture creation failed")
 			}
-			file := filepath.Join(base, "report.txt")
+			file := filepath.Join(base, nativeFixtureLeaf(base))
 			if err := os.WriteFile(file, []byte("native matrix payload"), 0o600); err != nil {
 				t.Fatal("native path fixture write failed")
 			}
@@ -179,14 +243,14 @@ func TestNativeUNCStageAndDownload(t *testing.T) {
 func TestStageTransferResolvesAncestorsBeforeInspect(t *testing.T) {
 	base, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("native fixture operation failed: %T", err)
 	}
 	target := filepath.Join(base, "target")
 	if err := os.Mkdir(target, 0o700); err != nil {
-		t.Fatal(err)
+		t.Fatalf("native fixture operation failed: %T", err)
 	}
 	if err := os.WriteFile(filepath.Join(target, "report.txt"), []byte("native matrix payload"), 0o600); err != nil {
-		t.Fatal(err)
+		t.Fatalf("native fixture operation failed: %T", err)
 	}
 	alias := filepath.Join(base, "alias")
 	nativeMatrixDirectoryLink(t, target, alias)
@@ -202,7 +266,7 @@ func TestStageTransferResolvesAncestorsBeforeInspect(t *testing.T) {
 	first := inspector.first
 	inspector.mu.Unlock()
 	if first != filepath.Join(target, "report.txt") {
-		t.Fatal("Inspect saw an unresolved path: resolution must precede the coordinator")
+		t.Fatal("Inspect saw an unresolved path: resolution must follow admission and precede Inspect")
 	}
 	assertNativeDownload(t, selected, false)
 	assertNativeDownload(t, alias+string(os.PathSeparator)+"."+string(os.PathSeparator)+"report.txt", false)
@@ -211,15 +275,15 @@ func TestStageTransferResolvesAncestorsBeforeInspect(t *testing.T) {
 func TestStageTransferRefusesSelectedSymlinkAndPreservesTraversalRefusals(t *testing.T) {
 	base, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("native fixture operation failed: %T", err)
 	}
 	target := filepath.Join(base, "target")
 	if err := os.Mkdir(target, 0o700); err != nil {
-		t.Fatal(err)
+		t.Fatalf("native fixture operation failed: %T", err)
 	}
 	file := filepath.Join(target, "report.txt")
 	if err := os.WriteFile(file, []byte("native matrix payload"), 0o600); err != nil {
-		t.Fatal(err)
+		t.Fatalf("native fixture operation failed: %T", err)
 	}
 	link := filepath.Join(base, "selected-link")
 	nativeMatrixDirectoryLink(t, target, link)
@@ -247,7 +311,7 @@ func TestNativeWindowsDeviceNamespaceRefusalSurvivesResolution(t *testing.T) {
 	}
 	file := filepath.Join(t.TempDir(), "report.txt")
 	if err := os.WriteFile(file, []byte("native matrix payload"), 0o600); err != nil {
-		t.Fatal(err)
+		t.Fatalf("native fixture operation failed: %T", err)
 	}
 	for _, prefix := range []string{`\\.\`, `\??\`, `\\?\GLOBALROOT\`} {
 		selected := prefix + file
@@ -289,7 +353,7 @@ func TestDarwinSystemTemporaryAncestorStageAndDownload(t *testing.T) {
 			t.Cleanup(func() { _ = os.RemoveAll(base) })
 			selected := filepath.Join(base, "report.txt")
 			if err := os.WriteFile(selected, []byte("native matrix payload"), 0o600); err != nil {
-				t.Fatal(err)
+				t.Fatalf("native fixture operation failed: %T", err)
 			}
 			if !strings.HasPrefix(selected, root+"/") {
 				t.Fatal("fixture lost the system alias")

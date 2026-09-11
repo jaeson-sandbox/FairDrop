@@ -17,10 +17,14 @@ under `docs/release-policy.md`. Historical mandatory-human wording is superseded
 
 Story 3.7 implementation uses Darwin parent-relative no-follow stat snapshots,
 not pinned leaf descriptors; later search/enumeration/content opens compare
-device/inode, with Linux O_PATH retained. HTTP natural completion waits for actual
+device/inode, generation and birth timestamp, with Linux O_PATH retained. A filesystem with identical/zero generation and birth fields retains residual snapshot fingerprint collision risk. HTTP natural completion waits for actual
 final body/framing writes observed at connection closure, including write-error
 and short-write checks. Preparation failure finalizes 410 before its terminal
-event; cancellation and streaming failures retain forced closure.
+event; cancellation and streaming failures retain forced closure. The connection
+wrapper preserves TCP half-close for unread-body and oversized-header responses.
+Selection resolution runs behind coordinator admission in a SourcePort decorator,
+with cancellation-aware waits and at most one outstanding resolver call; retries
+refuse busy until it returns. App delegation and the stream's raw inspector remain.
 
 - Story 3.1: Enforce One Running FairDrop Instance
 - Story 3.2: Automate Reproducible Cross-Platform Verification

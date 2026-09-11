@@ -48,7 +48,8 @@ jobs:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     # A hung npm ci or wails build otherwise burns the multi-hour default
-    # before GitHub kills it. The full gate takes about four minutes.
+    # before GitHub kills it. The full 4 GiB race fixture takes several minutes;
+    # the job budget includes its 1200s allowance plus build and mutation gates.
     timeout-minutes: 30
     defaults:
       run:
@@ -161,9 +162,8 @@ jobs:
         if: always()
         run: go test -count=1 -v -run 'Test(POSIX|Linux|Darwin|Native|StageTransferResolves|StageTransferRefusesSelected)' ./...
 
-      # go test -race silently reports clean when cgo is unavailable rather
-      # than failing, so confirm both the flag and a working C toolchain
-      # before trusting the race step that follows.
+      # go test -race requires cgo and fails without it. Confirm both the flag
+      # and a working C toolchain so its failure is clearly diagnosed.
       - name: Confirm cgo is enabled
         run: |
           enabled="$(go env CGO_ENABLED)"

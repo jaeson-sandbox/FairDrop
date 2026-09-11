@@ -39,13 +39,14 @@ const unknownCommandError = `{"code":"transfer_failed","message":"The transfer s
 // that a payload is a descriptor on a local disk.
 func compose(app *App) *transfer.Coordinator {
 	// One inspector, reached twice on purpose: the coordinator validates the
-	// selection with it at Stage, and the payload adapter re-validates the
-	// same root with it before it opens a descriptor. Two inspectors would be
+	// admitted selection through the ancestor-resolving boundary at Stage,
+	// and the payload adapter re-validates the canonical root directly before
+	// it opens a descriptor. Two inspectors would be
 	// two independent answers to "is this path acceptable".
 	inspector := source.New()
 
 	coordinator := transfer.NewCoordinator(transfer.Dependencies{
-		Source:   inspector,
+		Source:   newSelectionSource(inspector),
 		Network:  network.NewManager(),
 		Server:   server.New(stream.New(inspector)),
 		QR:       qr.New(),
@@ -121,6 +122,10 @@ const singleInstanceLockUniqueID = "d1766c78-45cf-4e6d-9f04-c3700ab32024"
 // build and lint check green while shipping a binary that silently discards
 // every drop -- see main_test.go.
 func appOptions(app *App) *options.App {
+	return appOptionsWithLockProbe(app, nativeSingleInstanceLockUsable)
+}
+
+func appOptionsWithLockProbe(app *App, usable func() bool) *options.App {
 	return &options.App{
 		Title:     "FairDrop",
 		Width:     1024,
@@ -160,7 +165,7 @@ func appOptions(app *App) *options.App {
 		// restores the existing window instead -- see its comment for why it
 		// touches neither the coordinator nor a lifecycle event, and for what a
 		// second launch's inert composition does before it ever gets here.
-		SingleInstanceLock: singleInstanceOption(app, nativeSingleInstanceLockUsable),
+		SingleInstanceLock: singleInstanceOption(app, usable),
 
 		OnStartup:  app.startup,
 		OnShutdown: app.shutdown,

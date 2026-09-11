@@ -250,7 +250,8 @@ line.
 - source_spec: `spec-phase-1-wails-scaffold.md`
   id: D-007
   summary: Path edge cases are untested — spaces, non-ASCII, >260 chars, UNC shares, symlinks, and zero-path drops.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-007 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: Every path in the matrix and tests is a simple `C:\x\...`. Windows MAX_PATH and UNC handling are real hazards for a file-transfer tool, and they become testable in Phases 2-4 where the Go side actually opens the paths.
 
 - source_spec: `spec-phase-1-wails-scaffold.md`
@@ -292,7 +293,8 @@ line.
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
   id: D-014
   summary: `WriteTo`'s once-only CAS is never exercised concurrently, so the race suite never visits the one place two callers can collide.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-014 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: `TestCloseIsSafeWhenCalledConcurrently` fires eight goroutines at `Close`, but `streamed.CompareAndSwap` is only driven sequentially by `TestWriteToRefusesASecondCall`. The contract says the server never calls `WriteTo` twice, so this is defense-in-depth coverage rather than a live defect.
 
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
@@ -664,7 +666,8 @@ line.
 - source_spec: `spec-2-1-validate-and-stage-one-directory.md`
   id: D-074
   summary: Execute Story 2.1's production no-follow, search-only-ancestor, and non-reading special-file tests on native Linux and macOS runners.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-074 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: The Linux and Darwin test binaries cross-compile and include direct tests for post-metadata symlink substitution, search-only ancestors, Linux `O_PATH`, and FIFO refusal, but this Windows host cannot execute those platform implementations. Windows production behavior, deterministic cross-platform seams, and cross-compilation are green; only native POSIX execution remains unproved.
 
 - source_spec: `spec-2-1-validate-and-stage-one-directory.md`
@@ -676,7 +679,8 @@ line.
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
   id: D-076
   summary: Execute the POSIX content-open guards -- O_NONBLOCK plus fstat-then-reject -- on native Linux and macOS.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-076 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: `posixNode.OpenChildContent` is the only read-granting open in the source package and the architecture text now claims a FIFO cannot block the response, but nothing asserts it. Every fixture entry is an ordinary regular file, so dropping `O_NONBLOCK` or the `S_IFREG` branch leaves the suite green. The failure it guards -- an entry swapped for a FIFO inside the metadata-to-content window -- parks the serving goroutine inside `openat` forever, after the response has started. The Windows twin is pinned by literal constants; POSIX has no equivalent.
 
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
@@ -688,7 +692,8 @@ line.
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
   id: D-078
   summary: Validate a large-entry-count archive by reading it back, and cover the ZIP64 thresholds.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-078 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: The fifty-thousand-entry archive is streamed to `io.Discard` and never opened, so nothing proves a large archive is still readable. No test approaches 65,535 entries, a 4 GiB entry, or a 4 GiB total, which are the points where `archive/zip` switches to ZIP64 and where a receiver's extractor is most likely to disagree.
 
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
@@ -724,7 +729,8 @@ line.
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
   id: D-084
   summary: Portable archive names are validated with host-dependent predicates.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-084 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: `childRelativeName` and `archiveEntryName` both use `filepath.IsAbs` and `filepath.VolumeName`, which are compiled for the sender's platform. On a Linux sender `C:evil.txt` is neither absolute nor volume-qualified, so those branches are dead exactly where the threat -- a Windows receiver extracting the archive -- lives.
 
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
@@ -754,7 +760,8 @@ line.
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
   id: D-089
   summary: On macOS a lock file that cannot be opened for any reason but contention makes the launching process exit silently, so FairDrop never opens.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-089 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: `darwin/single_instance.go` treats every `createLockFile` failure as "another instance holds it", sends the second-instance data, and `os.Exit(0)`s. A read-only or full temp directory therefore makes FairDrop refuse to launch with no message. Needs the native macOS runner to confirm and to decide between a pre-flight check and a documented limit.
 
 - source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
@@ -784,13 +791,15 @@ line.
 - source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
   id: D-094
   summary: On macOS a selection anywhere under /tmp, /var or /etc is refused, because each is a symlink and the traversal refuses link-like components.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-094 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: Established while discharging D-093. `rejectUnsupportedInfo` refuses a link-like component anywhere in a selection, which `TestInspectRejectsLinksSpecialsAndStopsBeforeLaterEntries` pins as intended behaviour, and macOS ships `/var`, `/tmp` and `/etc` as symlinks to `/private/*`. So a user who picks a file under any of them gets `path_unsupported` rather than a transfer, and inspecting `/` itself always fails because the root's own entries include those symlinks. Normal selections under `/Users/...` are unaffected, which is why the test fixtures were the only thing this broke. Left as-is deliberately: whether the picker should resolve the path before handing it over, or the copy should explain the refusal, is a product decision for the story that owns the native platform matrix, not a change to make while chasing a green build. Note Linux has the same shape wherever `/bin` or `/home` is a symlink.
 
 - source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
   id: D-095
   summary: The POSIX adapter is verified on macOS only; the Linux half of the same file is still compile-checked and never executed.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-095 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   evidence: `handle_posix.go` is `//go:build linux || darwin` and `handle_linux.go` supplies the `O_PATH` flag sets. Story 3.2's workflow runs Windows and macOS only, and the frozen boundary makes a Linux job Ask First -- correctly, since the epic's requirement is that a Linux job never stand in for release proof of a supported platform. But that leaves the Linux branch of a shared file in the same position darwin was in before this story: type-checked by `GOOS=linux go vet` and never run. The `O_PATH` path is the better-established of the two and the fallback seam declines on Linux, so the risk is lower than darwin's was -- and darwin's was assumed low too, right up until the first run failed forty tests. Deciding whether FairDrop wants a Linux job for adapter verification only, clearly not release proof, belongs to the platform-matrix story.
 
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
@@ -868,6 +877,7 @@ line.
 - source_spec: `spec-3-7-execute-the-native-platform-test-matrix.md`
   id: D-110
   summary: Natural completion can close the socket before net/http finishes the response, producing HTTP 200 with unexpected EOF for files and folders.
-  owner: 3-7-execute-the-native-platform-test-matrix
+  owner: discharged
+  resolution: Story 3.7 native matrix and mutation audit; see D-110 in evidence-3-7-execute-the-native-platform-test-matrix.md.
   resolution_plan: Owner approved bringing this fix into Story 3.7 on 2026-09-11. The original routing/evidence below is historical; no test failure is waived.
   evidence: Story 3.7's App/coordinator/real-server HTTP matrix failed in the full Windows race run, then reproduced 54 incomplete downloads in 240 attempts (30 of 40 iterations; 48 folders and 6 files), all with unexpected_eof=true. handler.go publishes ServerComplete before ServeHTTP returns; coordinator terminal teardown invokes Server.Stop and http.Server.Close before net/http's finishRequest has necessarily flushed buffered bytes and final chunk framing. Existing server tests finish reading before Stop, excluding the race. Full failure logs and exact code-path reasoning are in evidence-3-7-execute-the-native-platform-test-matrix.md. Routed to 3.8 because it owns server/stream lifecycle hardening outside 3.7's approved Code Map; this remains a blocker for 3.7's matrix, not an accepted failure. Fix requires deterministic response-finalization coverage while retaining force-close cancellation/failure semantics. No connection to the historical phone failure is proven.

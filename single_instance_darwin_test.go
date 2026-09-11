@@ -32,6 +32,83 @@ func TestDarwinLockPreflightAllowsUsableAndContendedLocks(t *testing.T) {
 	}
 }
 
+func TestDarwinLockPreflightRefusesFIFOAndSymlinkWithoutBlocking(t *testing.T) {
+	base := t.TempDir()
+	regular := filepath.Join(base, "regular")
+	if err := os.WriteFile(regular, nil, 0o600); err != nil {
+		t.Fatal("regular fixture failed")
+	}
+	fifo := filepath.Join(base, "fifo")
+	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatal("FIFO fixture failed")
+	}
+	link := filepath.Join(base, "link")
+	if err := os.Symlink(regular, link); err != nil {
+		t.Fatal("symlink fixture failed")
+	}
+	// RDWR keeps the FIFO open so a WRONLY probe succeeds: the regular-kind
+	// gate must refuse it independently of the nonblocking-open flag.
+	keeper, err := os.OpenFile(fifo, os.O_RDWR|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		t.Fatal("FIFO keeper failed")
+	}
+	defer keeper.Close()
+	for _, path := range []string{fifo, link} {
+		done := make(chan bool, 1)
+		go func() { done <- darwinLockPathUsable(path) }()
+		select {
+		case usable := <-done:
+			if usable {
+				t.Fatal("special lock path was accepted")
+			}
+		case <-time.After(time.Second):
+			t.Fatal("lock preflight blocked on a special file")
+		}
+	}
+	keeper.Close()
+	done := make(chan bool, 1)
+	go func() { done <- darwinLockPathUsable(fifo) }()
+	select {
+	case usable := <-done:
+		if usable {
+			t.Fatal("unconnected FIFO lock was accepted")
+		}
+	case <-time.After(time.Second):
+		// Rescue a mutated blocking open so the named assertion, rather than a
+		// process timeout, is the mutation verdict.
+		rescue, _ := os.OpenFile(fifo, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+		if rescue != nil {
+			defer rescue.Close()
+		}
+		t.Fatal("lock preflight blocked on an unconnected FIFO")
+	}
+}
+
+func TestDarwinLockKindIsCheckedBeforeFlock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fifo")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Fatal("FIFO fixture failed")
+	}
+	keeper, err := os.OpenFile(path, os.O_RDWR|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		t.Fatal("FIFO keeper failed")
+	}
+	defer keeper.Close()
+	calls := 0
+	usable := probeDarwinLock(path, func(int, int) error { calls++; return nil })
+	if usable || calls != 0 {
+		t.Fatal("nonregular lock descriptor reached flock")
+	}
+	// Keep the production syscall wiring independently pinned.
+	data, err := os.ReadFile("single_instance_darwin.go")
+	if err != nil {
+		t.Fatal("lock wiring source unavailable")
+	}
+	if !strings.Contains(string(data), "return probeDarwinLock(path, syscall.Flock)") {
+		t.Fatal("native lock probe bypasses production flock")
+	}
+}
+
 func TestDarwinLockPreflightDisablesWailsForUnusablePath(t *testing.T) {
 	dir := t.TempDir()
 	for _, path := range []string{dir, filepath.Join(dir, "absent", "fixture.lock")} {

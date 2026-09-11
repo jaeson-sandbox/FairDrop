@@ -19,7 +19,7 @@ import (
 // assertion is the only thing between a regression and a binary that silently
 // discards every drop.
 func TestAppOptionsEnablesNativeFileDrop(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.DragAndDrop == nil {
 		t.Fatal("DragAndDrop is nil: native file drop is not configured at all")
@@ -30,7 +30,7 @@ func TestAppOptionsEnablesNativeFileDrop(t *testing.T) {
 }
 
 func TestAppOptionsWindowContract(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.Title != "FairDrop" {
 		t.Errorf("Title = %q, want %q", opts.Title, "FairDrop")
@@ -60,7 +60,7 @@ func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
 		t.Fatalf("style.css no longer declares %q -- update this test and the option together", token)
 	}
 
-	got := appOptions(NewApp()).BackgroundColour
+	got := appOptionsWithLockProbe(NewApp(), func() bool { return true }).BackgroundColour
 	if got == nil {
 		t.Fatal("BackgroundColour is nil: the window would paint the platform default, not the canvas")
 	}
@@ -71,7 +71,7 @@ func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
 }
 
 func TestAppOptionsRegistersLifecycleHooks(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.OnStartup == nil {
 		t.Error("OnStartup is nil: a.ctx would never be captured, so runtime.EventsEmit fails in later phases")
@@ -88,7 +88,7 @@ func TestAppOptionsRegistersLifecycleHooks(t *testing.T) {
 // only inside main.go, and OnSecondInstanceLaunch is asserted present so a
 // second launch always has somewhere to hand its window off to.
 func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.SingleInstanceLock == nil {
 		t.Fatal("SingleInstanceLock is nil: a second launch would start a competing coordinator, listener and beacon")
@@ -103,6 +103,24 @@ func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
 	}
 }
 
+func TestAppOptionsDefaultUsesNativeLockProbe(t *testing.T) {
+	data, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.ReplaceAll(string(data), "\r\n", "\n"), "return appOptionsWithLockProbe(app, nativeSingleInstanceLockUsable)") {
+		t.Fatal("production appOptions bypasses the native lock probe")
+	}
+	app := NewApp()
+	var logged int
+	app.logf = func(string, ...any) { logged++ }
+	calls := 0
+	opts := appOptionsWithLockProbe(app, func() bool { calls++; return false })
+	if calls != 1 || opts.SingleInstanceLock != nil || logged != 1 {
+		t.Fatal("degraded options must run the probe, disable locking and report once")
+	}
+}
+
 // The non-nil check above is satisfied by any callback, including a stub
 // func(options.SecondInstanceData) {} that restores nothing -- appOptions
 // could swap in one and every test would stay green. This drives the callback
@@ -111,7 +129,7 @@ func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
 // App -- can pass.
 func TestAppOptionsSecondInstanceCallbackRestoresTheWindow(t *testing.T) {
 	h := newHarness(t)
-	opts := appOptions(h.app)
+	opts := appOptionsWithLockProbe(h.app, func() bool { return true })
 
 	opts.SingleInstanceLock.OnSecondInstanceLaunch(options.SecondInstanceData{Args: []string{testPath}})
 
@@ -134,7 +152,7 @@ func TestAppOptionsSecondInstanceCallbackRestoresTheWindow(t *testing.T) {
 // either by, say, answering "" or panicking instead of counting the drop.
 func TestAppOptionsSecondInstanceCallbackBeforeStartupIsSafe(t *testing.T) {
 	h := newUnstartedHarness(t)
-	opts := appOptions(h.app)
+	opts := appOptionsWithLockProbe(h.app, func() bool { return true })
 
 	opts.SingleInstanceLock.OnSecondInstanceLaunch(options.SecondInstanceData{})
 
@@ -155,7 +173,7 @@ func TestAppOptionsSecondInstanceCallbackBeforeStartupIsSafe(t *testing.T) {
 // string. Compilation cannot catch its absence, so it is pinned here beside
 // the drop and window options.
 func TestAppOptionsRegistersTheErrorFormatter(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.ErrorFormatter == nil {
 		t.Fatal("ErrorFormatter is nil: rejections would carry raw adapter text and no stable code")
@@ -460,7 +478,7 @@ func voiceToneMessageFor(t *testing.T, fullRegistry, key string) string {
 // load-bearing only when this story gave the App its first exported method.
 func TestAppOptionsBindsTheApp(t *testing.T) {
 	app := NewApp()
-	opts := appOptions(app)
+	opts := appOptionsWithLockProbe(app, func() bool { return true })
 
 	if len(opts.Bind) != 1 {
 		t.Fatalf("Bind holds %d entries, want exactly the App", len(opts.Bind))

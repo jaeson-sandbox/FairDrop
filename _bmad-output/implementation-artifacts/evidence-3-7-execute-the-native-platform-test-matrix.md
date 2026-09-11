@@ -1,8 +1,171 @@
 # Story 3.7 evidence
 
+## Current verdict: independent review requires implementation loop 1
+
+All three BMAD review layers completed after their first attempts failed with a usage-limit error (no findings existed from those failed attempts). Verification-gap returned no gaps. Blind Hunter returned ten findings; Edge Case Hunter returned the lock FIFO and TCP half-close findings independently. Deduplicated only those two exact claims/actions. The full 293,214-character cumulative diff from d43aa69db42c19324bae9f837b909649ca608099 was delivered as a temporary diff file, read completely by each reviewer; no reviewer edited the shared worktree.
+
+| Finding | Severity | Route / action |
+|---|---|---|
+| Resolution happens before busy/shutdown admission and cannot observe cancellation | high | bad_spec: corrected non-frozen Code Map; stage-facing source decorator behind admission, bounded outstanding resolver, explicit cancellation tests |
+| Lock FIFO can block startup; symlink/nonregular target not refused | high | patch carried through loop: nonblocking/no-follow regular-file probe, native fixtures |
+| Connection wrapper hides TCP CloseWrite used by net/http | high | patch carried through loop: forward half-close and exercise real closing paths |
+| Darwin snapshot can match recycled device/inode | medium | patch carried through loop: generation/birth fingerprint and unlink/recreate plus deterministic identity tests; honest limits |
+| Logical ZIP size does not prove >32-bit archive offsets | medium | patch carried through loop: synthetic offset-threshold readback through production entry writer, distinguished from actual large-entry stream |
+| New mutation/smoke gates not pinned in workflow tests | medium | patch carried through loop: job/platform-scoped pins and removal mutations |
+| Mutation script accepts unrelated named failure and may accept timeout | medium | patch carried through loop: passing baseline, exact expected assertion, reject timeout/build/setup failure; verdict tests |
+| Full-stack download helper never waits for natural terminal event | medium | patch carried through loop: matching Complete before cleanup; no cancellation counted as success |
+| Ordinary options tests assume usable host lock and can panic | medium | patch carried through loop: deterministic option usability plus default-path wiring proof |
+| Native names cover ancestors but not Unicode/space leaf metadata and archive names | medium | patch carried through loop: leaf fixtures and literal metadata/header/archive-name assertions |
+
+The loop counter is now 1. Frozen intent remains approved and unchanged. Verified code is preserved in adc492cfb656f888c9a284c89df445086a326ab7; code changes are reverted for BMAD re-derivation with positive KEEP instructions in the spec. Documentation and evidence remain intact. The earlier green native gate below proves that checkpoint, not the upcoming review fixes. Story 3.7 is not done.
+
+## Review loop 1 re-derivation (2026-09-11, verification in progress)
+
+Reconstructed the KEEP implementation from adc492cfb656f888c9a284c89df445086a326ab7,
+then corrected each of the ten routed findings. App delegates Stage unchanged;
+the coordinator's SourcePort now resolves ancestors after admission, checks
+cancellation, retains at most one unresolved OS call, and refuses busy retries
+until that call returns. The stream retains the same raw inspector.
+Darwin metadata identity compares device/inode/generation/birth timestamp across
+both stat representations, with native unlink/recreate and deterministic recycled
+identity coverage. The residual identical-fingerprint risk is documented; snapshots
+do not claim inode ownership.
+
+Darwin locking uses nonblocking/no-follow opens and a regular-descriptor gate
+before flock, with independent production wiring and FIFO/symlink/kind tests.
+The HTTP connection wrapper preserves TCP half-close, exercised by real unread
+body and oversized-header requests. ZIP64 offset coverage uses a virtual prefix
+and production entry writer; it checks central-directory and subsequent-entry
+offsets plus CRC, and does not claim a multi-GiB compressed stream.
+The full-stack matrix now checks returned metadata, Unicode/space leaf names,
+HTTP attachment names, ZIP entry names and a matching natural Complete before
+cleanup. Workflow tests pin proof gates to jobs/platforms and mutation verdicts
+require an executed passing named baseline plus the intended assertion failure;
+timeouts, panics, build/setup failures and skips are rejected.
+
+Local Windows verification passes: Wails build, bindings/gitkeep, gofmt, vet,
+staticcheck, ordinary Go suite, cgo=1 race suite (stream 263.358s), frontend
+(17 files / 498 tests), and LF checks. Darwin arm64 build/vet/bare staticcheck
+and Linux amd64 build/vet preflights pass; these are not native proof.
+Local selected-symlink tests explicitly skip because this account lacks creation
+privilege; local UNC fixtures are absent. CI requires those native capabilities.
+Manual UI/focus/browser observations remain optional and unverified.
+
+Ten local mutations each passed its exact named baseline and then failed its
+specific assertion: early Complete, early 410 failure, ignored final short write,
+concurrent file ownership, concurrent ZIP ownership, hidden TCP half-close and
+multiple outstanding resolvers, removed Linux job, removed native lock smoke,
+and removed mutation gates. Complete baseline/mutation transcripts are retained
+under C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-7-review-loop-1.
+Native-only mutations and corrected CI conclusions remain pending.
+
+### Complete new ordinary-gate failure, corrected before retry
+
+The existing composition test expected the raw inspector directly in the
+coordinator. It now checks the decorator, its production resolver, and pointer
+identity of the shared raw inspector held by staging and streaming.
+
+```text
+--- FAIL: TestComposeWiresTheSixRealAdapters (0.00s)
+    app_test.go:350: coordinator field "source" holds *main.selectionSource, want *source.Inspector
+2026/09/11 19:46:39 fairdrop: shutdown begin
+FAIL
+FAIL    fairdrop    0.393s
+ok      fairdrop/internal/network    0.580s
+ok      fairdrop/internal/qr    0.393s
+ok      fairdrop/internal/server    4.621s
+ok      fairdrop/internal/source    0.642s
+ok      fairdrop/internal/stream    10.468s
+ok      fairdrop/internal/transfer    0.746s
+ok      fairdrop/scripts/mutationverdict    0.420s
+FAIL
+```
+
+### Complete new foreign-preflight failure, corrected before retry
+
+x/sys v0.46.0 calls Darwin birth metadata Btim; syscall calls it Birthtimespec.
+The initial field spelling failed compilation and was corrected in production
+and synthetic tests before the successful build/vet preflight.
+
+```text
+# fairdrop/internal/source
+internal\source\handle_darwin.go:151:73: status.Birthtim undefined (type *"golang.org/x/sys/unix".Stat_t has no field or method Birthtim)
+# fairdrop/internal/source
+internal\source\handle_darwin.go:151:73: status.Birthtim undefined (type *"golang.org/x/sys/unix".Stat_t has no field or method Birthtim)
+# fairdrop/internal/source
+# [fairdrop/internal/source]
+vet.exe: internal\source\handle_darwin.go:151:73: status.Birthtim undefined (type *unix.Stat_t has no field or method Birthtim)
+```
+
+Story acceptance and independent review remain pending. No manual observation or
+foreign-platform preflight is counted as native execution.
+
+## Prior implementation verdict: step 03 complete before independent review
+
+Native Verify run [34656650584](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34656650584)
+at `adc492cfb656f888c9a284c89df445086a326ab7` concluded **success**, with all three
+job conclusions explicitly read: Windows `103450426742`, macOS `103450426600`,
+Linux adapters `103450426700`. Both desktop jobs passed native Wails build,
+bindings/gitkeep, formatting, vet/staticcheck, ordinary and cgo-backed race Go
+suites, 17 frontend files / 498 tests, LF checks and native mutations. Linux passed
+native Go vet, ordinary/race suites and mutations; it is not release proof.
+Stream race durations: Windows 424.291s, macOS 524.325s, Linux 477.951s.
+
+### Matrix test audit and deferred closure
+
+All ten rows pass. Names below identify executable covering tests; the native
+coverage logs were read, as were the unfiltered suite and mutation results.
+
+| Row | Covering test(s) | Native evidence / closed id |
+| --- | --- | --- |
+| System aliases | `TestDarwinSystemTemporaryAncestorStageAndDownload`; `TestStageTransferResolvesAncestorsBeforeInspect` | macOS /tmp and /var/tmp file+folder transfers; boundary tests on all hosts. D-094 |
+| Selected symlink refusal | `TestStageTransferRefusesSelectedSymlinkAndPreservesTraversalRefusals` | Windows/macOS/Linux pass; leaf-follow mutation killed on each. Part of D-094 |
+| FIFO after metadata | `TestPOSIXContentOpenRefusesFIFOAfterMetadataWithoutBlocking`; `TestPOSIXContentOpenClearsNonblockingForRegularFile` | Native macOS/Linux, both guard mutations killed. D-076 |
+| Non-reading metadata and identity | `TestLinuxMetadataHandleUsesOPathWithoutReadAccess`; `TestDarwinMetadataSnapshotNeedsNoContentPermission`; Darwin identity/no-follow/parent-relative tests; POSIX search-only tests | All relevant native tests pass, no permission capability skips. Four Darwin mutations killed. D-074 |
+| Path classes | `TestNativePathClassesStageAndDownload`; `TestNativeUNCStageAndDownload`; `TestNativeEmptySelectionRemainsInvalid` | Spaces/Unicode/>260 file+folder on both desktops; real Windows SMB file+folder; POSIX coded UNC refusal, not a UNC success claim. D-007 |
+| Portable name gate | `TestNativeChildNameRefusesReceiverVolumePrefixes`; existing archive-name suite | All hosts; reverting to host-dependent VolumeName killed on POSIX. D-084 |
+| ZIP64 | `TestArchiveZIP64EntryCountReadsBackEveryEntry`; `TestArchiveZIP64FourGiBEntryAndTotalReadBack` | Full suites pass all hosts; Linux verbose log names both. 65,537 entries and 4 GiB+1 entry plus tail, contents/CRC verified. Logical total, not a >4 GiB compressed-offset claim. D-078 |
+| Concurrent streaming | `TestWriteToConcurrentCallersStreamExactlyOnce` | Full native race suites; file and archive ownership mutations killed on all hosts. D-014 |
+| Unusable native lock | `TestDarwinBuiltAppSurvivesUnusableLock`; Darwin preflight tests; `TestNativeSingleInstanceDegradationReportsNoPathOrCause` | Actual built macOS process survives with fixed diagnostic (2.32s); mode restored through held descriptor. No window/focus claim. D-089 |
+| HTTP finalization | `TestNaturalCompletionWaitsForHTTPFinalization`; `TestPreparationFailureFinalizes410BeforeTerminalTeardown`; full App path tests | File/chunked delayed-write, failure, short-write, cancel, disconnect and 410 assertions; native suites and three native HTTP mutations. D-110 |
+
+D-095 also closes: the independently pinned Linux-only adapter job now actually
+executes O_PATH/POSIX behavior; deleting the job fails its named workflow test on
+all hosts. These are ten distinct discharged ids: D-007, D-014, D-074, D-076,
+D-078, D-084, D-089, D-094, D-095, D-110. The owning story already cites all ten.
+
+Native mutation outcomes: 14 killed on macOS, 10 on Linux, 7 on Windows (shared
+mutations repeat across platforms). No compiler error or unrelated timeout counts
+as a kill. Local extra mutations pin final-error conversion and progress lease
+release. Formal review has not yet run.
+
+Skip audit: Windows skips macOS-only aliases; POSIX skips Windows-only namespace
+forms. macOS's opt-in process smoke skips in ordinary suites but separately ran
+and passed its dedicated CI step, whose survival marker is mandatory. Linux's
+real-user-folder diagnostic is intentionally opt-in and unrelated to acceptance.
+Local UNC/symlink privilege skips were replaced by successful native Windows CI
+fixtures. No required row is closed by a skipped test. Manual UI/device checks
+remain optional/unverified under the owner's policy.
+
+Everything below is chronological checkpoint evidence, including failures that
+precede this successful verdict; those failures are intentionally preserved.
+
 ## Owner-approved fix continuation — 2026-09-11
 
 ### Native harness correction and stronger once-only assertion
+
+Third native run: `34656650584`, code checkpoint
+`adc492cfb656f888c9a284c89df445086a326ab7`. The corrected macOS process smoke
+passed and ordinary native Go gates passed; full native race/mutation conclusions
+are still pending at this checkpoint. The story Code Map has been refreshed to
+describe the implemented design and actual CI discoveries, not stale baseline
+defects. No approved intent or matrix expectation changed.
+
+Additional finalization mutation: suppressing conversion of an observed final
+write error into ServerFailed causes all six file/chunked error, short-write and
+disconnect cases to fail `failed final write was not reported as transfer_failed`.
+The production file was restored byte-for-byte; five focused race repetitions
+passed afterward. This pins error reporting as well as completion ordering.
 
 Corrected-harness checkpoint local gate: Wails 4.946s; stable bindings/gitkeep;
 gofmt/vet/staticcheck; seven Go packages (stream 10.204s); cgo=1; seven race

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"fairdrop/internal/transfer"
@@ -228,5 +229,101 @@ func TestDarwinStatModeMappingAndIdentityFields(t *testing.T) {
 	}
 	if nativeSameFile(nil, first) || nativeSameFile(first, nil) {
 		t.Fatal("identity accepted missing metadata")
+	}
+}
+
+type syscallDarwinInfo struct {
+	fs.FileInfo
+	status syscall.Stat_t
+}
+
+func (i syscallDarwinInfo) Sys() any { return &i.status }
+
+func TestDarwinMetadataRefusesRecycledIdentityAcrossStatRepresentations(t *testing.T) {
+	original := unix.Stat_t{Dev: 1, Ino: 2, Gen: 3, Btim: unix.Timespec{Sec: 4, Nsec: 5}}
+	for _, field := range []string{"device", "inode", "generation", "birth-seconds", "birth-nanoseconds"} {
+		t.Run(field, func(t *testing.T) {
+			changed := original
+			switch field {
+			case "device":
+				changed.Dev++
+			case "inode":
+				changed.Ino++
+			case "generation":
+				changed.Gen++
+			case "birth-seconds":
+				changed.Btim.Sec++
+			case "birth-nanoseconds":
+				changed.Btim.Nsec++
+			}
+			forms := func(s unix.Stat_t) []fs.FileInfo {
+				unixInfo := &darwinFileInfo{status: s}
+				return []fs.FileInfo{unixInfo, syscallDarwinInfo{FileInfo: unixInfo, status: syscall.Stat_t{
+					Dev: s.Dev, Ino: s.Ino, Gen: s.Gen,
+					Birthtimespec: syscall.Timespec{Sec: s.Btim.Sec, Nsec: s.Btim.Nsec},
+				}}}
+			}
+			for _, first := range forms(original) {
+				for _, same := range forms(original) {
+					if !nativeSameFile(first, same) {
+						t.Fatal("same identity rejected across stat representations")
+					}
+				}
+				for _, replacement := range forms(changed) {
+					if nativeSameFile(first, replacement) || nativeSameFile(replacement, first) {
+						t.Fatal("recycled identity accepted after " + field + " changed")
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestDarwinMetadataRefusesUnlinkRecreate(t *testing.T) {
+	for _, directory := range []bool{false, true} {
+		base := fixtureDir(t)
+		path := filepath.Join(base, "selected")
+		create := func() {
+			t.Helper()
+			if directory {
+				if err := os.Mkdir(path, 0o700); err != nil {
+					t.Fatal("directory fixture failed")
+				}
+			} else if err := os.WriteFile(path, []byte("payload"), 0o600); err != nil {
+				t.Fatal("file fixture failed")
+			}
+		}
+		create()
+		metadata, ancestors := openPOSIXMetadataForSelection(t, path)
+		inspected, err := metadata.Stat()
+		if err != nil {
+			t.Fatal("snapshot failed")
+		}
+		if err := os.Remove(path); err != nil {
+			t.Fatal("unlink fixture failed")
+		}
+		create()
+		var opened statHandle
+		var release func() error
+		if directory {
+			h, err := metadata.OpenEnumeration()
+			if err != nil {
+				t.Fatal("replacement directory open failed")
+			}
+			opened, release = h, h.Close
+		} else {
+			h, err := ancestors[len(ancestors)-1].(*posixNode).OpenChildContent("selected")
+			if err != nil {
+				t.Fatal("replacement content open failed")
+			}
+			opened, release = h, h.Close
+		}
+		_, verifyErr := New().verifyOpened(context.Background(), inspected, opened, directory)
+		_ = release()
+		_ = metadata.Close()
+		_ = closeMetadataHandles(context.Background(), ancestors, nil)
+		if transfer.ErrorCodeOf(verifyErr) != transfer.ErrSourceChanged {
+			t.Fatal("unlink/recreate escaped the snapshot identity gate")
+		}
 	}
 }
