@@ -7,7 +7,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -271,17 +270,25 @@ func TestTheCodeRegistryIsExactlyTheseThirteenCodes(t *testing.T) {
 func TestEveryDiagnosticMessageIsAFixedLiteral(t *testing.T) {
 	t.Parallel()
 
-	set := token.NewFileSet()
-	pkg, err := parser.ParseDir(set, ".", func(info fs.FileInfo) bool {
-		return !strings.HasSuffix(info.Name(), "_test.go")
-	}, 0)
+	// ParseFile over a glob rather than ParseDir, which is deprecated because
+	// it ignores build tags. Every file this package needs to check is
+	// unconditional Go, so the glob is exact here and carries no dependency.
+	sources, err := filepath.Glob("*.go")
 	if err != nil {
-		t.Fatalf("parse the package: %v", err)
+		t.Fatalf("glob the package: %v", err)
 	}
 
+	set := token.NewFileSet()
 	calls := 0
-	for _, files := range pkg {
-		for name, file := range files.Files {
+	for _, name := range sources {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(set, name, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", name, err)
+		}
+		{
 			ast.Inspect(file, func(node ast.Node) bool {
 				call, ok := node.(*ast.CallExpr)
 				if !ok {
@@ -307,6 +314,9 @@ func TestEveryDiagnosticMessageIsAFixedLiteral(t *testing.T) {
 		}
 	}
 
+	if len(sources) == 0 {
+		t.Fatal("no package sources found, so this test would pass vacuously")
+	}
 	if calls == 0 {
 		t.Fatal("no recordDiagnostic calls parsed, so this test would pass vacuously")
 	}
