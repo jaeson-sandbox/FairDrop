@@ -4,6 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"io/fs"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -245,5 +250,64 @@ func TestTheCodeRegistryIsExactlyTheseThirteenCodes(t *testing.T) {
 		if _, found := publicMessages[code]; !found {
 			t.Errorf("publicMessages no longer defines %q", code)
 		}
+	}
+}
+
+// TestEveryDiagnosticMessageIsAFixedLiteral is where AD-9's diagnostic
+// guarantee actually lives.
+//
+// app.go's logDiagnostic takes a string and prints it; nothing inside it could
+// reliably recognise every shape an absolute path or a capability token can
+// take, and a guarantee that depends on guessing is not one. What can be
+// guaranteed is that no caller ever hands it anything but text this package
+// wrote itself -- so this parses the package's own source and requires every
+// recordDiagnostic call to pass a string literal as its message, never a
+// variable, a format, or a concatenation that could carry an adapter's words.
+//
+// Parsed with go/ast rather than matched with a regular expression: these
+// calls span lines and nest another call in their first argument, which a
+// pattern gets wrong in exactly the direction that makes a test pass while
+// reading nothing -- the first version of this test did.
+func TestEveryDiagnosticMessageIsAFixedLiteral(t *testing.T) {
+	t.Parallel()
+
+	set := token.NewFileSet()
+	pkg, err := parser.ParseDir(set, ".", func(info fs.FileInfo) bool {
+		return !strings.HasSuffix(info.Name(), "_test.go")
+	}, 0)
+	if err != nil {
+		t.Fatalf("parse the package: %v", err)
+	}
+
+	calls := 0
+	for _, files := range pkg {
+		for name, file := range files.Files {
+			ast.Inspect(file, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				selector, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || selector.Sel.Name != "recordDiagnostic" {
+					return true
+				}
+				calls++
+				if len(call.Args) != 2 {
+					t.Errorf("%s:%d: recordDiagnostic called with %d arguments, want 2",
+						filepath.Base(name), set.Position(call.Pos()).Line, len(call.Args))
+					return true
+				}
+				if literal, ok := call.Args[1].(*ast.BasicLit); !ok || literal.Kind != token.STRING {
+					t.Errorf("%s:%d: the diagnostic message is not a string literal -- adapter text is "+
+						"exactly where a path or a capability token would be (AD-9)",
+						filepath.Base(name), set.Position(call.Pos()).Line)
+				}
+				return true
+			})
+		}
+	}
+
+	if calls == 0 {
+		t.Fatal("no recordDiagnostic calls parsed, so this test would pass vacuously")
 	}
 }

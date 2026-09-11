@@ -147,6 +147,36 @@ type harness struct {
 	// exactly one reset armed must not see it polluted by a lease wait that
 	// happened to arm and immediately stop its own timer.
 	bounds *fakeTimer
+
+	// diagnosed collects every call the coordinator's Diagnose seam
+	// receives, separately from the internal sink: a diagnostic reaching
+	// this seam is exactly the property Story 3.6 adds (D-098), and folding
+	// it into the generic call log would make "this reached the seam"
+	// indistinguishable from "this was merely recorded in the sink".
+	diagnosed *diagnosticLog
+}
+
+// diagnosticLog collects every (code, message) pair a Diagnose seam call
+// carries, in order. A dedicated type rather than *recorder because a
+// diagnostic is two fields, not one string, and a test should not have to
+// reconstruct them from a formatted line.
+type diagnosticLog struct {
+	mu      sync.Mutex
+	entries []diagnostic
+}
+
+func (d *diagnosticLog) add(code ErrorCode, message string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.entries = append(d.entries, diagnostic{code: code, message: message})
+}
+
+func (d *diagnosticLog) snapshot() []diagnostic {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make([]diagnostic, len(d.entries))
+	copy(out, d.entries)
+	return out
 }
 
 func newHarness(t *testing.T) *harness {
@@ -162,6 +192,7 @@ func newHarness(t *testing.T) *harness {
 	h.clock = &fakeClock{h: h, current: time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC), step: time.Second}
 	h.timer = &fakeTimer{h: h}
 	h.bounds = &fakeTimer{h: h}
+	h.diagnosed = &diagnosticLog{}
 
 	h.coordinator = NewCoordinator(Dependencies{
 		Source:     h.source,
@@ -173,6 +204,7 @@ func newHarness(t *testing.T) *harness {
 		Now:        h.clock.Now,
 		AfterFunc:  h.timer.afterFunc,
 		BoundTimer: h.bounds.afterFunc,
+		Diagnose:   h.diagnosed.add,
 	})
 
 	t.Cleanup(h.close)

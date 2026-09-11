@@ -890,3 +890,38 @@ func TestACompleteCarryingNoSnapshotStillSucceeds(t *testing.T) {
 		t.Errorf("state is %q, want %q -- a port defect must not downgrade a success", got, stateDone)
 	}
 }
+
+// TestEveryRecordedDiagnosticAlsoReachesTheSeam is the property Story 3.6
+// exists for, asserted on the one path that produces a diagnostic without any
+// adapter failing: an observer that panics.
+//
+// The sink has always been written. What did not exist was a way for anything
+// outside this package to see it -- the contract cites "recorded as a
+// diagnostic" wherever it swallows a failure, and in a shipped binary that
+// record went nowhere. Deleting the seam call from recordDiagnostic left this
+// whole package green until this test existed, because every other test reads
+// the sink.
+func TestEveryRecordedDiagnosticAlsoReachesTheSeam(t *testing.T) {
+	h := newHarness(t)
+	h.observer.publish = func(Event) { panic("a defective observer") }
+
+	// transferring(), not stageSuccessfully(): Stage publishes no event at
+	// all, so a panicking observer there produces nothing to observe. The
+	// started event is the first one that reaches the observer.
+	h.transferring()
+
+	sunk := h.coordinator.diagnostics.snapshot()
+	seen := h.diagnosed.snapshot()
+	if len(sunk) == 0 {
+		t.Fatal("no diagnostic was recorded at all, so this test would pass vacuously")
+	}
+	if len(seen) != len(sunk) {
+		t.Fatalf("the sink holds %d diagnostics and the seam saw %d: a record that reaches only the "+
+			"sink is invisible to a running FairDrop", len(sunk), len(seen))
+	}
+	for i := range sunk {
+		if seen[i] != sunk[i] {
+			t.Errorf("diagnostic %d reached the seam as %+v and the sink as %+v", i, seen[i], sunk[i])
+		}
+	}
+}

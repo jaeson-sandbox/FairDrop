@@ -381,6 +381,24 @@ func (a *App) publish(event transfer.Event) {
 	a.emit(ctx, string(event.Kind), event)
 }
 
+// logDiagnostic writes the one line an internal diagnostic leaves behind, and
+// is what makes the coordinator's diagnostic sink mean anything outside a test
+// (D-098). The contract leans on "recorded as a diagnostic" wherever a failure
+// is deliberately swallowed -- a cleanup error, a bound that elapsed, an event
+// the observer refused -- and until this existed every one of those records
+// went somewhere no running FairDrop could show anyone.
+//
+// Only a stable code and a fixed message the transfer package chose reach this
+// line. An adapter's own error text never does: that is where an absolute path
+// or a capability token would be, and AD-9 has no exceptions (see
+// recordDiagnostic, which passes a code rather than a cause for that reason).
+func (a *App) logDiagnostic(code transfer.ErrorCode, message string) {
+	if a == nil || a.logf == nil {
+		return
+	}
+	a.logf("fairdrop: diagnostic code=%s %s", string(code), message)
+}
+
 // logEvent writes the one line a lifecycle event leaves behind. Everything in
 // it is either a fixed word, a number, or a value the contract already allows
 // on the wire to the window; nothing here can name a path or a token.

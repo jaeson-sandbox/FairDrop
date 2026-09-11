@@ -352,6 +352,40 @@ func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 	}
 }
 
+// TestEveryWarningCodeIsAcceptedByTheFrontendParser closes Epic 1
+// retrospective item 3. Warning.Code is now transfer.WarningCode, a
+// narrower type than ErrorCode, so a Warning carrying some other recognized
+// failure code no longer compiles -- but nothing yet proved the set of
+// WarningCode constants this package declares is exactly the set
+// frontend/src/transfer/validation.ts's parseWarning accepts. Before the
+// type existed, a mismatch there destroyed the whole Stage acknowledgement
+// rather than just the one warning: parseWarning rejects an unrecognized
+// code, and parseFileMetadata rejects the entire metadata when any one
+// warning fails to parse, cancelling a perfectly good session over a
+// warning nobody needed to see.
+//
+// The list below is a literal, in the same spirit as registryEntries above:
+// a WarningCode added to types.go without also being added here is not
+// reported as missing, so adding one is two edits, not one -- but it is one
+// deliberate edit in a small, visible list, not a silent compile-time gap.
+func TestEveryWarningCodeIsAcceptedByTheFrontendParser(t *testing.T) {
+	everyWarningCode := []transfer.WarningCode{transfer.WarnBeaconUnavailable}
+
+	mirror, err := os.ReadFile(filepath.Join("frontend", "src", "transfer", "validation.ts"))
+	if err != nil {
+		t.Fatalf("read validation.ts: %v", err)
+	}
+	parseWarningBody := tableSection(t, string(mirror), "export function parseWarning", "\n}\n")
+
+	for _, code := range everyWarningCode {
+		t.Run(string(code), func(t *testing.T) {
+			if !strings.Contains(parseWarningBody, "'"+string(code)+"'") {
+				t.Errorf("validation.ts's parseWarning does not accept the Go WarningCode %q", code)
+			}
+		})
+	}
+}
+
 // tableSection returns the file content between the first occurrence of
 // start and the following occurrence of end, so a per-code search is scoped
 // to the one table or block it names rather than the whole file -- a code
@@ -657,4 +691,34 @@ func storyPrefix(key string) string {
 		return key
 	}
 	return parts[0] + "-" + parts[1]
+}
+
+// TestComposeWiresTheDiagnosticSeam pins the half of D-098 that lives outside
+// internal/transfer.
+//
+// The coordinator calls its Diagnose seam on every recorded diagnostic, and
+// the coordinator's own tests wire a fake one, so that side is well covered.
+// None of that says compose passes anything: with the field omitted the seam
+// defaults to a no-op, every test in every package stays green, and a shipped
+// FairDrop goes back to recording diagnostics nowhere -- which is the exact
+// state this story exists to end. The same two-halves shape as Story 3.3's
+// workflow_call: one side asked, nothing pinned the other side offering.
+//
+// Read as text rather than by constructing a coordinator because the seam is
+// not readable back off the built value, and a test that reconstructs
+// Dependencies would be pinning its own literal instead of main.go's.
+func TestComposeWiresTheDiagnosticSeam(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+
+	compose, _, found := strings.Cut(string(source), "app.useCoordinator(coordinator)")
+	if !found {
+		t.Fatal("main.go no longer calls app.useCoordinator, so this test would pass vacuously")
+	}
+	if !strings.Contains(compose, "Diagnose: app.logDiagnostic") {
+		t.Error("compose does not pass Diagnose: app.logDiagnostic, so every internal diagnostic " +
+			"a shipped binary records reaches nothing a person can read")
+	}
 }

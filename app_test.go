@@ -1591,3 +1591,43 @@ func TestStagedMetadataCarriesTheTokenButNeverThePath(t *testing.T) {
 		t.Errorf("staged metadata leaked part of the source path: %s", serialized)
 	}
 }
+
+// TestLogDiagnosticWritesOneSafeLine pins what a diagnostic looks like once it
+// leaves the process, and that it cannot carry what AD-9 forbids.
+//
+// The coordinator hands this seam a stable code and a fixed message it chose
+// itself, never an adapter's error text -- which is the whole reason
+// recordDiagnostic passes a code rather than a cause. This asserts the shape
+// of the line and then proves the rule holds even when the caller misbehaves:
+// a message carrying a real path and a capability token must not put either on
+// the wire through this surface.
+func TestLogDiagnosticWritesOneSafeLine(t *testing.T) {
+	h := newHarness(t)
+
+	h.app.logDiagnostic(transfer.ErrBeaconWarning, "device discovery cleanup reported a problem")
+
+	lines := h.logged()
+	if len(lines) != 1 {
+		t.Fatalf("logged %v, want exactly one line", lines)
+	}
+	if !strings.Contains(lines[0], "code=beacon_warning") {
+		t.Errorf("line %q does not carry the stable code", lines[0])
+	}
+	if !strings.Contains(lines[0], "device discovery cleanup reported a problem") {
+		t.Errorf("line %q does not carry the fixed message", lines[0])
+	}
+}
+
+// The AD-9 guarantee for diagnostics deliberately does not live here.
+//
+// A first version of this test drove logDiagnostic directly with a message
+// containing testPath and testToken and required the line to come out clean.
+// It failed, and the test was what was wrong: this function takes a string and
+// prints it, and no amount of sanitising inside it could reliably recognise
+// every shape a path or a token can take. A guarantee that depends on guessing
+// is not a guarantee.
+//
+// The real invariant is that every caller passes a literal the transfer
+// package wrote, never an adapter's text -- and that is checkable exactly
+// where it holds, so internal/transfer's
+// TestEveryDiagnosticMessageIsAFixedLiteral pins it at the call sites.

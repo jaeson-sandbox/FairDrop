@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/netip"
 	"slices"
@@ -60,6 +61,18 @@ const (
 	// a healthy teardown -- which finishes in milliseconds -- never comes
 	// close, and an unhealthy one is reported rather than waited on forever.
 	leaseBound = 45 * time.Second
+
+	// observerPublishBound caps how long the coordinator waits for one
+	// Observer.Publish call before giving up on that one event and moving
+	// on. The contract already calls Publish a synchronous FIFO handoff, so
+	// a healthy observer returns in microseconds; this is generous headroom
+	// for a slow UI callback, never a ceiling a working one approaches. A
+	// call that has not returned when the bound elapses keeps running on its
+	// own goroutine -- the same shape callBounded already uses for every
+	// other adapter call this package bounds -- so a blocking observer can
+	// no longer hold the operation lease hostage and stall the next command
+	// (D-034).
+	observerPublishBound = 5 * time.Second
 )
 
 // sessionState is the coordinator's lifecycle state. STAGING and CLAIMING are
@@ -98,14 +111,31 @@ type diagnostic struct {
 }
 
 type diagnosticSink struct {
-	mu      sync.Mutex
-	entries []diagnostic
+	mu         sync.Mutex
+	entries    []diagnostic
+	overflowed bool
+}
+
+// diagnosticOverflow replaces whatever entry would have been silently
+// dropped once the sink is full. A truncated sink is indistinguishable from
+// a complete one to anything that reads it, and this package's whole reason
+// for keeping the sink is to be inspected (D-031) -- so the last slot is
+// reserved for saying so, once, rather than left to keep dropping silently
+// forever after.
+var diagnosticOverflow = diagnostic{
+	code:    ErrTransferFailed,
+	message: "further diagnostics were dropped: the sink reached its limit",
 }
 
 func (s *diagnosticSink) record(entry diagnostic) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.entries) >= maxDiagnostics {
+	if s.overflowed {
+		return
+	}
+	if len(s.entries) >= maxDiagnostics-1 {
+		s.entries = append(s.entries, diagnosticOverflow)
+		s.overflowed = true
 		return
 	}
 	s.entries = append(s.entries, entry)
@@ -202,6 +232,17 @@ type Dependencies struct {
 	Entropy  io.Reader
 	Now      func() time.Time
 
+	// Diagnose is the optional seam every recorded diagnostic also reaches,
+	// beyond the internal sink that only a test reads today (D-098). It
+	// defaults to a no-op: internal/transfer imports no logging package and
+	// must not know what stderr is -- main.go's compose is what wires this
+	// to app.go's logf in a composed binary, the same surface every other
+	// lifecycle line already goes through. Every call carries a stable code
+	// and a fixed message this package chose, never adapter text (AD-9); see
+	// recordDiagnostic, the single write path both the sink and this seam
+	// share.
+	Diagnose func(code ErrorCode, message string)
+
 	// AfterFunc schedules the terminal reset. It must behave like
 	// time.AfterFunc in the one way the coordinator depends on: run must not
 	// be invoked before AfterFunc returns. The reset is armed on the drainer
@@ -239,6 +280,7 @@ type Coordinator struct {
 	now        func() time.Time
 	afterFunc  func(delay time.Duration, run func()) StopTimer
 	boundTimer func(delay time.Duration, run func()) StopTimer
+	diagnose   func(code ErrorCode, message string)
 
 	// afterArm is a test-only hook, nil in production. It runs on the drainer
 	// goroutine inside armReset, after the reset timer has been created and
@@ -298,6 +340,10 @@ func NewCoordinator(deps Dependencies) *Coordinator {
 			return time.AfterFunc(delay, run).Stop
 		}
 	}
+	diagnose := deps.Diagnose
+	if diagnose == nil {
+		diagnose = func(ErrorCode, string) {}
+	}
 
 	return &Coordinator{
 		source:     deps.Source,
@@ -309,6 +355,7 @@ func NewCoordinator(deps Dependencies) *Coordinator {
 		now:        now,
 		afterFunc:  afterFunc,
 		boundTimer: boundTimer,
+		diagnose:   diagnose,
 		lease:      lease,
 		state:      stateIdle,
 	}
@@ -613,24 +660,30 @@ func (c *Coordinator) failStage(live *session, cause error) (FileMetadata, error
 // handling runs on the drainer goroutine and uses releaseAcquired directly,
 // because joining itself would be a guaranteed deadlock.
 //
-// The returned error is nil on the healthy path and otherwise the first
-// bound that was hit, naming which adapter or wait did not return in time.
-// Every step still runs regardless of an earlier one's outcome: a stuck
-// server must not skip the attempt to stop a live beacon, and a bound hit on
-// either must not skip the drainer join.
+// The returned error is nil on the healthy path and otherwise every bound
+// that was hit, naming which adapters or waits did not return in time --
+// not only the first (D-100): releaseAcquired's own release calls and the
+// drainer join can each hit their own bound in one unwind, and a caller
+// told about only the first has no way to learn the second is also
+// unaccounted for. Every step still runs regardless of an earlier one's
+// outcome: a stuck server must not skip the attempt to stop a live beacon,
+// and a bound hit on either must not skip the drainer join.
 func (c *Coordinator) unwind(live *session) error {
 	err := c.releaseAcquired(live)
-	if joinErr := c.joinDrainerBounded(live); joinErr != nil && err == nil {
-		err = joinErr
+	if joinErr := c.joinDrainerBounded(live); joinErr != nil {
+		err = errors.Join(err, joinErr)
 	}
 	return err
 }
 
 // releaseAcquired releases every live resource in reverse acquisition order,
-// each within its own bound, and reports the first bound that was hit. The
-// caller owns the operation lease and must not hold the state mutex.
+// each within its own bound, and reports every bound that was hit -- both
+// the beacon and the server can each be unaccounted for in one teardown, and
+// a caller told about only the first has no way to learn the second is too
+// (D-100). The caller owns the operation lease and must not hold the state
+// mutex.
 func (c *Coordinator) releaseAcquired(live *session) error {
-	var first error
+	var joined error
 	for index := len(live.acquired) - 1; index >= 0; index-- {
 		var err error
 		switch live.acquired[index] {
@@ -639,12 +692,12 @@ func (c *Coordinator) releaseAcquired(live *session) error {
 		case resourceServer:
 			err = c.stopServerBounded()
 		}
-		if err != nil && first == nil {
-			first = err
+		if err != nil {
+			joined = errors.Join(joined, err)
 		}
 	}
 	live.acquired = nil
-	return first
+	return joined
 }
 
 // joinDrainerBounded waits, up to drainerJoinBound, for this session's
@@ -912,11 +965,53 @@ func (c *Coordinator) publish(event Event) {
 	if c.observer == nil {
 		return
 	}
-	c.observer.Publish(event)
+
+	_, completed := c.callBounded(observerPublishBound, func() error {
+		return c.publishToObserver(event)
+	})
+	if !completed {
+		// The call is left running on its own abandoned goroutine, exactly
+		// like every other bounded adapter call in this package: Go offers
+		// no way to force it to stop, and this event is the one thing that
+		// did not reach the observer in time -- reported rather than waited
+		// on forever (D-034, D-049).
+		c.recordDiagnostic(
+			NewError(ErrTransferFailed, "an event observer did not return before its bound"),
+			"a lifecycle event could not be confirmed delivered because the observer did not return in time",
+		)
+	}
 }
 
+// publishToObserver calls the observer exactly once, recovering a panic so
+// that a defective implementation can neither crash the process nor strand
+// the operation lease the caller holds (D-043). The recovered value is
+// never inspected or logged: a panic can carry anything, which is exactly
+// the shape an absolute path or a capability token would take, so only the
+// fact that one happened is ever recorded (AD-9).
+func (c *Coordinator) publishToObserver(event Event) (err error) {
+	defer func() {
+		if recover() != nil {
+			c.recordDiagnostic(
+				NewError(ErrTransferFailed, "an event observer panicked"),
+				"a lifecycle event observer panicked while publishing",
+			)
+		}
+	}()
+	c.observer.Publish(event)
+	return nil
+}
+
+// recordDiagnostic is the single write path for an internal diagnostic: the
+// bounded sink a test can inspect, and the injected seam a composed binary
+// can (D-098). cause supplies only its stable code -- never its message,
+// which may be adapter text -- and message is always a fixed string this
+// package chose (AD-9).
 func (c *Coordinator) recordDiagnostic(cause error, message string) {
-	c.diagnostics.record(diagnostic{code: ErrorCodeOf(cause), message: message})
+	code := ErrorCodeOf(cause)
+	c.diagnostics.record(diagnostic{code: code, message: message})
+	if c.diagnose != nil {
+		c.diagnose(code, message)
+	}
 }
 
 // ready reports whether every port the coordinator needs was injected.
@@ -972,8 +1067,9 @@ func capabilityURL(address netip.Addr, port int, token CapabilityToken) string {
 
 // beaconWarning is the fixed non-fatal warning for a discovery failure. Its
 // copy comes from the public registry rather than from the adapter, so no
-// adapter text can reach the UI through it.
+// adapter text can reach the UI through it, and its code is the one
+// WarningCode this build produces (Epic 1 retrospective item 3).
 func beaconWarning() Warning {
 	public := PublicErrorOf(NewError(ErrBeaconWarning, "device discovery is unavailable"))
-	return Warning(public)
+	return Warning{Code: WarnBeaconUnavailable, Message: public.Message}
 }

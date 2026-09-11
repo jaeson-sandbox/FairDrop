@@ -1,12 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
-	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -93,6 +94,13 @@ type Server struct {
 	// a transfer that outlives all of them still completes. Production is
 	// always defaultTimeouts.
 	timeouts serverTimeouts
+	// panicked is called, with no argument, exactly when net/http recovers a
+	// handler panic other than http.ErrAbortHandler -- the one ErrorLog line
+	// this package does not silence (D-021). It is a seam for the same
+	// reason timeouts is one: production writes a fixed, safe line to
+	// os.Stderr, and a test replaces it to observe the call without a real
+	// panicking handler racing a real listener.
+	panicked func()
 
 	mu     sync.Mutex
 	active *run
@@ -135,7 +143,51 @@ func New(payloads PayloadPort) *Server {
 		},
 		now:      time.Now,
 		timeouts: defaultTimeouts(),
+		panicked: logHandlerPanic,
 	}
+}
+
+// logHandlerPanic is the production panicked seam: one fixed line to
+// os.Stderr, carrying nothing net/http supplied. internal/server imports no
+// application logging package -- there is no App here to hand a seam to, the
+// way internal/transfer's Diagnose is wired through main.go -- so this is
+// the same stderr surface reached directly, by the same reasoning app.go's
+// own logf documents: a value that escaped a panic is adapter text, and
+// adapter text is exactly where a path or a capability token would be
+// (AD-9).
+func logHandlerPanic() {
+	_, _ = os.Stderr.WriteString("fairdrop: a request handler panicked; recovered, request details withheld\n")
+}
+
+// netHTTPPanicLinePrefix is the fixed prefix net/http's own conn.serve
+// writes its ErrorLog line under when it recovers a handler panic other
+// than http.ErrAbortHandler ("http: panic serving %v: %v\n%s" in
+// net/http/server.go). Matching only this prefix, and never forwarding the
+// bytes that follow it, is what lets one net/http mechanism serve both
+// jobs: every other line this server could log through the same *log.Logger
+// -- which can quote the request line, and therefore the capability token
+// in it -- stays silenced exactly as before, while a genuine handler panic
+// stops being swallowed along with them (D-021).
+const netHTTPPanicLinePrefix = "http: panic serving "
+
+// panicOnlyErrorLog is the io.Writer net/http's ErrorLog is bound to. It
+// never forwards a byte net/http handed it: the remote address, the
+// panic value, and the recovered stack trace can all vary in ways this
+// package has no way to bound, so the disclosure guarantee holds by
+// construction rather than by trusting net/http's formatting never changes.
+// A recognized panic line instead triggers the fixed, safe report.
+type panicOnlyErrorLog struct {
+	report func()
+}
+
+func (w panicOnlyErrorLog) Write(p []byte) (int, error) {
+	if w.report != nil && bytes.HasPrefix(p, []byte(netHTTPPanicLinePrefix)) {
+		w.report()
+	}
+	// net/http's own logger never inspects this return; reporting the full
+	// length written is what a normal io.Writer does with input it consumed
+	// and chose to withhold rather than reject.
+	return len(p), nil
 }
 
 // run is one started server: everything acquired by a single Start and
@@ -276,8 +328,14 @@ func (s *Server) Start(
 		ConnState:         active.trackConnection,
 		// net/http logs connection and panic diagnostics that can quote a
 		// request. Nothing about this server's traffic is safe to print: the
-		// path carries the capability token.
-		ErrorLog: log.New(io.Discard, "", 0),
+		// path carries the capability token. But net/http also writes a
+		// recovered handler panic to this same logger, and discarding
+		// everything discarded that too -- a genuine production defect,
+		// silenced along with the request text that made silencing anything
+		// necessary in the first place (D-021). panicOnlyErrorLog forwards
+		// only the fact that a panic happened, through the fixed report
+		// below, and drops every byte of the line itself.
+		ErrorLog: log.New(panicOnlyErrorLog{report: s.panicked}, "", 0),
 	}
 	// One request, one response, one connection. Disabling keep-alives means a
 	// finished receiver's socket closes instead of idling against a listener

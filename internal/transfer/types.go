@@ -47,12 +47,30 @@ type ProgressSnapshot struct {
 	SpeedBytesPerSec float64 `json:"speedBytesPerSec"`
 }
 
+// WarningCode is a stable code for a non-fatal condition. It is a narrower
+// type than ErrorCode on purpose: a Warning may carry only a code this
+// package has deliberately decided describes a warning, not any of the
+// thirteen recognized at a failure boundary. Before this type existed,
+// Warning.Code was plain ErrorCode, so nothing stopped a future warning from
+// compiling with a code frontend/src/transfer/validation.ts's parseWarning
+// does not recognize -- and that parser rejects the whole Stage
+// acknowledgement, not just the one warning, when it sees a code it does not
+// know (Epic 1 retrospective item 3).
+type WarningCode string
+
+// WarnBeaconUnavailable is the one WarningCode this build produces. It
+// shares ErrBeaconWarning's wire value deliberately -- the two describe the
+// same condition from two different boundaries -- without sharing its type,
+// which is the whole point: assigning any other ErrorCode to a Warning is a
+// compile error.
+const WarnBeaconUnavailable WarningCode = WarningCode(ErrBeaconWarning)
+
 // Warning is one non-fatal condition attached to an otherwise successful
 // command result. A warning never carries adapter text: its code selects fixed
 // public copy, so nothing a warning can say could contain a path or a token.
 type Warning struct {
-	Code    ErrorCode `json:"code"`
-	Message string    `json:"message"`
+	Code    WarningCode `json:"code"`
+	Message string      `json:"message"`
 }
 
 // FileMetadata is the acknowledgement of a staged transfer: everything the

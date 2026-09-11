@@ -41,11 +41,13 @@ func TestAuthorizeClaimCommitsAndPublishesStarted(t *testing.T) {
 	}
 
 	// The beacon stops before the commit, and both happen without the mutex.
-	// timer.AfterFunc arms the bound this story wraps every StopBeacon call
-	// in (D-024); it is stopped again the instant the fake returns, but it is
-	// armed first, deterministically, so it always precedes the call it
-	// bounds.
-	want0 := []string{"timer.AfterFunc", "network.StopBeacon", "clock.Now", "observer.Publish"}
+	// The first timer.AfterFunc arms the bound this story wraps every
+	// StopBeacon call in (D-024); the second arms observerPublishBound
+	// around the publication itself (D-034), added by Story 3.6 so a
+	// blocking observer cannot hold the operation lease. Both are stopped
+	// again the instant the call they bound returns, but each is armed
+	// first, deterministically, so it always precedes the call it bounds.
+	want0 := []string{"timer.AfterFunc", "network.StopBeacon", "clock.Now", "timer.AfterFunc", "observer.Publish"}
 	if got := h.calls.snapshot()[before:]; !slices.Equal(got, want0) {
 		t.Errorf("the claim handshake ran %v, want %v", got, want0)
 	}

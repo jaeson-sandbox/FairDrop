@@ -538,7 +538,7 @@ func TestStageCommitsWithAWarningWhenOnlyTheBeaconFails(t *testing.T) {
 	// usable session -- HTTP and QR live, only discovery down -- must not be
 	// told a transfer failed that never started.
 	want := Warning{
-		Code:    ErrBeaconWarning,
+		Code:    WarnBeaconUnavailable,
 		Message: PublicErrorOf(NewError(ErrBeaconWarning, "")).Message,
 	}
 	if metadata.Warnings[0] != want {
