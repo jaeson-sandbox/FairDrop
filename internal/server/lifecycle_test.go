@@ -862,3 +862,63 @@ func assertQuiescent(t *testing.T, active *run) {
 		t.Fatal("the data-plane context was still live when Stop returned")
 	}
 }
+
+// TestARepeatedStopDoesNotUpgradeAnUnresolvedTeardownToSuccess pins the one
+// place this story's governing rule collided with an older one.
+//
+// Stop is documented idempotent and safe to repeat, and it detaches the run
+// before it waits so a bounded teardown cannot deadlock a later Start. Those
+// two facts together meant the second call found nothing attached and answered
+// a bare nil -- a clean success -- for a teardown whose first call had just
+// correctly reported that quiescence was unproven. Any caller repeating Stop to
+// re-confirm got a false all-clear. Found by review.
+func TestARepeatedStopDoesNotUpgradeAnUnresolvedTeardownToSuccess(t *testing.T) {
+	t.Parallel()
+
+	blocked := make(chan struct{})
+	unblock := make(chan struct{})
+	var closeOnce sync.Once
+	payload := &stubPayload{
+		name: "report.pdf", size: 4, known: true,
+		stream: func(context.Context, io.Writer) error {
+			closeOnce.Do(func() { close(blocked) })
+			<-unblock
+			return nil
+		},
+	}
+	server := newTestServer(t, payloadsReturning(payload))
+	server.timeouts = serverTimeouts{
+		readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout,
+		teardown: 100 * time.Millisecond,
+	}
+	handle := startTestServer(t, server, &stubAuthorizer{})
+	t.Cleanup(func() { close(unblock) })
+
+	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := testClient().Do(request)
+	if err != nil {
+		t.Fatalf("GET error = %v", err)
+	}
+	t.Cleanup(func() { _ = response.Body.Close() })
+	<-blocked
+
+	first := server.Stop()
+	if first == nil {
+		t.Fatal("the first Stop reported success while a handler never returned")
+	}
+
+	second := server.Stop()
+	if second == nil {
+		t.Fatal("the second Stop reported success for a teardown that never proved quiescence: " +
+			"repeating Stop must not upgrade an unresolved answer")
+	}
+	if got, want := transfer.ErrorCodeOf(second), transfer.ErrorCodeOf(first); got != want {
+		t.Errorf("the second Stop reported code %q, want the first call's %q", got, want)
+	}
+	if second.Error() != first.Error() {
+		t.Errorf("the second Stop reported %q, want the first call's %q", second, first)
+	}
+}

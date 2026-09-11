@@ -531,8 +531,15 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 	// story covers: an mDNS shutdown that never returns must not hang the
 	// claim (D-024), so this proceeds to commit regardless of whether the
 	// bound was hit -- the diagnostic it leaves behind is the honest record.
-	_ = c.stopBeaconBounded()
-	live.release(resourceBeacon)
+	// Released only when the adapter actually confirmed it stopped. The claim
+	// still commits either way -- that is D-024, and hanging here would be the
+	// worse failure -- but booking the resource as released when the bound
+	// elapsed would be this story's rule broken in the data model rather than
+	// in a return value: a later teardown would then never revisit a beacon
+	// that may still be advertising.
+	if c.stopBeaconBounded() == nil {
+		live.release(resourceBeacon)
+	}
 
 	startedAt := c.now()
 

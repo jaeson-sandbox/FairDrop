@@ -96,6 +96,9 @@ type Server struct {
 
 	mu     sync.Mutex
 	active *run
+	// unresolved holds a run whose teardown ended without proving
+	// quiescence, so a later Stop repeats that answer instead of reporting
+	unresolved *run
 }
 
 // serverTimeouts are the net/http deadlines one server applies, plus the
@@ -312,14 +315,30 @@ func (s *Server) Stop() error {
 	}
 	s.mu.Lock()
 	if s.active == nil {
+		// A teardown that hit its bound left this behind. Answering nil here
+		// would be the story's own rule broken by the idempotence clause: the
+		// first call correctly reported that quiescence was unproven, and a
+		// second call must not upgrade that to success just because the run
+		// has already been detached. Whatever the first call concluded is what
+		// every later caller gets.
+		unresolved := s.unresolved
 		s.mu.Unlock()
+		if unresolved != nil {
+			return unresolved.teardown()
+		}
 		return nil
 	}
 	active := s.active
 	s.active = nil
 	s.mu.Unlock()
 
-	return active.teardown()
+	err := active.teardown()
+	if err != nil {
+		s.mu.Lock()
+		s.unresolved = active
+		s.mu.Unlock()
+	}
+	return err
 }
 
 func (s *Server) clock() clock {

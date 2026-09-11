@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1558,5 +1559,67 @@ func TestCancelReportsACodedFailureWhenServerStopNeverReturns(t *testing.T) {
 	if got := len(h.coordinator.diagnostics.snapshot()); got <= before {
 		t.Errorf("%d diagnostics recorded, want more than the %d before: a bound that elapsed must leave a trace",
 			got, before)
+	}
+}
+
+// TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown pins that a bound which
+// elapsed is not recorded as a release.
+//
+// AuthorizeClaim must commit even when StopBeacon hangs -- that is D-024, and
+// blocking the claim would be the worse failure. But it used to book the beacon
+// as released on the way past, which is this story's rule broken in the data
+// model rather than in a return value: teardown walks the acquired list, so a
+// beacon marked released is one no later cleanup ever revisits, and the mDNS
+// advertisement could outlive the session with only a diagnostic to show for
+// it. Found by review.
+func TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown(t *testing.T) {
+	h := newHarness(t)
+	metadata := h.stageSuccessfully()
+
+	var hang atomic.Bool
+	hang.Store(true)
+	unblock := make(chan struct{})
+	blocked := make(chan struct{})
+	var once sync.Once
+	h.network.stopBeacon = func() error {
+		if !hang.Load() {
+			return nil
+		}
+		once.Do(func() { close(blocked) })
+		<-unblock
+		return nil
+	}
+	t.Cleanup(func() { close(unblock) })
+
+	claimDone := make(chan error, 1)
+	go func() { claimDone <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
+
+	<-blocked
+	h.awaitBoundsPending()
+	h.bounds.fire()
+
+	select {
+	case err := <-claimDone:
+		if err != nil {
+			t.Fatalf("AuthorizeClaim returned %v, want it to commit despite the stuck beacon", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("AuthorizeClaim never returned")
+	}
+
+	// The beacon answers normally from here, so teardown's own attempt is the
+	// thing being observed rather than a second hang.
+	hang.Store(false)
+
+	before := strings.Count(strings.Join(portCalls(h), " "), "network.StopBeacon")
+	if err := h.coordinator.Cancel(context.Background()); err != nil {
+		t.Fatalf("Cancel returned %v", err)
+	}
+	after := strings.Count(strings.Join(portCalls(h), " "), "network.StopBeacon")
+
+	if after <= before {
+		t.Errorf("teardown made no further StopBeacon attempt (%d then %d): a beacon whose stop "+
+			"timed out was never confirmed stopped, so it must not be booked as released",
+			before, after)
 	}
 }

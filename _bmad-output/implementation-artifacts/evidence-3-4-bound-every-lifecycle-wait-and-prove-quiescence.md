@@ -287,3 +287,43 @@ driven by a test. `assertQuiescent` checks the other two on the healthy path, so
 unverified, but no test isolates a timeout in which only the accept loop or only a connection is still
 outstanding.
 
+## The adversarial layer, and the two rule violations it found
+
+The Blind Hunter layer returned twelve findings. Two of them were this story's own governing rule --
+"a bound that elapses never reports the resource gone" -- broken in places the rule's author did not
+look, and both are fixed here. The other ten are recorded as `D-096` through `D-102`.
+
+**A repeated `Stop` upgraded an unresolved teardown to success.** `Stop` is documented idempotent, and
+this story made it detach the run *before* waiting so a bounded teardown could not deadlock a later
+`Start`. Those two correct facts combined into a wrong one: the second call found nothing attached and
+answered a bare `nil` for a teardown whose first call had just reported that quiescence was unproven.
+Any caller repeating `Stop` to re-confirm got a false all-clear. The server now remembers an
+unresolved run and repeats its answer.
+
+**The claim booked the beacon as released when its bound had elapsed.** `AuthorizeClaim` must commit
+even when `StopBeacon` hangs -- that is D-024, and blocking the claim is the worse failure -- but it
+marked the resource released on the way past. Teardown walks the acquired list, so a beacon marked
+released is one no later cleanup revisits: the advertisement could outlive the session with a
+diagnostic as the only trace. The release is now conditional on the adapter actually confirming, and
+a test proves teardown makes a second attempt.
+
+Three mutations against those two fixes, all killed: answering `nil` again from the idempotence
+clause, forgetting the unresolved run, and booking the beacon released unconditionally.
+
+**What was deferred rather than fixed, and why.** Four of the ten are about the same root cause the
+layer found one level below this story: `network.Manager.StopBeacon` holds the shared selection gate
+across its own blocking `Shutdown`, so a hung mDNS shutdown degrades every later transfer in the
+process even though the coordinator itself now recovers (`D-096`). `internal/server` got exactly that
+treatment here -- detach, release, then wait -- and `internal/network` was outside this story's Code
+Map. Two more are the honesty mechanism being unreachable: the context production hands `Cancel` and
+`Shutdown` can never be cancelled, because Wails builds it from `Background` plus `WithValue` and
+never wraps it (`D-097`), and every bound-timeout diagnostic goes to a sink `app.go` never reads
+(`D-098`). Both mean a feature this story delivered is real in tests and inert in the shipped binary,
+which is worth stating plainly rather than filing quietly.
+
+The remaining three are smaller: the coordinator's bound on `Stop` equals the server's own, so the
+outer wait can preempt the inner one's more precise message (`D-099`, which the orchestrator had
+flagged independently); `unwind` reports only the first of two simultaneous bound failures (`D-100`);
+and `callBounded` abandons one goroutine per timed-out call with no cap (`D-101`). Plus `D-102`, from
+the verification-gap layer: only one of the teardown report's three named waits is driven by a test.
+

@@ -1092,7 +1092,7 @@ So that a transfer that silently stops is never mistaken for one I cancelled.
 
 **Why a separate story:** Epic 1's retrospective found a successful transfer that could be announced as "Transfer canceled", and Epic 2's live run found a failure that left no trace at all. Both are the same class of defect -- an event was lost and nothing said so -- and it had been buried among Story 3.4's timing work.
 
-**Closes:** D-020, D-021, D-031, D-034, D-035, D-039, D-042, D-043, D-048, D-049, D-059, D-091, D-092, plus Epic 1 retrospective items 2, 3, 4 and 7.
+**Closes:** D-020, D-021, D-031, D-034, D-035, D-039, D-042, D-043, D-048, D-049, D-059, D-091, D-092, D-097, D-098, D-100, plus Epic 1 retrospective items 2, 3, 4 and 7.
 
 **Acceptance Criteria:**
 
@@ -1128,7 +1128,7 @@ So that "it cross-compiles" is never mistaken for "it was verified".
 
 **Scope:** running and extending tests on the native runners Story 3.2 provides. This story adds no product behaviour.
 
-**Closes:** D-007, D-014, D-065, D-068, D-074, D-076, D-078, D-084, D-089, D-094, D-095.
+**Closes:** D-007, D-014, D-065, D-068, D-074, D-076, D-078, D-084, D-089, D-094, D-095, D-099, D-102.
 
 **Acceptance Criteria:**
 
@@ -1154,7 +1154,7 @@ As a sender,
 I want the folder stream to fail safely under the conditions Epic 2 deferred,
 So that a deep tree, a swapped root, or a misused reader cannot break a live download.
 
-**Closes:** D-077, D-079, D-080, D-081, D-082, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
+**Closes:** D-077, D-079, D-080, D-081, D-082, D-096, D-101, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
 
 **Acceptance Criteria:**
 
