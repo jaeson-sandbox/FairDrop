@@ -1094,3 +1094,88 @@ func TestStageWithoutAContextIsASetupFailure(t *testing.T) {
 		t.Errorf("calls = %v, want none: the guard is the first statement in Stage", got)
 	}
 }
+
+// TestALaneThatClosesWhileStagedStillEndsTheSession is D-042 and D-091.
+//
+// The drainer's post-loop synthesis required stateTransferring, so a server
+// that died before anyone claimed the link produced nothing at all: the window
+// kept showing a QR code for a listener that no longer existed, with no
+// outcome, no error and nothing to dismiss. The only test that closed a lane
+// at STAGED asserted the drainer exited, which stayed true throughout.
+func TestALaneThatClosesWhileStagedStillEndsTheSession(t *testing.T) {
+	h := newHarness(t)
+	h.stageSuccessfully()
+
+	live := h.liveSession()
+	h.server.closeEvents()
+	<-live.drainerDone
+
+	events := h.awaitEvents(1)
+	failure := events[len(events)-1]
+	if failure.Kind != TransferError || failure.Error == nil {
+		t.Fatalf("a lane that closed at STAGED published %+v, want a terminal error", failure)
+	}
+	if failure.Error.Code != ErrTransferFailed {
+		t.Errorf("the outcome carries %q, want %q", failure.Error.Code, ErrTransferFailed)
+	}
+	if got := h.state(); got != stateError {
+		t.Errorf("state is %q, want %q -- the session must not stay staged for a server that is gone", got, stateError)
+	}
+	if h.coordinator.leaseHeld() {
+		t.Error("the synthesised outcome kept the operation lease")
+	}
+}
+
+// TestTheDrainerMayEndASessionFromEveryStateOneCanBeIn covers the same guard
+// across all three states the contract names, which no runnable path can
+// reach deterministically: CLAIMING exists only inside AuthorizeClaim, which
+// holds the operation lease the synthesis itself needs, so a test that raced
+// for it would be a test that usually proved nothing.
+//
+// The guard is called directly instead. What it must refuse is unchanged --
+// a session that is cancelled, replaced, closing or already terminal -- and
+// what it must now allow is every state a live session can actually be in
+// when its server dies.
+//
+// It passes its own list, so on its own it would prove only that the guard
+// honours whatever it is handed: narrowing the production call site back to
+// stateTransferring leaves this test green. The behavioural half above is
+// what pins that call site, and the two are only worth having together.
+func TestTheDrainerMayEndASessionFromEveryStateOneCanBeIn(t *testing.T) {
+	allowed := []sessionState{stateStaged, stateClaiming, stateTransferring}
+
+	for _, state := range allowed {
+		h := newHarness(t)
+		h.stageSuccessfully()
+		live := h.liveSession()
+
+		h.coordinator.mu.Lock()
+		h.coordinator.state = state
+		may := h.coordinator.drainerMayActLocked(live, live.id, allowed...)
+		h.coordinator.mu.Unlock()
+
+		if !may {
+			t.Errorf("a server that died at %q leaves the session with no outcome at all", state)
+		}
+	}
+
+	// The refusals the widened guard must not have cost: a terminal session
+	// and a session whose id no longer matches stay refused.
+	h := newHarness(t)
+	h.stageSuccessfully()
+	live := h.liveSession()
+
+	h.coordinator.mu.Lock()
+	live.terminal = true
+	stillActs := h.coordinator.drainerMayActLocked(live, live.id, allowed...)
+	live.terminal = false
+	actsOnAStranger := h.coordinator.drainerMayActLocked(live, SessionID("0000"), allowed...)
+	h.coordinator.mu.Unlock()
+
+	if stillActs {
+		t.Error("a session that already reached a terminal outcome accepted a second one")
+	}
+	if actsOnAStranger {
+		t.Error("an event for another session was accepted")
+	}
+}

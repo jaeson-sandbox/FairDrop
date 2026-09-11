@@ -925,3 +925,85 @@ func TestEveryRecordedDiagnosticAlsoReachesTheSeam(t *testing.T) {
 		}
 	}
 }
+
+// TestTheDiagnosticSinkSaysWhenItStoppedRecording is D-031.
+//
+// The sink's cap is what keeps a long-running session from accumulating an
+// unbounded slice, and the silent `return` that enforced it made a truncated
+// sink indistinguishable from a complete one to the only thing that reads it.
+// Reserving the last slot for a marker costs one entry and turns "these are
+// the diagnostics" into a claim the sink can actually support.
+//
+// Driven through recordDiagnostic rather than the sink's own method so the
+// seam count is covered too: an overflow that never reached logDiagnostic
+// would be as invisible as the drop it replaced.
+func TestTheDiagnosticSinkSaysWhenItStoppedRecording(t *testing.T) {
+	h := newHarness(t)
+
+	for i := range maxDiagnostics + 8 {
+		h.coordinator.recordDiagnostic(
+			NewError(ErrTransferFailed, "a bound elapsed"),
+			fmt.Sprintf("diagnostic %d", i),
+		)
+	}
+
+	entries := h.coordinator.diagnostics.snapshot()
+	if len(entries) != maxDiagnostics {
+		t.Fatalf("the sink holds %d entries, want exactly its %d cap", len(entries), maxDiagnostics)
+	}
+	if last := entries[len(entries)-1]; last != diagnosticOverflow {
+		t.Errorf("the last entry is %+v, want the overflow marker %+v -- a full sink that says "+
+			"nothing reads as a complete one", last, diagnosticOverflow)
+	}
+	// The marker replaces the entry it dropped; it does not repeat forever.
+	for i, entry := range entries[:len(entries)-1] {
+		if entry == diagnosticOverflow {
+			t.Errorf("entry %d is the overflow marker, which belongs only in the last slot", i)
+		}
+	}
+	if seen := h.diagnosed.snapshot(); len(seen) != maxDiagnostics+8 {
+		t.Errorf("the seam saw %d diagnostics, want all %d: the sink's cap bounds what is kept, "+
+			"never what a running FairDrop is told", len(seen), maxDiagnostics+8)
+	}
+}
+
+// TestATerminalFailureRecordsItsCauseBeforeRewritingIt is D-092.
+//
+// terminalPublicError answers with one of four codes whatever the adapter
+// actually said, which is right for a user and destroys the only evidence of
+// what happened for anyone debugging it. The code is recorded first. The
+// message never is: an adapter's own text is where a path or a token would be
+// (AD-9), and recordDiagnostic reads only ErrorCodeOf its cause.
+func TestATerminalFailureRecordsItsCauseBeforeRewritingIt(t *testing.T) {
+	h := newHarness(t)
+	h.transferring()
+	token := string(h.liveSession().token)
+
+	h.emit(ServerEvent{
+		SessionID: testSessionID,
+		Kind:      ServerFailed,
+		Err:       WrapError(ErrNetworkUnavailable, "the interface went away", errors.New(testPath)),
+	})
+
+	events := h.awaitEvents(2)
+	failure := events[len(events)-1]
+	if failure.Kind != TransferError || failure.Error == nil {
+		t.Fatalf("published %+v, want a terminal error", failure)
+	}
+	if failure.Error.Code != ErrTransferFailed {
+		t.Errorf("the user was told %q, want the public rewrite %q", failure.Error.Code, ErrTransferFailed)
+	}
+
+	var recorded bool
+	for _, entry := range h.diagnosed.snapshot() {
+		if entry.code == ErrNetworkUnavailable {
+			recorded = true
+		}
+		assertSafe(t, "diagnostic", entry.message, token)
+	}
+	if !recorded {
+		t.Errorf("no diagnostic carried the original %q code: after the rewrite there is nothing "+
+			"left anywhere that says what actually failed, diagnostics were %+v",
+			ErrNetworkUnavailable, h.diagnosed.snapshot())
+	}
+}

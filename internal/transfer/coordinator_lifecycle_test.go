@@ -1642,3 +1642,109 @@ func TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown(t *testing.T) {
 			before, after)
 	}
 }
+
+// TestATeardownThatLosesTwoResourcesReportsBoth is D-100.
+//
+// One teardown can leave a beacon and a drainer both unaccounted for, and a
+// caller told only about the first has no way to learn the second is stuck
+// too -- which is exactly the report a user would be asked for. Both bounds
+// are forced deterministically, in the order the unwind runs them.
+func TestATeardownThatLosesTwoResourcesReportsBoth(t *testing.T) {
+	h := newHarness(t)
+	// Cancelled from STAGED, not TRANSFERRING: the claim handshake stops the
+	// beacon itself, so a transferring session has only one resource left to
+	// lose and this test would quietly become a one-resource test.
+	h.stageSuccessfully()
+
+	// Neither adapter ever returns: the beacon stop hangs, and the server's
+	// Stop returns without closing the lane, so the drainer join hangs too.
+	released := make(chan struct{})
+	t.Cleanup(func() { close(released) })
+	h.network.stopBeacon = func() error {
+		<-released
+		return nil
+	}
+	h.server.keepLaneOpenOnStop = true
+
+	cancelDone := make(chan error, 1)
+	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
+
+	// The beacon's own bound first: it is the first resource released, so its
+	// is the only bound pending at this point.
+	h.awaitCalls("network.StopBeacon")
+	h.awaitBoundsPending()
+	h.bounds.fire()
+
+	// Then the drainer join's. server.Stop has returned by the time it appears
+	// in the call log, so its bound is already armed and stopped and the one
+	// still pending is the join's.
+	h.awaitCalls("server.Stop")
+	h.awaitBoundsPending()
+	h.bounds.fire()
+
+	select {
+	case err := <-cancelDone:
+		if err == nil {
+			t.Fatal("Cancel succeeded with two resources unaccounted for")
+		}
+		report := err.Error()
+		if !strings.Contains(report, "device discovery") {
+			t.Errorf("Cancel reported %q, which never names the beacon", report)
+		}
+		if !strings.Contains(report, "drainer did not finish") {
+			t.Errorf("Cancel reported %q, which never names the drainer join", report)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Cancel never returned")
+	}
+
+	h.server.closeEvents()
+}
+
+// TestAnObserverThatNeverReturnsCannotHoldACommand is D-034.
+//
+// Publish is a UI callback: a webview that stops answering must cost the
+// event, never the lease every later Cancel and Shutdown needs. The call is
+// bounded like every adapter call, the drop is recorded where a person can
+// read it, and the command completes.
+func TestAnObserverThatNeverReturnsCannotHoldACommand(t *testing.T) {
+	h := newHarness(t)
+	metadata := h.stageSuccessfully()
+
+	released := make(chan struct{})
+	t.Cleanup(func() { close(released) })
+	h.observer.publish = func(Event) { <-released }
+
+	claimDone := make(chan error, 1)
+	go func() { claimDone <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
+
+	h.awaitCalls("observer.Publish")
+	h.awaitBoundsPending()
+	h.bounds.fire()
+
+	select {
+	case err := <-claimDone:
+		if err != nil {
+			t.Fatalf("AuthorizeClaim returned %v; the claim was committed before the event was published", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("AuthorizeClaim never returned: a blocking observer still holds the command")
+	}
+
+	if h.coordinator.leaseHeld() {
+		t.Error("the operation lease is still held, so every later Cancel and Shutdown is wedged")
+	}
+	if got := h.state(); got != stateTransferring {
+		t.Errorf("state is %q, want %q -- the commit stands whatever the observer did", got, stateTransferring)
+	}
+
+	var reported bool
+	for _, entry := range h.diagnosed.snapshot() {
+		if strings.Contains(entry.message, "did not return in time") {
+			reported = true
+		}
+	}
+	if !reported {
+		t.Errorf("no diagnostic says an event went unconfirmed; the seam saw %+v", h.diagnosed.snapshot())
+	}
+}
