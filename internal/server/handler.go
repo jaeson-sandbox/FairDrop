@@ -125,7 +125,7 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 		// cause reaches the coordinator unchanged.
 		writeStatus(writer, http.StatusGone)
 		event := failedEvent(r.sessionID, transfer.ProgressSnapshot{}, err)
-		r.finish(&event)
+		r.finalizeAfterResponse(request, event)
 		return
 	}
 	// From here the payload has exactly one owner and exactly one Close: this
@@ -178,7 +178,7 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 		// on the source blocks renaming or deleting it.
 		closePayload()
 		event := completeEvent(r.sessionID, snapshot)
-		r.finish(&event)
+		r.finalizeAfterResponse(request, event)
 		return
 	}
 
@@ -196,6 +196,24 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 	// is the only honest signal left: it turns a truncated file that looks
 	// complete into a failed download the receiver's browser reports.
 	panic(http.ErrAbortHandler)
+}
+
+func (r *run) finalizeAfterResponse(request *http.Request, event transfer.ServerEvent) {
+	connection, ok := request.Context().Value(responseConnectionKey{}).(*finalizingConn)
+	if !ok {
+		// Every production request has this observer. An alternate transport
+		// cannot claim success without observing finalization.
+		if event.Kind == transfer.ServerComplete {
+			event = failedEvent(r.sessionID, *event.Progress, transfer.NewError(
+				transfer.ErrTransferFailed, "the HTTP response has no finalization observer"))
+		}
+		r.finish(&event)
+		panic(http.ErrAbortHandler)
+	}
+	connection.terminal = &event
+	// Retire the capability now but leave this connection and context live
+	// until net/http finishes the response. Stop still force-closes both.
+	r.closeListener()
 }
 
 // finish ends the transfer: cancel the data-plane context, retire the listener

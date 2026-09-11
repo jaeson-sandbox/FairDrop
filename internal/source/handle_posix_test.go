@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"fairdrop/internal/transfer"
+	"golang.org/x/sys/unix"
 )
 
 func TestPOSIXReopenRefusesPostMetadataSymlinkSubstitution(t *testing.T) {
@@ -134,4 +136,77 @@ func errorsIsPOSIXCapability(err error) bool {
 
 func errorsIsPermission(err error) bool {
 	return os.IsPermission(err)
+}
+
+func TestPOSIXContentOpenRefusesFIFOAfterMetadataWithoutBlocking(t *testing.T) {
+	base := fixtureDir(t)
+	selected := filepath.Join(base, "selected.bin")
+	if err := os.WriteFile(selected, []byte("ordinary"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	metadata, ancestors := openPOSIXMetadataForSelection(t, selected)
+	defer func() { _ = metadata.Close(); _ = closeMetadataHandles(context.Background(), ancestors, nil) }()
+	info, err := metadata.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		t.Fatalf("regular metadata = %v, %v", info, err)
+	}
+	if err := os.Remove(selected); err != nil {
+		t.Fatal(err)
+	}
+	if err := unix.Mkfifo(selected, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	parent := ancestors[len(ancestors)-1].(*posixNode)
+	type result struct {
+		content contentHandle
+		err     error
+	}
+	done := make(chan result, 1)
+	go func() { content, err := parent.OpenChildContent("selected.bin"); done <- result{content, err} }()
+	select {
+	case got := <-done:
+		if got.content != nil {
+			_ = got.content.Close()
+			t.Error("FIFO received a content handle")
+		}
+		if code := transfer.ErrorCodeOf(got.err); code != transfer.ErrPathUnsupported {
+			t.Fatalf("FIFO content guard code = %q, want path_unsupported", code)
+		}
+	case <-time.After(2 * time.Second):
+		// Rescue the blocked open so this mutation fails by name without
+		// leaving a goroutine that races descriptor/fixture cleanup.
+		fd, err := unix.Open(selected, unix.O_WRONLY|unix.O_NONBLOCK, 0)
+		if err == nil {
+			_ = unix.Close(fd)
+		}
+		select {
+		case got := <-done:
+			if got.content != nil {
+				_ = got.content.Close()
+			}
+		case <-time.After(time.Second):
+		}
+		t.Fatal("content open blocked on substituted FIFO: O_NONBLOCK guard missing")
+	}
+}
+
+func TestPOSIXContentOpenClearsNonblockingForRegularFile(t *testing.T) {
+	selected := filepath.Join(fixtureDir(t), "ordinary.bin")
+	if err := os.WriteFile(selected, []byte("ordinary"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	metadata, ancestors := openPOSIXMetadataForSelection(t, selected)
+	defer func() { _ = metadata.Close(); _ = closeMetadataHandles(context.Background(), ancestors, nil) }()
+	content, err := ancestors[len(ancestors)-1].(*posixNode).OpenChildContent("ordinary.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer content.Close()
+	flags, err := unix.FcntlInt(content.(*posixContent).file.Fd(), unix.F_GETFL, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flags&unix.O_NONBLOCK != 0 {
+		t.Fatal("regular content retained O_NONBLOCK")
+	}
 }

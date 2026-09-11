@@ -96,6 +96,12 @@ components:
 
 # FairDrop — Design Spine
 
+> **Owner policy, 2026-09-11:** `docs/release-policy.md` supersedes earlier
+> mandatory-human-release wording in this document. Automated verification remains
+> required; manual device/browser, screen-reader, firewall and visual observations
+> are optional for personal releases. Unobserved behavior is not a verified pass,
+> and known functional failures are not waived.
+
 > Selected direction: **Paper Relay** with **Terracotta Linen**. Exploration references: [design directions](.working/design-directions.html) and [color themes](.working/color-themes-paper-relay.html). The `DESIGN.md` and `EXPERIENCE.md` spines win on every conflict with a mockup, wireframe, or import.
 
 **Source precedence:** the canonical `SPEC.md` and its binding architecture/contracts companions control. `epics.md` supplies the approved decomposition. The corrected `docs/fairdrop-spec.md` supplies narrative only where it does not conflict. Frontmatter contains only this confirmed source set.

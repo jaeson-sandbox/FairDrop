@@ -1,8 +1,8 @@
 # The reproducible cross-platform verification gate for FairDrop.
 #
 # This is the whole gate, run natively on both platforms FairDrop ships to.
-# There is no Linux job: a cross-compiled or emulated result is not release
-# proof, and internal/*_windows.go / internal/*_darwin.go are only analysed,
+# Linux separately verifies Go adapters; it is not release proof.
+# internal/*_windows.go / internal/*_darwin.go are only analysed,
 # built, and tested on the job whose OS actually compiles them. Toolchains
 # are pinned so the verified state does not silently drift between runs.
 #
@@ -69,6 +69,17 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Provision native Windows UNC fixtures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP 'fairdrop-native-unc'
+          New-Item -ItemType Directory -Path $fixture -Force | Out-Null
+          [IO.File]::WriteAllText((Join-Path $fixture 'report.txt'), 'native matrix payload')
+          New-SmbShare -Name FairDropNativeMatrix -Path $fixture -FullAccess ([Security.Principal.WindowsIdentity]::GetCurrent().Name) | Out-Null
+          'FAIRDROP_TEST_UNC_FILE=\\localhost\FairDropNativeMatrix\report.txt' >> $env:GITHUB_ENV
+          'FAIRDROP_TEST_UNC_DIRECTORY=\\localhost\FairDropNativeMatrix' >> $env:GITHUB_ENV
+
       # actions/setup-go does not guarantee $(go env GOPATH)/bin is on PATH
       # for every step shell on every platform, and that is where `go
       # install` puts the Wails CLI -- so add it explicitly rather than
@@ -105,6 +116,10 @@ jobs:
       - name: wails build
         run: wails build
 
+      - name: Native macOS unusable-lock launch smoke
+        if: runner.os == 'macOS'
+        run: bash scripts/smoke-darwin-unusable-lock.sh
+
       # A regenerated-but-uncommitted frontend/wailsjs means the committed
       # bindings are stale, and a missing frontend/dist/.gitkeep would break
       # embedding on the next clean clone.
@@ -140,7 +155,11 @@ jobs:
         run: go tool staticcheck ./...
 
       - name: go test
-        run: go test -count=1 ./...
+        run: go test -count=1 -timeout 240s ./...
+
+      - name: Report native platform coverage and capability skips
+        if: always()
+        run: go test -count=1 -v -run 'Test(POSIX|Linux|Darwin|Native|StageTransferResolves|StageTransferRefusesSelected)' ./...
 
       # go test -race silently reports clean when cgo is unavailable rather
       # than failing, so confirm both the flag and a working C toolchain
@@ -172,7 +191,7 @@ jobs:
       # makes a silent regression to a cgo-less runner fail loudly instead
       # of reporting a clean race run that never actually detected anything.
       - name: go test -race
-        run: go test -count=1 -race ./...
+        run: go test -count=1 -race -timeout 420s ./...
 
       - name: Frontend suite
         working-directory: frontend
@@ -186,3 +205,37 @@ jobs:
             echo "$bad" >&2
             exit 1
           fi
+
+      - name: Remove native Windows UNC share
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: Remove-SmbShare -Name FairDropNativeMatrix -Force -ErrorAction SilentlyContinue
+
+      - name: Prove native acceptance tests detect broken guards
+        if: always()
+        run: bash scripts/verify-native-mutations.sh
+
+  linux-adapters:
+    name: Linux adapter verification (not release proof)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.7'
+      - name: Vet Go adapters
+        run: go vet ./...
+      - name: Execute Go suite and report capability skips
+        run: go test -count=1 -v -timeout 240s ./...
+      - name: Execute adapter race suite
+        run: |
+          test "$(go env CGO_ENABLED)" = 1
+          go test -count=1 -race -timeout 420s ./...
+      - name: Prove native acceptance tests detect broken guards
+        run: bash scripts/verify-native-mutations.sh

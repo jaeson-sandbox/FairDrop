@@ -111,10 +111,20 @@ as historical narrative and apply all corrections and supersessions before using
   verification.
 - Preserve complete failing-test output. Truncated logs destroyed the only
   evidence for an unreproduced Epic 1 failure.
-- Browser-unit tests do not prove native interaction. Keep a real built-app,
-  nearby-device QR/download smoke test in each epic until Story 3.2 automates it.
+- Browser-unit tests do not prove native interaction. Manual nearby-device smoke
+  observations are optional under the owner-approved personal-project policy below;
+  record unverified behavior honestly and keep automated native checks mandatory.
 
 <!-- /bmad:context -->
+
+## Owner-approved personal release policy (2026-09-11)
+
+`docs/release-policy.md` supersedes older mandatory-human-release gates. Automated
+verification is required; manual phone/browser, screen-reader, firewall and visual
+checks are optional for this personal project. Never fabricate manual passes or
+waive known functional failures. Story 3.7 includes the newly approved D-110 HTTP
+finalization fix and replacement of Darwin O_EVTONLY metadata acquisition with
+supported no-follow queries; preserve content-read separation and identity checks.
 
 ## Environment and verification pitfalls
 

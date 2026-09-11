@@ -160,10 +160,7 @@ func appOptions(app *App) *options.App {
 		// restores the existing window instead -- see its comment for why it
 		// touches neither the coordinator nor a lifecycle event, and for what a
 		// second launch's inert composition does before it ever gets here.
-		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId:               singleInstanceLockUniqueID,
-			OnSecondInstanceLaunch: app.restoreWindow,
-		},
+		SingleInstanceLock: singleInstanceOption(app, nativeSingleInstanceLockUsable),
 
 		OnStartup:  app.startup,
 		OnShutdown: app.shutdown,
@@ -171,6 +168,15 @@ func appOptions(app *App) *options.App {
 			app,
 		},
 	}
+}
+
+func singleInstanceOption(app *App, usable func() bool) *options.SingleInstanceLock {
+	if !usable() {
+		// Fixed diagnostic only: filesystem errors can contain private paths.
+		app.logf("fairdrop: single-instance protection unavailable (temporary lock file unusable); launching without protection")
+		return nil
+	}
+	return &options.SingleInstanceLock{UniqueId: singleInstanceLockUniqueID, OnSecondInstanceLaunch: app.restoreWindow}
 }
 
 // newBoundApp builds the App exactly as main does: wired to the real Wails

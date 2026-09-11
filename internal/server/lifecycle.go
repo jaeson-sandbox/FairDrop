@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -304,7 +305,7 @@ func (s *Server) Start(
 		ctx:          dataCtx,
 		cancel:       cancel,
 		mux:          http.NewServeMux(),
-		listener:     &onceCloseListener{Listener: listener},
+		listener:     &onceCloseListener{Listener: &finalizingListener{Listener: listener}},
 		lane:         newEventLane(),
 		serveDone:    make(chan struct{}),
 		conns:        make(map[net.Conn]struct{}),
@@ -326,6 +327,9 @@ func (s *Server) Start(
 		IdleTimeout:       s.timeouts.idle,
 		MaxHeaderBytes:    maxHeaderBytes,
 		ConnState:         active.trackConnection,
+		ConnContext: func(ctx context.Context, conn net.Conn) context.Context {
+			return context.WithValue(ctx, responseConnectionKey{}, conn.(*finalizingConn))
+		},
 		// net/http logs connection and panic diagnostics that can quote a
 		// request. Nothing about this server's traffic is safe to print: the
 		// path carries the capability token. But net/http also writes a
@@ -560,6 +564,24 @@ func (r *run) leave() {
 // this the point where that goroutine is known to be gone.
 func (r *run) trackConnection(conn net.Conn, state http.ConnState) {
 	r.mu.Lock()
+	stopping := r.stopping
+	r.mu.Unlock()
+	// Keep-alives are disabled. StateClosed follows net/http's finishRequest,
+	// including its final buffer flush and terminating chunk, on the serving
+	// goroutine. A handler return (or its Flush) is too early to claim success.
+	// Keep the connection tracked until its final event has been published,
+	// so a concurrent Stop cannot close the lane while this callback produces.
+	if state == http.StateClosed && !stopping && r.ctx.Err() == nil {
+		if tracked, ok := conn.(*finalizingConn); ok && tracked.terminal != nil {
+			event := *tracked.terminal
+			if tracked.writeErr != nil && event.Kind == transfer.ServerComplete {
+				event = failedEvent(r.sessionID, *event.Progress, transfer.WrapError(
+					transfer.ErrTransferFailed, "the HTTP response could not be finalized", tracked.writeErr))
+			}
+			r.finish(&event)
+		}
+	}
+	r.mu.Lock()
 	defer r.mu.Unlock()
 	switch state {
 	case http.StateNew:
@@ -570,6 +592,38 @@ func (r *run) trackConnection(conn net.Conn, state http.ConnState) {
 			r.connsGone.Broadcast()
 		}
 	}
+}
+
+type responseConnectionKey struct{}
+
+// finalizingConn observes every real connection write, including writes made
+// by net/http after our handler returns. Its fields belong to the serving
+// goroutine; concurrent Stop only closes the embedded connection.
+type finalizingConn struct {
+	net.Conn
+	writeErr error
+	terminal *transfer.ServerEvent
+}
+
+func (c *finalizingConn) Write(p []byte) (int, error) {
+	n, err := c.Conn.Write(p)
+	if err == nil && n != len(p) {
+		err = io.ErrShortWrite
+	}
+	if err != nil && c.writeErr == nil {
+		c.writeErr = err
+	}
+	return n, err
+}
+
+type finalizingListener struct{ net.Listener }
+
+func (l *finalizingListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return &finalizingConn{Conn: conn}, nil
 }
 
 func (r *run) awaitConnections() {

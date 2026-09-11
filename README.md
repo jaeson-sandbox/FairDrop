@@ -11,8 +11,12 @@ Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the wi
 | Epic | What it delivers | State |
 | --- | --- | --- |
 | 1 — Share one file | Native drop or browse, QR/direct URL, one-shot download, honest progress, cancel, accessibility contract | Done, verified on a real phone, merged to `main` |
-| 2 — Share one folder | Safe directory staging through native no-follow handles; streamed ZIP with no temp archive | Built and reviewed; live phone verification in progress on `epic-2-share-one-folder` |
-| 3 — Run reliably on supported desktops | Nine stories: single instance, native CI, release artifacts, bounded lifecycle waits, honest error copy, lost-event visibility, the native platform test matrix, directory-stream hardening, and a human release-evidence gate | Backlog |
+| 2 — Share one folder | Safe directory staging through native no-follow handles; streamed ZIP with no temp archive | Done and merged; receiver-side observations remain recorded as incomplete |
+| 3 — Run reliably on supported desktops | Twelve stories covering native CI/releases, lifecycle and platform hardening, error/event handling, and verification evidence | Stories 3.1–3.6 done; 3.7 in progress |
+
+This is a personal project. [Automated verification is the release gate](docs/release-policy.md);
+manual device/browser and accessibility observations are optional, not invented
+passes. Known test failures still block acceptance.
 
 ## Read these first
 

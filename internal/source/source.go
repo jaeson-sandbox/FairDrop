@@ -455,7 +455,7 @@ func childRelativeName(parent, name string) (string, error) {
 	if name == "" || name == "." || name == ".." ||
 		strings.ContainsAny(name, "/\\") ||
 		strings.IndexByte(name, 0) >= 0 ||
-		filepath.IsAbs(name) || filepath.VolumeName(name) != "" {
+		volumeQualified(name) {
 		return "", transfer.NewError(transfer.ErrPathUnsupported, "selection contains an unsupported entry name")
 	}
 	slashed := filepath.ToSlash(name)
@@ -463,6 +463,16 @@ func childRelativeName(parent, name string) (string, error) {
 		return slashed, nil
 	}
 	return parent + "/" + slashed, nil
+}
+
+// Match the archive's receiver-side Windows drive predicate on every sender.
+// Host filepath.VolumeName is empty for C:evil.txt on POSIX.
+func volumeQualified(segment string) bool {
+	if len(segment) < 2 || segment[1] != ':' {
+		return false
+	}
+	letter := segment[0]
+	return (letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')
 }
 
 func closeContentHandle(ctx context.Context, handle contentHandle, primary error) error {
@@ -558,7 +568,7 @@ func (i *Inspector) sameFileInfo(first, second fs.FileInfo) bool {
 	if i != nil && i.sameFile != nil {
 		return i.sameFile(first, second)
 	}
-	return os.SameFile(first, second)
+	return nativeSameFile(first, second)
 }
 
 func (i *Inspector) classifyOperationError(err error) error {

@@ -14,6 +14,12 @@ sources:
 
 # FairDrop — Experience Spine
 
+> **Owner policy, 2026-09-11:** `docs/release-policy.md` supersedes earlier
+> mandatory-human-release wording in this document. Automated verification remains
+> required; manual device/browser, screen-reader, firewall and visual observations
+> are optional for personal releases. Unobserved behavior is not a verified pass,
+> and known functional failures are not waived.
+
 > Exploration references: [source extract](.working/source-extract.md), [Paper Relay direction](.working/design-directions.html), and [Terracotta Linen themes](.working/color-themes-paper-relay.html). Production references are linked where they illustrate the contract.
 
 **Source precedence:** the canonical `SPEC.md` and its binding architecture/contracts companions control. `epics.md` supplies the approved requirement and story decomposition. The corrected `docs/fairdrop-spec.md` supplies narrative only where non-conflicting. No Phase 1 or deferred-work path is a direct spine source.

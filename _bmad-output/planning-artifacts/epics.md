@@ -14,6 +14,12 @@ inputDocuments:
 
 # FairDrop - Epic Breakdown
 
+> **Owner policy, 2026-09-11:** `docs/release-policy.md` supersedes earlier
+> mandatory-human-release wording in this document. Automated verification remains
+> required; manual device/browser, screen-reader, firewall and visual observations
+> are optional for personal releases. Unobserved behavior is not a verified pass,
+> and known functional failures are not waived.
+
 ## Overview
 
 This document provides the complete epic and story breakdown for FairDrop, decomposing the canonical SPEC, its binding architecture companions, the implemented Phase 1 foundation, and preserved review findings into implementable stories.
@@ -926,7 +932,7 @@ So that I can download it in a browser without the sender creating a temporary a
 
 Maintainers can verify and ship a single-instance FairDrop application through reproducible native Windows and macOS builds.
 
-> **Re-planned 2026-09-08, after the Epic 2 retrospective.** The original five stories had absorbed 47 deferred findings between three of them, and Story 3.3 mixed release work a workflow can perform with evidence only a person on a real device can collect. There are now nine stories. Each lists the `deferred-work.md` ids it must close (`D-NNN`); **a story is not done while any id it names is still open**, and a session that cannot close one must re-own it explicitly rather than leave it. Stories 3.1-3.5 keep their sprint keys; 3.6-3.9 are new.
+> **Re-planned 2026-09-08, updated 2026-09-11.** The original five stories had absorbed 47 deferred findings between three of them. Subsequent splits bring the epic to twelve stories. Each lists the `deferred-work.md` ids it must close (`D-NNN`); **a story is not done while any id it names is still open**, and a session that cannot close one must re-own it explicitly rather than leave it. The owner now makes manual release observations optional under `docs/release-policy.md`; automated checks and known-defect resolution remain required.
 
 ### Story 3.1: Enforce One Running FairDrop Instance
 
@@ -998,7 +1004,7 @@ As a maintainer,
 I want native FairDrop artifacts built and checked on each supported operating system,
 So that a release candidate is a real build of the real code, correctly named, with its known platform gaps decided.
 
-**Scope:** what a workflow can build and verify without a person. Human-collected evidence -- browser matrix, screen readers, first-launch firewall behaviour -- is Story 3.9 and is *required* before release; this story produces the artifacts 3.9 exercises.
+**Scope:** what a workflow can build and verify without a person. Story 3.9 consolidates automated evidence and optional browser, screen-reader and firewall observations under the owner's 2026-09-11 personal-release policy; this story produces the artifacts it records.
 
 **Narrowed 2026-09-09:** the four platform and contract decisions this story used to carry -- the HTTP header set (D-018), the window theme flash (D-055), the macOS non-secure-context limit (D-064), and the Windows single-instance fallthrough (D-088) -- moved to Story 3.10. Each is independently reviewable, three change product behaviour, and none is needed to build and identify an artifact. They remain release-blocking: **Story 3.10 must close before Story 3.9 can record release evidence**, whatever the numbering suggests.
 
@@ -1133,7 +1139,14 @@ So that "it cross-compiles" is never mistaken for "it was verified".
 
 **Narrowed 2026-09-11:** this story had accumulated thirteen ids across four unrelated mechanisms. Nine are one goal -- a guarantee that only the native OS can prove -- and are kept here. `D-065` and `D-068` need a real browser rendering a layout in CI, which is a new dependency and a harness rather than a test run, and moved to Story 3.12. `D-099` and `D-102` are about the relationship between the coordinator's bound and the server's own, and about two teardown wordings no test drives; they carry no platform content and moved to Story 3.8, which already owns adapter hardening.
 
-**Closes:** D-007, D-014, D-074, D-076, D-078, D-084, D-089, D-094, D-095.
+**Closes:** D-007, D-014, D-074, D-076, D-078, D-084, D-089, D-094, D-095, D-110.
+
+**Approved extension (2026-09-11):** fix response-finalization ordering (D-110)
+here because the native integration matrix exposed it. Replace Darwin O_EVTONLY
+metadata acquisition with supported parent-relative no-follow queries; preserve
+identity checks and separate content-read acquisition (D-074). Natural Complete
+must follow final HTTP framing/write success, with deterministic delayed-write,
+write-failure and cancel coverage. Owner approved the fixes and approach selection.
 
 **Acceptance Criteria:**
 
@@ -1167,6 +1180,10 @@ So that a deep tree, a swapped root, or a misused reader cannot break a live dow
 
 **Closes:** D-077, D-079, D-080, D-081, D-082, D-096, D-099, D-101, D-102, D-105, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
 
+**Routing update (2026-09-11):** D-110 was initially routed here; the owner approved
+bringing it into 3.7 to unblock that story's failing full-stack matrix. It is no
+longer an acceptance item for 3.8.
+
 **Acceptance Criteria:**
 
 **Given** a tree nested deeper than the process can hold handles for
@@ -1198,13 +1215,16 @@ So that a deep tree, a swapped root, or a misused reader cannot break a live dow
 **When** each is the only one outstanding
 **Then** the accept loop and the tracked-connection branches are each driven by a test, as the handler branch already is, so all three wordings are proven rather than one (D-102).
 
-### Story 3.9: Record Human Release Evidence
+### Story 3.9: Record Release Evidence and Optional Manual Checks
 
 As a release operator,
-I want a checklist that a person completes on real devices,
-So that supported-browser and accessibility claims rest on recorded results rather than assumptions.
+I want automated results, known limitations and optional real-device observations recorded,
+So that personal releases rely on tested behavior without inventing broader support claims.
 
-**Why a separate story:** a model can build a release candidate and produce the template; it cannot scan a QR with an iPhone, run NVDA, or watch the Windows firewall prompt. Mixing those into an automatable story guaranteed the story could never be closed by the agent executing it.
+**Owner policy change (2026-09-11):** `docs/release-policy.md` makes human device,
+browser and accessibility observations optional. This story consolidates native
+CI/artifact evidence and preserves unverified limits; it no longer waits on a
+person. The stable sprint key remains `3-9-record-human-release-evidence`.
 
 **Closes:** D-073, and the smoke, browser-matrix, and accessibility gates removed from Story 3.3, D-086.
 
@@ -1212,11 +1232,14 @@ So that supported-browser and accessibility claims rest on recorded results rath
 
 **Given** the sender-to-receiver compatibility matrix and native accessibility gate in `EXPERIENCE.md`
 **When** the story closes
-**Then** `_bmad-output/implementation-artifacts/release-evidence.md` exists with one row per required scenario -- first launch and firewall guidance, native drop and both browse actions, single-instance restoration, one exact file download, one valid folder ZIP download that opens on the receiver, progress, cancellation, terminal reset, retained outcome with Dismiss, clean shutdown, each browser combination `EXPERIENCE.md` names, and the Windows (keyboard, Narrator, NVDA) and macOS (Full Keyboard Access, VoiceOver) checks -- and every row records platform and OS version, artifact version or checksum, date, reviewer, and pass/fail.
+**Then** `_bmad-output/implementation-artifacts/release-evidence.md` records the native automated runs and artifact identity, with optional rows for firewall guidance, native input, restoration, nearby file/folder downloads, cancellation, shutdown, browser combinations and Windows/macOS assistive technology. Observed rows identify platform, artifact, date, observer and result; unperformed manual rows say optional/unverified rather than requiring unavailable details.
 
 **Given** a row
 **When** an agent works on this story
-**Then** the agent produces or maintains the template and records results a person supplies; it never fills in a pass itself, and a missing, ambiguous, stale, or failed row blocks release rather than being summarised as an unverified manual check.
+**Then** the agent records machine-executed results with their run/artifact identity,
+and records human results only when supplied. Unperformed manual checks are labelled
+optional/unverified and do not block personal release. Failed automated checks or
+known functional defects still block acceptance; no manual pass is invented.
 
 **Given** the Epic 2 live folder download
 **When** the first evidence is recorded
@@ -1305,7 +1328,7 @@ So that the human evidence rows are the ones that genuinely need a person.
 
 **Ordering:** numbered last, required before Story 3.9. What this story cannot capture becomes a row in the human release evidence, so 3.9 needs to know which rows are left.
 
-**Closes:** D-065, D-068.
+**Closes:** D-065, D-068, D-109.
 
 **Acceptance Criteria:**
 
@@ -1321,3 +1344,7 @@ So that the human evidence rows are the ones that genuinely need a person.
 **Given** what a runner still cannot do -- hear a screen reader, or point a phone camera at a screen
 **When** this story closes
 **Then** those are written into Story 3.9's evidence template as named rows with the platform, assistive technology and exact observation each requires, rather than left as an unverified manual check.
+
+**Given** Story 1.10's missing Blind Hunter and verification-gap reviews
+**When** the accessibility evidence is completed
+**Then** both independent layers run against that story's change and their findings are revalidated against current code, fixed or explicitly routed, with evidence recorded (D-109). The 2026-09-11 project audit recovered this id-less entry from the already-done Story 3.2; its later review covered Story 1.6, not 1.10.

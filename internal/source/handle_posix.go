@@ -3,7 +3,6 @@
 package source
 
 import (
-	"errors"
 	"io/fs"
 	"os"
 	"strings"
@@ -52,33 +51,10 @@ func (n *posixNode) Stat() (fs.FileInfo, error) {
 	return n.file.Stat()
 }
 
-// OpenChildMetadata acquires a no-read handle on one child, whose kind is not
-// known until after the open.
-//
-// The retry exists for one case that is not an error: a directory carrying
-// execute permission but not read permission. It is traversable, and a
-// selection inside it must stay inspectable -- pinned by
-// TestPOSIXInspectUsesSearchOnlyAncestorRights. Linux gets that from O_PATH in
-// a single open and declines the fallback; darwin's metadata flags are refused
-// EACCES there and only O_SEARCH will open it. When the retry fails the first
-// refusal is reported, not the second, because for anything that is not a
-// directory the retry can only answer ENOTDIR, which would describe the wrong
-// problem.
+// OpenChildMetadata describes one child without opening its contents. Linux
+// pins an O_PATH descriptor; Darwin takes a parent-relative no-follow snapshot.
 func (n *posixNode) OpenChildMetadata(name string) (metadataHandle, error) {
-	locator := posixLocator{parent: n, name: name}
-	node, err := openPosixNode(locator, nativeMetadataFlags(), false)
-	if err == nil || !errors.Is(err, unix.EACCES) {
-		return node, err
-	}
-	fallbackFlags, hasFallback := nativeMetadataFallbackFlags()
-	if !hasFallback {
-		return node, err
-	}
-	retried, retryErr := openPosixNode(locator, fallbackFlags, false)
-	if retryErr != nil {
-		return node, err
-	}
-	return retried, nil
+	return openNativeMetadata(posixLocator{parent: n, name: name})
 }
 
 func (n *posixNode) OpenSearch() (metadataHandle, error) {
@@ -89,7 +65,7 @@ func (n *posixNode) OpenEnumeration() (directoryHandle, error) {
 	return openPosixNode(n.locator, nativeEnumerationFlags(), true)
 }
 
-// OpenChildContent is the one read-capable open in the package, and the only
+// OpenChildContent is the one file-content open in the package, and the only
 // place a POSIX descriptor can block. O_NOFOLLOW refuses a symlink, but the
 // kind of whatever else sits behind the name is knowable only after the open,
 // and opening a FIFO O_RDONLY parks the caller until a writer appears. So the

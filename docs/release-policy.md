@@ -1,0 +1,24 @@
+# Personal-project verification policy
+
+Owner decision, 2026-09-11: FairDrop is being developed for personal use, not as a
+client deliverable. Passing automated verification is the release gate. Manual
+phone/browser, screen-reader, firewall, appearance and focus observations are
+optional; their absence does not block development, story completion or a personal
+release. This supersedes earlier mandatory-human-evidence wording in planning,
+UX, architecture, completed-story and retrospective documents.
+
+The automated gate still includes native Windows/macOS builds and tests, Go race
+checks with cgo, frontend tests, static analysis, bindings and formatting checks,
+plus the Linux adapter job introduced in Story 3.7. Linux and cross-compilation do
+not substitute for native desktop verification. A known functional failure is not
+waived by this policy and must not be hidden by retries or weaker assertions.
+
+Keep evidence honest: record which tests ran, retain failing output, and label
+unobserved native UI/browser behavior as unverified. Never invent a manual pass or
+claim complete browser/accessibility certification from unit tests. Actual manual
+observations remain useful and may be recorded when convenient.
+
+Story 3.9 now consolidates automated release evidence, limitations, optional manual
+checks and its existing documentation fixes; it no longer requires a person to
+complete a device matrix. Story 3.12's automatable accessibility checks remain in
+scope. Historical observations are retained rather than rewritten as successes.

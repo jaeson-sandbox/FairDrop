@@ -1,5 +1,12 @@
 # Deferred Work
 
+> **Resumption audit (2026-09-11):** two id-less legacy records are now D-108
+> (lost log evidence, discharged by the existing direct CI test output) and D-109
+> (missing Story 1.10 review layers, now owned and cited by 3.12). Their original
+> observations remain below. The citation check now rejects missing/duplicate ids
+> instead of skipping them. D-110 is a newly reproduced HTTP completion-ordering
+> failure, routed to 3.8 and blocking 3.7 acceptance; see Story 3.7 evidence.
+
 Real findings surfaced during review that are not the current story's problem.
 Append-only. Each entry names the spec that surfaced it and the `owner:` that will
 resolve it. An owner is a story key from `sprint-status.yaml`, or one of two
@@ -613,12 +620,14 @@ line.
   evidence: jsdom performs no layout and evaluates no media query, so 320-pixel reflow, the 44px target floor, 200% text, forced colors and reduced motion are all asserted as stylesheet text; and no automated check can hear what a screen reader says. The routing table, the throttle and every focus target are unit-proved, but "each transition is announced exactly once" is ultimately an observation about NVDA or VoiceOver. The spec's own manual checks -- one keyboard-only transfer with a screen reader running, and Staged at 320 CSS pixels with 200% text and forced colors on -- are still owed, and belong with the release evidence rather than in a story that cannot run them.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  id: D-108
+  owner: discharged
   summary: A single unreproduced failure in `internal/transfer`, whose evidence the gate discarded.
   evidence: `go test ./...` failed once in `internal/transfer` on 2026-09-01 during the Story 1.10 gate, then did not reproduce in 40 in-process iterations plus 12 separate processes. The failure detail was lost because the command piped through `tail -3`, which discarded everything above the summary -- a gate that hides the evidence it exists to surface. Story 1.6 fixed a 1-in-40 flake in this same package, so a second one is plausible rather than hypothetical. Verification should run the suite without swallowing output and should keep failing runs.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
-  owner: 3-2-automate-reproducible-cross-platform-verification
+  id: D-109
+  owner: 3-12-capture-the-accessibility-evidence-a-runner-can-produce
   summary: Story 1.10 was reviewed by one adversarial layer instead of three, because a rate limit killed the other two.
   evidence: Only the edge-case layer completed for Story 1.10; Blind Hunter and the verification-gap layer both terminated on a session rate limit. Blind Hunter is the layer that looks for what is missing rather than what is wrong, and it is the one that found the unexecuted `appObserver` in 1.7 and the blank-window test in 1.9. Story 1.10 closes Epic 1 and its own acceptance criteria are the epic's accessibility gate, so the thinnest review in the epic sits on its most cross-cutting story. Re-running the two layers against `f7338af..HEAD` costs nothing but time.
 
@@ -855,3 +864,10 @@ line.
   summary: A wiring regression in compose would crash FairDrop before any window exists, invisibly in a release build.
   owner: 3-10-settle-the-release-blocking-platform-decisions
   evidence: Raised by the adversarial layer reviewing Story 3.5. `NewCoordinator` now panics when a port is nil, which is what makes `ready()`'s nil-port branch unreachable and was the right trade for D-029. The only production caller supplies all five, so it cannot fire today. What is unexamined is the failure shape if it ever does: `compose` runs in `main()` before `wails.Run`, no `recover` covers that path, and a release Wails build has no console -- so the process would vanish with no window, no dialog, and no visible message. A panic is the right answer for a wiring defect; whether it should be preceded by something a user can see belongs with the release-platform decisions.
+
+- source_spec: `spec-3-7-execute-the-native-platform-test-matrix.md`
+  id: D-110
+  summary: Natural completion can close the socket before net/http finishes the response, producing HTTP 200 with unexpected EOF for files and folders.
+  owner: 3-7-execute-the-native-platform-test-matrix
+  resolution_plan: Owner approved bringing this fix into Story 3.7 on 2026-09-11. The original routing/evidence below is historical; no test failure is waived.
+  evidence: Story 3.7's App/coordinator/real-server HTTP matrix failed in the full Windows race run, then reproduced 54 incomplete downloads in 240 attempts (30 of 40 iterations; 48 folders and 6 files), all with unexpected_eof=true. handler.go publishes ServerComplete before ServeHTTP returns; coordinator terminal teardown invokes Server.Stop and http.Server.Close before net/http's finishRequest has necessarily flushed buffered bytes and final chunk framing. Existing server tests finish reading before Stop, excluding the race. Full failure logs and exact code-path reasoning are in evidence-3-7-execute-the-native-platform-test-matrix.md. Routed to 3.8 because it owns server/stream lifecycle hardening outside 3.7's approved Code Map; this remains a blocker for 3.7's matrix, not an accepted failure. Fix requires deterministic response-finalization coverage while retaining force-close cancellation/failure semantics. No connection to the historical phone failure is proven.

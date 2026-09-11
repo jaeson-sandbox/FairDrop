@@ -14,6 +14,12 @@ sources:
 
 # FairDrop
 
+> **Owner policy, 2026-09-11:** `docs/release-policy.md` supersedes earlier
+> mandatory-human-release wording in this document. Automated verification remains
+> required; manual device/browser, screen-reader, firewall and visual observations
+> are optional for personal releases. Unobserved behavior is not a verified pass,
+> and known functional failures are not waived.
+
 ## Why
 
 People need a quick way to move a local file or directory from a Windows or macOS desktop to a nearby browser without accounts, cloud storage, installation on the receiver, or retained product data. FairDrop realizes that trusted-LAN handoff as a small, ephemeral desktop application whose behavior remains understandable and recoverable when different implementation agents continue the work.
@@ -55,7 +61,9 @@ People need a quick way to move a local file or directory from a Windows or macO
 - Payload memory remains O(buffer) in payload bytes regardless of payload size; files and ZIPs stream with prompt context cancellation and no whole-payload reads. A streamed ZIP additionally retains the one central-directory record per entry that the format requires (measured at ~250 bytes each) and never a second per-entry index of its own.
 - V1 is trusted-LAN plain HTTP with a separate cryptographically random capability token of at least 128 bits. The receiver uses a modern browser on the same LAN, and the sender permits the operating-system firewall access required for inbound HTTP.
 - Capability tokens and source paths never enter mDNS, diagnostics, unrelated HTTP errors, or persistent storage; receiver-visible names are sanitized as specified by the binding contracts.
-- The coordinator is the sole lifecycle owner. External calls occur outside its mutex, state commits are generation-checked, and every Stop is idempotent, force-closing, and quiescent on every return.
+- The coordinator is the sole lifecycle owner. External calls occur outside its mutex, state commits are generation-checked, and every Stop is idempotent and force-closing. Teardown waits are bounded: successful teardown proves quiescence; an elapsed bound reports a coded failure and never claims the underlying resource has stopped (Story 3.4).
+- Natural transfer completion follows successful HTTP final body/framing writes, including chunk termination; a final-write error or short write is failure. Cancel/Stop force-close pending finalization within documented teardown bounds.
+- Metadata inspection grants no content-read access: Windows uses attribute handles, Linux `O_PATH`, and Darwin parent-relative no-follow stat snapshots. Darwin snapshots do not pin a leaf; later search/enumeration/content descriptors must match their device/inode before use. Leaf and traversal no-follow guards remain mandatory.
 - Backend events and typed errors are authoritative and session-scoped. Ordering, sequence, progress, public DTO, HTTP, and disclosure semantics are exactly those in the binding contracts companion.
 - Preserve the proven Wails v2 native drop boundary, standard OS chrome, application-lifetime Wails context, single-instance restoration, and accessibility rules defined by the architecture companions.
 - Preserve spaces, Unicode, long Windows paths, and UNC paths wherever native Go APIs permit. Never shell-interpolate paths; reject symlinks, reparse traversal, and non-regular files with typed errors.

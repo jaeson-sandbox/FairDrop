@@ -199,6 +199,7 @@ func TestStopIsSafeAtEveryPointInTheLifecycle(t *testing.T) {
 	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
 	readBody(t, response)
 
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() after a completed transfer = %v", err)
 	}

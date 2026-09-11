@@ -292,6 +292,21 @@ func drainEvents(t *testing.T, events <-chan transfer.ServerEvent) []transfer.Se
 	}
 }
 
+// A receiver can read the last byte before the server's connection callback
+// runs. Tests of natural completion must wait for that outcome before Stop,
+// which deliberately cancels any still-pending response finalization.
+func awaitNaturalCompletion(t *testing.T, server *Server) {
+	t.Helper()
+	server.mu.Lock()
+	active := server.active
+	server.mu.Unlock()
+	select {
+	case <-active.ctx.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatal("natural response finalization did not finish")
+	}
+}
+
 func assertNoEvents(t *testing.T, events <-chan transfer.ServerEvent) {
 	t.Helper()
 	select {

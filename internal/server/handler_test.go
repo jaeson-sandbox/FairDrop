@@ -287,6 +287,7 @@ func TestCompetingClaimsAuthorizeExactlyOnce(t *testing.T) {
 		t.Fatal("the winning claim delivered no body")
 	}
 
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
@@ -352,6 +353,7 @@ func TestPrepareFailureIsGenericGone(t *testing.T) {
 	}
 	assertNoDisclosure(t, response, body)
 
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
@@ -439,6 +441,7 @@ func TestSuccessfulDownloadServesHeadersBodyAndOneCompleteEvent(t *testing.T) {
 		t.Fatal("Content-Disposition disclosed the source path")
 	}
 
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
@@ -578,6 +581,7 @@ func TestUnknownLengthOmitsContentLength(t *testing.T) {
 		t.Fatalf("Content-Length = %v, want it absent for an unknown length", got)
 	}
 
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
@@ -613,6 +617,7 @@ func TestKnownEmptyPayloadCompletesAtZeroPercent(t *testing.T) {
 		t.Fatalf("Content-Length = %q, want %q", got, "0")
 	}
 
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
@@ -773,6 +778,7 @@ func TestProgressIsCappedAndCountsOnlyAcceptedBytes(t *testing.T) {
 	if received := readBody(t, response); len(received) != len(body) {
 		t.Fatalf("received %d bytes, want %d", len(received), len(body))
 	}
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
@@ -830,6 +836,7 @@ func TestEventDeliveryNeverBlocksTheHandler(t *testing.T) {
 	if received := readBody(t, response); len(received) != len(body) {
 		t.Fatalf("received %d bytes, want %d", len(received), len(body))
 	}
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
@@ -1036,6 +1043,7 @@ func TestPrepareReturningNoPayloadIsASetupFailure(t *testing.T) {
 	}
 	assertNoDisclosure(t, response, body)
 
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}

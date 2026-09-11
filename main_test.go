@@ -551,6 +551,46 @@ func TestEveryDeferredEntryHasALiveOwner(t *testing.T) {
 // epics.md cites.
 var deferredIDPattern = regexp.MustCompile(`D-\d{3}`)
 
+// Read each entry independently: an absent id must not inherit its neighbour's
+// id or silently bypass the owning-story checks. Field order is not a contract.
+type deferredEntry struct{ id, owner string }
+
+func deferredEntries(t *testing.T, content []byte) []deferredEntry {
+	t.Helper()
+	blocks := strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n- source_spec:")
+	if len(blocks) < 2 {
+		t.Fatal("no deferred entries parsed")
+	}
+	seen := map[string]bool{}
+	var entries []deferredEntry
+	for index, block := range blocks[1:] {
+		var entry deferredEntry
+		var ids, owners int
+		for _, line := range strings.Split(block, "\n") {
+			if value, ok := strings.CutPrefix(line, "  id:"); ok {
+				entry.id = strings.TrimSpace(value)
+				ids++
+			}
+			if value, ok := strings.CutPrefix(line, "  owner:"); ok {
+				entry.owner = strings.TrimSpace(value)
+				owners++
+			}
+		}
+		if ids != 1 || len(entry.id) != 5 || deferredIDPattern.FindString(entry.id) != entry.id {
+			t.Fatalf("deferred entry %d must have exactly one stable D-NNN id (got %q, count %d)", index+1, entry.id, ids)
+		}
+		if seen[entry.id] {
+			t.Fatalf("duplicate deferred id %s", entry.id)
+		}
+		seen[entry.id] = true
+		if owners != 1 || entry.owner == "" {
+			t.Fatalf("%s must have exactly one non-empty owner", entry.id)
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
 // splitLines normalises CRLF so a Windows checkout parses the same as a macOS
 // one. The workflow's line-ending check keeps the repository LF, and this makes
 // these tests independent of that check rather than quietly dependent on it.
@@ -648,19 +688,9 @@ func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
 	}
 
 	var open int
-	var id string
-	for _, line := range splitLines(deferred) {
-		if rest, found := strings.CutPrefix(line, "  id:"); found {
-			id = strings.TrimSpace(rest)
-			continue
-		}
-		rest, found := strings.CutPrefix(line, "  owner:")
-		if !found {
-			continue
-		}
-		owner := strings.TrimSpace(rest)
-		if id == "" || owner == "discharged" || owner == "accepted" {
-			id = ""
+	for _, entry := range deferredEntries(t, deferred) {
+		id, owner := entry.id, entry.owner
+		if owner == "discharged" || owner == "accepted" {
 			continue
 		}
 		open++
@@ -675,7 +705,6 @@ func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
 			t.Errorf("%s is still open but its owner %q is already done: "+
 				"the finding belongs to nobody", id, owner)
 		}
-		id = ""
 	}
 
 	if open == 0 {

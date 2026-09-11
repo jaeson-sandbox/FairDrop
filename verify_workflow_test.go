@@ -102,24 +102,45 @@ func TestVerifyWorkflowCancelsSupersededRuns(t *testing.T) {
 	}
 }
 
-// Windows and macOS only: a Linux job would prove nothing about the
-// platforms FairDrop ships to, and a cross-compiled or emulated result is
-// never release proof.
+// Release verification stays native to Windows and macOS. Linux executes
+// adapters in its own explicitly limited job, with no desktop/frontend build.
 func TestVerifyWorkflowRunsOnlyOnNativeWindowsAndMacRunners(t *testing.T) {
 	wf := readVerifyWorkflow(t)
+	if !strings.Contains(wf, "os: [windows-latest, macos-latest]") {
+		t.Error("release matrix must contain exactly native Windows and macOS runners")
+	}
+}
 
-	if !strings.Contains(wf, "windows-latest") {
-		t.Error("the workflow does not target windows-latest")
+func TestVerifyWorkflowLinuxJobIsAdapterVerificationOnly(t *testing.T) {
+	wf := readVerifyWorkflow(t)
+	_, linux, found := strings.Cut(wf, "\n  linux-adapters:\n")
+	if !found {
+		t.Fatal("Linux adapter verification job is missing")
 	}
-	if !strings.Contains(wf, "macos-latest") {
-		t.Error("the workflow does not target macos-latest")
+	// Extract only this job, so another job cannot satisfy or violate its pins.
+	for i, line := range strings.Split(linux, "\n") {
+		if strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   ") && strings.HasSuffix(line, ":") {
+			linux = strings.Join(strings.Split(linux, "\n")[:i], "\n")
+			break
+		}
 	}
-	lower := strings.ToLower(wf)
-	if strings.Contains(lower, "ubuntu") {
-		t.Error("the workflow references a ubuntu runner: a Linux job is Ask First and none was approved")
+	for _, want := range []string{
+		"name: Linux adapter verification (not release proof)", "runs-on: ubuntu-latest",
+		"uses: actions/setup-go@v7", "go-version: '1.26.7'", "run: go vet ./...",
+		"run: go test -count=1 -v -timeout 240s ./...", "go test -count=1 -race -timeout 420s ./...",
+		`test "$(go env CGO_ENABLED)" = 1`,
+	} {
+		if !strings.Contains(linux, want) {
+			t.Errorf("Linux job is missing %q", want)
+		}
 	}
-	if strings.Contains(lower, "runs-on: linux") {
-		t.Error("the workflow runs a job on Linux directly")
+	for _, forbidden := range []string{"wails", "frontend", "npm", "setup-node"} {
+		if strings.Contains(strings.ToLower(linux), forbidden) {
+			t.Errorf("Linux adapter job contains forbidden desktop/frontend step %q", forbidden)
+		}
+	}
+	if !strings.Contains(wf, "-v -run 'Test(POSIX|Linux|Darwin|Native|StageTransferResolves|StageTransferRefusesSelected)' ./...") {
+		t.Error("native capability skips must be reported with verbose platform tests")
 	}
 }
 
@@ -371,8 +392,8 @@ func TestVerifyWorkflowRunsTheFixedGoCommands(t *testing.T) {
 		"gofmt -l .",
 		"go vet ./...",
 		"go tool staticcheck ./...",
-		"go test -count=1 ./...",
-		"go test -count=1 -race ./...",
+		"go test -count=1 -timeout 240s ./...",
+		"go test -count=1 -race -timeout 420s ./...",
 	} {
 		if !strings.Contains(wf, want) {
 			t.Errorf("the workflow does not run %q", want)
