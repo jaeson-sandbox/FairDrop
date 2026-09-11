@@ -1092,13 +1092,15 @@ So that a transfer that silently stops is never mistaken for one I cancelled.
 
 **Why a separate story:** Epic 1's retrospective found a successful transfer that could be announced as "Transfer canceled", and Epic 2's live run found a failure that left no trace at all. Both are the same class of defect -- an event was lost and nothing said so -- and it had been buried among Story 3.4's timing work.
 
-**Closes:** D-020, D-021, D-031, D-034, D-035, D-039, D-042, D-043, D-048, D-049, D-059, D-091, D-092, D-097, D-098, D-100, plus Epic 1 retrospective items 2, 3, 4 and 7.
+**Narrowed 2026-09-11:** this story had accumulated nineteen deferred ids, more than any story yet built. Twelve of them are one goal -- a failure that nobody can see -- and are kept here. The other seven are contract shapes and leftover copy, which share no mechanism with them, and moved to Story 3.11.
+
+**Closes:** D-020, D-021, D-031, D-034, D-042, D-043, D-049, D-059, D-091, D-092, D-098, D-100, plus Epic 1 retrospective items 2, 3, 4 and 7.
 
 **Acceptance Criteria:**
 
-**Given** a `transfer-complete` the reducer refuses, or a `ServerComplete` carrying no snapshot
+**Given** a `transfer-complete` the reducer refuses
 **When** it occurs
-**Then** the window shows a failure, never the cancel-won summary, and a test drives both shapes (D-035, retrospective item 2).
+**Then** the window shows a failure, never the cancel-won summary, and a test drives that shape (Epic 1 retrospective item 2).
 
 **Given** an `Observer.Publish` that panics or blocks
 **When** the coordinator next runs a lifecycle command
@@ -1106,19 +1108,20 @@ So that a transfer that silently stops is never mistaken for one I cancelled.
 
 **Given** an event lane that closes while the session is STAGED or CLAIMING
 **When** the drainer observes the close
-**Then** a terminal outcome is synthesized and the UI is never left waiting (D-042).
+**Then** a terminal outcome is synthesized and the UI is never left waiting for a server that is gone (D-042, D-091).
 
-**Given** the `undelivered` counter and the stderr lifecycle log `app.go` writes
+**Given** every diagnostic the coordinator and server record
+**When** one is written in a shipped build
+**Then** it reaches a surface outside the process -- the same stderr lifecycle log `app.go` already writes -- rather than a sink only tests can read (D-098)
+**And** a transfer failure's original cause is recorded before it is rewritten to fixed public copy (D-092), a teardown that leaves two resources unaccounted reports both rather than the first (D-100), a repeated `Stop` keeps its first call's diagnostic (D-020), `ErrorLog` stops swallowing handler panics (D-021), and `diagnosticSink` marks an overflow instead of dropping silently (D-031) -- each with a named test.
+
+**Given** the `undelivered` counter
 **When** a lifecycle event cannot be delivered
-**Then** the drop is logged and reaches a surface a test can observe (D-049), and a terminal outcome always carries a control so a lost `transfer-reset` cannot strand the window (D-059).
+**Then** the drop is logged where a test can observe it (D-049), and a terminal outcome always carries a control so a lost `transfer-reset` cannot strand the window (D-059).
 
 **Given** `Warning.Code`, the discovery warning, and progress coherence
 **When** the story closes
 **Then** `Warning.Code` is constrained at the boundary or covered by the cross-language pin (retrospective item 3); the beacon warning reaches a screen reader through a reachable trigger or an announced region (retrospective item 4); and progress is validated by one strategy with Stage metadata parsed once (retrospective item 7).
-
-**Given** the smaller visibility gaps
-**When** the story closes
-**Then** a repeated `Stop` keeps its first diagnostic (D-020), `ErrorLog` no longer swallows handler panics (D-021), `diagnosticSink` marks overflow instead of dropping silently (D-031), `sanitizeProgress` checks the known/unknown invariant (D-039), and the pre-startup command and dialog paths agree (D-048) -- each with a named test.
 
 ### Story 3.7: Execute the Native Platform Test Matrix
 
@@ -1154,7 +1157,7 @@ As a sender,
 I want the folder stream to fail safely under the conditions Epic 2 deferred,
 So that a deep tree, a swapped root, or a misused reader cannot break a live download.
 
-**Closes:** D-077, D-079, D-080, D-081, D-082, D-096, D-101, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
+**Closes:** D-077, D-079, D-080, D-081, D-082, D-096, D-101, D-105, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
 
 **Acceptance Criteria:**
 
@@ -1216,7 +1219,7 @@ So that a release candidate is not blocked by open questions nobody has answered
 
 **Ordering:** numbered last, required before Story 3.9. Release evidence cannot record a pass against a header set, a first-paint behaviour, or a single-instance guarantee that has not been decided.
 
-**Closes:** D-018, D-055, D-064, D-088.
+**Closes:** D-018, D-055, D-064, D-088, D-107.
 
 **Acceptance Criteria:**
 
@@ -1242,3 +1245,35 @@ So that a release candidate is not blocked by open questions nobody has answered
 **Given** any of these four decisions
 **When** it changes a contract or an architecture decision
 **Then** the spec, the architecture documents, the owning story, its tests, and `AGENTS.md` are updated together before the story closes.
+
+### Story 3.11: Close the Residual Contract and Copy Gaps
+
+As a sender,
+I want the last few states that report the wrong thing to report the right thing,
+So that the contract describes what the code does and the copy describes what happened.
+
+**Why a separate story:** these seven were left on Story 3.6 when it was narrowed. They are real and they are small, and they share no mechanism with each other or with 3.6's observability work -- two are progress-shape contract rows, two are contexts fabricated or never cancellable, three are error copy that survived Story 3.5. Grouping them by size rather than by theme is deliberate: each is a short, self-contained correction, and carrying them on a story about something else is how they went unfixed twice already.
+
+**Ordering:** numbered last, required before Story 3.9. Three of the seven change what a user reads, so release evidence cannot record a pass against copy that is still wrong.
+
+**Closes:** D-035, D-039, D-048, D-097, D-103, D-104, D-106.
+
+**Acceptance Criteria:**
+
+**Given** a `ServerComplete` that carries no snapshot, and `sanitizeProgress`'s known/unknown total invariant
+**When** the contract is read
+**Then** the payload table has a row for the snapshot-less shape and says what the coordinator publishes for it (D-035), and the invariant `sanitizeProgress` trusts is either enforced there like the values beside it or documented as the producer's to keep (D-039).
+
+**Given** the contexts the app hands the coordinator
+**When** a command must be abandoned
+**Then** no command fabricates a background context while a sibling refuses (D-048), and the context `Cancel` and `Shutdown` receive is one that can actually be cancelled rather than the runtime's permanently-open one (D-097)
+**And** a test proves cancelling it ends the wait, rather than proving only that the parameter is passed.
+
+**Given** the three states Story 3.5 could not settle without wording
+**When** each is reached
+**Then** a `Cancel` against a staged-but-never-claimed session, a `Cancel` on a missing coordinator, and a clipboard write failure each report copy that describes what happened (D-103, D-104, D-106)
+**And** any new code or string enters `EXPERIENCE.md` by stable key first and moves the registry, the contract, the Go table and the TypeScript mirror together, as Story 3.5 established.
+
+**Given** a malformed Stage acknowledgement whose cleanup call fails
+**When** the user is told nothing was sent
+**Then** either the cleanup is guaranteed or the failure is surfaced, so the next Stage cannot be refused `busy` for a session the user was told did not exist (D-106).

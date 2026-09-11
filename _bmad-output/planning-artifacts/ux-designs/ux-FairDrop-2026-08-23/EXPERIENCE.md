@@ -114,7 +114,7 @@ The codes come from the binding contract. `PublicErrorOf` and the malformed/unkn
 | Code | Visible heading | Exact `PublicError.message` | Sole announcement owner | Recovery |
 |---|---|---|---|---|
 | `invalid_selection` | Choose one item | “Choose exactly one file or folder.” | Focused inline Error Panel | Use the drop target or one browse action and choose one item. |
-| `busy` | Transfer already active | “Finish or cancel the current transfer before choosing another item.” | Focused current-state heading with the message as description | Finish or Cancel; do not replace the active session. |
+| `busy` | Transfer already active | “FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.” | Focused current-state heading with the message as description | Wait a moment, or cancel it; do not replace the active session. |
 | `cancelled` | Transfer canceled | “Transfer canceled.” | Polite status during pending; focused Idle cancellation summary when reset wins | Return to Idle; never render as Error. |
 | `path_not_found` | Item not found | “That file or folder is no longer available. Choose it again.” | Focused Error Panel | Choose the item again. |
 | `path_unsupported` | Can’t use that item | “FairDrop can use regular files and folders only. Choose another item.” | Focused Error Panel | Choose a non-link regular file or folder. |
@@ -122,6 +122,7 @@ The codes come from the binding contract. `PublicErrorOf` and the malformed/unkn
 | `network_unavailable` | Local network unavailable | “FairDrop couldn’t find a usable local network. Connect to local Wi-Fi, then try again.” | Focused Error Panel | Check same Wi-Fi and firewall help, then retry. |
 | `server_start_failed` | Couldn’t open a connection | “FairDrop couldn’t open a local transfer connection. Check firewall access, then try again.” | Focused Error Panel | Follow platform firewall recovery, then retry. |
 | `qr_failed` | Couldn’t create the QR code | “FairDrop couldn’t create the QR code. Prepare the item again.” | Focused Error Panel | Retry from Idle. |
+| `setup_failed` | Couldn’t prepare that item | “FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.” | Focused Error Panel | Choose the item again. |
 | `beacon_warning` | Discovery unavailable | `copy.discovery.warning` | One polite status update; focus stays in Staged | Continue with QR/link; this is Warning, not Error. |
 | `transfer_failed` | Transfer stopped | “The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.” | Focused terminal Error Panel | Check network; prepare again after reset. |
 | `shutting_down` | FairDrop is closing | “FairDrop is closing. Reopen it to start a transfer.” | Focused inline message if the window remains | Reopen FairDrop. |

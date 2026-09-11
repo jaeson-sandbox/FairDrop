@@ -9,9 +9,18 @@ import {
     type ProgressSpeechMemory,
 } from './progressSpeech'
 
-function known(bytesSent: number, percent: number, totalBytes = 100_000_000): ProgressSelection {
+/*
+  The wire's `percent` is deliberately 0 in every case below.
+
+  The selector derives the figure that is spoken from the byte pair, so a
+  snapshot whose percent field disagrees changes nothing anyone hears (Epic 1
+  retrospective item 7). Passing a plausible-looking figure here would hide
+  that: every expectation would still read as though the wire had been
+  believed.
+*/
+function known(bytesSent: number, totalBytes = 100_000_000): ProgressSelection {
     return selectProgressSnapshot({
-        bytesSent, totalBytes, totalKnown: true, percent, speedBytesPerSec: 12_400_000,
+        bytesSent, totalBytes, totalKnown: true, percent: 0, speedBytesPerSec: 12_400_000,
     })
 }
 
@@ -37,32 +46,34 @@ describe('the assistive progress throttle', () => {
     */
     it('speaks a known total that gained bytes without gaining percentage points', () => {
         const memory = {spokenAtMs: 0, percent: 0, bytesSent: 0}
-        const snapshot = known(progressSpeechBytes, 5)
+        // A total large enough that 10 MiB is worth fewer than ten percentage
+        // points, which is the whole distinction this case exists to draw.
+        const snapshot = known(progressSpeechBytes, 200_000_000)
 
         expect(nextProgressSpeech(memory, snapshot, progressSpeechIntervalMs)).not.toBeNull()
     })
 
     it('speaks once at the start, before any interval has passed', () => {
-        expect(nextProgressSpeech(null, known(1_000, 0), 0)).toEqual({
+        expect(nextProgressSpeech(null, known(1_000), 0)).toEqual({
             text: '1.0 KB of 100.0 MB · 0%',
             memory: {spokenAtMs: 0, percent: 0, bytesSent: 1_000},
         })
     })
 
     it('stays silent inside the five-second floor however much changed', () => {
-        const start = nextProgressSpeech(null, known(0, 0), 0)!
+        const start = nextProgressSpeech(null, known(0), 0)!
 
         // 90 percentage points and 90 MB of new bytes, one millisecond early.
-        const early = nextProgressSpeech(start.memory, known(90_000_000, 90), progressSpeechIntervalMs - 1)
+        const early = nextProgressSpeech(start.memory, known(90_000_000), progressSpeechIntervalMs - 1)
 
         expect(early).toBeNull()
     })
 
     it('stays silent past the floor when nothing meaningful changed', () => {
-        const start = nextProgressSpeech(null, known(0, 0), 0)!
+        const start = nextProgressSpeech(null, known(0), 0)!
 
         // Nine percentage points, and well under 10 MiB of new wire bytes.
-        const small = nextProgressSpeech(start.memory, known(9_000_000, 9), 60_000)
+        const small = nextProgressSpeech(start.memory, known(9_000_000), 60_000)
 
         expect(small).toBeNull()
     })
@@ -72,12 +83,16 @@ describe('the assistive progress throttle', () => {
 
         const spoken = nextProgressSpeech(
             memory,
-            known(1_000, 10 + progressSpeechPercentPoints),
+            known(20_000_000),
             progressSpeechIntervalMs,
         )
 
-        expect(spoken?.text).toBe('1.0 KB of 100.0 MB · 20%')
-        expect(spoken?.memory).toEqual({spokenAtMs: progressSpeechIntervalMs, percent: 20, bytesSent: 1_000})
+        expect(spoken?.text).toBe('20.0 MB of 100.0 MB · 20%')
+        expect(spoken?.memory).toEqual({
+            spokenAtMs: progressSpeechIntervalMs,
+            percent: 10 + progressSpeechPercentPoints,
+            bytesSent: 20_000_000,
+        })
     })
 
     it('speaks on 10 MiB of new wire bytes when the total is unknown', () => {
@@ -91,31 +106,34 @@ describe('the assistive progress throttle', () => {
     })
 
     it('counts a backwards percentage as change, since it is still new information', () => {
-        const memory: ProgressSpeechMemory = {spokenAtMs: 0, percent: 40, bytesSent: 50_000_000}
+        const memory: ProgressSpeechMemory = {spokenAtMs: 0, percent: 60, bytesSent: 50_000_000}
 
-        // A clamped wire percentage can fall without bytesSent falling.
-        expect(nextProgressSpeech(memory, known(50_000_000, 25), 20_000)?.text).toContain('25%')
+        // The throttle compares magnitudes, not direction. Nothing in it
+        // depends on the reducer's monotonicity holding, which is the point:
+        // it is a pure function over a remembered figure, and a figure that
+        // moved backwards is still information the listener does not have.
+        expect(nextProgressSpeech(memory, known(50_000_000), 20_000)?.text).toContain('50%')
     })
 
     it('stays silent on a clock that went backwards or produced nothing usable', () => {
         const memory: ProgressSpeechMemory = {spokenAtMs: 60_000, percent: 0, bytesSent: 0}
 
-        expect(nextProgressSpeech(memory, known(90_000_000, 90), 0)).toBeNull()
-        expect(nextProgressSpeech(memory, known(90_000_000, 90), Number.NaN)).toBeNull()
+        expect(nextProgressSpeech(memory, known(90_000_000), 0)).toBeNull()
+        expect(nextProgressSpeech(memory, known(90_000_000), Number.NaN)).toBeNull()
     })
 
     it('is cancelled by clearing the memory, which is what a terminal outcome does', () => {
         // The App drops the memory the moment the phase stops being
         // Transferring, so nothing is left queued to speak after Done or Error.
-        const restarted = nextProgressSpeech(null, known(90_000_000, 90), 1_000)
+        const restarted = nextProgressSpeech(null, known(90_000_000), 1_000)
 
         expect(restarted).not.toBeNull()
     })
 })
 
 describe('what a progress update says', () => {
-    it('reads a known positive total as sent-of-total and the wire percentage', () => {
-        expect(progressSpeechText(known(5_800_000, 68, 8_400_000))).toBe('5.8 MB of 8.4 MB · 68%')
+    it('reads a known positive total as sent-of-total and the derived percentage', () => {
+        expect(progressSpeechText(known(5_800_000, 8_400_000))).toBe('5.8 MB of 8.4 MB · 69%')
     })
 
     it('reads an unknown total as its literal status and the wire bytes', () => {
@@ -127,7 +145,7 @@ describe('what a progress update says', () => {
     })
 
     it('never speaks throughput in any mode', () => {
-        for (const progress of [known(5_800_000, 68, 8_400_000), unknown(48_200_000), empty]) {
+        for (const progress of [known(5_800_000, 8_400_000), unknown(48_200_000), empty]) {
             const spoken = progressSpeechText(progress)
             expect(spoken, spoken).not.toContain('/s')
             expect(spoken, spoken).not.toContain('12.4 MB')

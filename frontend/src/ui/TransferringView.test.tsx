@@ -45,17 +45,20 @@ describe('known positive totals', () => {
         bytesSent: 5_800_000,
         totalBytes: 8_400_000,
         totalKnown: true,
-        // Deliberately not 5.8/8.4: the view must show the wire percentage, not
-        // one it computed for itself, which would read 69%.
+        // Deliberately not 5.8/8.4. The meter reads the authoritative byte
+        // pair, so this figure reaches no surface: what shows is 69%, and a
+        // sender that rounds its own percentage for display cannot make the
+        // bar disagree with the counts printed beside it (Epic 1 retrospective
+        // item 7).
         percent: 68,
         speedBytesPerSec: 4_700_000,
     }
 
-    it('renders a determinate progressbar carrying the wire percentage', () => {
+    it('renders a determinate progressbar carrying the derived percentage', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
         const bar = screen.getByRole('progressbar')
-        expect(bar.getAttribute('aria-valuenow')).toBe('68')
+        expect(bar.getAttribute('aria-valuenow')).toBe('69')
         expect(bar.getAttribute('aria-valuemin')).toBe('0')
         expect(bar.getAttribute('aria-valuemax')).toBe('100')
         expect(meter()?.getAttribute('data-progress-mode')).toBe('known-positive')
@@ -65,8 +68,8 @@ describe('known positive totals', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
         expect(screen.getByText('5.8 MB of 8.4 MB')).toBeTruthy()
-        expect(screen.getByText('68%')).toBeTruthy()
-        expect(screen.queryByText('69%')).toBeNull()
+        expect(screen.getByText('69%')).toBeTruthy()
+        expect(screen.queryByText('68%')).toBeNull()
     })
 
     it('reports wire bytes first and throughput second', () => {
@@ -76,11 +79,11 @@ describe('known positive totals', () => {
         expect(metrics).toEqual(['5.8 MB sentWire bytes', '4.7 MB/sThroughput'])
     })
 
-    it('fills the track from the wire percentage', () => {
+    it('fills the track from the byte pair, not from the wire percentage', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
         const fill = document.querySelector('.fd-meter__fill') as HTMLElement
-        expect(fill.style.width).toBe('68%')
+        expect(fill.style.width).toBe(`${100 * 5_800_000 / 8_400_000}%`)
     })
 })
 
@@ -265,7 +268,7 @@ describe('the pending cancellation contract', () => {
         render(<TransferringView state={transferring(snapshot, {cancelPending: true})} onCancel={vi.fn()}/>)
 
         expect(screen.getByText('5.8 MB of 8.4 MB')).toBeTruthy()
-        expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('68')
+        expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('69')
     })
 
     it('marks the sending heading as the target transfer-started focuses', () => {

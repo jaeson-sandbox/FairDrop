@@ -18,6 +18,7 @@ const (
 	ErrNetworkUnavailable ErrorCode = "network_unavailable"
 	ErrServerStartFailed  ErrorCode = "server_start_failed"
 	ErrQRFailed           ErrorCode = "qr_failed"
+	ErrSetupFailed        ErrorCode = "setup_failed"
 	ErrBeaconWarning      ErrorCode = "beacon_warning"
 	ErrTransferFailed     ErrorCode = "transfer_failed"
 	ErrShuttingDown       ErrorCode = "shutting_down"
@@ -116,7 +117,7 @@ func nilInterface(value any) bool {
 
 var publicMessages = map[ErrorCode]string{
 	ErrInvalidSelection:   "Choose exactly one file or folder.",
-	ErrBusy:               "Finish or cancel the current transfer before choosing another item.",
+	ErrBusy:               "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.",
 	ErrCancelled:          "Transfer canceled.",
 	ErrPathNotFound:       "That file or folder is no longer available. Choose it again.",
 	ErrPathUnsupported:    "FairDrop can use regular files and folders only. Choose another item.",
@@ -124,6 +125,7 @@ var publicMessages = map[ErrorCode]string{
 	ErrNetworkUnavailable: "FairDrop couldn’t find a usable local network. Connect to local Wi-Fi, then try again.",
 	ErrServerStartFailed:  "FairDrop couldn’t open a local transfer connection. Check firewall access, then try again.",
 	ErrQRFailed:           "FairDrop couldn’t create the QR code. Prepare the item again.",
+	ErrSetupFailed:        "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.",
 	ErrBeaconWarning:      "Device discovery isn’t available. The QR code and download link still work.",
 	ErrTransferFailed:     "The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.",
 	ErrShuttingDown:       "FairDrop is closing. Reopen it to start a transfer.",

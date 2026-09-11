@@ -901,8 +901,8 @@ func TestDialogBeforeStartupIsRefusedRatherThanFatal(t *testing.T) {
 	if got != "" || err == nil {
 		t.Fatalf("SelectFile before startup returned (%q, %v), want a coded refusal", got, err)
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "transfer_failed" {
-		t.Errorf("the refusal crossed as %q, want %q", code, "transfer_failed")
+	if code := string(transfer.ErrorCodeOf(err)); code != "setup_failed" {
+		t.Errorf("the refusal crossed as %q, want %q", code, "setup_failed")
 	}
 	if titles := h.dialogs(); len(titles) != 0 {
 		t.Errorf("a dialog was opened without a window context: %v", titles)
@@ -1024,6 +1024,13 @@ func TestPublishBeforeStartupDropsTheEventWithoutEmitting(t *testing.T) {
 	if got := h.app.undelivered.Load(); got != 1 {
 		t.Errorf("undelivered = %d, want 1: the drop must be recorded", got)
 	}
+	// Counting it is not seeing it. Nothing in a running FairDrop reads the
+	// counter, so a drop that is only counted is still a drop nobody can be
+	// asked about; the line is the observable half of D-049.
+	if lines := h.logged(); len(lines) != 1 ||
+		lines[0] != "fairdrop: undelivered (no window yet) transfer-started seq=1 session="+string(testSessionID) {
+		t.Errorf("logged %v, want one line naming the pre-window drop", lines)
+	}
 	// The coordinator holds its operation lease across this call, so the only
 	// thing that matters is that it got control back -- which reaching this
 	// line proves.
@@ -1043,6 +1050,12 @@ func TestPublishRecoversAnEmitPanicSoTheLeaseIsNotStranded(t *testing.T) {
 
 	if got := h.app.undelivered.Load(); got != 1 {
 		t.Errorf("undelivered = %d, want 1: the failed emission must be recorded", got)
+	}
+	// A recovered panic that logs nothing is indistinguishable from an event
+	// that was delivered -- which is the failure mode recovering it introduces.
+	if lines := h.logged(); len(lines) != 1 ||
+		lines[0] != "fairdrop: undelivered (emit panicked) transfer-progress seq=1 session="+string(testSessionID) {
+		t.Errorf("logged %v, want one line naming the panicking emission", lines)
 	}
 	if calls := h.coordinator.log(); len(calls) != 0 {
 		t.Errorf("Publish called back into the coordinator: %v", calls)
@@ -1380,8 +1393,8 @@ func TestCommandsRefuseBeforeCompositionRatherThanPanicking(t *testing.T) {
 	if metadata != nil || err == nil {
 		t.Fatalf("StageTransfer returned (%v, %v) with no coordinator", metadata, err)
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "transfer_failed" {
-		t.Errorf("the refusal crossed as %q, want %q", code, "transfer_failed")
+	if code := string(transfer.ErrorCodeOf(err)); code != "setup_failed" {
+		t.Errorf("the refusal crossed as %q, want %q", code, "setup_failed")
 	}
 
 	if err := app.CancelTransfer(); err == nil {
@@ -1591,3 +1604,43 @@ func TestStagedMetadataCarriesTheTokenButNeverThePath(t *testing.T) {
 		t.Errorf("staged metadata leaked part of the source path: %s", serialized)
 	}
 }
+
+// TestLogDiagnosticWritesOneSafeLine pins what a diagnostic looks like once it
+// leaves the process, and that it cannot carry what AD-9 forbids.
+//
+// The coordinator hands this seam a stable code and a fixed message it chose
+// itself, never an adapter's error text -- which is the whole reason
+// recordDiagnostic passes a code rather than a cause. This asserts the shape
+// of the line and then proves the rule holds even when the caller misbehaves:
+// a message carrying a real path and a capability token must not put either on
+// the wire through this surface.
+func TestLogDiagnosticWritesOneSafeLine(t *testing.T) {
+	h := newHarness(t)
+
+	h.app.logDiagnostic(transfer.ErrBeaconWarning, "device discovery cleanup reported a problem")
+
+	lines := h.logged()
+	if len(lines) != 1 {
+		t.Fatalf("logged %v, want exactly one line", lines)
+	}
+	if !strings.Contains(lines[0], "code=beacon_warning") {
+		t.Errorf("line %q does not carry the stable code", lines[0])
+	}
+	if !strings.Contains(lines[0], "device discovery cleanup reported a problem") {
+		t.Errorf("line %q does not carry the fixed message", lines[0])
+	}
+}
+
+// The AD-9 guarantee for diagnostics deliberately does not live here.
+//
+// A first version of this test drove logDiagnostic directly with a message
+// containing testPath and testToken and required the line to come out clean.
+// It failed, and the test was what was wrong: this function takes a string and
+// prints it, and no amount of sanitising inside it could reliably recognise
+// every shape a path or a token can take. A guarantee that depends on guessing
+// is not a guarantee.
+//
+// The real invariant is that every caller passes a literal the transfer
+// package wrote, never an adapter's text -- and that is checkable exactly
+// where it holds, so internal/transfer's
+// TestEveryDiagnosticMessageIsAFixedLiteral pins it at the call sites.

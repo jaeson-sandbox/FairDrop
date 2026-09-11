@@ -159,8 +159,10 @@ func TestStageFailsClosedWhenEntropyFails(t *testing.T) {
 
 			metadata, err := h.stage()
 
-			if got := ErrorCodeOf(err); got != ErrTransferFailed {
-				t.Errorf("error code is %q, want %q", got, ErrTransferFailed)
+			// Called before c.mu.Lock(): no state changed and no resource was
+			// acquired, so this is a pre-transfer setup failure (D-025).
+			if got := ErrorCodeOf(err); got != ErrSetupFailed {
+				t.Errorf("error code is %q, want %q", got, ErrSetupFailed)
 			}
 			if metadata.SessionID != "" {
 				t.Errorf("a failed Stage returned metadata %+v", metadata)
@@ -536,7 +538,7 @@ func TestStageCommitsWithAWarningWhenOnlyTheBeaconFails(t *testing.T) {
 	// usable session -- HTTP and QR live, only discovery down -- must not be
 	// told a transfer failed that never started.
 	want := Warning{
-		Code:    ErrBeaconWarning,
+		Code:    WarnBeaconUnavailable,
 		Message: PublicErrorOf(NewError(ErrBeaconWarning, "")).Message,
 	}
 	if metadata.Warnings[0] != want {
@@ -818,8 +820,13 @@ func TestStageRejectsUnrepresentableMetadataBeforeResourceAcquisition(t *testing
 			if metadata.SessionID != "" {
 				t.Fatalf("rejected Stage returned metadata %+v", metadata)
 			}
-			if got := ErrorCodeOf(err); got != ErrTransferFailed {
-				t.Fatalf("error code = %q, want %q", got, ErrTransferFailed)
+			// setup_failed, not transfer_failed: the call log on the very next
+			// line is the argument. Nothing beyond Inspect ran, so no transfer
+			// began, and the copy transfer_failed carries says one stopped
+			// midway. Changed with Story 3.5; this expectation moved because
+			// the behaviour did, not to make a failing test pass.
+			if got := ErrorCodeOf(err); got != ErrSetupFailed {
+				t.Fatalf("error code = %q, want %q", got, ErrSetupFailed)
 			}
 			if got := h.calls.snapshot(); !slices.Equal(got, []string{"entropy.Read", "entropy.Read", "source.Inspect"}) {
 				t.Fatalf("calls = %v, want rejection before network resources", got)
@@ -864,8 +871,10 @@ func TestStageRejectsUnknownItemKindBeforeResourceAcquisition(t *testing.T) {
 	if metadata.SessionID != "" || metadata.Name != "" || metadata.Size != 0 || metadata.IsDir || metadata.URL != "" || metadata.QR != "" {
 		t.Fatalf("rejected Stage returned metadata %+v", metadata)
 	}
-	if got := ErrorCodeOf(err); got != ErrTransferFailed {
-		t.Fatalf("error code = %q, want literal %q", got, ErrTransferFailed)
+	// setup_failed for the same reason as the size check above: the call log
+	// below proves nothing past Inspect ran, so no transfer began.
+	if got := ErrorCodeOf(err); got != ErrSetupFailed {
+		t.Fatalf("error code = %q, want literal %q", got, ErrSetupFailed)
 	}
 	if got := h.calls.snapshot(); !slices.Equal(got, []string{"entropy.Read", "entropy.Read", "source.Inspect"}) {
 		t.Fatalf("calls = %v, want literal rejection before resource acquisition", got)
@@ -922,16 +931,55 @@ func TestCapabilityURLUsesTheRouteTheServerRegisters(t *testing.T) {
 	}
 }
 
-func TestStageRefusesWithoutItsPorts(t *testing.T) {
-	coordinator := NewCoordinator(Dependencies{})
+// NewCoordinator now refuses to build a coordinator missing a port or the
+// observer (D-029): the one real caller, main.go's compose, always supplies
+// every one, so a missing port is a wiring defect to catch at construction
+// rather than a runtime state Stage or AuthorizeClaim has to report.
+func TestNewCoordinatorRefusesAMissingPortOrObserver(t *testing.T) {
+	full := Dependencies{
+		Source:   &fakeSource{},
+		Network:  &fakeNetwork{},
+		Server:   &fakeServer{},
+		QR:       &fakeQR{},
+		Observer: &fakeObserver{},
+	}
+
+	for _, testCase := range []struct {
+		name string
+		zero func(d Dependencies) Dependencies
+	}{
+		{"no ports at all", func(Dependencies) Dependencies { return Dependencies{} }},
+		{"missing Source", func(d Dependencies) Dependencies { d.Source = nil; return d }},
+		{"missing Network", func(d Dependencies) Dependencies { d.Network = nil; return d }},
+		{"missing Server", func(d Dependencies) Dependencies { d.Server = nil; return d }},
+		{"missing QR", func(d Dependencies) Dependencies { d.QR = nil; return d }},
+		{"missing Observer", func(d Dependencies) Dependencies { d.Observer = nil; return d }},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("NewCoordinator did not panic on a missing port or observer")
+				}
+			}()
+			NewCoordinator(testCase.zero(full))
+		})
+	}
+}
+
+// ready() is the residual, defensive path a *Coordinator assembled some
+// other way than NewCoordinator could still hit -- unreachable through the
+// constructor now, but still honest if ever reached: a missing port means
+// nothing was ever staged or sent, so it must report the pre-transfer setup
+// code rather than borrow the interrupted-transfer one (D-029).
+func TestReadyReportsSetupFailedRatherThanTransferFailed(t *testing.T) {
+	var coordinator Coordinator // zero value: every port and the observer are nil.
 
 	_, err := coordinator.Stage(context.Background(), testPath)
-
-	if got := ErrorCodeOf(err); got != ErrTransferFailed {
-		t.Errorf("error code is %q, want %q", got, ErrTransferFailed)
+	if got := ErrorCodeOf(err); got != ErrSetupFailed {
+		t.Errorf("Stage error code is %q, want %q", got, ErrSetupFailed)
 	}
-	if err := coordinator.AuthorizeClaim(context.Background(), testSessionID); ErrorCodeOf(err) != ErrTransferFailed {
-		t.Errorf("AuthorizeClaim returned %q, want %q", ErrorCodeOf(err), ErrTransferFailed)
+	if err := coordinator.AuthorizeClaim(context.Background(), testSessionID); ErrorCodeOf(err) != ErrSetupFailed {
+		t.Errorf("AuthorizeClaim returned %q, want %q", ErrorCodeOf(err), ErrSetupFailed)
 	}
 }
 
@@ -1018,5 +1066,116 @@ func TestStageIsRefusedDuringTheTerminalLease(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestStageWithoutAContextIsASetupFailure pins the very first line of Stage.
+//
+// A nil context is a programmer error rather than something a user can cause,
+// and it is unreachable through the bound command surface -- but if it is ever
+// reached it is reached before ready(), before entropy, before any port. The
+// code it reports used to be transfer_failed, whose copy says a transfer
+// stopped before FairDrop finished sending. Nothing asserted it either way, so
+// the first pass of this story fixed the line below it and left this one.
+// Found by review.
+func TestStageWithoutAContextIsASetupFailure(t *testing.T) {
+	h := newHarness(t)
+
+	//lint:ignore SA1012 the nil context is the case under test
+	metadata, err := h.coordinator.Stage(nil, testPath) //nolint:staticcheck // the nil context is the case under test
+
+	if metadata.SessionID != "" {
+		t.Fatalf("a refused Stage returned metadata %+v", metadata)
+	}
+	if got := ErrorCodeOf(err); got != ErrSetupFailed {
+		t.Fatalf("error code = %q, want %q -- nothing ran, so nothing was sent", got, ErrSetupFailed)
+	}
+	if got := portCalls(h); len(got) != 0 {
+		t.Errorf("calls = %v, want none: the guard is the first statement in Stage", got)
+	}
+}
+
+// TestALaneThatClosesWhileStagedStillEndsTheSession is D-042 and D-091.
+//
+// The drainer's post-loop synthesis required stateTransferring, so a server
+// that died before anyone claimed the link produced nothing at all: the window
+// kept showing a QR code for a listener that no longer existed, with no
+// outcome, no error and nothing to dismiss. The only test that closed a lane
+// at STAGED asserted the drainer exited, which stayed true throughout.
+func TestALaneThatClosesWhileStagedStillEndsTheSession(t *testing.T) {
+	h := newHarness(t)
+	h.stageSuccessfully()
+
+	live := h.liveSession()
+	h.server.closeEvents()
+	<-live.drainerDone
+
+	events := h.awaitEvents(1)
+	failure := events[len(events)-1]
+	if failure.Kind != TransferError || failure.Error == nil {
+		t.Fatalf("a lane that closed at STAGED published %+v, want a terminal error", failure)
+	}
+	if failure.Error.Code != ErrTransferFailed {
+		t.Errorf("the outcome carries %q, want %q", failure.Error.Code, ErrTransferFailed)
+	}
+	if got := h.state(); got != stateError {
+		t.Errorf("state is %q, want %q -- the session must not stay staged for a server that is gone", got, stateError)
+	}
+	if h.coordinator.leaseHeld() {
+		t.Error("the synthesised outcome kept the operation lease")
+	}
+}
+
+// TestTheDrainerMayEndASessionFromEveryStateOneCanBeIn covers the same guard
+// across all three states the contract names, which no runnable path can
+// reach deterministically: CLAIMING exists only inside AuthorizeClaim, which
+// holds the operation lease the synthesis itself needs, so a test that raced
+// for it would be a test that usually proved nothing.
+//
+// The guard is called directly instead. What it must refuse is unchanged --
+// a session that is cancelled, replaced, closing or already terminal -- and
+// what it must now allow is every state a live session can actually be in
+// when its server dies.
+//
+// It passes its own list, so on its own it would prove only that the guard
+// honours whatever it is handed: narrowing the production call site back to
+// stateTransferring leaves this test green. The behavioural half above is
+// what pins that call site, and the two are only worth having together.
+func TestTheDrainerMayEndASessionFromEveryStateOneCanBeIn(t *testing.T) {
+	allowed := []sessionState{stateStaged, stateClaiming, stateTransferring}
+
+	for _, state := range allowed {
+		h := newHarness(t)
+		h.stageSuccessfully()
+		live := h.liveSession()
+
+		h.coordinator.mu.Lock()
+		h.coordinator.state = state
+		may := h.coordinator.drainerMayActLocked(live, live.id, allowed...)
+		h.coordinator.mu.Unlock()
+
+		if !may {
+			t.Errorf("a server that died at %q leaves the session with no outcome at all", state)
+		}
+	}
+
+	// The refusals the widened guard must not have cost: a terminal session
+	// and a session whose id no longer matches stay refused.
+	h := newHarness(t)
+	h.stageSuccessfully()
+	live := h.liveSession()
+
+	h.coordinator.mu.Lock()
+	live.terminal = true
+	stillActs := h.coordinator.drainerMayActLocked(live, live.id, allowed...)
+	live.terminal = false
+	actsOnAStranger := h.coordinator.drainerMayActLocked(live, SessionID("0000"), allowed...)
+	h.coordinator.mu.Unlock()
+
+	if stillActs {
+		t.Error("a session that already reached a terminal outcome accepted a second one")
+	}
+	if actsOnAStranger {
+		t.Error("an event for another session was accepted")
 	}
 }

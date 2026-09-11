@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -16,7 +20,7 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		message string
 	}{
 		{ErrInvalidSelection, "Choose exactly one file or folder."},
-		{ErrBusy, "Finish or cancel the current transfer before choosing another item."},
+		{ErrBusy, "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item."},
 		{ErrCancelled, "Transfer canceled."},
 		{ErrPathNotFound, "That file or folder is no longer available. Choose it again."},
 		{ErrPathUnsupported, "FairDrop can use regular files and folders only. Choose another item."},
@@ -24,6 +28,7 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		{ErrNetworkUnavailable, "FairDrop couldn’t find a usable local network. Connect to local Wi-Fi, then try again."},
 		{ErrServerStartFailed, "FairDrop couldn’t open a local transfer connection. Check firewall access, then try again."},
 		{ErrQRFailed, "FairDrop couldn’t create the QR code. Prepare the item again."},
+		{ErrSetupFailed, "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again."},
 		{ErrBeaconWarning, "Device discovery isn’t available. The QR code and download link still work."},
 		{ErrTransferFailed, "The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link."},
 		{ErrShuttingDown, "FairDrop is closing. Reopen it to start a transfer."},
@@ -94,7 +99,7 @@ func TestIndependentCodedErrorSurvivesWrapping(t *testing.T) {
 	}
 	want := PublicError{
 		Code:    ErrBusy,
-		Message: "Finish or cancel the current transfer before choosing another item.",
+		Message: "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.",
 	}
 	if got := PublicErrorOf(err); got != want {
 		t.Fatalf("PublicErrorOf() = %#v, want %#v", got, want)
@@ -214,7 +219,7 @@ func (e independentCodedError) Code() ErrorCode { return e.code }
 // removed code and misses an added one entirely -- and an added code reaches
 // the Wails boundary as unrecognized, degrading to transfer_failed with the
 // wrong copy and no test failing anywhere. This pins the registry as a set.
-func TestTheCodeRegistryIsExactlyTheseTwelveCodes(t *testing.T) {
+func TestTheCodeRegistryIsExactlyTheseThirteenCodes(t *testing.T) {
 	t.Parallel()
 
 	want := map[ErrorCode]bool{
@@ -227,6 +232,7 @@ func TestTheCodeRegistryIsExactlyTheseTwelveCodes(t *testing.T) {
 		ErrNetworkUnavailable: true,
 		ErrServerStartFailed:  true,
 		ErrQRFailed:           true,
+		ErrSetupFailed:        true,
 		ErrBeaconWarning:      true,
 		ErrTransferFailed:     true,
 		ErrShuttingDown:       true,
@@ -243,5 +249,75 @@ func TestTheCodeRegistryIsExactlyTheseTwelveCodes(t *testing.T) {
 		if _, found := publicMessages[code]; !found {
 			t.Errorf("publicMessages no longer defines %q", code)
 		}
+	}
+}
+
+// TestEveryDiagnosticMessageIsAFixedLiteral is where AD-9's diagnostic
+// guarantee actually lives.
+//
+// app.go's logDiagnostic takes a string and prints it; nothing inside it could
+// reliably recognise every shape an absolute path or a capability token can
+// take, and a guarantee that depends on guessing is not one. What can be
+// guaranteed is that no caller ever hands it anything but text this package
+// wrote itself -- so this parses the package's own source and requires every
+// recordDiagnostic call to pass a string literal as its message, never a
+// variable, a format, or a concatenation that could carry an adapter's words.
+//
+// Parsed with go/ast rather than matched with a regular expression: these
+// calls span lines and nest another call in their first argument, which a
+// pattern gets wrong in exactly the direction that makes a test pass while
+// reading nothing -- the first version of this test did.
+func TestEveryDiagnosticMessageIsAFixedLiteral(t *testing.T) {
+	t.Parallel()
+
+	// ParseFile over a glob rather than ParseDir, which is deprecated because
+	// it ignores build tags. Every file this package needs to check is
+	// unconditional Go, so the glob is exact here and carries no dependency.
+	sources, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob the package: %v", err)
+	}
+
+	set := token.NewFileSet()
+	calls := 0
+	for _, name := range sources {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(set, name, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", name, err)
+		}
+		{
+			ast.Inspect(file, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				selector, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || selector.Sel.Name != "recordDiagnostic" {
+					return true
+				}
+				calls++
+				if len(call.Args) != 2 {
+					t.Errorf("%s:%d: recordDiagnostic called with %d arguments, want 2",
+						filepath.Base(name), set.Position(call.Pos()).Line, len(call.Args))
+					return true
+				}
+				if literal, ok := call.Args[1].(*ast.BasicLit); !ok || literal.Kind != token.STRING {
+					t.Errorf("%s:%d: the diagnostic message is not a string literal -- adapter text is "+
+						"exactly where a path or a capability token would be (AD-9)",
+						filepath.Base(name), set.Position(call.Pos()).Line)
+				}
+				return true
+			})
+		}
+	}
+
+	if len(sources) == 0 {
+		t.Fatal("no package sources found, so this test would pass vacuously")
+	}
+	if calls == 0 {
+		t.Fatal("no recordDiagnostic calls parsed, so this test would pass vacuously")
 	}
 }

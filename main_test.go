@@ -171,7 +171,7 @@ func TestAppOptionsRegistersTheErrorFormatter(t *testing.T) {
 		t.Fatalf("ErrorFormatter returned %T, want a JSON string", opts.ErrorFormatter(coded))
 	}
 
-	const want = `{"code":"busy","message":"Finish or cancel the current transfer before choosing another item."}`
+	const want = `{"code":"busy","message":"FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item."}`
 	if got != want {
 		t.Errorf("ErrorFormatter produced\n %s\nwant\n %s", got, want)
 	}
@@ -194,58 +194,264 @@ func TestUnknownFailuresBecomeTheFixedTransferFailedCopy(t *testing.T) {
 	}
 }
 
-// The frontend's code list is the other half of the error contract, and
-// nothing in either toolchain compiles across the boundary. This is the pin:
-// a code added or renamed in Go without the matching frontend change fails
-// here rather than at runtime, where it would simply become transfer_failed.
-func TestEveryStableCodeIsRecognizedByTheFrontend(t *testing.T) {
-	parser, err := os.ReadFile(filepath.Join("frontend", "src", "transfer", "errors.ts"))
+// registryEntries is the complete cross-language error contract: every
+// stable code and the exact PublicError.message it must produce everywhere a
+// user can see it. It is spelled out here -- not derived from any file under
+// test, including the Go map itself, which is unexported and in a different
+// package anyway -- because a literal is what turns a code or message that
+// silently drifted in exactly one of the four places (EXPERIENCE.md's
+// registry, docs/fairdrop-contracts.md's binding code list, the Go table in
+// internal/transfer/errors.go, and the TypeScript mirror in
+// frontend/src/transfer/errors.ts) into a named failure instead of two
+// out-of-date things quietly agreeing with each other.
+var registryEntries = []struct {
+	code    string
+	message string
+}{
+	{"invalid_selection", "Choose exactly one file or folder."},
+	{"busy", "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item."},
+	{"cancelled", "Transfer canceled."},
+	{"path_not_found", "That file or folder is no longer available. Choose it again."},
+	{"path_unsupported", "FairDrop can use regular files and folders only. Choose another item."},
+	{"source_changed", "The item changed after it was prepared. Cancel and create a fresh link."},
+	{"network_unavailable", "FairDrop couldn’t find a usable local network. Connect to local Wi-Fi, then try again."},
+	{"server_start_failed", "FairDrop couldn’t open a local transfer connection. Check firewall access, then try again."},
+	{"qr_failed", "FairDrop couldn’t create the QR code. Prepare the item again."},
+	{"setup_failed", "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again."},
+	{"beacon_warning", "Device discovery isn’t available. The QR code and download link still work."},
+	{"transfer_failed", "The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link."},
+	{"shutting_down", "FairDrop is closing. Reopen it to start a transfer."},
+}
+
+// TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage proves the four
+// places that describe FairDrop's fixed public errors cannot silently
+// disagree, extending the older code-only pin to cover every exact message
+// too (Epic 1 retrospective item 6, Story 3.5):
+//
+//   - EXPERIENCE.md's UX registry -- the source the other three follow.
+//   - docs/fairdrop-contracts.md's binding code list -- codes only, no
+//     messages, so only the code half is checked here.
+//   - The Go table in internal/transfer/errors.go, read through the real
+//     formatCommandError rather than by parsing source: this is what a
+//     rejected command actually carries across the Wails boundary.
+//   - The TypeScript mirror in frontend/src/transfer/errors.ts.
+//
+// A code or message edited in exactly one of these four fails here, naming
+// the file and the code that disagrees with the literal registryEntries
+// above.
+// TestTheRegistryLiteralCoversEveryCodeTheDomainDefines closes the hole under
+// the pin above.
+//
+// registryEntries is a hand-written literal, and it is the sole driver of every
+// cross-file comparison in this file. A code dropped from it is not reported as
+// missing -- it simply stops being checked anywhere, in every file at once,
+// while the suite stays green. That is precisely the failure this story exists
+// to fix, one level up: two places quietly agreeing because nothing compares
+// them. Found by review.
+func TestTheRegistryLiteralCoversEveryCodeTheDomainDefines(t *testing.T) {
+	// The domain's own list, read from the Go source rather than from a slice
+	// built out of the same constants the literal uses -- a shared helper
+	// would make both sides wrong together.
+	source, err := os.ReadFile(filepath.Join("internal", "transfer", "errors.go"))
+	if err != nil {
+		t.Fatalf("read errors.go: %v", err)
+	}
+	declared := regexp.MustCompile(`ErrorCode = "([a-z_]+)"`).FindAllStringSubmatch(string(source), -1)
+	if len(declared) == 0 {
+		t.Fatal("no ErrorCode constants parsed from errors.go, so this test would pass vacuously")
+	}
+
+	pinned := map[string]bool{}
+	for _, entry := range registryEntries {
+		pinned[entry.code] = true
+	}
+
+	for _, match := range declared {
+		if !pinned[match[1]] {
+			t.Errorf("%q is a declared ErrorCode but is absent from registryEntries, so nothing checks "+
+				"its copy in any of the four files", match[1])
+		}
+	}
+	if len(pinned) != len(declared) {
+		t.Errorf("registryEntries has %d codes and errors.go declares %d: the literal and the domain disagree",
+			len(pinned), len(declared))
+	}
+}
+
+func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
+	registry, err := os.ReadFile(filepath.Join(
+		"_bmad-output", "planning-artifacts", "ux-designs", "ux-FairDrop-2026-08-23", "EXPERIENCE.md",
+	))
+	if err != nil {
+		t.Fatalf("read EXPERIENCE.md: %v", err)
+	}
+	registryTable := tableSection(t, string(registry), "### Stable public error and warning copy", "\n## ")
+
+	contract, err := os.ReadFile(filepath.Join("docs", "fairdrop-contracts.md"))
+	if err != nil {
+		t.Fatalf("read fairdrop-contracts.md: %v", err)
+	}
+	contractTable := tableSection(t, string(contract), "Stable domain error codes are:", "\n## ")
+	contractConstants := tableSection(t, string(contract), "type ErrorCode string", "\n)")
+
+	mirror, err := os.ReadFile(filepath.Join("frontend", "src", "transfer", "errors.ts"))
 	if err != nil {
 		t.Fatalf("the frontend error parser is missing: %v", err)
 	}
+	mirrorText := string(mirror)
+	codeList := tableSection(t, mirrorText, "export const transferErrorCodes = [", "]")
+	messagesBlock := tableSection(t, mirrorText, "export const fixedErrorMessages", "\n}")
 
-	const listStart = "export const transferErrorCodes = ["
-	start := strings.Index(string(parser), listStart)
-	if start < 0 {
-		t.Fatal("frontend/src/transfer/errors.ts no longer exports transferErrorCodes")
-	}
-	end := strings.Index(string(parser)[start:], "]")
-	if end < 0 {
-		t.Fatal("the transferErrorCodes array is unterminated")
-	}
-	codeList := string(parser)[start : start+end]
+	for _, entry := range registryEntries {
+		t.Run(entry.code, func(t *testing.T) {
+			// The Go table (internal/transfer/errors.go), through the real
+			// formatter -- what a rejected command actually carries.
+			formatted, ok := formatCommandError(transfer.NewError(transfer.ErrorCode(entry.code), "diagnostic")).(string)
+			if !ok {
+				t.Fatalf("formatCommandError returned a non-string for %q", entry.code)
+			}
+			wantJSON := `{"code":"` + entry.code + `","message":"` + entry.message + `"}`
+			if formatted != wantJSON {
+				t.Errorf("errors.go produced\n %s\nwant\n %s", formatted, wantJSON)
+			}
 
-	// Spelled out, not ranged over a Go slice built from the same constants
-	// the formatter uses: a literal list is what makes a renamed code visible.
-	for _, code := range []string{
-		"invalid_selection",
-		"busy",
-		"cancelled",
-		"path_not_found",
-		"path_unsupported",
-		"source_changed",
-		"network_unavailable",
-		"server_start_failed",
-		"qr_failed",
-		"beacon_warning",
-		"transfer_failed",
-		"shutting_down",
-	} {
-		// Inside the exported array, not merely somewhere in the file: a code
-		// surviving only in a comment or an unused union would otherwise keep
-		// this green while parseCommandError rejected it.
-		if !strings.Contains(codeList, `'`+code+`'`) {
-			t.Errorf("frontend/src/transfer/errors.ts does not list %q in transferErrorCodes", code)
-		}
+			// docs/fairdrop-contracts.md's binding code list: codes only.
+			if !strings.Contains(contractTable, "`"+entry.code+"`") {
+				t.Errorf("docs/fairdrop-contracts.md's stable domain error codes table does not list %q", entry.code)
+			}
+			// The same document restates the ErrorCode constants as Go source,
+			// which is a second statement of the same fact. Removing a code
+			// from that block alone left this test green, so the contract
+			// could disagree with itself inside one file.
+			if !strings.Contains(contractConstants, `"`+entry.code+`"`) {
+				t.Errorf("docs/fairdrop-contracts.md's ErrorCode constant block does not declare %q", entry.code)
+			}
 
-		formatted, ok := formatCommandError(transfer.NewError(transfer.ErrorCode(code), "diagnostic")).(string)
-		if !ok {
-			t.Fatalf("formatCommandError returned a non-string for %q", code)
-		}
-		if !strings.Contains(formatted, `"code":"`+code+`"`) {
-			t.Errorf("formatCommandError turned %q into %s", code, formatted)
-		}
+			// frontend/src/transfer/errors.ts: the code list, inside the
+			// exported array rather than merely somewhere in the file, and
+			// the exact message.
+			if !strings.Contains(codeList, `'`+entry.code+`'`) {
+				t.Errorf("frontend/src/transfer/errors.ts does not list %q in transferErrorCodes", entry.code)
+			}
+			mirrorMessage := quotedValueAfter(t, messagesBlock, entry.code+":")
+			if mirrorMessage != entry.message {
+				t.Errorf("frontend/src/transfer/errors.ts's fixedErrorMessages.%s = %q, want %q",
+					entry.code, mirrorMessage, entry.message)
+			}
+
+			// EXPERIENCE.md's registry: the code and its exact message,
+			// between the curly quotes the table already uses.
+			if !strings.Contains(registryTable, "`"+entry.code+"`") {
+				t.Errorf("EXPERIENCE.md's stable public error table does not list %q", entry.code)
+			}
+			registryMessage := registryMessageFor(t, registryTable, string(registry), entry.code)
+			if registryMessage != entry.message {
+				t.Errorf("EXPERIENCE.md's %s row message = %q, want %q", entry.code, registryMessage, entry.message)
+			}
+		})
 	}
+}
+
+// TestEveryWarningCodeIsAcceptedByTheFrontendParser closes Epic 1
+// retrospective item 3. Warning.Code is now transfer.WarningCode, a
+// narrower type than ErrorCode, so a Warning carrying some other recognized
+// failure code no longer compiles -- but nothing yet proved the set of
+// WarningCode constants this package declares is exactly the set
+// frontend/src/transfer/validation.ts's parseWarning accepts. Before the
+// type existed, a mismatch there destroyed the whole Stage acknowledgement
+// rather than just the one warning: parseWarning rejects an unrecognized
+// code, and parseFileMetadata rejects the entire metadata when any one
+// warning fails to parse, cancelling a perfectly good session over a
+// warning nobody needed to see.
+//
+// The list below is a literal, in the same spirit as registryEntries above:
+// a WarningCode added to types.go without also being added here is not
+// reported as missing, so adding one is two edits, not one -- but it is one
+// deliberate edit in a small, visible list, not a silent compile-time gap.
+func TestEveryWarningCodeIsAcceptedByTheFrontendParser(t *testing.T) {
+	everyWarningCode := []transfer.WarningCode{transfer.WarnBeaconUnavailable}
+
+	mirror, err := os.ReadFile(filepath.Join("frontend", "src", "transfer", "validation.ts"))
+	if err != nil {
+		t.Fatalf("read validation.ts: %v", err)
+	}
+	parseWarningBody := tableSection(t, string(mirror), "export function parseWarning", "\n}\n")
+
+	for _, code := range everyWarningCode {
+		t.Run(string(code), func(t *testing.T) {
+			if !strings.Contains(parseWarningBody, "'"+string(code)+"'") {
+				t.Errorf("validation.ts's parseWarning does not accept the Go WarningCode %q", code)
+			}
+		})
+	}
+}
+
+// tableSection returns the file content between the first occurrence of
+// start and the following occurrence of end, so a per-code search is scoped
+// to the one table or block it names rather than the whole file -- a code
+// name surviving only in a comment or an unrelated section must not satisfy
+// this pin.
+func tableSection(t *testing.T, content, start, end string) string {
+	t.Helper()
+	from := strings.Index(content, start)
+	if from < 0 {
+		t.Fatalf("marker %q not found", start)
+	}
+	rest := content[from+len(start):]
+	to := strings.Index(rest, end)
+	if to < 0 {
+		t.Fatalf("closing marker %q not found after %q", end, start)
+	}
+	return rest[:to]
+}
+
+// quotedValueAfter finds label (e.g. "busy:") and returns the contents of the
+// single-quoted string that follows it, across any whitespace or line break
+// in between -- fixedErrorMessages wraps its longest value onto its own
+// line, so the label and its string are not always on the same one.
+func quotedValueAfter(t *testing.T, block, label string) string {
+	t.Helper()
+	pattern := regexp.MustCompile(regexp.QuoteMeta(label) + `\s*'([^']*)'`)
+	match := pattern.FindStringSubmatch(block)
+	if match == nil {
+		t.Fatalf("%q not found in errors.ts's fixedErrorMessages", label)
+	}
+	return match[1]
+}
+
+// registryMessageFor finds code's row in EXPERIENCE.md's error table and
+// returns its message. Most rows spell the message out between curly quotes;
+// beacon_warning's cell instead names the stable Voice and Tone key
+// `copy.discovery.warning`, so that indirection is resolved against the full
+// registry text rather than skipped.
+func registryMessageFor(t *testing.T, table, fullRegistry, code string) string {
+	t.Helper()
+	rowPattern := regexp.MustCompile(
+		"`" + regexp.QuoteMeta(code) + "`[^|]*\\|[^|]*\\|\\s*(`[^`]*`|“[^”]*”)",
+	)
+	match := rowPattern.FindStringSubmatch(table)
+	if match == nil {
+		t.Fatalf("row for %q not found in EXPERIENCE.md's error table", code)
+	}
+	cell := match[1]
+	if strings.HasPrefix(cell, "`") {
+		return voiceToneMessageFor(t, fullRegistry, strings.Trim(cell, "`"))
+	}
+	return strings.Trim(cell, "“”")
+}
+
+// voiceToneMessageFor resolves a stable copy key (e.g. copy.discovery.warning)
+// against EXPERIENCE.md's "Voice and Tone" registry table.
+func voiceToneMessageFor(t *testing.T, fullRegistry, key string) string {
+	t.Helper()
+	pattern := regexp.MustCompile(
+		"`" + regexp.QuoteMeta(key) + "`[^|]*\\|[^|]*\\|\\s*“([^”]*)”",
+	)
+	match := pattern.FindStringSubmatch(fullRegistry)
+	if match == nil {
+		t.Fatalf("stable key %q not found in EXPERIENCE.md's Voice and Tone table", key)
+	}
+	return match[1]
 }
 
 // Bind is what makes the App callable at all. Emptying it ships a binary with
@@ -485,4 +691,34 @@ func storyPrefix(key string) string {
 		return key
 	}
 	return parts[0] + "-" + parts[1]
+}
+
+// TestComposeWiresTheDiagnosticSeam pins the half of D-098 that lives outside
+// internal/transfer.
+//
+// The coordinator calls its Diagnose seam on every recorded diagnostic, and
+// the coordinator's own tests wire a fake one, so that side is well covered.
+// None of that says compose passes anything: with the field omitted the seam
+// defaults to a no-op, every test in every package stays green, and a shipped
+// FairDrop goes back to recording diagnostics nowhere -- which is the exact
+// state this story exists to end. The same two-halves shape as Story 3.3's
+// workflow_call: one side asked, nothing pinned the other side offering.
+//
+// Read as text rather than by constructing a coordinator because the seam is
+// not readable back off the built value, and a test that reconstructs
+// Dependencies would be pinning its own literal instead of main.go's.
+func TestComposeWiresTheDiagnosticSeam(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+
+	compose, _, found := strings.Cut(string(source), "app.useCoordinator(coordinator)")
+	if !found {
+		t.Fatal("main.go no longer calls app.useCoordinator, so this test would pass vacuously")
+	}
+	if !strings.Contains(compose, "Diagnose: app.logDiagnostic") {
+		t.Error("compose does not pass Diagnose: app.logDiagnostic, so every internal diagnostic " +
+			"a shipped binary records reaches nothing a person can read")
+	}
 }

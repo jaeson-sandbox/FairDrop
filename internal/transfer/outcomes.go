@@ -30,7 +30,11 @@ func (c *Coordinator) drain(live *session, events <-chan ServerEvent) {
 		case ServerProgress:
 			c.forwardProgress(live, event)
 		case ServerComplete, ServerFailed:
-			c.acceptTerminal(live, event)
+			// A real report from the server only ever describes a claimed,
+			// in-flight transfer, so this arm stays gated to TRANSFERRING --
+			// unlike the post-loop synthesis below, which must reach a
+			// session the server left behind before a claim ever happened.
+			c.acceptTerminal(live, event, stateTransferring)
 		default:
 			// The port defines three kinds and this coordinator does not own
 			// the adapter that produces them. Discarding an unrecognized one
@@ -49,11 +53,19 @@ func (c *Coordinator) drain(live *session, events <-chan ServerEvent) {
 	// or already terminal, and this is refused silently -- or the server went
 	// away without reporting an outcome while a transfer was live, which is a
 	// failure the UI would otherwise never hear about.
+	//
+	// Unlike a real server-reported event, this synthesis is allowed from
+	// STAGED and CLAIMING too: the server can vanish before it is ever
+	// claimed, and a session sitting on a QR code for a listener that no
+	// longer exists is exactly the lost signal this story exists to close
+	// (D-042, D-091). revalidateLocked still refuses a session that is
+	// cancelled, closing, replaced, or already terminal, which is what keeps
+	// a coordinator-requested teardown's own lane closure silent.
 	c.acceptTerminal(live, ServerEvent{
 		SessionID: live.id,
 		Kind:      ServerFailed,
 		Err:       NewError(ErrTransferFailed, "the transfer server stopped before reporting an outcome"),
-	})
+	}, stateStaged, stateClaiming, stateTransferring)
 }
 
 // forwardProgress publishes one snapshot, or drops it.
@@ -77,7 +89,7 @@ func (c *Coordinator) forwardProgress(live *session, event ServerEvent) {
 	}
 
 	c.mu.Lock()
-	if !c.drainerMayActLocked(live, event.SessionID) {
+	if !c.drainerMayActLocked(live, event.SessionID, stateTransferring) {
 		c.mu.Unlock()
 		return
 	}
@@ -103,12 +115,19 @@ func (c *Coordinator) forwardProgress(live *session, event ServerEvent) {
 // and arm the reset.
 //
 // It is refused -- silently, changing nothing -- when the session is not the
-// live one, is not TRANSFERRING, has already accepted an outcome, has been
-// marked cancelled, or when the operation lease is held by the teardown that
-// owns this outcome instead.
-func (c *Coordinator) acceptTerminal(live *session, event ServerEvent) {
+// live one, is not in one of the allowed states, has already accepted an
+// outcome, has been marked cancelled, or when the operation lease is held by
+// the teardown that owns this outcome instead.
+//
+// allowed names which session states this call may act from. A real report
+// from the server (ServerComplete/ServerFailed inside drain's loop) only
+// ever describes a claimed transfer, so its caller passes stateTransferring
+// alone; the post-loop synthesis for a lane that closed unexpectedly passes
+// STAGED and CLAIMING too, because the server can vanish before a claim ever
+// happens (D-042, D-091).
+func (c *Coordinator) acceptTerminal(live *session, event ServerEvent, allowed ...sessionState) {
 	c.mu.Lock()
-	if !c.drainerMayActLocked(live, event.SessionID) {
+	if !c.drainerMayActLocked(live, event.SessionID, allowed...) {
 		c.mu.Unlock()
 		return
 	}
@@ -169,6 +188,15 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent) {
 		c.publishNext(live, Event{Kind: TransferComplete, Progress: &snapshot})
 		settled = stateDone
 	default:
+		// The original cause is recorded, by code only, before it is
+		// rewritten to fixed public copy below -- otherwise a real failure
+		// leaves no internal trail at all once terminalPublicError has
+		// discarded whatever code or adapter text does not describe a
+		// transfer that began and then failed (D-092). recordDiagnostic
+		// never inspects event.Err's message, only ErrorCodeOf it, so this
+		// is safe even when the cause is adapter text carrying a path or a
+		// token (AD-9).
+		c.recordDiagnostic(event.Err, "the transfer failed; its cause is recorded before the public rewrite")
 		failure := terminalPublicError(event.Err)
 		var payload *ProgressSnapshot
 		if reported {
@@ -194,14 +222,14 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent) {
 // The event's own session id is checked too. ServerHandle.Events belongs to
 // one session by construction, but the coordinator does not get to assume an
 // adapter it does not own labels its events correctly.
-func (c *Coordinator) drainerMayActLocked(live *session, reported SessionID) bool {
+func (c *Coordinator) drainerMayActLocked(live *session, reported SessionID, allowed ...sessionState) bool {
 	if live.terminal {
 		return false
 	}
 	if reported != live.id {
 		return false
 	}
-	return c.revalidateLocked(live.ctx, live.id, live.generation, stateTransferring) == nil
+	return c.revalidateLocked(live.ctx, live.id, live.generation, allowed...) == nil
 }
 
 // publishNext assigns the next sequence number and publishes. The caller owns

@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import {publicError} from '../transfer/errors'
-import {createInitialTransferState} from '../transfer/state'
+import {createInitialTransferState, transferReducer} from '../transfer/state'
 import type {TransferState} from '../transfer/state'
 import type {FileMetadata, Warning} from '../transfer/types'
 import {parseWarning} from '../transfer/validation'
@@ -208,6 +208,44 @@ describe('a cancellation that lands beside a command failure', () => {
 
         expect(routeTransition(staged, idle)).toEqual({
             row: 'cancel-won', owner: 'focus', target: 'cancel-summary',
+        })
+    })
+
+    /*
+      Both sides of the seam Epic 1's retrospective found (item 2), in one test.
+
+      A `transfer-complete` whose snapshot the reducer refused used to leave the
+      view in Transferring. The backend's three-second reset then landed on
+      plain Idle -- and transferring -> plain idle is the cancel-won row above,
+      so a transfer that had actually finished was announced as "Transfer
+      canceled". Each layer was right alone, which is why this drives the real
+      reducer rather than hand-building the state: the routing is only correct
+      if the reducer's answer to a refused completion is.
+    */
+    it('announces a refused completion as the outcome, never as the cancellation', () => {
+        let live = transferReducer(createInitialTransferState(), {
+            type: 'stage-requested', generation: 1, itemKind: 'file',
+        })
+        live = transferReducer(live, {type: 'stage-succeeded', generation: 1, metadata: metadata()})
+        live = transferReducer(live, {
+            type: 'lifecycle', eventName: 'transfer-started', args: [{sessionId, seq: 1}],
+        })
+        expect(live.phase).toBe('transferring')
+
+        // One byte of one, against staged metadata that says 8.4 MB.
+        const refused = transferReducer(live, {
+            type: 'lifecycle',
+            eventName: 'transfer-complete',
+            args: [{
+                sessionId,
+                seq: 2,
+                progress: {bytesSent: 1, totalBytes: 1, totalKnown: true, percent: 100, speedBytesPerSec: 1},
+            }],
+        })
+
+        expect(refused).not.toBe(live)
+        expect(routeTransition(live, refused)).toEqual({
+            row: 'terminal-outcome', owner: 'focus', target: 'outcome',
         })
     })
 })

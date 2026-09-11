@@ -120,7 +120,10 @@ export function useTransfer(): TransferController {
                     // Best effort: no rejection text from cleanup is trusted.
                 }
                 if (mountedRef.current && stageOperationRef.current === operation) {
-                    dispatch({type: 'stage-failed', generation, error: publicError('transfer_failed')})
+                    // The command itself resolved -- no lifecycle event was ever
+                    // received -- so nothing was sent; the selection was refused,
+                    // not interrupted (D-053).
+                    dispatch({type: 'stage-failed', generation, error: publicError('setup_failed')})
                 }
                 if (stageOperationRef.current === operation) stageOperationRef.current = null
                 return

@@ -44,6 +44,13 @@ interface OutcomePanelProps {
  * There is no `role="alert"` here, in any form. Every path that shows this
  * panel is a focus-owned row of the routing table, and the spine allows an
  * alert only on a path that does not also move focus.
+ *
+ * Every outcome carries the control, not only a retained one. A live Done or
+ * Error used to render a heading, a message and nothing else, because the way
+ * out was the backend's three-second reset -- which meant a reset that never
+ * arrived left the window with no way forward at all, and the coordinator
+ * drops an event it cannot deliver (D-059). The caller decides what the
+ * control does; this only guarantees one is offered whenever it is given.
  */
 export function OutcomePanel({
     outcome,
@@ -76,11 +83,11 @@ export function OutcomePanel({
             <p className="fd-outcome__body">
                 {done ? copy.done.body : errorMessages[outcome.error.code]}
             </p>
-            {outcome.retained && onDismiss !== undefined ? (
+            {onDismiss === undefined ? null : (
                 <button type="button" className="fd-button fd-target" onClick={onDismiss}>
                     {copy.outcome.dismiss}
                 </button>
-            ) : null}
+            )}
         </section>
     )
 }

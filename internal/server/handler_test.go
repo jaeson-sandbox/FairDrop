@@ -1014,3 +1014,40 @@ func renderResponse(t *testing.T, response *http.Response) string {
 	rendered.WriteString("|body=" + string(body))
 	return rendered.String()
 }
+
+// TestPrepareReturningNoPayloadIsASetupFailure pins the one Prepare outcome
+// that is not an error at all: a PayloadPort that answers (nil, nil).
+//
+// The handler synthesises a coded failure for it, and that code used to be
+// transfer_failed -- whose copy tells the user a transfer stopped partway.
+// Prepare runs strictly before writeDownloadHeaders, so nothing had been sent.
+// Nothing asserted the code here, so moving it to setup_failed and moving it
+// back both left this package green. Found by review.
+func TestPrepareReturningNoPayloadIsASetupFailure(t *testing.T) {
+	t.Parallel()
+
+	server := newTestServer(t, payloadsReturning(nil))
+	handle := startTestServer(t, server, &stubAuthorizer{})
+
+	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	body := readBody(t, response)
+	if response.StatusCode != http.StatusGone {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusGone)
+	}
+	assertNoDisclosure(t, response, body)
+
+	if err := server.Stop(); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+	terminal := terminalEvent(t, drainEvents(t, handle.Events))
+	if terminal.Kind != transfer.ServerFailed {
+		t.Fatalf("terminal event = %s, want %s", terminal.Kind, transfer.ServerFailed)
+	}
+	if terminal.Progress != nil {
+		t.Fatalf("a failure before the first byte carried progress: %+v", terminal.Progress)
+	}
+	if code := transfer.ErrorCodeOf(terminal.Err); code != transfer.ErrSetupFailed {
+		t.Fatalf("failure code = %q, want %q -- nothing was sent, so the copy must not say a transfer stopped",
+			code, transfer.ErrSetupFailed)
+	}
+}

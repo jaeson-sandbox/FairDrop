@@ -68,7 +68,14 @@ export function parseWarning(value: unknown): Warning | null {
     }
 }
 
-/** Parses a finite, internally coherent wire-progress snapshot. */
+/**
+ * Parses a finite, internally coherent wire-progress snapshot.
+ *
+ * This is the one layer that decides whether a snapshot is coherent. It
+ * refuses, and nothing downstream repairs: a rejecting layer followed by a
+ * repairing layer is two strategies for one rule, and the repairs could never
+ * run because the refusal ran first.
+ */
 export function parseProgressSnapshot(value: unknown): ProgressSnapshot | null {
     try {
         const record = asRecord(value)
@@ -85,11 +92,16 @@ export function parseProgressSnapshot(value: unknown): ProgressSnapshot | null {
             if (totalBytes !== 0 || percent !== 0) return null
         } else if (totalBytes === 0) {
             if (bytesSent !== 0 || percent !== 0) return null
-        } else {
-            if (bytesSent > totalBytes) return null
-            const expected = 100 * bytesSent / totalBytes
-            if (!nearlyEqual(percent, expected)) return null
+        } else if (bytesSent > totalBytes) {
+            return null
         }
+        // `percent` is checked for range above and never re-derived here.
+        // Requiring it to equal 100 * bytesSent / totalBytes within 8 ULP made
+        // the frontend depend on an exact float expression evaluated in another
+        // language: the day the Go side rounded a percentage for display, every
+        // progress event would have been refused, silently. The two integers
+        // are the authoritative pair, and selectProgressSnapshot derives what
+        // is displayed from them (Epic 1 retrospective item 7).
 
         return {bytesSent, totalBytes, totalKnown, percent, speedBytesPerSec}
     } catch {
@@ -253,9 +265,4 @@ function isPositiveSafeInteger(value: unknown): value is number {
 
 function isFiniteRange(value: unknown, minimum: number, maximum: number): value is number {
     return typeof value === 'number' && Number.isFinite(value) && value >= minimum && value <= maximum
-}
-
-function nearlyEqual(actual: number, expected: number): boolean {
-    const tolerance = Number.EPSILON * Math.max(1, Math.abs(expected)) * 8
-    return Math.abs(actual - expected) <= tolerance
 }

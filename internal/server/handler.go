@@ -113,7 +113,10 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 
 	payload, err := r.payloads.Prepare(r.ctx, r.item)
 	if err == nil && payload == nil {
-		err = transfer.NewError(transfer.ErrTransferFailed, "payload preparation returned no payload")
+		// Prepare runs before writeDownloadHeaders, so nothing has been sent
+		// when this fires -- the same reasoning that moved every other
+		// pre-header failure off transfer_failed.
+		err = transfer.NewError(transfer.ErrSetupFailed, "payload preparation returned no payload")
 	}
 	if err != nil {
 		// Preparation is the last moment a failure can still choose a status.

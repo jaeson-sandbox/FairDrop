@@ -1,12 +1,12 @@
 import {describe, expect, it} from 'vitest'
 import {publicError} from './errors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
-import type {PublicError} from './types'
+import type {FileMetadata, PublicError} from './types'
 
 const sessionId = '0123456789abcdef0123456789abcdef'
 const qrPNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
 
-function metadata(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function metadata(overrides: Partial<FileMetadata> = {}): FileMetadata {
     return {
         sessionId,
         name: 'report.pdf',
@@ -29,7 +29,7 @@ function progress(bytesSent: number, totalBytes = 100): Record<string, unknown> 
     }
 }
 
-function staged(metadataOverrides: Record<string, unknown> = {}): TransferState {
+function staged(metadataOverrides: Partial<FileMetadata> = {}): TransferState {
     let state: TransferState = createInitialTransferState()
     state = transferReducer(state, {type: 'stage-requested', generation: 1, itemKind: 'unknown'})
     return transferReducer(state, {type: 'stage-succeeded', generation: 1, metadata: metadata(metadataOverrides)})
@@ -61,7 +61,12 @@ describe('Stage acknowledgement and local command state', () => {
         })
 
         expect(transferReducer(pending, {type: 'stage-succeeded', generation: 6, metadata: metadata()})).toBe(pending)
-        expect(transferReducer(pending, {type: 'stage-succeeded', generation: 7, metadata: metadata({sessionId: ''})})).toBe(pending)
+        // Malformed metadata is refused one layer out, by the controller that
+        // received it -- which quiesces the backend session and reports
+        // setup_failed rather than leaving the window in Pending. Pinned by
+        // useTransfer.test.tsx's "attempts Cancel exactly once for malformed
+        // successful metadata"; the reducer's parameter type is what makes an
+        // unparsed acknowledgement unable to reach this case at all.
 
         const cancelling = transferReducer(pending, {type: 'cancel-requested'})
         expect(transferReducer(cancelling, {type: 'stage-succeeded', generation: 7, metadata: metadata()})).toBe(cancelling)
@@ -216,7 +221,7 @@ describe('authoritative lifecycle grammar', () => {
         expect(accepted).toMatchObject({session: {lastSeq: 3}, progress: {bytesSent: 75}})
     })
 
-    it('rejects file snapshots that disagree with staged size without consuming sequence', () => {
+    it('drops disagreeing progress without consuming sequence, but never drops a terminal event', () => {
         let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
 
         const wrongTotal = event(state, 'transfer-progress', {
@@ -232,15 +237,30 @@ describe('authoritative lifecycle grammar', () => {
         state = event(state, 'transfer-progress', {sessionId, seq: 2, progress: progress(25)})
         expect(state).toMatchObject({session: {lastSeq: 2}, progress: {totalBytes: 100}})
 
-        const wrongComplete = event(state, 'transfer-complete', {
+        /*
+          A terminal event with a disagreeing snapshot ends the session.
+
+          Dropping it left the view in Transferring until the backend's reset
+          landed three seconds later, and transferring -> plain idle is the
+          cancel-won row: a transfer that had actually completed was announced
+          as "Transfer canceled" (Epic 1 retrospective item 2). What the
+          refusal costs is the claim of success, not the end of the session.
+        */
+        expect(event(state, 'transfer-complete', {
             sessionId, seq: 3, progress: progress(50, 50),
+        })).toMatchObject({
+            phase: 'error',
+            session: {lastSeq: 3},
+            outcome: {kind: 'error', error: {code: 'transfer_failed'}},
         })
-        expect(wrongComplete).toBe(state)
-        const wrongError = event(state, 'transfer-error', {
+        expect(event(state, 'transfer-error', {
             sessionId, seq: 3, progress: progress(50, 50),
             error: {code: 'transfer_failed', message: 'forged'},
+        })).toMatchObject({
+            phase: 'error',
+            session: {lastSeq: 3},
+            outcome: {kind: 'error', error: {code: 'transfer_failed'}},
         })
-        expect(wrongError).toBe(state)
 
         expect(event(state, 'transfer-complete', {sessionId, seq: 3, progress: progress(100)})).toMatchObject({
             phase: 'done', session: {lastSeq: 3},
@@ -318,7 +338,7 @@ describe('terminal scrubbing and retained outcome', () => {
 
     it('rewrites caller-supplied error copy rather than storing what it was handed', () => {
         const forged: PublicError = {code: 'busy', message: 'C:\\private\\report.pdf?token=fedcba98'}
-        const registryCopy = 'Finish or cancel the current transfer before choosing another item.'
+        const registryCopy = 'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.'
 
         const pending = transferReducer(createInitialTransferState(), {
             type: 'stage-requested', generation: 1, itemKind: 'file',

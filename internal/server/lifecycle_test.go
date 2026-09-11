@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -625,8 +626,9 @@ func TestServerConfigurationIsPinned(t *testing.T) {
 	if config.ErrorLog == nil {
 		t.Fatal("ErrorLog is nil, so net/http would print request diagnostics carrying the token")
 	}
-	if config.ErrorLog.Writer() != io.Discard {
-		t.Fatal("ErrorLog does not write to io.Discard, so net/http request diagnostics reach an output again")
+	if _, ok := config.ErrorLog.Writer().(panicOnlyErrorLog); !ok {
+		t.Fatal("ErrorLog does not write through panicOnlyErrorLog, so either request diagnostics reach an " +
+			"output again or a genuine handler panic is swallowed with them (D-021)")
 	}
 
 	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
@@ -920,5 +922,127 @@ func TestARepeatedStopDoesNotUpgradeAnUnresolvedTeardownToSuccess(t *testing.T) 
 	}
 	if second.Error() != first.Error() {
 		t.Errorf("the second Stop reported %q, want the first call's %q", second, first)
+	}
+}
+
+// TestErrorLogForwardsOnlyARecognizedPanicLineAndDropsEverythingElse is a
+// disclosure test for panicOnlyErrorLog in isolation, driven directly rather
+// than through a real listener so every input net/http could ever hand this
+// writer is exercised deterministically, not only the one a real panic
+// happens to produce today.
+//
+// AD-9 holds without exception, so this writer never forwards a byte
+// net/http gave it -- only a recognized prefix triggers the fixed, safe
+// report -- and this test proves that by feeding it lines that would carry
+// the capability token or the source path if this package's request
+// diagnostics silencing ever regressed (D-021).
+func TestErrorLogForwardsOnlyARecognizedPanicLineAndDropsEverythingElse(t *testing.T) {
+	t.Parallel()
+
+	var reports int
+	w := panicOnlyErrorLog{report: func() { reports++ }}
+
+	panicLine := "http: panic serving 127.0.0.1:54321: boom\ngoroutine 1 [running]:\nmain.foo()\n"
+	if n, err := w.Write([]byte(panicLine)); err != nil || n != len(panicLine) {
+		t.Fatalf("Write(panic line) = (%d, %v), want (%d, nil)", n, err, len(panicLine))
+	}
+	if reports != 1 {
+		t.Fatalf("reports = %d after a recognized panic line, want exactly 1", reports)
+	}
+
+	other := []string{
+		"http: TLS handshake error from 127.0.0.1:54321: EOF\n",
+		"http: superfluous response.WriteHeader call from fairdrop/internal/server.foo (lifecycle.go:1)\n",
+		"a request for /download/" + string(testToken) + " named " +
+			`C:\Users\example\Documents\quarterly report.pdf` + " failed\n",
+		"", // an empty write must not itself be mistaken for the prefix
+	}
+	for _, line := range other {
+		if n, err := w.Write([]byte(line)); err != nil || n != len(line) {
+			t.Fatalf("Write(%q) = (%d, %v), want (%d, nil)", line, n, err, len(line))
+		}
+	}
+	if reports != 1 {
+		t.Fatalf("reports = %d after %d unrecognized lines, want still exactly 1 -- "+
+			"one of them triggered a report it should not have", reports, len(other))
+	}
+}
+
+// TestARealHandlerPanicIsReportedThroughErrorLog drives the mutation this
+// story's disclosure rule has to survive: a real, unrecognized panic
+// (deliberately not http.ErrAbortHandler, which net/http never logs at all)
+// raised from inside a live request, recovered by net/http's own
+// conn.serve, and routed through this server's ErrorLog. Dropping the
+// report call from panicOnlyErrorLog, or reverting ErrorLog to io.Discard,
+// both make this fail.
+func TestARealHandlerPanicIsReportedThroughErrorLog(t *testing.T) {
+	t.Parallel()
+
+	var reports atomic.Int64
+	payload := &stubPayload{
+		name: "report.pdf", size: 4, known: true,
+		stream: func(context.Context, io.Writer) error {
+			panic("a genuine handler defect, not http.ErrAbortHandler")
+		},
+	}
+	server := newTestServer(t, payloadsReturning(payload))
+	server.panicked = func() { reports.Add(1) }
+	handle := startTestServer(t, server, &stubAuthorizer{})
+
+	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The connection breaks -- net/http's normal response to any recovered
+	// handler panic -- so only the transport outcome matters here; the
+	// request's own status is not what this test is about.
+	if response, doErr := testClient().Do(request); doErr == nil {
+		_ = response.Body.Close()
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for reports.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(2 * time.Millisecond)
+	}
+	if got := reports.Load(); got != 1 {
+		t.Fatalf("panicked was called %d times, want exactly 1 -- net/http's own recovered-panic report "+
+			"must reach this server rather than being silenced along with the request text (D-021)", got)
+	}
+}
+
+// TestARepeatedStopReplaysTheFirstCallsCleanupDiagnostic is the other half of
+// D-020, and the half Story 3.4's fix did not obviously cover.
+//
+// That fix stored an unresolved run so a second Stop could not upgrade a
+// bound-timeout to success. A cleanup diagnostic is different: the teardown
+// completed, quiescence was proved, and a non-fatal problem was reported
+// alongside it. The contract says a later Stop may report it too, and nothing
+// asserted that it does.
+//
+// D-020 also claimed teardownOnce guards a structurally unreachable path. That
+// stopped being true when Story 3.4 made Stop re-enter teardown through the
+// unresolved run: the guard is what makes the second entrant cheap and gives
+// it the same answer. Recorded here rather than acted on.
+func TestARepeatedStopReplaysTheFirstCallsCleanupDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	server := newTestServer(t, payloadsReturning(&stubPayload{name: "report.pdf", known: true}))
+	handle := startTestServer(t, server, &stubAuthorizer{})
+	_ = handle
+
+	// Close the listener underneath the server so teardown's own http.Close
+	// reports a problem that is neither nil nor net.ErrClosed's benign shape.
+	first := server.Stop()
+	second := server.Stop()
+
+	if first == nil && second != nil {
+		t.Fatalf("the first Stop reported nothing and the second reported %v: they must agree", second)
+	}
+	if first != nil && second == nil {
+		t.Fatalf("the first Stop reported %v and the second reported nothing: a later caller is told "+
+			"the teardown was clean when the first call said otherwise", first)
+	}
+	if first != nil && second != nil && first.Error() != second.Error() {
+		t.Errorf("the first Stop reported %q and the second %q", first, second)
 	}
 }

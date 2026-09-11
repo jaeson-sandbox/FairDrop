@@ -272,9 +272,11 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 	if ctx == nil {
 		// The real dialog answers a context that did not come from a running
 		// window with log.Fatalf, so this is the difference between a coded
-		// refusal and a process that vanishes.
+		// refusal and a process that vanishes. Unreachable in a composed
+		// binary (Wails runs OnStartup before the webview can call a
+		// command), and no transfer has begun either way (D-047).
 		return "", transfer.NewError(
-			transfer.ErrTransferFailed,
+			transfer.ErrSetupFailed,
 			"FairDrop is not ready to open a chooser",
 		)
 	}
@@ -377,6 +379,24 @@ func (a *App) publish(event transfer.Event) {
 	// payload carries sessionId, seq, and whichever of progress and error this
 	// event kind is allowed to have.
 	a.emit(ctx, string(event.Kind), event)
+}
+
+// logDiagnostic writes the one line an internal diagnostic leaves behind, and
+// is what makes the coordinator's diagnostic sink mean anything outside a test
+// (D-098). The contract leans on "recorded as a diagnostic" wherever a failure
+// is deliberately swallowed -- a cleanup error, a bound that elapsed, an event
+// the observer refused -- and until this existed every one of those records
+// went somewhere no running FairDrop could show anyone.
+//
+// Only a stable code and a fixed message the transfer package chose reach this
+// line. An adapter's own error text never does: that is where an absolute path
+// or a capability token would be, and AD-9 has no exceptions (see
+// recordDiagnostic, which passes a code rather than a cause for that reason).
+func (a *App) logDiagnostic(code transfer.ErrorCode, message string) {
+	if a == nil || a.logf == nil {
+		return
+	}
+	a.logf("fairdrop: diagnostic code=%s %s", string(code), message)
 }
 
 // logEvent writes the one line a lifecycle event leaves behind. Everything in
@@ -509,10 +529,12 @@ func (a *App) runtimeContext() context.Context {
 // errNotComposed is the coded refusal a command returns when it is reached
 // before main.go has handed the App its coordinator. It cannot happen in a
 // composed binary; it exists so a command answers with a code rather than a
-// nil dereference if composition is ever reordered.
+// nil dereference if composition is ever reordered. No transfer has begun
+// either way, so it uses the pre-transfer setup code rather than the
+// interrupted-transfer one (D-047).
 func errNotComposed() error {
 	return transfer.NewError(
-		transfer.ErrTransferFailed,
+		transfer.ErrSetupFailed,
 		"FairDrop is not ready to run a transfer command",
 	)
 }

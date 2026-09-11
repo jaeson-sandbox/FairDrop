@@ -890,3 +890,120 @@ func TestACompleteCarryingNoSnapshotStillSucceeds(t *testing.T) {
 		t.Errorf("state is %q, want %q -- a port defect must not downgrade a success", got, stateDone)
 	}
 }
+
+// TestEveryRecordedDiagnosticAlsoReachesTheSeam is the property Story 3.6
+// exists for, asserted on the one path that produces a diagnostic without any
+// adapter failing: an observer that panics.
+//
+// The sink has always been written. What did not exist was a way for anything
+// outside this package to see it -- the contract cites "recorded as a
+// diagnostic" wherever it swallows a failure, and in a shipped binary that
+// record went nowhere. Deleting the seam call from recordDiagnostic left this
+// whole package green until this test existed, because every other test reads
+// the sink.
+func TestEveryRecordedDiagnosticAlsoReachesTheSeam(t *testing.T) {
+	h := newHarness(t)
+	h.observer.publish = func(Event) { panic("a defective observer") }
+
+	// transferring(), not stageSuccessfully(): Stage publishes no event at
+	// all, so a panicking observer there produces nothing to observe. The
+	// started event is the first one that reaches the observer.
+	h.transferring()
+
+	sunk := h.coordinator.diagnostics.snapshot()
+	seen := h.diagnosed.snapshot()
+	if len(sunk) == 0 {
+		t.Fatal("no diagnostic was recorded at all, so this test would pass vacuously")
+	}
+	if len(seen) != len(sunk) {
+		t.Fatalf("the sink holds %d diagnostics and the seam saw %d: a record that reaches only the "+
+			"sink is invisible to a running FairDrop", len(sunk), len(seen))
+	}
+	for i := range sunk {
+		if seen[i] != sunk[i] {
+			t.Errorf("diagnostic %d reached the seam as %+v and the sink as %+v", i, seen[i], sunk[i])
+		}
+	}
+}
+
+// TestTheDiagnosticSinkSaysWhenItStoppedRecording is D-031.
+//
+// The sink's cap is what keeps a long-running session from accumulating an
+// unbounded slice, and the silent `return` that enforced it made a truncated
+// sink indistinguishable from a complete one to the only thing that reads it.
+// Reserving the last slot for a marker costs one entry and turns "these are
+// the diagnostics" into a claim the sink can actually support.
+//
+// Driven through recordDiagnostic rather than the sink's own method so the
+// seam count is covered too: an overflow that never reached logDiagnostic
+// would be as invisible as the drop it replaced.
+func TestTheDiagnosticSinkSaysWhenItStoppedRecording(t *testing.T) {
+	h := newHarness(t)
+
+	for i := range maxDiagnostics + 8 {
+		h.coordinator.recordDiagnostic(
+			NewError(ErrTransferFailed, "a bound elapsed"),
+			fmt.Sprintf("diagnostic %d", i),
+		)
+	}
+
+	entries := h.coordinator.diagnostics.snapshot()
+	if len(entries) != maxDiagnostics {
+		t.Fatalf("the sink holds %d entries, want exactly its %d cap", len(entries), maxDiagnostics)
+	}
+	if last := entries[len(entries)-1]; last != diagnosticOverflow {
+		t.Errorf("the last entry is %+v, want the overflow marker %+v -- a full sink that says "+
+			"nothing reads as a complete one", last, diagnosticOverflow)
+	}
+	// The marker replaces the entry it dropped; it does not repeat forever.
+	for i, entry := range entries[:len(entries)-1] {
+		if entry == diagnosticOverflow {
+			t.Errorf("entry %d is the overflow marker, which belongs only in the last slot", i)
+		}
+	}
+	if seen := h.diagnosed.snapshot(); len(seen) != maxDiagnostics+8 {
+		t.Errorf("the seam saw %d diagnostics, want all %d: the sink's cap bounds what is kept, "+
+			"never what a running FairDrop is told", len(seen), maxDiagnostics+8)
+	}
+}
+
+// TestATerminalFailureRecordsItsCauseBeforeRewritingIt is D-092.
+//
+// terminalPublicError answers with one of four codes whatever the adapter
+// actually said, which is right for a user and destroys the only evidence of
+// what happened for anyone debugging it. The code is recorded first. The
+// message never is: an adapter's own text is where a path or a token would be
+// (AD-9), and recordDiagnostic reads only ErrorCodeOf its cause.
+func TestATerminalFailureRecordsItsCauseBeforeRewritingIt(t *testing.T) {
+	h := newHarness(t)
+	h.transferring()
+	token := string(h.liveSession().token)
+
+	h.emit(ServerEvent{
+		SessionID: testSessionID,
+		Kind:      ServerFailed,
+		Err:       WrapError(ErrNetworkUnavailable, "the interface went away", errors.New(testPath)),
+	})
+
+	events := h.awaitEvents(2)
+	failure := events[len(events)-1]
+	if failure.Kind != TransferError || failure.Error == nil {
+		t.Fatalf("published %+v, want a terminal error", failure)
+	}
+	if failure.Error.Code != ErrTransferFailed {
+		t.Errorf("the user was told %q, want the public rewrite %q", failure.Error.Code, ErrTransferFailed)
+	}
+
+	var recorded bool
+	for _, entry := range h.diagnosed.snapshot() {
+		if entry.code == ErrNetworkUnavailable {
+			recorded = true
+		}
+		assertSafe(t, "diagnostic", entry.message, token)
+	}
+	if !recorded {
+		t.Errorf("no diagnostic carried the original %q code: after the rewrite there is nothing "+
+			"left anywhere that says what actually failed, diagnostics were %+v",
+			ErrNetworkUnavailable, h.diagnosed.snapshot())
+	}
+}

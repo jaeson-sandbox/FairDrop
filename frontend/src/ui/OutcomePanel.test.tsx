@@ -29,8 +29,22 @@ describe('the Done panel', () => {
         }
     })
 
-    it('carries no Dismiss control while the session is still the current phase', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}} onDismiss={vi.fn()}/>)
+    // Reversed by Story 3.6. A live Done or Error used to render no control
+    // even when a handler was supplied, because the way out was the backend's
+    // three-second reset. The coordinator drops an event it cannot deliver, so
+    // a reset that never arrives left the window with nothing to press
+    // (D-059). The expectation moved because the contract did.
+    it('carries the control a live terminal outcome is given, so a lost reset cannot strand it', () => {
+        const dismiss = vi.fn()
+        render(<OutcomePanel outcome={{kind: 'done', retained: false}} onDismiss={dismiss}/>)
+
+        const control = screen.getByRole('button')
+        fireEvent.click(control)
+        expect(dismiss).toHaveBeenCalledTimes(1)
+    })
+
+    it('offers no control when the caller supplies no handler', () => {
+        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
 
         expect(screen.queryByRole('button')).toBeNull()
     })
@@ -59,8 +73,13 @@ describe('the retained outcome node', () => {
 describe('the Error panel', () => {
     it.each([
         ['invalid_selection', 'Choose one item', 'Choose exactly one file or folder.'],
-        ['busy', 'Transfer already active', 'Finish or cancel the current transfer before choosing another item.'],
+        [
+            'busy',
+            'Transfer already active',
+            'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
+        ],
         ['path_not_found', 'Item not found', 'That file or folder is no longer available. Choose it again.'],
+        ['setup_failed', 'Couldn’t prepare that item', 'FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.'],
         ['source_changed', 'Item changed', 'The item changed after it was prepared. Cancel and create a fresh link.'],
         [
             'transfer_failed',

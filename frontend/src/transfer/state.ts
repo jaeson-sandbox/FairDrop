@@ -1,5 +1,5 @@
 import {publicError} from './errors'
-import {parseFileMetadata, parseLifecycleEvent} from './validation'
+import {parseLifecycleEvent} from './validation'
 import type {
     FileMetadata,
     LifecycleEvent,
@@ -67,7 +67,7 @@ export type TransferState =
 
 export type TransferAction =
     | {readonly type: 'stage-requested'; readonly generation: number; readonly itemKind: PendingItemKind}
-    | {readonly type: 'stage-succeeded'; readonly generation: number; readonly metadata: unknown}
+    | {readonly type: 'stage-succeeded'; readonly generation: number; readonly metadata: FileMetadata}
     | {readonly type: 'stage-failed'; readonly generation: number; readonly error: PublicError}
     | {readonly type: 'invalid-selection'}
     | {readonly type: 'cancel-requested'}
@@ -100,8 +100,15 @@ export function transferReducer(state: TransferState, action: TransferAction): T
 
         case 'stage-succeeded': {
             if (state.phase !== 'pending' || state.generation !== action.generation || state.cancelPending) return state
-            const metadata = parseFileMetadata(action.metadata)
-            if (metadata === null) return state
+            // Already parsed. The controller is the boundary the acknowledgement
+            // crosses, and it refuses a malformed one by quiescing the backend
+            // session and dispatching stage-failed -- so a second parse here
+            // could only fail on a value the first accepted, and its answer
+            // ("return state") was to leave the window in Pending with no
+            // error and no announcement. It also repeated a base64 decode and
+            // a full PNG chunk walk of up to 2 MB (Epic 1 retrospective item
+            // 7). The type is the proof: nothing unparsed can reach this case.
+            const {metadata} = action
             return {
                 phase: 'staged',
                 session: {sessionId: metadata.sessionId, lastSeq: 0},
@@ -184,13 +191,29 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                 return {...state, session, progress: event.progress}
             }
             if (event.kind === 'transfer-complete') {
+                // A terminal event ends the session even when its snapshot is
+                // refused. Returning `state` here left the view in Transferring
+                // until the backend's reset landed, and transferring -> plain
+                // idle is the cancel-won row -- so a completed transfer was
+                // announced as "Transfer canceled", strictly worse than the
+                // downgrade the Go side refuses to make (Epic 1 retrospective
+                // item 2). What the refusal costs is the claim of success, not
+                // the end of the session: FairDrop cannot vouch for bytes it
+                // could not reconcile, so it says the transfer did not finish.
                 if (!progressMatchesMetadata(state.metadata, event.progress) ||
-                    !progressCanFollow(state.progress, event.progress)) return state
+                    !progressCanFollow(state.progress, event.progress)) {
+                    return {
+                        phase: 'error',
+                        session,
+                        outcome: {kind: 'error', error: publicError('transfer_failed')},
+                    }
+                }
                 return {phase: 'done', session, outcome: {kind: 'done'}}
             }
             if (event.kind === 'transfer-error') {
-                if (event.progress !== null && (!progressMatchesMetadata(state.metadata, event.progress) ||
-                    !progressCanFollow(state.progress, event.progress))) return state
+                // Same rule, easier answer: this event is already a failure, so
+                // an incoherent snapshot beside it changes no claim. Dropping
+                // the event instead would hide a failure behind a cancellation.
                 return {
                     phase: 'error',
                     session,

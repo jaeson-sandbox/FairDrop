@@ -50,6 +50,11 @@ func compose(app *App) *transfer.Coordinator {
 		Server:   server.New(stream.New(inspector)),
 		QR:       qr.New(),
 		Observer: appObserver{app: app},
+		// Diagnose is what carries an internal diagnostic out of the process.
+		// Without it the coordinator's sink is written by production and read
+		// only by tests, which is what D-098 found: the contract's stated
+		// honesty mechanism did not exist in a shipped binary.
+		Diagnose: app.logDiagnostic,
 		// Entropy, Now and AfterFunc stay defaulted: the process CSPRNG, the
 		// process clock and time.AfterFunc are the production sources, and
 		// only coordinator tests replace them.

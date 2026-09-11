@@ -52,6 +52,7 @@ const (
     ErrNetworkUnavailable ErrorCode = "network_unavailable"
     ErrServerStartFailed  ErrorCode = "server_start_failed"
     ErrQRFailed           ErrorCode = "qr_failed"
+    ErrSetupFailed        ErrorCode = "setup_failed"
     ErrBeaconWarning      ErrorCode = "beacon_warning"
     ErrTransferFailed     ErrorCode = "transfer_failed"
     ErrShuttingDown       ErrorCode = "shutting_down"
@@ -115,13 +116,14 @@ Stable domain error codes are:
 | `network_unavailable` | no eligible LAN IPv4 |
 | `server_start_failed` | listener could not become ready |
 | `qr_failed` | capability QR could not be encoded |
+| `setup_failed` | a coded failure before any byte was sent: entropy exhaustion, a Prepare-time deadline, an uncoded `SourcePort` error, a malformed Stage acknowledgement, a pre-startup/pre-composition refusal, or `ready()` finding a missing port |
 | `beacon_warning` | HTTP/QR are ready but mDNS publication failed; non-terminal |
 | `transfer_failed` | invalid preflight size arithmetic, handle-close, read, ZIP, connection, or post-header stream failure |
 | `shutting_down` | command rejected after application shutdown begins |
 
 Errors wrap internal causes but expose only the stable code and safe message to React. Absolute paths and capability tokens are never included in HTTP or mDNS errors.
 
-`ErrorCodeOf` uses `errors.As` to find `CodedError` through `%w` wrappers and maps every unknown non-nil error to `transfer_failed`. `PublicErrorOf` uses the recognized code and a fixed safe message; it never copies arbitrary adapter text. `SourcePort` may return `cancelled`, `path_not_found`, `path_unsupported`, `source_changed`, or `transfer_failed` for invalid size arithmetic; network selection returns `network_unavailable`; beacon start returns `beacon_warning`; server start returns `server_start_failed`; QR encoding returns `qr_failed`; claim authorization returns `cancelled` or `shutting_down`; payload preparation/streaming returns the applicable path/source code or `transfer_failed`. Adapters create or preserve this `internal/transfer` carrier and never compare error strings. `ServerFailed.Err` preserves the wrapped coded error unchanged; the coordinator maps unknowns only at its UI boundary.
+`ErrorCodeOf` uses `errors.As` to find `CodedError` through `%w` wrappers and maps every unknown non-nil error to `transfer_failed`. `PublicErrorOf` uses the recognized code and a fixed safe message; it never copies arbitrary adapter text. `SourcePort` may return `cancelled`, `path_not_found`, `path_unsupported`, `source_changed`, or `transfer_failed` for invalid size arithmetic; network selection returns `network_unavailable`; beacon start returns `beacon_warning`; server start returns `server_start_failed`; QR encoding returns `qr_failed`; claim authorization returns `cancelled` or `shutting_down` (or, only on the residual path where a required port is missing -- unreachable through `NewCoordinator`, which refuses to build a coordinator missing one -- `setup_failed`); payload preparation returns the applicable path/source code, `setup_failed` for a pre-header deadline or an uncoded `SourcePort` error, or `transfer_failed`; streaming after headers are written returns the applicable code or `transfer_failed`. Adapters create or preserve this `internal/transfer` carrier and never compare error strings. `ServerFailed.Err` preserves the wrapped coded error unchanged; the coordinator maps unknowns only at its UI boundary.
 
 ## Coordinator-facing ports
 

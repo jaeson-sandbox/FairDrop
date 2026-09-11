@@ -10,6 +10,7 @@ import {
     selectWarnings,
 } from './selectors'
 import type {TransferState} from './state'
+import {parseProgressSnapshot} from './validation'
 
 const metadata = {
     sessionId: '0123456789abcdef0123456789abcdef',
@@ -22,7 +23,7 @@ const metadata = {
 } as const
 
 describe('progress presentation modes', () => {
-    it('returns finite clamped determinate values for known positive totals', () => {
+    it('derives the determinate percentage from the authoritative byte pair', () => {
         expect(selectProgressSnapshot({
             bytesSent: 75,
             totalBytes: 100,
@@ -52,6 +53,17 @@ describe('progress presentation modes', () => {
             percent: Number.POSITIVE_INFINITY,
             speedBytesPerSec: 20,
         }).value).toBe(0)
+
+        // The wire's own percent does not fill the bar. A sender that rounded
+        // it for display would otherwise put a figure on screen that disagrees
+        // with the byte counts printed beside it (Epic 1 retrospective item 7).
+        expect(selectProgressSnapshot({
+            bytesSent: 58,
+            totalBytes: 84,
+            totalKnown: true,
+            percent: 68,
+            speedBytesPerSec: 20,
+        }).value).toBeCloseTo(100 * 58 / 84, 12)
     })
 
     it('represents known empty totals explicitly without a determinate percentage', () => {
@@ -91,23 +103,27 @@ describe('progress presentation modes', () => {
         expect(Number.isFinite(selected.value)).toBe(true)
     })
 
+/*
+      One layer decides coherence, and it is not this one.
+
+      The selector used to re-clamp these three totals into known-empty. That
+      branch could never run: parseProgressSnapshot is the only producer of a
+      ProgressSnapshot in the app, and it refuses all three before any selector
+      sees them -- a rejecting layer followed by a repairing layer, two
+      strategies for one rule (Epic 1 retrospective item 7). The guarantee the
+      repair stood for is asserted here against the layer that actually owns it,
+      so deleting the dead branch did not delete the promise.
+    */
     it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
-        'does not classify runtime-invalid known total %s as known-positive',
+        'never lets a runtime-invalid known total %s reach a selector at all',
         (totalBytes) => {
-            expect(selectProgressSnapshot({
+            expect(parseProgressSnapshot({
                 bytesSent: 25,
                 totalBytes,
                 totalKnown: true,
                 percent: 50,
                 speedBytesPerSec: 10,
-            })).toEqual({
-                mode: 'known-empty',
-                determinate: false,
-                value: 0,
-                bytesSent: 0,
-                totalBytes: 0,
-                speedBytesPerSec: 0,
-            })
+            })).toBeNull()
         },
     )
 })
@@ -169,7 +185,8 @@ describe('state-aware selectors', () => {
         }
 
         expect(selectCommandError(staged)).toEqual({
-            code: 'busy', message: 'Finish or cancel the current transfer before choosing another item.',
+            code: 'busy',
+            message: 'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
         })
         expect(selectOutcome(terminal)).toEqual({
             kind: 'error',

@@ -457,10 +457,167 @@ func TestPrepareDistinguishesDeadlineExpiryFromCancellation(t *testing.T) {
 	})
 
 	prepared, err := adapter.Prepare(ctx, staged)
-	assertNoPayload(t, prepared, err, transfer.ErrTransferFailed)
+	// Prepare runs entirely before response headers, so an expired deadline
+	// here is FairDrop's own setup timing out, not an interrupted transfer:
+	// nothing was ever sent (D-012).
+	assertNoPayload(t, prepared, err, transfer.ErrSetupFailed)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatal("deadline cause is not preserved through Unwrap")
 	}
+}
+
+// The deadline above expires before Prepare is ever called, so it only
+// proves Prepare's very first check. D-012 touches four more contextError
+// call sites inside Prepare/prepareArchive (after Inspect, after
+// pinIdentity, and after Stat, plus prepareArchive's own), and a deadline
+// already expired at entry can never reach any of them. This isolates the
+// second one -- the deadline expires *during* Inspect, inside the call
+// itself -- so only that later check can catch it.
+func TestPrepareDistinguishesDeadlineExpiryDuringInspectFromCancellation(t *testing.T) {
+	t.Parallel()
+
+	staged := fabricatedItem(t, "expires-during-inspect.bin", 3)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	adapter := &Payloads{
+		source: sourceFunc(func(context.Context, string) (transfer.StagedItem, error) {
+			time.Sleep(60 * time.Millisecond)
+			return staged, nil
+		}),
+		open: func(string) (payloadFile, error) {
+			t.Error("open ran after the deadline expired")
+			return nil, errors.New("must not run")
+		},
+	}
+
+	prepared, err := adapter.Prepare(ctx, staged)
+	assertNoPayload(t, prepared, err, transfer.ErrSetupFailed)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("deadline cause is not preserved through Unwrap")
+	}
+}
+
+// Isolates Prepare's second contextError call site: the deadline expires
+// while pinIdentity's Lstat is in flight, so only the check after it can
+// catch it.
+func TestPrepareDistinguishesDeadlineExpiryDuringPinIdentityFromCancellation(t *testing.T) {
+	t.Parallel()
+
+	staged := fabricatedItem(t, "expires-during-pin.bin", 3)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	adapter := syntheticAdapter(staged, func(string) (payloadFile, error) {
+		t.Error("open ran after the deadline expired")
+		return nil, errors.New("must not run")
+	})
+	adapter.lstat = func(path string) (fs.FileInfo, error) {
+		time.Sleep(60 * time.Millisecond)
+		return matchingLstat(staged)(path)
+	}
+
+	prepared, err := adapter.Prepare(ctx, staged)
+	assertNoPayload(t, prepared, err, transfer.ErrSetupFailed)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("deadline cause is not preserved through Unwrap")
+	}
+}
+
+// Isolates Prepare's third contextError call site: the deadline expires
+// while a descriptor is already open (inside the open seam), so only the
+// check after Stat can catch it, and the opened descriptor must still be
+// released.
+func TestPrepareDistinguishesDeadlineExpiryDuringOpenFromCancellation(t *testing.T) {
+	t.Parallel()
+
+	staged := fabricatedItem(t, "expires-during-open.bin", 3)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	file := &fakeFile{data: []byte("abc"), info: fakeFileInfo{name: staged.Name, size: 3, modTime: staged.ModTime}}
+	adapter := syntheticAdapter(staged, func(string) (payloadFile, error) {
+		time.Sleep(60 * time.Millisecond)
+		return file, nil
+	})
+
+	prepared, err := adapter.Prepare(ctx, staged)
+	assertNoPayload(t, prepared, err, transfer.ErrSetupFailed)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("deadline cause is not preserved through Unwrap")
+	}
+	if file.closeCount() != 1 {
+		t.Fatalf("descriptor closed %d times after the deadline expired, want 1", file.closeCount())
+	}
+}
+
+// prepareArchive has its own contextError call site, after its own
+// pinIdentity -- a directory selection never reaches Prepare's file-path
+// checks above, so this is the only test that exercises it.
+func TestPrepareArchiveDistinguishesDeadlineExpiryFromCancellation(t *testing.T) {
+	t.Parallel()
+
+	staged := transfer.StagedItem{
+		Path:    filepath.Join(fixtureDir(t), "expires-during-pin-archive"),
+		Name:    "expires-during-pin-archive",
+		Kind:    transfer.ItemDirectory,
+		ModTime: time.Unix(1_700_000_000, 123),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	adapter := &Payloads{
+		source: matchingSource(staged),
+		lstat: func(string) (fs.FileInfo, error) {
+			time.Sleep(60 * time.Millisecond)
+			return fakeFileInfo{name: staged.Name, mode: fs.ModeDir, modTime: staged.ModTime}, nil
+		},
+	}
+
+	prepared, err := adapter.Prepare(ctx, staged)
+	assertNoPayload(t, prepared, err, transfer.ErrSetupFailed)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("deadline cause is not preserved through Unwrap")
+	}
+}
+
+// D-015: Prepare used to return a SourcePort error verbatim, so the "every
+// Prepare failure is coded" postcondition rested on the adapter rather than
+// being enforced at the boundary. An uncoded error reaching PublicErrorOf
+// through the generic ErrorCodeOf fallback would describe an interrupted
+// transfer even though Inspect here runs before any header is written.
+func TestPrepareCodesAnUncodedSourceError(t *testing.T) {
+	t.Parallel()
+
+	staged := fabricatedItem(t, "uncoded.bin", 3)
+	adapter := &Payloads{
+		source: sourceFunc(func(context.Context, string) (transfer.StagedItem, error) {
+			return transfer.StagedItem{}, errors.New("adapter forgot to code this")
+		}),
+	}
+
+	prepared, err := adapter.Prepare(context.Background(), staged)
+	assertNoPayload(t, prepared, err, transfer.ErrSetupFailed)
+	if !strings.Contains(err.Error(), "no stable code") {
+		t.Errorf("Error() = %q, want it to explain the source's error carried no stable code", err.Error())
+	}
+}
+
+// A SourcePort error that is already coded must pass through unchanged: the
+// wrap at the port call is a safety net for a non-compliant adapter, not a
+// second opinion on top of one that already answered correctly.
+func TestPrepareLeavesAnAlreadyCodedSourceErrorUnchanged(t *testing.T) {
+	t.Parallel()
+
+	staged := fabricatedItem(t, "coded.bin", 3)
+	adapter := &Payloads{
+		source: sourceFunc(func(context.Context, string) (transfer.StagedItem, error) {
+			return transfer.StagedItem{}, transfer.NewError(transfer.ErrPathUnsupported, "already coded")
+		}),
+	}
+
+	prepared, err := adapter.Prepare(context.Background(), staged)
+	assertNoPayload(t, prepared, err, transfer.ErrPathUnsupported)
 }
 
 func TestPrepareRejectsNilContextWithoutTouchingTheFilesystem(t *testing.T) {
