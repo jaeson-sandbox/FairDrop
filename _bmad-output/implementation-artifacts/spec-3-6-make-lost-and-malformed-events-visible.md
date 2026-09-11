@@ -2,7 +2,7 @@
 title: 'Story 3.6: Make Lost and Malformed Events Visible'
 type: 'feature'
 created: '2026-09-11'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '3d979dd97dc3d4575848271a2ad0b21299938074'
 context:
@@ -61,16 +61,16 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/transfer/coordinator.go` — a diagnostics seam on `Dependencies`, called by `recordDiagnostic` beside the sink; overflow marked rather than silent; the original failure cause recorded before `terminalPublicError` rewrites it.
-- [ ] `internal/transfer/coordinator.go` — `publish` recovers a panicking observer, reports it, and releases the lease on every path; a blocking observer cannot hold a command.
-- [ ] `internal/transfer/outcomes.go` — synthesise a terminal outcome from STAGED and CLAIMING, not only TRANSFERRING.
-- [ ] `internal/transfer/lifecycle.go` — `unwind` reports every unaccounted resource.
-- [ ] `internal/server/lifecycle.go` — a filtering `ErrorLog` that forwards panics and drops request text; the first `Stop`'s diagnostic survives a second call.
-- [ ] `app.go` — wire the seam to `logf`; log the lifecycle `undelivered` drop.
-- [ ] `frontend/src/ui/OutcomePanel.tsx` — a control on every terminal outcome.
-- [ ] Epic 1 retrospective items 2, 3, 4 and 7.
-- [ ] Tests for each, plus a disclosure test proving no diagnostic line can carry a path or token.
-- [ ] `evidence-3-6-make-lost-and-malformed-events-visible.md`, and the twelve ids closed with `epics.md` kept in step.
+- [x] `internal/transfer/coordinator.go` — a diagnostics seam on `Dependencies`, called by `recordDiagnostic` beside the sink; overflow marked rather than silent; the original failure cause recorded before `terminalPublicError` rewrites it.
+- [x] `internal/transfer/coordinator.go` — `publish` recovers a panicking observer, reports it, and releases the lease on every path; a blocking observer cannot hold a command.
+- [x] `internal/transfer/outcomes.go` — synthesise a terminal outcome from STAGED and CLAIMING, not only TRANSFERRING.
+- [x] `internal/transfer/lifecycle.go` — `unwind` reports every unaccounted resource.
+- [x] `internal/server/lifecycle.go` — a filtering `ErrorLog` that forwards panics and drops request text; the first `Stop`'s diagnostic survives a second call.
+- [x] `app.go` — wire the seam to `logf`; log the lifecycle `undelivered` drop.
+- [x] `frontend/src/ui/OutcomePanel.tsx` — a control on every terminal outcome.
+- [x] Epic 1 retrospective items 2, 3, 4 and 7.
+- [x] Tests for each, plus a disclosure test proving no diagnostic line can carry a path or token.
+- [x] `evidence-3-6-make-lost-and-malformed-events-visible.md`, and the twelve ids closed with `epics.md` kept in step.
 
 **Acceptance Criteria:**
 - Given any diagnostic recorded in a composed binary, when it is written, then a test observes one log line carrying its code and message and nothing else.
@@ -84,6 +84,25 @@ Audit, mutation tables and gate transcripts live in
 [evidence-3-6-make-lost-and-malformed-events-visible.md](evidence-3-6-make-lost-and-malformed-events-visible.md), created with the implementation.
 
 ## Spec Change Log
+
+**2026-09-11 (implementation).** Three notes, none of which change the frozen Intent.
+
+Item 3 of the Epic 1 retrospective was closed before the rest, by `transfer.WarningCode` and
+`TestEveryWarningCodeIsAcceptedByTheFrontendParser`; the Tasks list names all four items together
+and this records that they did not land together.
+
+Item 7's "one strategy" was settled as **reject at the boundary, derive for display**: the validator
+keeps the refusal (it is a security boundary -- Wails notifies same-window listeners before Go ever
+sees an event), the selector derives the displayed percentage from the two authoritative integers,
+and the selector's repair layer is deleted. The alternative -- keep trusting the wire `percent` and
+delete only the repairs -- was rejected because it leaves the exact-float coupling the retrospective
+flagged, and a rounded percentage would then disagree on screen with the byte counts printed beside
+it. `EXPERIENCE.md`'s NFR8 is satisfied either way: it requires a finite clamped 0-100 percentage
+for known positive totals, which the derived value is by construction.
+
+A mutation sweep over all twelve ids found four implemented and defended by no test. Five tests were
+added for them rather than deferring the gaps, and the story's own Verification section's mutation
+list is extended accordingly in the evidence file.
 
 ## Design Notes
 

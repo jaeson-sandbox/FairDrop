@@ -56,6 +56,26 @@ line.
 > Mutation tables and gate transcripts live in
 > `evidence-3-5-reconcile-public-error-copy-with-its-states.md`.
 
+> **Discharged (Story 3.6):** all twelve ids this story's Closes line names are closed --
+> `D-020`, `D-021`, `D-031`, `D-034`, `D-042`, `D-043`, `D-049`, `D-059`, `D-091`, `D-092`,
+> `D-098`, `D-100`. Every diagnostic the coordinator or server records now leaves the process
+> through an injected seam `compose` wires to the stderr line `app.go` already writes (D-098), so
+> the "recorded as a diagnostic" the contract leans on is something a person can actually be asked
+> for. Around it: a terminal failure's original cause is recorded before `terminalPublicError`
+> rewrites it (D-092), a teardown that loses two resources reports both (D-100), a panicking
+> observer is recovered and reported rather than unwinding past every lease release (D-043), a
+> blocking one is bounded like any adapter call (D-034), a lane that closes at STAGED or CLAIMING
+> synthesises a terminal outcome instead of leaving a QR code up for a listener that is gone
+> (D-042, D-091), a repeated `Stop` replays the first call's diagnostic (D-020), `ErrorLog`
+> forwards a fixed line for a genuine handler panic while still dropping every byte net/http
+> wrote (D-021), the diagnostic sink marks its overflow rather than dropping silently (D-031),
+> every `undelivered` drop is logged and not only counted (D-049), and a terminal outcome always
+> carries a control so a lost `transfer-reset` cannot strand the window (D-059). A mutation sweep
+> over all twelve found that four -- `D-031`, `D-042`/`D-091`, `D-092`, `D-100` -- were correctly
+> implemented and defended by no test at all; each has one now. Epic 1 retrospective items 2, 3, 4
+> and 7 are closed with them. Mutation tables and gate transcripts live in
+> `evidence-3-6-make-lost-and-malformed-events-visible.md`.
+
 > **Discharged (Story 3.4):** all eleven ids this story's Closes line names are closed --
 > `D-017`, `D-019`, `D-022`, `D-024`, `D-027`, `D-030`, `D-032`, `D-036`, `D-037`, `D-087`, `D-090`.
 > Every quiescence wait the coordinator or server performs while holding a lock or lease now ends
@@ -301,13 +321,13 @@ line.
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   id: D-020
   summary: Repeated `Stop` discards the first call's cleanup diagnostic, and `teardownOnce`/`teardownDone` guard a path with one structurally unreachable entrant.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: `teardown()` is called only after `Stop` takes `s.mu` and clears `s.active`, so a second entrant cannot occur; the `sync.Once` plus channel join therefore protects nothing, while causing later `Stop` calls to return `nil` rather than replaying the diagnostic the contract says they may report.
 
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   id: D-021
   summary: `ErrorLog` discards genuine handler panics along with the request diagnostics it is there to silence.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: `log.New(io.Discard, "", 0)` blinds every `net/http` report from this server, including a real panic that is not `http.ErrAbortHandler`. A redacting writer that strips the request line would keep the disclosure property without making a production fault in this package invisible.
 
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
@@ -367,7 +387,7 @@ line.
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
   id: D-031
   summary: `diagnosticSink` silently drops entries past 32 with no marker.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: A truncated sink is indistinguishable from a complete one in a structure whose stated purpose is to be inspected, and the policy drops newest rather than oldest. Nothing outside the package reads it until Story 1.6 exposes it, which is the moment to settle both.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -385,7 +405,7 @@ line.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-034
   summary: A blocking `Observer.Publish` now stalls every lifecycle command, not just the event lane.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Publication is lease-owned by design, so the coordinator calls `Publish` while holding the operation lease. A Wails observer that blocks -- an emit into a frontend that is not draining, say -- therefore blocks the next `Cancel` or `Shutdown` for as long as it blocks, because those wait for the lease. The contract already calls `Publish` a synchronous FIFO handoff, so this is a constraint on the Story 1.7 adapter rather than a coordinator defect: whatever implements `Observer` must return promptly and must never call back into the coordinator.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -433,13 +453,13 @@ line.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-042
   summary: An event lane that closes while the session is STAGED or CLAIMING leaves the coordinator holding a dead session with no synthesized outcome.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Raised by the edge-case layer, which proposed widening `acceptTerminal` to accept those states. That fix would break the event grammar: publishing `transfer-error` from STAGED means an error with no preceding `started`, and the contract's grammars all begin with `started` for anything after Stage acknowledgement. It is also unreachable today -- only `ServerPort.Stop` closes the lane, and every caller of Stop is a teardown that drives to IDLE -- and the user can still recover with Cancel. What is missing is a defined grammar for a server that dies under a staged-but-unclaimed session, which is a contract question rather than a coordinator one.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-043
   summary: A panicking `Observer.Publish` permanently wedges the coordinator, because no lease release is deferred.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Raised by the edge-case layer. `AuthorizeClaim` runs on the serving goroutine, where `net/http` recovers a handler panic; the `c.publish(event)` before `c.releaseLease()` is not deferred, so a panicking observer leaves the lease held forever and every later `Cancel` or `Shutdown` blocks in `awaitLease` with no timeout. The drainer sites have the same shape but no recovery at all, so there the process dies instead. The root shape predates this story (Story 1.5 wrote the AuthorizeClaim path), and converting five lease sites to deferred release during triage risks a double release, which panics. Worth a focused pass together with the `Observer` constraint already recorded above.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -475,7 +495,7 @@ line.
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
   id: D-049
   summary: `undelivered` counts dropped lifecycle events and nothing in production reads it.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Incremented on a nil context, a recovered emit panic, and an unknown event kind; read only by tests. A dropped terminal event is precisely the failure no other party can observe -- the UI simply waits forever -- so the count is the only trace, and it is inert. The spec forbids logs, so surfacing it means a UI-visible degraded state, which belongs to Story 1.10's recovery contract. The comment now says it is inert rather than calling itself "the record".
 
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
@@ -535,7 +555,7 @@ line.
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   id: D-059
   summary: A terminal outcome offers no control at all, so a lost `transfer-reset` strands the window.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Done and Error render heading, message and nothing else; the way out is the backend's three-second reset, which produces the retained Idle node that carries Dismiss. The Story 1.7 entry above records that `publish` silently drops an event it cannot deliver and counts it in an inert `undelivered`, so a dropped reset is both possible and invisible. The frontend is forbidden a lifecycle timer, which makes this a recovery-contract question for Story 1.10 rather than something a view can fix.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
@@ -737,13 +757,13 @@ line.
 - source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
   id: D-091
   summary: An event lane that closes while the session is STAGED synthesises no terminal outcome, so the sender keeps looking at a QR code for a server that is gone.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Raised by the Edge Case Hunter layer while discharging D-038, and verified against HEAD. `drain`'s post-loop synthesis calls `acceptTerminal`, which is refused by `drainerMayActLocked` for anything but `stateTransferring`. `TestStagedServerEventsAreDrainedWhileStaged` (`coordinator_stage_test.go:612`) closes the lane at STAGED and asserts only that the drainer exits, so the gap is covered by a passing test that never asks the question. Epic 3's requirement for this story says an event lane closing mid-session synthesises a terminal outcome; STAGED is mid-session.
 
 - source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
   id: D-092
   summary: A transfer failure's original cause is rewritten to fixed public copy and never recorded, so a real failure leaves no internal trail.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Raised by the Blind Hunter layer while discharging D-038, and verified against HEAD. `acceptTerminal` passes `event.Err` to `terminalPublicError`, which maps it onto the twelve-message registry; the adapter's own error text is then discarded. `outcomes.go`'s three `recordDiagnostic` calls cover an unrecognized event kind, a snapshot-less progress event and a nil stop function -- not the failure itself. Adjacent code does record adapter errors as diagnostics (`stopServer`, `StopBeacon`), and `TestStagedSessionNeverDisclosesTheTokenOrThePath` already pins that diagnostics disclose neither the token nor the path, so the disclosure rule is not the obstacle. Deferred rather than fixed in 3.2 because it is a production change outside that story's stated boundary.
 
 - source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
@@ -779,7 +799,7 @@ line.
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-098
   summary: Every bound-timeout diagnostic is written to a sink nothing in the running binary ever reads.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Raised by the Blind Hunter layer reviewing Story 3.4 and verified against HEAD. `recordDiagnostic` writes to the coordinator's `diagnosticSink`, and `docs/fairdrop-contracts.md` leans on "recorded as a diagnostic" as the honesty mechanism for a bound that elapsed. But `app.go` never reads `coordinator.diagnostics`; the `logf` seam is wired only to lifecycle events. So in a shipped build the caller's coded error is the entire trace, and the diagnostic record the contract cites is reachable only from tests through `h.coordinator.diagnostics.snapshot()`. This story's charter is that a lost or refused signal always reaches a visible surface, which is exactly what a diagnostic nobody reads is not.
 
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
@@ -791,7 +811,7 @@ line.
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-100
   summary: `unwind` returns only the first bound failure, so a second simultaneously-unaccounted resource is invisible to the caller.
-  owner: 3-6-make-lost-and-malformed-events-visible
+  owner: discharged
   evidence: Raised by the Blind Hunter layer reviewing Story 3.4. `releaseAcquired` and `joinDrainerBounded` can each hit their own bound in one `unwind`, and only the first error reaches Cancel or Shutdown's caller; the second exists only in the diagnostic sink, which D-098 records is unread in production. A caller told "the server did not confirm it stopped" has no way to learn the drainer is also unaccounted for. Joining the failures, or reporting a count, is the fix; it pairs naturally with D-098 since both are about what a teardown failure actually tells anyone.
 
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
