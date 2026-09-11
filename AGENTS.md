@@ -150,6 +150,21 @@ as historical narrative and apply all corrections and supersessions before using
   writes. `internal/stream/diagnose_test.go` (env `FAIRDROP_DIAGNOSE`) runs the production
   Inspect/Walk/Prepare/WriteTo path over a real folder and names the first stage that refuses;
   start there when a live folder download fails.
+- Every quiescence wait the coordinator or server performs while holding a lock or lease is
+  bounded (Story 3.4): the operation lease, the drainer join, and the coordinator's own bounded
+  calls into `ServerPort.Stop` and `NetworkPort.StopBeacon`, plus `ServerPort.Stop`'s own wait for
+  its listener/handlers/connections inside `internal/server`. A bound that elapses is reported as a
+  coded failure (`transfer_failed`) naming what did not return, recorded as a diagnostic, and never
+  reported as success -- the coordinator still reaches `IDLE` and frees the lease, but nothing claims
+  the underlying resource is quiescent. `Coordinator.Cancel` and `Coordinator.Shutdown` now take a
+  `context.Context`, honoured while waiting to join a teardown some other operation already owns.
+  `internal/transfer/coordinator.go`'s `boundTimer` seam (distinct from `afterFunc`, the reset
+  scheduler) and `internal/server/lifecycle.go`'s `serverTimeouts.teardown` seam are what a test
+  drives deterministically -- never by sleeping out a real bound. See the amended `ServerPort.Stop`
+  and `NetworkPort` postconditions in `docs/fairdrop-contracts.md` and the matching decision in
+  `docs/fairdrop-architecture.md`'s Transfer lifecycle section for the reasoning: a watchdog that let
+  `Cancel` return early while a listener was still live would have been a worse defect than the hang
+  it replaced, so a hit bound is reported honestly rather than absorbed as quiescence.
 
 ## Git workflow
 

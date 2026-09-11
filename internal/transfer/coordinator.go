@@ -33,6 +33,33 @@ const (
 	// maxDiagnostics bounds the internal cleanup record. A session produces a
 	// handful at most, and the sink exists to be inspected, not to grow.
 	maxDiagnostics = 32
+
+	// adapterCallBound is the ceiling on one external port call the operation
+	// lease holds across: ServerPort.Stop and NetworkPort.StopBeacon. Neither
+	// adapter's own teardown work is expected to take more than milliseconds
+	// on a healthy host -- Stop force-closes every connection and StopBeacon
+	// unregisters one mDNS record -- so ten seconds is headroom for a slow
+	// machine, never a ceiling any real cleanup step approaches. It cannot be
+	// hit by a real Wi-Fi transfer because it only bounds teardown, which
+	// starts after the transfer is already over or being abandoned.
+	adapterCallBound = 10 * time.Second
+
+	// drainerJoinBound bounds how long unwind waits for the event drainer to
+	// end once the adapter call above has already returned, timed out, or
+	// been skipped. The drainer ends the instant ServerPort.Stop closes its
+	// event channel, which a healthy adapter does well inside
+	// adapterCallBound, so this only fires when the drainer goroutine itself
+	// -- not the adapter call already accounted for -- is what is still
+	// running.
+	drainerJoinBound = 10 * time.Second
+
+	// leaseBound is how long Cancel or Shutdown will wait to join a teardown
+	// already in flight rather than starting a second one. It covers the
+	// worst case of every bounded step above running to its own bound in
+	// sequence (StopBeacon, ServerPort.Stop, the drainer join) plus margin, so
+	// a healthy teardown -- which finishes in milliseconds -- never comes
+	// close, and an unhealthy one is reported rather than waited on forever.
+	leaseBound = 45 * time.Second
 )
 
 // sessionState is the coordinator's lifecycle state. STAGING and CLAIMING are
@@ -181,6 +208,15 @@ type Dependencies struct {
 	// goroutine, and the callback joins that drainer, so a seam that called
 	// back synchronously would make the drainer wait for itself.
 	AfterFunc func(delay time.Duration, run func()) StopTimer
+
+	// BoundTimer schedules every quiescence-wait bound this story adds: the
+	// operation lease, the drainer join, and the bounded calls into
+	// ServerPort.Stop and NetworkPort.StopBeacon. It follows the same shape
+	// and the same run-not-before-return contract as AfterFunc, and is a
+	// separate seam on purpose: the two count and drive genuinely different
+	// things (a UI-visible reset versus an internal cleanup deadline), and
+	// sharing one would make a test of either unable to tell them apart.
+	BoundTimer func(delay time.Duration, run func()) StopTimer
 }
 
 // Coordinator owns FairDrop's transfer lifecycle. It is framework-independent:
@@ -194,14 +230,22 @@ type Dependencies struct {
 // lease serializes the long adapter work itself, so a cancellation joins the
 // teardown already in flight instead of racing a second one.
 type Coordinator struct {
-	source    SourcePort
-	network   NetworkPort
-	server    ServerPort
-	qr        QRPort
-	observer  Observer
-	entropy   io.Reader
-	now       func() time.Time
-	afterFunc func(delay time.Duration, run func()) StopTimer
+	source     SourcePort
+	network    NetworkPort
+	server     ServerPort
+	qr         QRPort
+	observer   Observer
+	entropy    io.Reader
+	now        func() time.Time
+	afterFunc  func(delay time.Duration, run func()) StopTimer
+	boundTimer func(delay time.Duration, run func()) StopTimer
+
+	// afterArm is a test-only hook, nil in production. It runs on the drainer
+	// goroutine inside armReset, after the reset timer has been created and
+	// before armReset re-checks that the session survived -- the exact window
+	// D-037 identifies. It exists to force a Cancel into that window
+	// deterministically rather than relying on goroutine scheduling.
+	afterArm func()
 
 	// lease holds exactly one token. Whoever receives it may call adapter
 	// Start/Stop/unwind methods; nobody else may.
@@ -237,18 +281,25 @@ func NewCoordinator(deps Dependencies) *Coordinator {
 			return time.AfterFunc(delay, run).Stop
 		}
 	}
+	boundTimer := deps.BoundTimer
+	if boundTimer == nil {
+		boundTimer = func(delay time.Duration, run func()) StopTimer {
+			return time.AfterFunc(delay, run).Stop
+		}
+	}
 
 	return &Coordinator{
-		source:    deps.Source,
-		network:   deps.Network,
-		server:    deps.Server,
-		qr:        deps.QR,
-		observer:  deps.Observer,
-		entropy:   entropy,
-		now:       now,
-		afterFunc: afterFunc,
-		lease:     lease,
-		state:     stateIdle,
+		source:     deps.Source,
+		network:    deps.Network,
+		server:     deps.Server,
+		qr:         deps.QR,
+		observer:   deps.Observer,
+		entropy:    entropy,
+		now:        now,
+		afterFunc:  afterFunc,
+		boundTimer: boundTimer,
+		lease:      lease,
+		state:      stateIdle,
 	}
 }
 
@@ -356,8 +407,9 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	}
 	if handle.Events == nil || handle.Port < 1 || handle.Port > 65535 {
 		// Refusing a handle still means owning it: Stop is safe after any
-		// Start, and leaving it be would strand a listener.
-		c.stopServer()
+		// Start, and leaving it be would strand a listener. Bounded like
+		// every other Stop call this story covers.
+		_ = c.stopServerBounded()
 		return c.failStage(live, NewError(ErrServerStartFailed, "the transfer server did not report a usable listener"))
 	}
 	live.drainerDone = make(chan struct{})
@@ -475,11 +527,19 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 	// here is a cleanup note and never evidence that the beacon is still up.
 	// The call is unconditional because it is idempotent and safe before a
 	// start: proving the advertisement is gone matters more than remembering
-	// whether it was ever there.
-	if err := c.network.StopBeacon(); err != nil {
-		c.recordDiagnostic(err, "device discovery cleanup reported a problem")
+	// whether it was ever there. Bounded like every other adapter call this
+	// story covers: an mDNS shutdown that never returns must not hang the
+	// claim (D-024), so this proceeds to commit regardless of whether the
+	// bound was hit -- the diagnostic it leaves behind is the honest record.
+	// Released only when the adapter actually confirmed it stopped. The claim
+	// still commits either way -- that is D-024, and hanging here would be the
+	// worse failure -- but booking the resource as released when the bound
+	// elapsed would be this story's rule broken in the data model rather than
+	// in a return value: a later teardown would then never revisit a beacon
+	// that may still be advertising.
+	if c.stopBeaconBounded() == nil {
+		live.release(resourceBeacon)
 	}
-	live.release(resourceBeacon)
 
 	startedAt := c.now()
 
@@ -509,7 +569,10 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 // to IDLE, and reports the cause. It emits no lifecycle event: nothing was
 // acknowledged, so there is nothing for the UI to terminate.
 func (c *Coordinator) failStage(live *session, cause error) (FileMetadata, error) {
-	c.unwind(live)
+	// unwind's own bound failure, if any, is already a recorded diagnostic;
+	// cause is the setup failure that actually explains why Stage did not
+	// commit, and it stays the one thing this call reports.
+	_ = c.unwind(live)
 	live.stop()
 
 	c.mu.Lock()
@@ -528,54 +591,163 @@ func (c *Coordinator) failStage(live *session, cause error) (FileMetadata, error
 	return FileMetadata{}, cause
 }
 
-// unwind releases every live resource and then waits for the drainer to end.
-// The caller owns the operation lease and must not hold the state mutex: Stop
-// and StopBeacon are adapter calls like any other.
+// unwind releases every live resource and then waits, up to its own bound,
+// for the drainer to end. The caller owns the operation lease and must not
+// hold the state mutex: Stop and StopBeacon are adapter calls like any other.
 //
 // Only an operation that is not itself the drainer may call this. Terminal
 // handling runs on the drainer goroutine and uses releaseAcquired directly,
 // because joining itself would be a guaranteed deadlock.
-func (c *Coordinator) unwind(live *session) {
-	c.releaseAcquired(live)
-	c.joinDrainer(live)
+//
+// The returned error is nil on the healthy path and otherwise the first
+// bound that was hit, naming which adapter or wait did not return in time.
+// Every step still runs regardless of an earlier one's outcome: a stuck
+// server must not skip the attempt to stop a live beacon, and a bound hit on
+// either must not skip the drainer join.
+func (c *Coordinator) unwind(live *session) error {
+	err := c.releaseAcquired(live)
+	if joinErr := c.joinDrainerBounded(live); joinErr != nil && err == nil {
+		err = joinErr
+	}
+	return err
 }
 
-// releaseAcquired releases every live resource in reverse acquisition order.
-// The caller owns the operation lease and must not hold the state mutex.
-func (c *Coordinator) releaseAcquired(live *session) {
+// releaseAcquired releases every live resource in reverse acquisition order,
+// each within its own bound, and reports the first bound that was hit. The
+// caller owns the operation lease and must not hold the state mutex.
+func (c *Coordinator) releaseAcquired(live *session) error {
+	var first error
 	for index := len(live.acquired) - 1; index >= 0; index-- {
+		var err error
 		switch live.acquired[index] {
 		case resourceBeacon:
-			if err := c.network.StopBeacon(); err != nil {
-				c.recordDiagnostic(err, "device discovery cleanup reported a problem")
-			}
+			err = c.stopBeaconBounded()
 		case resourceServer:
-			c.stopServer()
+			err = c.stopServerBounded()
+		}
+		if err != nil && first == nil {
+			first = err
 		}
 	}
 	live.acquired = nil
+	return first
 }
 
-// joinDrainer waits for this session's drainer goroutine to end, which is what
-// keeps a session's goroutine from outliving the session. Calling it twice is
-// safe, and so is calling it after the drainer has already gone: Stop closed
-// the event lane, so the loop is on its way out, and a closed done channel
-// receives forever.
+// joinDrainerBounded waits, up to drainerJoinBound, for this session's
+// drainer goroutine to end, which is what keeps a session's goroutine from
+// outliving the session. Calling it twice is safe, and so is calling it after
+// the drainer has already gone: Stop closed the event lane, so the loop is on
+// its way out, and a closed done channel receives immediately.
 //
-// The wait is deliberately unbounded. ServerPort.Stop is quiescent on every
-// return, so the lane is closed by the time this runs; a watchdog here would
-// let Cancel report success while a drainer -- and therefore a publication --
-// was still in flight.
-func (c *Coordinator) joinDrainer(live *session) {
-	if live.drainerDone != nil {
-		<-live.drainerDone
+// A drainer that never ends is now reported rather than waited on forever
+// (D-027, D-032, D-090): the reasoning the old unbounded wait's comment gave
+// -- a watchdog here would let Cancel report success while a publication was
+// still in flight -- is answered by reporting failure instead of success, not
+// by waiting without end. ServerPort.Stop remains documented as quiescent on
+// every healthy return, so on a healthy adapter this still resolves the
+// instant the lane closes, well inside the bound.
+func (c *Coordinator) joinDrainerBounded(live *session) error {
+	if live.drainerDone == nil {
+		return nil
+	}
+	if c.awaitBounded(live.drainerDone, drainerJoinBound) {
+		return nil
+	}
+	timeoutErr := NewError(ErrTransferFailed, "the transfer event drainer did not finish before its bound")
+	c.recordDiagnostic(timeoutErr, "the transfer event drainer did not finish before its bound")
+	return timeoutErr
+}
+
+// awaitBounded waits for ch to be ready or for bound to elapse, whichever
+// comes first, and reports which happened. It never consumes ch's value when
+// the bound wins, so a lease token or a closed-channel receive that arrives
+// late is still there for whoever asks next.
+func (c *Coordinator) awaitBounded(ch <-chan struct{}, bound time.Duration) bool {
+	// Fast path, exactly like awaitLeaseBounded's: ch is a real, already-
+	// settled fact here (unlike callBounded's call, which has not run yet),
+	// so checking it without arming anything is safe rather than a race, and
+	// it is what keeps a drainer that has already ended from costing every
+	// caller a timer entry in its call log.
+	select {
+	case <-ch:
+		return true
+	default:
+	}
+
+	timedOut := make(chan struct{})
+	stop := c.boundTimer(bound, func() { close(timedOut) })
+	select {
+	case <-ch:
+		stop()
+		return true
+	case <-timedOut:
+		return false
 	}
 }
 
-func (c *Coordinator) stopServer() {
-	if err := c.server.Stop(); err != nil {
+// callBounded runs one external adapter call on its own goroutine and waits,
+// up to bound, for it to return, reporting whether it did. An adapter that
+// never returns leaves that goroutine running -- Go offers no way to force a
+// function to stop -- so a bound that elapses reports exactly that: the call
+// did not come back in time, never that it succeeded or that it failed. The
+// abandoned goroutine's eventual result, if it ever arrives, is delivered
+// into a buffered channel nobody is obliged to read again, so it cannot block
+// anything further.
+func (c *Coordinator) callBounded(bound time.Duration, call func() error) (result error, completed bool) {
+	// Armed before the call is launched, deliberately: arming after would
+	// race the spawned goroutine for which one logs first, making the
+	// adapter-call order nondeterministic for no reason. Arming first costs
+	// nothing on the healthy path -- the timer is stopped the instant the
+	// call returns -- and keeps every bound's position in a test's call log
+	// fixed rather than a coin flip.
+	timedOut := make(chan struct{})
+	stop := c.boundTimer(bound, func() { close(timedOut) })
+
+	done := make(chan error, 1)
+	go func() { done <- call() }()
+
+	select {
+	case err := <-done:
+		stop()
+		return err, true
+	case <-timedOut:
+		return nil, false
+	}
+}
+
+// stopServerBounded stops the transfer server within adapterCallBound. A
+// returned error means the bound was hit and the server did not confirm it
+// stopped in time -- the coded failure Cancel, Shutdown, or a claim must
+// report. An adapter error that arrives within the bound is recorded as a
+// diagnostic exactly as before and never surfaces as a command failure of its
+// own: cleanup errors stay diagnostics on the healthy path.
+func (c *Coordinator) stopServerBounded() error {
+	err, completed := c.callBounded(adapterCallBound, c.server.Stop)
+	if !completed {
+		timeoutErr := NewError(ErrTransferFailed, "the transfer server did not confirm it stopped before its bound")
+		c.recordDiagnostic(timeoutErr, "transfer server cleanup did not finish before its bound")
+		return timeoutErr
+	}
+	if err != nil {
 		c.recordDiagnostic(err, "transfer server cleanup reported a problem")
 	}
+	return nil
+}
+
+// stopBeaconBounded stops the discovery beacon within adapterCallBound,
+// mirroring stopServerBounded exactly: a bound hit is reported, an adapter
+// error that arrives in time stays a diagnostic.
+func (c *Coordinator) stopBeaconBounded() error {
+	err, completed := c.callBounded(adapterCallBound, c.network.StopBeacon)
+	if !completed {
+		timeoutErr := NewError(ErrTransferFailed, "device discovery did not confirm it stopped before its bound")
+		c.recordDiagnostic(timeoutErr, "device discovery cleanup did not finish before its bound")
+		return timeoutErr
+	}
+	if err != nil {
+		c.recordDiagnostic(err, "device discovery cleanup reported a problem")
+	}
+	return nil
 }
 
 // afterStep reacquires the state mutex and revalidates the operation after an

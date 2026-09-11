@@ -28,6 +28,38 @@ line.
 > `TestATransferLongerThanEveryTimeoutStillCompletes`, which streams an unknown-length payload through
 > a real listener and asserts the omitted `Content-Length` and the unknown-total terminal snapshot.
 
+> **Discharged (Story 3.4):** all eleven ids this story's Closes line names are closed --
+> `D-017`, `D-019`, `D-022`, `D-024`, `D-027`, `D-030`, `D-032`, `D-036`, `D-037`, `D-087`, `D-090`.
+> Every quiescence wait the coordinator or server performs while holding a lock or lease now ends
+> on a documented, injected bound: the operation lease and the drainer join in
+> `internal/transfer/coordinator.go` (a new `boundTimer` seam, distinct from `afterFunc`'s reset
+> scheduler, drives both deterministically), the coordinator's own bounded calls into
+> `ServerPort.Stop` and `NetworkPort.StopBeacon` (closing D-024, D-027, D-032, D-090), and
+> `ServerPort.Stop`'s own wait for its listener, handlers and connections inside
+> `internal/server/lifecycle.go` (a `serverTimeouts.teardown` seam, closing D-017 and, since a
+> coordinator that never returns from `AuthorizeClaim` is just another stuck handler from the
+> server's point of view, D-019 as well). A bound that elapses is reported as a coded
+> `transfer_failed` naming what did not return, recorded as a diagnostic, and never reported as
+> success; the coordinator still reaches `IDLE` and frees the lease regardless, because a stuck
+> adapter must cost only its own resource's proven quiescence, never the coordinator's ability to
+> serve the next command. `Server.Stop` also stopped holding `s.mu` across its wait, so a bounded
+> teardown can never deadlock a later `Start`, and `Start` after `Stop` is now a specified,
+> tested restart contract (D-022). `Coordinator.Cancel` and `Coordinator.Shutdown` take a
+> `context.Context` and honour it while waiting to join a teardown some other operation already
+> owns (D-036); `app.go`'s `CancelTransfer` hands it the stored application-lifetime context and
+> `shutdown` hands it the Wails-supplied shutdown context, with a `shutdown begin` log line so a
+> second launch swallowed while shutdown is blocked on a live transfer is diagnosable (D-087).
+> `armReset`'s window between arming its timer and re-checking the session survived is forced
+> deterministically through a test-only `afterArm` hook rather than left to scheduling (D-037).
+> `NetworkPort`'s doc now states that `StartBeacon` requires a prior successful `GetLocalIP`, and
+> the coordinator's `fakeNetwork` asserts the ordering rather than accepting the call at any time
+> (D-030); `internal/network`'s own `TestStartBeaconRequiresSelectionAndLiveContext` already pinned
+> the real adapter's refusal. `docs/fairdrop-contracts.md`, `docs/fairdrop-architecture.md`, and
+> `AGENTS.md` carry the amended postconditions and the decision behind them. No new public error
+> code was added: every new failure this story reports uses the existing `transfer_failed` carrier.
+> Mutation tables and the bound-value reasoning live in
+> `evidence-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`.
+
 > **Discharged (Story 3.2, macOS):** `D-093` is closed. The POSIX adapter now
 > builds, tests and race-tests green on `macos-latest`
 > (https://github.com/jaeson-sandbox/FairDrop/actions/runs/34428026493). Three
@@ -223,7 +255,7 @@ line.
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   id: D-017
   summary: `Stop` can block indefinitely while holding the server mutex, which also deadlocks a later `Start`.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: `<-r.serveDone`, `r.handlers.Wait()`, and `r.awaitConnections()` have no deadline. A payload parked on the destination is covered, because `http.Server.Close` breaks it, but a `WriteTo` blocked on a slow source read that ignores its context hangs `Stop` forever, and `s.mu` is held throughout. A watchdog changes the force-closing semantics the contract states, so this needs a design decision rather than a patch.
 
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
@@ -235,7 +267,7 @@ line.
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   id: D-019
   summary: `AuthorizeClaim` is trusted to return, so a coordinator that blocks in it hangs `Stop` and loses quiescence.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: The handler calls it synchronously with `r.ctx` and waits. The contract makes it the coordinator's own synchronous handshake, so bounding it here would duplicate a timeout the coordinator should own -- but nothing on the server side currently survives a coordinator that never returns. Worth settling when Story 1.5 implements the authorizer.
 
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
@@ -253,7 +285,7 @@ line.
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   id: D-022
   summary: Restart after `Stop` is possible but unspecified and untested.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: `Stop` clears `s.active`, so `Start` -> `Stop` -> `Start` succeeds and builds a fresh run. The type comment says "one listener, one capability token, one authorized download, then nothing", which reads as forbidding it. Whether a server instance is reusable belongs in the contract, since the coordinator will decide whether to construct one per session.
 
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
@@ -265,7 +297,7 @@ line.
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
   id: D-024
   summary: `AuthorizeClaim` is now deadlock-free by construction, but it is still not time-bounded, and the one unlocked call inside it is `StopBeacon`.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: This closes half of the Story 1.4 entry above. The handshake never blocks on the operation lease (it takes it with a non-blocking try and answers `cancelled` when a teardown owns it) and never holds the state mutex across a call, so `ServerPort.Stop` can always make progress against a handler parked in it. What remains is the `NetworkPort` side: the claim calls `StopBeacon` synchronously while holding the lease, so an mDNS shutdown that never returns hangs the serving handler and therefore `Stop`. Bounding it needs the same design decision as the unbounded `Stop` entry above, not a patch here.
 
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
@@ -283,7 +315,7 @@ line.
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
   id: D-027
   summary: `unwind` waits on the drainer unbounded while holding the operation lease.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: `<-live.drainerDone` depends entirely on `ServerPort.Stop` closing the event lane. A Stop that returns without closing it wedges the coordinator in permanent `busy` with no timeout and no diagnostic. This is the second unbounded wait in the file -- the deferred entry about `StopBeacon` inside `AuthorizeClaim` names the first -- and no test drives a Stop that leaves the lane open, because the fake always closes it.
 
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
@@ -301,7 +333,7 @@ line.
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
   id: D-030
   summary: `NetworkPort` does not document that `StartBeacon` requires a prior successful `GetLocalIP`.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: `internal/network` enforces that ordering and answers `beacon_warning` without it, but the port doc states no such precondition and the coordinator's fake accepts `StartBeacon` at any time. Swapping the coordinator's address and beacon steps would keep every coordinator test green and fail in production. The ordering belongs on the port, and the fake should assert it.
 
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
@@ -313,7 +345,7 @@ line.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-032
   summary: Every quiescence wait in the coordinator is unbounded, and this story added two more.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: Restates the Story 1.5 entry about `unwind`. `Cancel` and `Shutdown` wait on the operation lease, then on `<-live.drainerDone`, then inside `releaseAcquired` on `ServerPort.Stop` and `NetworkPort.StopBeacon`. Each rests on a port postcondition -- Stop is quiescent on every return, StopBeacon guarantees no advertisement remains -- so an adapter that violates one wedges the command with no timeout and no diagnostic. The spec puts a watchdog behind Ask First deliberately: bounding these would let Cancel report success while a listener was still live. The decision belongs with the `internal/server` entry about `Stop` blocking on a source read that ignores its context, which is the one concrete way this can happen today.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -337,13 +369,13 @@ line.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-036
   summary: `Cancel` and `Shutdown` take no context, so a Wails command cannot abandon one.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: Both return only when the resources they name are quiescent, which is the contract's requirement, so a caller-supplied context would be a parameter they must ignore. Story 1.7 wires `App.CancelTransfer` and the Wails shutdown hook to them: the hook must be prepared to block for as long as the adapters take, and `App.shutdown` is the only place that may call `Shutdown`.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-037
   summary: `armReset`'s window between creating the reset timer and re-checking that the session survived is guarded but unproven, and can leave one timer armed and unstopped.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: Found by mutation: replacing the second `resetIsDueLocked` check with an unconditional `live.stopReset = stop` leaves every test green. The window is real but narrow. `retire` reads `stopReset` before it calls `joinDrainer`, and the drainer is the goroutine running `armReset`, so a Cancel that arrives just after the terminal outcome reads a nil `stopReset`, then blocks until `armReset` finishes -- by which point `armReset` has seen the session still installed and armed a timer nobody will ever stop. That timer fires three seconds later, revalidates, finds the session cleared and publishes nothing, so the consequence is one leaked pending callback rather than a second reset. `fakeTimer` already exposes `armed()` and `stops()`, so the assertion exists; what is missing is a deterministic way to hold the drainer inside `armReset` while a Cancel runs.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -653,7 +685,7 @@ line.
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
   id: D-087
   summary: A second launch arriving while `Shutdown` is blocked on a live transfer's lease is swallowed: the lock and listener stay alive but no window returns.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: `OnShutdown` blocks in `coordinator.Shutdown` (unbounded, see D-032) after the window has closed. The mutex is still held, so a second launch hands off and exits `0`, and `restoreWindow` runs against a window that no longer exists. Bounding the shutdown wait is this story's work; a log line at shutdown entry would at least make the swallowed relaunch diagnosable.
 
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
@@ -671,7 +703,7 @@ line.
 - source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
   id: D-090
   summary: Two coordinator waits are unbounded by design, and nothing decides what happens when the port postcondition they rest on is violated.
-  owner: 3-4-bound-every-lifecycle-wait-and-prove-quiescence
+  owner: discharged
   evidence: Raised by the Edge Case Hunter layer while discharging D-038, and verified against HEAD. `joinDrainer` waits forever on `live.drainerDone`, and `awaitLease` waits forever on the lease; both are deliberate, and the comments say why -- a watchdog would let Cancel report success while a publication was still in flight. The unexamined case is the one the layer named: `ServerPort.Stop` is documented as quiescent on every return, so an adapter that returns an error *and* leaves the event lane open makes Cancel and Shutdown hang and the app unclosable. Either the port's postcondition is enough and the story records that reasoning, or the waits need the documented bound with a coded failure that this story's own charter asks for. `stopServer` currently records a diagnostic and continues either way.
 
 - source_spec: `spec-3-2-automate-reproducible-cross-platform-verification.md`
@@ -703,3 +735,45 @@ line.
   summary: The POSIX adapter is verified on macOS only; the Linux half of the same file is still compile-checked and never executed.
   owner: 3-7-execute-the-native-platform-test-matrix
   evidence: `handle_posix.go` is `//go:build linux || darwin` and `handle_linux.go` supplies the `O_PATH` flag sets. Story 3.2's workflow runs Windows and macOS only, and the frozen boundary makes a Linux job Ask First -- correctly, since the epic's requirement is that a Linux job never stand in for release proof of a supported platform. But that leaves the Linux branch of a shared file in the same position darwin was in before this story: type-checked by `GOOS=linux go vet` and never run. The `O_PATH` path is the better-established of the two and the fallback seam declines on Linux, so the risk is lower than darwin's was -- and darwin's was assumed low too, right up until the first run failed forty tests. Deciding whether FairDrop wants a Linux job for adapter verification only, clearly not release proof, belongs to the platform-matrix story.
+
+- source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
+  id: D-096
+  summary: `network.Manager.StopBeacon` holds the selection gate across its own blocking Shutdown, so one hung mDNS shutdown degrades every later transfer in the process.
+  owner: 3-8-harden-the-directory-stream
+  evidence: Raised by the Blind Hunter layer reviewing Story 3.4 and verified against HEAD. `internal/network/beacon.go` takes `m.selectionGate` and `m.mu` and releases them by `defer`, after `handle.Shutdown()` returns. Story 3.4 bounded the coordinator's *wait* for `StopBeacon`, which stops the coordinator wedging -- but the adapter itself is unchanged, so a genuinely hung `Shutdown` leaves the gate held forever and every later `GetLocalIP` on the shared `Manager` blocks on it. `acquireSelectionGate` does honour its context, so an explicit Cancel can still unstick a later Stage, but nothing does that automatically. `internal/server.Server.Stop` received exactly this treatment in 3.4 -- detach, release the lock, then wait -- and the network adapter did not. The same fix shape applies. Not done in 3.4 because `internal/network` was outside that story's Code Map and the coordinator-side bound already removed the wedge the story was scoped to remove.
+
+- source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
+  id: D-097
+  summary: Cancel and Shutdown honour a caller's context, but the context production hands them can never be cancelled, so the feature is unreachable in the shipped app.
+  owner: 3-6-make-lost-and-malformed-events-visible
+  evidence: Raised by the Blind Hunter layer reviewing Story 3.4 and verified against the vendored Wails v2.15.0. `app.go`'s `CancelTransfer` and `shutdown` pass their Wails context straight through, which is what D-036 asked for and what the new tests exercise. But Wails builds that context once from `context.Background()` plus `WithValue` and never wraps it in `WithCancel` or `WithTimeout`, so `ctx.Done()` never fires in a running FairDrop: both commands are bounded in production only by the internal `leaseBound`. The same dead context is Stage's only escape from a setup-phase adapter that ignores cancellation -- `Inspect`, `GetLocalIP`, `Server.Start`, `EncodePNG`, `StartBeacon` got no `callBounded` wrap -- so a hung setup call leaves `StageTransfer` unable to return at all. Closing it means the app owning a cancellable context of its own rather than borrowing the runtime's, which is an `app.go` design change rather than a coordinator one.
+
+- source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
+  id: D-098
+  summary: Every bound-timeout diagnostic is written to a sink nothing in the running binary ever reads.
+  owner: 3-6-make-lost-and-malformed-events-visible
+  evidence: Raised by the Blind Hunter layer reviewing Story 3.4 and verified against HEAD. `recordDiagnostic` writes to the coordinator's `diagnosticSink`, and `docs/fairdrop-contracts.md` leans on "recorded as a diagnostic" as the honesty mechanism for a bound that elapsed. But `app.go` never reads `coordinator.diagnostics`; the `logf` seam is wired only to lifecycle events. So in a shipped build the caller's coded error is the entire trace, and the diagnostic record the contract cites is reachable only from tests through `h.coordinator.diagnostics.snapshot()`. This story's charter is that a lost or refused signal always reaches a visible surface, which is exactly what a diagnostic nobody reads is not.
+
+- source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
+  id: D-099
+  summary: The coordinator's bound on ServerPort.Stop equals the server's own teardown bound, so the outer wait can give up on an inner one that was about to succeed.
+  owner: 3-7-execute-the-native-platform-test-matrix
+  evidence: Raised independently by the orchestrator and the Blind Hunter layer while reviewing Story 3.4. `adapterCallBound` is 10s in `internal/transfer/coordinator.go` and `teardownBound` is 10s in `internal/server/lifecycle.go`. The outer bound therefore races the inner one rather than outlasting it: the coordinator can report "the transfer server did not confirm it stopped" for a `Stop` that was about to return its own, more specific coded failure naming which wait was outstanding. Both values are now pinned by tests, but to their own literals -- nothing ties them to each other, because `internal/server` imports `internal/transfer` and the reverse import would be a cycle, and both constants are unexported. Fixing it means either exporting them for a root-package pin or giving the coordinator a margin above whatever the server documents. Harmless today in that both answers are honest failures; it costs the more precise message.
+
+- source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
+  id: D-100
+  summary: `unwind` returns only the first bound failure, so a second simultaneously-unaccounted resource is invisible to the caller.
+  owner: 3-6-make-lost-and-malformed-events-visible
+  evidence: Raised by the Blind Hunter layer reviewing Story 3.4. `releaseAcquired` and `joinDrainerBounded` can each hit their own bound in one `unwind`, and only the first error reaches Cancel or Shutdown's caller; the second exists only in the diagnostic sink, which D-098 records is unread in production. A caller told "the server did not confirm it stopped" has no way to learn the drainer is also unaccounted for. Joining the failures, or reporting a count, is the fix; it pairs naturally with D-098 since both are about what a teardown failure actually tells anyone.
+
+- source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
+  id: D-101
+  summary: `callBounded` abandons one goroutine per timed-out adapter call with no cap, so repeated attempts against a wedged device accumulate them.
+  owner: 3-8-harden-the-directory-stream
+  evidence: Raised by the Blind Hunter layer reviewing Story 3.4. `callBounded` spawns a goroutine per bounded adapter call and abandons it when the bound elapses -- Go offers no way to make a function return, which the code documents honestly. The consequence the code does not address is accumulation: `NetworkPort.StopBeacon` takes no context and, per D-096, can hang forever, so a user retrying Cancel or Stage against the same broken device leaks one goroutine each time with no cap, backoff, or circuit breaker. Bounded in practice by how many times a person retries, and each goroutine is idle rather than spinning, which is why this is recorded rather than fixed in 3.4.
+
+- source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
+  id: D-102
+  summary: Only one of the server teardown report's three named waits is ever driven by a test.
+  owner: 3-7-execute-the-native-platform-test-matrix
+  evidence: Raised by the verification-gap layer reviewing Story 3.4. `teardownTimeoutError` names the accept loop, a request handler, and a tracked connection independently, and only the handler branch is exercised (`TestStopReturnsACodedFailureWhenAHandlerNeverReturns`, `TestStopBoundsAHandlerStuckInAuthorizeClaim`). `assertQuiescent` verifies the other two on the healthy path, so they are not unverified, but no test isolates a timeout where only the accept loop or only a connection is still outstanding -- so the wording of those two branches is unproven.

@@ -90,6 +90,23 @@ func (r *recorder) teardownCalls() []string {
 	return out
 }
 
+// withoutBoundTimerCalls drops every "timer.AfterFunc" entry the bounds seam
+// logs. Whether one appears next to a given bounded adapter call is a
+// scheduling accident -- it depends on whether the call's own goroutine or
+// the drainer it may be racing got there first -- so a test asserting an
+// exact call sequence around a bounded call needs this to stay deterministic.
+// entropy.Read and every adapter call are left in place; only portCalls and
+// adapterCalls also drop entropy.Read, because some assertions want to see it.
+func (r *recorder) withoutBoundTimerCalls() []string {
+	var out []string
+	for _, call := range r.snapshot() {
+		if call != "timer.AfterFunc" {
+			out = append(out, call)
+		}
+	}
+	return out
+}
+
 func (r *recorder) count(name string) int {
 	total := 0
 	for _, call := range r.snapshot() {
@@ -121,6 +138,15 @@ type harness struct {
 	entropy  *fakeEntropy
 	clock    *fakeClock
 	timer    *fakeTimer
+	// bounds drives every quiescence-wait bound this story adds -- the
+	// operation lease, the drainer join, and the bounded ServerPort.Stop and
+	// NetworkPort.StopBeacon calls -- on the coordinator's separate
+	// BoundTimer seam. It is a distinct fakeTimer from timer (the reset
+	// scheduler) on purpose: a test that fires a bound must not also fire, or
+	// be confused with, the three-second terminal reset, and a test asserting
+	// exactly one reset armed must not see it polluted by a lease wait that
+	// happened to arm and immediately stop its own timer.
+	bounds *fakeTimer
 }
 
 func newHarness(t *testing.T) *harness {
@@ -135,16 +161,18 @@ func newHarness(t *testing.T) *harness {
 	h.entropy = &fakeEntropy{h: h}
 	h.clock = &fakeClock{h: h, current: time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC), step: time.Second}
 	h.timer = &fakeTimer{h: h}
+	h.bounds = &fakeTimer{h: h}
 
 	h.coordinator = NewCoordinator(Dependencies{
-		Source:    h.source,
-		Network:   h.network,
-		Server:    h.server,
-		QR:        h.qr,
-		Observer:  h.observer,
-		Entropy:   h.entropy,
-		Now:       h.clock.Now,
-		AfterFunc: h.timer.afterFunc,
+		Source:     h.source,
+		Network:    h.network,
+		Server:     h.server,
+		QR:         h.qr,
+		Observer:   h.observer,
+		Entropy:    h.entropy,
+		Now:        h.clock.Now,
+		AfterFunc:  h.timer.afterFunc,
+		BoundTimer: h.bounds.afterFunc,
 	})
 
 	t.Cleanup(h.close)
@@ -304,23 +332,46 @@ type fakeNetwork struct {
 	startBeacon func(ctx context.Context, request BeaconRequest) error
 	stopBeacon  func() error
 
-	mu       sync.Mutex
-	requests []BeaconRequest
+	mu         sync.Mutex
+	requests   []BeaconRequest
+	addrChosen bool
 }
 
 func (f *fakeNetwork) GetLocalIP(ctx context.Context) (netip.Addr, error) {
 	f.h.enter("network.GetLocalIP")
 	if f.getLocalIP != nil {
-		return f.getLocalIP(ctx)
+		addr, err := f.getLocalIP(ctx)
+		if err == nil {
+			f.mu.Lock()
+			f.addrChosen = true
+			f.mu.Unlock()
+		}
+		return addr, err
 	}
+	f.mu.Lock()
+	f.addrChosen = true
+	f.mu.Unlock()
 	return testAddr(), nil
 }
 
+// StartBeacon asserts the NetworkPort precondition ports.go now documents: a
+// successful GetLocalIP must have run first. internal/network already
+// enforces this in production; without this assertion the fake would accept
+// the call at any time, and swapping the coordinator's address and beacon
+// steps would leave every coordinator test green while shipping a build that
+// fails in production (D-030).
 func (f *fakeNetwork) StartBeacon(ctx context.Context, request BeaconRequest) error {
 	f.h.enter("network.StartBeacon")
 	f.mu.Lock()
+	chosen := f.addrChosen
 	f.requests = append(f.requests, request)
 	f.mu.Unlock()
+	if !chosen {
+		// Errorf, not Fatal: this may run on a goroutine other than the
+		// test's own (the same reason assertMutexUnheld uses Errorf), and
+		// FailNow off that goroutine is unsafe.
+		f.h.t.Errorf("StartBeacon was called before a successful GetLocalIP selected an address")
+	}
 	if f.startBeacon != nil {
 		return f.startBeacon(ctx, request)
 	}
@@ -358,6 +409,12 @@ type fakeServer struct {
 	// Stage by design, so a test can assert it is NOT cancelled when the
 	// caller's command context ends.
 	startCtx context.Context
+	// keepLaneOpenOnStop, when true, makes Stop skip closing the event lane
+	// even though it still returns -- the one ServerPort.Stop postcondition
+	// violation this story's bounds have to survive: a Stop that returns but
+	// leaves the lane open (D-027, D-090). Set before Stage/AuthorizeClaim
+	// runs, like every other fake hook; never written concurrently with Stop.
+	keepLaneOpenOnStop bool
 }
 
 func (f *fakeServer) Start(
@@ -382,6 +439,9 @@ func (f *fakeServer) Stop() error {
 	var err error
 	if f.stop != nil {
 		err = f.stop()
+	}
+	if f.keepLaneOpenOnStop {
+		return err
 	}
 	// Closed last, which is the order the real port tears down in: handlers and
 	// producers end first and lane closure is the final step. The order is
@@ -862,6 +922,31 @@ func (h *harness) awaitClosing() {
 		}
 		if time.Now().After(deadline) {
 			h.t.Fatal("the closing flag was never raised")
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+}
+
+// awaitBoundsPending blocks until the bounds seam (h.bounds, wired to the
+// coordinator's BoundTimer) has at least one armed timer that has not yet
+// been stopped.
+//
+// A bounded wait's own arm-then-stop cycle is near-instant on a healthy
+// adapter, so several may arm and settle before the one this test actually
+// wants to force -- releaseAcquired's beacon and server calls, say, ahead of
+// the drainer join. By the time exactly one stays pending, every earlier one
+// has necessarily already resolved (they run sequentially on one goroutine),
+// so the pending one is the one fakeTimer.fire's "most recently armed" rule
+// will hit.
+func (h *harness) awaitBoundsPending() {
+	h.t.Helper()
+	deadline := time.Now().Add(mutexProbeTimeout)
+	for {
+		if h.bounds.armed() > h.bounds.stops() {
+			return
+		}
+		if time.Now().After(deadline) {
+			h.t.Fatal("no bound was ever left pending")
 		}
 		time.Sleep(200 * time.Microsecond)
 	}

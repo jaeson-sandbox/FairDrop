@@ -888,7 +888,10 @@ func TestDirectoryStageFailureKeepsReverseUnwind(t *testing.T) {
 	if got := ErrorCodeOf(err); got != ErrQRFailed {
 		t.Fatalf("error code = %q, want %q", got, ErrQRFailed)
 	}
-	if got := h.calls.snapshot(); !slices.Equal(got, []string{
+	// timer.AfterFunc entries are dropped: whether one lands next to
+	// server.Stop or the drainer join depends on a scheduling accident (see
+	// withoutBoundTimerCalls), not on anything this test is about.
+	if got := h.calls.withoutBoundTimerCalls(); !slices.Equal(got, []string{
 		"entropy.Read", "entropy.Read", "source.Inspect", "network.GetLocalIP", "server.Start", "qr.EncodePNG", "server.Stop",
 	}) {
 		t.Fatalf("directory unwind order = %v, want reverse release after QR failure", got)

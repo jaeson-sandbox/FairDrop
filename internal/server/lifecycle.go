@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,6 +50,20 @@ const (
 	// idleTimeout reaps a connection that claims nothing. Keep-alives are
 	// disabled, so this covers the window between accept and request only.
 	idleTimeout = 30 * time.Second
+
+	// teardownBound caps how long a single teardown waits for the accept loop
+	// to exit, every handler to return, and every tracked connection to close,
+	// once the data-plane context is cancelled and the destination is
+	// force-closed. A real payload is unblocked by that force-close within
+	// milliseconds -- TestStopUnblocksAStalledPayload proves it against a
+	// payload that ignores cancellation and writes forever -- so this bound
+	// exists only for the one case a forced destination close cannot reach: a
+	// source read that also ignores its context and never returns at all. Ten
+	// seconds is generous headroom above that millisecond reality for a slow
+	// host, never a ceiling a real transfer could approach, because teardown
+	// only starts after Stop is called -- the transfer's own bytes are never
+	// what this bound waits on.
+	teardownBound = 10 * time.Second
 )
 
 // listenFunc is the bind seam. Tests use it to bind loopback instead of every
@@ -56,7 +71,15 @@ const (
 type listenFunc func(ctx context.Context, address string) (net.Listener, error)
 
 // Server is the ephemeral one-shot HTTP server: one listener, one capability
-// token, one authorized download, then nothing.
+// token, one authorized download, then nothing -- for the run Start creates.
+//
+// The Server itself is reusable: Start after a completed Stop builds a fresh
+// run from scratch, with no state surviving from the one before it. Every
+// seam (listen, now, timeouts) is reapplied, and a run that never fully
+// quiesced -- because its teardown hit its bound -- still lets a new Start
+// proceed, because Stop clears s.active and releases s.mu before it waits on
+// anything (see Stop below). What is not reusable is a *run*: once Stop has
+// cleared it, the same run is never resumed or reattached.
 //
 // It owns no session state of its own. The coordinator decides whether a claim
 // may proceed, and this type's whole job is to make that decision the only way
@@ -73,17 +96,29 @@ type Server struct {
 
 	mu     sync.Mutex
 	active *run
+	// unresolved holds a run whose teardown ended without proving
+	// quiescence, so a later Stop repeats that answer instead of reporting
+	unresolved *run
 }
 
-// serverTimeouts are the net/http deadlines one server applies.
+// serverTimeouts are the net/http deadlines one server applies, plus the
+// teardown bound below them. teardown is a seam for the same reason the three
+// net/http deadlines are: a test shrinks it to prove the bound fires, and
+// production always gets defaultTimeouts.
 type serverTimeouts struct {
 	readHeader time.Duration
 	read       time.Duration
 	idle       time.Duration
+	teardown   time.Duration
 }
 
 func defaultTimeouts() serverTimeouts {
-	return serverTimeouts{readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout}
+	return serverTimeouts{
+		readHeader: readHeaderTimeout,
+		read:       readTimeout,
+		idle:       idleTimeout,
+		teardown:   teardownBound,
+	}
 }
 
 var _ transfer.ServerPort = (*Server)(nil)
@@ -113,6 +148,11 @@ type run struct {
 	payloads   PayloadPort
 	authorizer transfer.ClaimAuthorizer
 	now        clock
+	// timeouts carries the teardown bound from the Server that started this
+	// run, captured once at Start so a later change to s.timeouts (a test
+	// reusing one *Server across cases) cannot reach back into a run already
+	// in flight.
+	timeouts serverTimeouts
 
 	// ctx is the data-plane context: it governs authorization, payload
 	// preparation, and streaming for the whole serving lifetime, and
@@ -208,6 +248,7 @@ func (s *Server) Start(
 		payloads:     s.payloads,
 		authorizer:   authorizer,
 		now:          s.clock(),
+		timeouts:     s.timeouts,
 		ctx:          dataCtx,
 		cancel:       cancel,
 		mux:          http.NewServeMux(),
@@ -249,24 +290,55 @@ func (s *Server) Start(
 	return transfer.ServerHandle{Port: port, Events: active.lane.channel()}, nil
 }
 
-// Stop force-closes the server and returns only once it is quiescent: no
+// Stop force-closes the server and returns once it is quiescent -- no
 // listener, no connection, no handler, no payload worker, and no event
-// producer is still live, and the event channel is closed for good. It is safe
-// before Start, after a failed Start, and when repeated. A returned error is a
-// cleanup diagnostic; it never means something is still running.
+// producer is still live, and the event channel is closed for good -- or once
+// its teardown bound elapses, whichever comes first. It is safe before Start,
+// after a failed Start, and when repeated.
+//
+// A returned error means one of two different things, and a caller must not
+// conflate them: an error carrying a cleanup diagnostic (net/http's own
+// Close error) means teardown finished and something merely went wrong along
+// the way; an error naming a wait that hit its bound means teardown did NOT
+// finish and quiescence is unproven -- the accept loop, a handler, or a
+// connection may still be running. Neither ever means Stop is unsafe to call
+// again: repeating it after either kind of error is still a no-op, because
+// s.active is already cleared below.
+//
+// s.mu is held only long enough to take ownership of s.active and clear it --
+// never across the wait itself. A teardown that hits its bound therefore
+// cannot deadlock a later Start: by the time anything is waited on, s.active
+// is already nil and s.mu is already free.
 func (s *Server) Stop() error {
 	if s == nil {
 		return nil
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.active == nil {
+		// A teardown that hit its bound left this behind. Answering nil here
+		// would be the story's own rule broken by the idempotence clause: the
+		// first call correctly reported that quiescence was unproven, and a
+		// second call must not upgrade that to success just because the run
+		// has already been detached. Whatever the first call concluded is what
+		// every later caller gets.
+		unresolved := s.unresolved
+		s.mu.Unlock()
+		if unresolved != nil {
+			return unresolved.teardown()
+		}
 		return nil
 	}
-
 	active := s.active
 	s.active = nil
-	return active.teardown()
+	s.mu.Unlock()
+
+	err := active.teardown()
+	if err != nil {
+		s.mu.Lock()
+		s.unresolved = active
+		s.mu.Unlock()
+	}
+	return err
 }
 
 func (s *Server) clock() clock {
@@ -286,22 +358,33 @@ func (r *run) serve() {
 
 // teardown releases everything this run owns, in the one order that is safe:
 // cancel the data-plane context so workers stop, force-close the destination
-// so a blocked write unblocks, wait for the handler -- and therefore for
-// WriteTo and the payload Close it owns -- to finish, then close the lane.
-// Reversing any pair of those steps risks waiting forever on a write that will
-// never complete, or closing a payload while it is still being read.
+// so a blocked write unblocks, wait -- up to the bound -- for the handler and
+// every connection to finish, then close the lane. Reversing any pair of
+// those steps risks waiting forever on a write that will never complete, or
+// closing a payload while it is still being read.
+//
+// The three waits that follow the forced close are the ones this story
+// bounds: they can only be unblocked by the adapter itself returning, and
+// nothing here can force a stuck source read to return. A wait that hits its
+// bound means quiescence is unproven for whatever is still outstanding, and
+// the returned error names it rather than pretending the resource is gone.
+// The lane is still closed either way: closing it is always safe (eventLane
+// guards every publish with the same mutex its close takes), and doing so
+// unblocks the coordinator's own drainer promptly instead of leaving it to
+// find out only from its own, independent bound.
 func (r *run) teardown() error {
 	r.teardownOnce.Do(func() {
 		r.beginStop()
 		r.cancel()
 
 		closeErr := r.http.Close()
-		<-r.serveDone
-		r.handlers.Wait()
-		r.awaitConnections()
+		quiesceErr := r.awaitQuiescence()
 		r.lane.close()
 
-		if closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
+		switch {
+		case quiesceErr != nil:
+			r.teardownErr = quiesceErr
+		case closeErr != nil && !errors.Is(closeErr, net.ErrClosed):
 			r.teardownErr = transfer.WrapError(
 				transfer.ErrTransferFailed,
 				"transfer server cleanup reported a problem",
@@ -312,6 +395,81 @@ func (r *run) teardown() error {
 	})
 	<-r.teardownDone
 	return r.teardownErr
+}
+
+// awaitQuiescence waits, up to r.timeouts.teardown, for the accept loop to
+// exit, every handler to return, and every tracked connection to close. A
+// sync.WaitGroup and a sync.Cond cannot be selected on directly, so each is
+// run on its own goroutine that closes a channel when it finishes, which is
+// what makes a bounded select over all three possible.
+//
+// A bound that elapses leaks whichever of those goroutines is still blocked:
+// there is no way in Go to force one to return. That is the documented cost
+// of a bound at all, not a new one, and it is why the report names exactly
+// what is still outstanding rather than only saying "timed out".
+func (r *run) awaitQuiescence() error {
+	handlersDone := doneChannel(r.handlers.Wait)
+	connsDone := doneChannel(r.awaitConnections)
+
+	bound := time.NewTimer(r.timeoutsOrDefault())
+	defer bound.Stop()
+
+	serveDone, thisHandlersDone, thisConnsDone := r.serveDone, handlersDone, connsDone
+	for serveDone != nil || thisHandlersDone != nil || thisConnsDone != nil {
+		select {
+		case <-serveDone:
+			serveDone = nil
+		case <-thisHandlersDone:
+			thisHandlersDone = nil
+		case <-thisConnsDone:
+			thisConnsDone = nil
+		case <-bound.C:
+			return teardownTimeoutError(serveDone != nil, thisHandlersDone != nil, thisConnsDone != nil)
+		}
+	}
+	return nil
+}
+
+// timeoutsOrDefault covers a *run built without going through Server.Start,
+// which no production path does but a focused unit test reasonably might.
+func (r *run) timeoutsOrDefault() time.Duration {
+	if r.timeouts.teardown > 0 {
+		return r.timeouts.teardown
+	}
+	return teardownBound
+}
+
+// doneChannel runs a blocking wait on its own goroutine and reports
+// completion by closing a channel, which is what makes a sync.WaitGroup.Wait
+// or a sync.Cond.Wait -- neither selectable on its own -- usable inside a
+// bounded select.
+func doneChannel(wait func()) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		wait()
+		close(done)
+	}()
+	return done
+}
+
+// teardownTimeoutError names exactly which of the three waits was still
+// outstanding when the bound elapsed, so a diagnostic reader learns which
+// adapter did not return rather than only that something did not.
+func teardownTimeoutError(acceptLoop, handlers, connections bool) error {
+	var outstanding []string
+	if acceptLoop {
+		outstanding = append(outstanding, "the accept loop")
+	}
+	if handlers {
+		outstanding = append(outstanding, "a request handler")
+	}
+	if connections {
+		outstanding = append(outstanding, "a connection")
+	}
+	return transfer.NewError(
+		transfer.ErrTransferFailed,
+		"transfer server teardown did not finish before its bound: "+strings.Join(outstanding, ", ")+" did not return",
+	)
 }
 
 // beginStop closes the door on new handlers before anything is torn down, so

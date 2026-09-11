@@ -327,6 +327,250 @@ func TestStopUnblocksAStalledPayload(t *testing.T) {
 	payload.assertOwnedOnce(t)
 }
 
+// TestStopReturnsACodedFailureWhenAHandlerNeverReturns is D-017: a source read
+// that ignores its context is not unblocked by anything teardown does -- the
+// destination close only breaks a blocked *write*. The bound is what keeps
+// Stop from waiting on it forever, and the error names the handler as the
+// thing still outstanding rather than claiming quiescence it cannot prove.
+func TestStopReturnsACodedFailureWhenAHandlerNeverReturns(t *testing.T) {
+	t.Parallel()
+
+	blocked := make(chan struct{})
+	unblock := make(chan struct{})
+	var closeOnce sync.Once
+	payload := &stubPayload{
+		name: "report.pdf", size: 4, known: true,
+		stream: func(context.Context, io.Writer) error {
+			closeOnce.Do(func() { close(blocked) })
+			// Ignores cancellation on purpose, and never touches dst: this
+			// models a source read that ignores its context, which a forced
+			// destination close cannot reach.
+			<-unblock
+			return nil
+		},
+	}
+	server := newTestServer(t, payloadsReturning(payload))
+	server.timeouts = serverTimeouts{
+		readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout,
+		teardown: 100 * time.Millisecond,
+	}
+	handle := startTestServer(t, server, &stubAuthorizer{})
+	t.Cleanup(func() { close(unblock) })
+
+	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := testClient().Do(request)
+	if err != nil {
+		t.Fatalf("GET error = %v", err)
+	}
+	t.Cleanup(func() { _ = response.Body.Close() })
+	<-blocked
+
+	started := time.Now()
+	stopErr := server.Stop()
+	elapsed := time.Since(started)
+
+	if stopErr == nil {
+		t.Fatal("Stop() succeeded, want a coded failure naming the stuck handler")
+	}
+	if code := transfer.ErrorCodeOf(stopErr); code != transfer.ErrTransferFailed {
+		t.Fatalf("Stop() error code = %q, want %q", code, transfer.ErrTransferFailed)
+	}
+	if !strings.Contains(stopErr.Error(), "request handler") {
+		t.Fatalf("Stop() error = %v, want it to name the stuck request handler", stopErr)
+	}
+	// The bound was 100ms; a generous multiple covers a slow CI host without
+	// tolerating anything close to the old unbounded wait.
+	if elapsed > 5*time.Second {
+		t.Fatalf("Stop() took %v, want it bounded near the shrunk teardown timeout", elapsed)
+	}
+
+	// s.mu was released before the wait (see Stop's own comment), so a later
+	// Start is never blocked by this still-running handler.
+	startDone := make(chan error, 1)
+	go func() {
+		_, err := server.Start(context.Background(), startRequest(), &stubAuthorizer{})
+		startDone <- err
+	}()
+	select {
+	case err := <-startDone:
+		if err != nil {
+			t.Fatalf("Start() after a stuck teardown = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Start() after a stuck teardown deadlocked on Stop's mutex")
+	}
+	t.Cleanup(func() { _ = server.Stop() })
+}
+
+// TestStopReleasesItsMutexBeforeWaitingSoAConcurrentStartIsNeverBlocked is
+// the other half of D-017. The test above only proves Start works *after*
+// Stop has already returned, which every implementation satisfies trivially
+// -- a deferred Unlock always runs before the function returns to its
+// caller, whichever line it sits on. What that cannot distinguish is whether
+// s.mu was held for the whole bounded wait or released before it began, and
+// that only matters while a Stop is still genuinely in flight. This races a
+// Start against a Stop that has not returned yet, with a teardown bound long
+// enough (several seconds) that "s.mu released immediately" and "s.mu held
+// across the wait" are trivially different by wall clock, not a coin flip
+// against scheduler noise.
+func TestStopReleasesItsMutexBeforeWaitingSoAConcurrentStartIsNeverBlocked(t *testing.T) {
+	t.Parallel()
+
+	blocked := make(chan struct{})
+	unblock := make(chan struct{})
+	var closeOnce sync.Once
+	payload := &stubPayload{
+		name: "report.pdf", size: 4, known: true,
+		stream: func(context.Context, io.Writer) error {
+			closeOnce.Do(func() { close(blocked) })
+			<-unblock
+			return nil
+		},
+	}
+	server := newTestServer(t, payloadsReturning(payload))
+	server.timeouts = serverTimeouts{
+		readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout,
+		teardown: 3 * time.Second,
+	}
+	handle := startTestServer(t, server, &stubAuthorizer{})
+	t.Cleanup(func() { close(unblock) })
+
+	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := testClient().Do(request)
+	if err != nil {
+		t.Fatalf("GET error = %v", err)
+	}
+	t.Cleanup(func() { _ = response.Body.Close() })
+	<-blocked
+
+	stopDone := make(chan error, 1)
+	go func() { stopDone <- server.Stop() }()
+	// A scheduling head start for the Stop goroutine, not the mechanism under
+	// test: Stop takes and releases s.mu in microseconds before its bounded
+	// wait even begins, so any reasonable head start puts the mutex into
+	// whichever state (held across the wait, or already free) the
+	// implementation under test produces. The actual pass/fail determination
+	// below is the bounded select, not this sleep.
+	time.Sleep(50 * time.Millisecond)
+
+	startDone := make(chan error, 1)
+	go func() {
+		_, err := server.Start(context.Background(), startRequest(), &stubAuthorizer{})
+		startDone <- err
+	}()
+
+	select {
+	case err := <-startDone:
+		if err != nil {
+			t.Fatalf("Start() while a prior Stop was still in flight = %v", err)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("Start() did not proceed while a prior Stop was still in flight -- " +
+			"s.mu is being held across the bounded wait instead of being released before it")
+	}
+
+	select {
+	case err := <-stopDone:
+		if err == nil {
+			t.Fatal("the stuck Stop() succeeded, want a coded failure -- the fixture is broken")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the original Stop() never returned")
+	}
+	t.Cleanup(func() { _ = server.Stop() })
+}
+
+// TestStopBoundsAHandlerStuckInAuthorizeClaim is D-019, "AuthorizeClaim as
+// seen by Stop": the coordinator's handshake is trusted to return, and this
+// proves the server no longer trusts that blindly. AuthorizeClaim is called
+// synchronously from inside the handler, so a coordinator that never returns
+// from it is indistinguishable, from this package's point of view, from any
+// other stuck handler -- and the same bound that covers a stuck WriteTo
+// covers this too, because both block inside r.handlers.Wait().
+func TestStopBoundsAHandlerStuckInAuthorizeClaim(t *testing.T) {
+	t.Parallel()
+
+	blocked := make(chan struct{})
+	unblock := make(chan struct{})
+	var closeOnce sync.Once
+	authorizer := &stubAuthorizer{
+		authorize: func(context.Context, transfer.SessionID) error {
+			closeOnce.Do(func() { close(blocked) })
+			<-unblock
+			return nil
+		},
+	}
+	server := newTestServer(t, payloadsReturning(&stubPayload{name: "report.pdf", known: true}))
+	server.timeouts = serverTimeouts{
+		readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout,
+		teardown: 100 * time.Millisecond,
+	}
+	handle := startTestServer(t, server, authorizer)
+	t.Cleanup(func() { close(unblock) })
+
+	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { _, _ = testClient().Do(request) }()
+	select {
+	case <-blocked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the handler never reached AuthorizeClaim")
+	}
+
+	stopErr := server.Stop()
+	if stopErr == nil {
+		t.Fatal("Stop() succeeded, want a coded failure: AuthorizeClaim never returned")
+	}
+	if code := transfer.ErrorCodeOf(stopErr); code != transfer.ErrTransferFailed {
+		t.Fatalf("Stop() error code = %q, want %q", code, transfer.ErrTransferFailed)
+	}
+}
+
+// TestStartAfterStopBuildsAFreshRun is D-022: Start -> Stop -> Start is
+// specified to work, not merely observed to compile. A fresh run is built
+// from scratch, with no state -- including the one-shot claim CAS -- carried
+// over from the run Stop just released.
+func TestStartAfterStopBuildsAFreshRun(t *testing.T) {
+	t.Parallel()
+
+	server := newTestServer(t, payloadsReturning(&stubPayload{name: "first.pdf", known: true}))
+	first := startTestServer(t, server, &stubAuthorizer{})
+	firstResponse := do(t, http.MethodGet, downloadURL(first.Port, string(testToken)))
+	readBody(t, firstResponse)
+	if firstResponse.StatusCode != http.StatusOK {
+		t.Fatalf("first transfer status = %d, want 200", firstResponse.StatusCode)
+	}
+	if err := server.Stop(); err != nil {
+		t.Fatalf("first Stop() = %v", err)
+	}
+
+	second, err := server.Start(context.Background(), startRequest(), &stubAuthorizer{})
+	if err != nil {
+		t.Fatalf("Start() after Stop = %v", err)
+	}
+	t.Cleanup(func() { _ = server.Stop() })
+
+	// The same fixed token is reused deliberately: the restart contract this
+	// pins is that a fresh run answers it again, not merely that it accepts a
+	// different one.
+	secondResponse := do(t, http.MethodGet, downloadURL(second.Port, string(testToken)))
+	readBody(t, secondResponse)
+	if secondResponse.StatusCode != http.StatusOK {
+		t.Fatalf("second transfer status = %d, want 200 -- restart must serve a fresh transfer", secondResponse.StatusCode)
+	}
+	if err := server.Stop(); err != nil {
+		t.Fatalf("second Stop() = %v", err)
+	}
+}
+
 // TestServerConfigurationIsPinned guards the values compilation cannot check.
 // A wrong bind address publishes nothing to the LAN; a missing header or read
 // timeout lets a handful of sockets hold the listener open; a write timeout
@@ -341,6 +585,25 @@ func TestServerConfigurationIsPinned(t *testing.T) {
 	server := newTestServer(t, payloadsReturning(&stubPayload{name: "report.pdf", known: true}))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	config := server.active.http
+
+	// The teardown bound is configuration too, and it lives in the same const
+	// block as the timeouts below. Every test that drives it goes through the
+	// timeouts seam, which is blind to the real duration: cutting it to 500ms
+	// left this whole package green while making a slow host's healthy teardown
+	// report failure.
+	if got := defaultTimeouts().teardown; got != teardownBound {
+		t.Fatalf("defaultTimeouts().teardown = %v, want %v", got, teardownBound)
+	}
+	if teardownBound != 10*time.Second {
+		t.Fatalf("teardownBound = %v, want 10s -- production uses this value", teardownBound)
+	}
+	// Deliberately not asserted: that teardownBound outlasts readTimeout. That
+	// assertion was written and immediately failed, and the rule was the thing
+	// that was wrong. readTimeout bounds reading a request; teardown cancels
+	// the data-plane context and force-closes the destination before it waits
+	// at all, so any request still being read is already broken by the time
+	// this bound starts counting. The two govern different phases and no
+	// ordering between them is required.
 
 	if config.ReadHeaderTimeout != readHeaderTimeout || config.ReadHeaderTimeout <= 0 {
 		t.Fatalf("ReadHeaderTimeout = %v, want %v", config.ReadHeaderTimeout, readHeaderTimeout)
@@ -597,5 +860,65 @@ func assertQuiescent(t *testing.T, active *run) {
 	}
 	if active.ctx.Err() == nil {
 		t.Fatal("the data-plane context was still live when Stop returned")
+	}
+}
+
+// TestARepeatedStopDoesNotUpgradeAnUnresolvedTeardownToSuccess pins the one
+// place this story's governing rule collided with an older one.
+//
+// Stop is documented idempotent and safe to repeat, and it detaches the run
+// before it waits so a bounded teardown cannot deadlock a later Start. Those
+// two facts together meant the second call found nothing attached and answered
+// a bare nil -- a clean success -- for a teardown whose first call had just
+// correctly reported that quiescence was unproven. Any caller repeating Stop to
+// re-confirm got a false all-clear. Found by review.
+func TestARepeatedStopDoesNotUpgradeAnUnresolvedTeardownToSuccess(t *testing.T) {
+	t.Parallel()
+
+	blocked := make(chan struct{})
+	unblock := make(chan struct{})
+	var closeOnce sync.Once
+	payload := &stubPayload{
+		name: "report.pdf", size: 4, known: true,
+		stream: func(context.Context, io.Writer) error {
+			closeOnce.Do(func() { close(blocked) })
+			<-unblock
+			return nil
+		},
+	}
+	server := newTestServer(t, payloadsReturning(payload))
+	server.timeouts = serverTimeouts{
+		readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout,
+		teardown: 100 * time.Millisecond,
+	}
+	handle := startTestServer(t, server, &stubAuthorizer{})
+	t.Cleanup(func() { close(unblock) })
+
+	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := testClient().Do(request)
+	if err != nil {
+		t.Fatalf("GET error = %v", err)
+	}
+	t.Cleanup(func() { _ = response.Body.Close() })
+	<-blocked
+
+	first := server.Stop()
+	if first == nil {
+		t.Fatal("the first Stop reported success while a handler never returned")
+	}
+
+	second := server.Stop()
+	if second == nil {
+		t.Fatal("the second Stop reported success for a teardown that never proved quiescence: " +
+			"repeating Stop must not upgrade an unresolved answer")
+	}
+	if got, want := transfer.ErrorCodeOf(second), transfer.ErrorCodeOf(first); got != want {
+		t.Errorf("the second Stop reported code %q, want the first call's %q", got, want)
+	}
+	if second.Error() != first.Error() {
+		t.Errorf("the second Stop reported %q, want the first call's %q", second, first)
 	}
 }

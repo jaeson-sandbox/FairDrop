@@ -66,6 +66,16 @@ type BeaconRequest struct {
 
 // NetworkPort selects the address used by the direct URL and owns the matching
 // discovery beacon.
+//
+// StartBeacon requires a prior successful GetLocalIP: it advertises the
+// selected endpoint, and there is no endpoint to advertise until one has been
+// chosen. A StartBeacon reached without that precondition is refused with
+// beacon_warning rather than advertising nothing meaningful. StopBeacon has
+// no such precondition -- it is safe and idempotent before Start, after a
+// failed Start, and when repeated -- but a caller of it is bounded by its own
+// wait, not by this port: an mDNS shutdown that never returns still leaves
+// the coordinator waiting unless the caller applies its own bound, because
+// this interface carries no context for StopBeacon to honour.
 type NetworkPort interface {
 	GetLocalIP(ctx context.Context) (netip.Addr, error)
 	StartBeacon(ctx context.Context, request BeaconRequest) error
@@ -138,11 +148,22 @@ type QRPort interface {
 //
 // A successful Start means the listener is bound and its accept loop is ready
 // before return; a failed Start leaves no listener, goroutine, or channel
-// behind. Stop is idempotent and force-closing: on every return, including one
-// that reports a cleanup diagnostic, the listener, connections, handlers,
-// payload workers, and event producers have ended and the event channel is
-// closed for good. A cleanup diagnostic is a report, never a transfer of
-// ownership back to the caller.
+// behind. Start after a completed Stop is a specified contract, not merely a
+// possibility: it builds a fresh run with no state carried over from the one
+// before it.
+//
+// Stop is idempotent, force-closing, and bounded: it returns once the
+// listener, connections, handlers, payload workers, and event producers have
+// ended -- or once its own documented bound elapses, whichever comes first.
+// A returned error therefore means one of two different things, and a caller
+// must not conflate them: a cleanup diagnostic means teardown finished and
+// something merely went wrong along the way, and ownership was not
+// transferred back to the caller; a bound-elapsed failure means teardown did
+// NOT finish and quiescence is unproven for whatever adapter call or wait is
+// still outstanding -- Stop never reports that resource as gone when it
+// cannot prove it. Either way Stop remains safe to call again, and never
+// blocks a later Start: an implementation must never hold a lock across the
+// wait that could still be outstanding when it returns.
 type ServerPort interface {
 	Start(ctx context.Context, request ServerStartRequest, authorizer ClaimAuthorizer) (ServerHandle, error)
 	Stop() error
