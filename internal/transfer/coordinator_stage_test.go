@@ -820,8 +820,13 @@ func TestStageRejectsUnrepresentableMetadataBeforeResourceAcquisition(t *testing
 			if metadata.SessionID != "" {
 				t.Fatalf("rejected Stage returned metadata %+v", metadata)
 			}
-			if got := ErrorCodeOf(err); got != ErrTransferFailed {
-				t.Fatalf("error code = %q, want %q", got, ErrTransferFailed)
+			// setup_failed, not transfer_failed: the call log on the very next
+			// line is the argument. Nothing beyond Inspect ran, so no transfer
+			// began, and the copy transfer_failed carries says one stopped
+			// midway. Changed with Story 3.5; this expectation moved because
+			// the behaviour did, not to make a failing test pass.
+			if got := ErrorCodeOf(err); got != ErrSetupFailed {
+				t.Fatalf("error code = %q, want %q", got, ErrSetupFailed)
 			}
 			if got := h.calls.snapshot(); !slices.Equal(got, []string{"entropy.Read", "entropy.Read", "source.Inspect"}) {
 				t.Fatalf("calls = %v, want rejection before network resources", got)
@@ -866,8 +871,10 @@ func TestStageRejectsUnknownItemKindBeforeResourceAcquisition(t *testing.T) {
 	if metadata.SessionID != "" || metadata.Name != "" || metadata.Size != 0 || metadata.IsDir || metadata.URL != "" || metadata.QR != "" {
 		t.Fatalf("rejected Stage returned metadata %+v", metadata)
 	}
-	if got := ErrorCodeOf(err); got != ErrTransferFailed {
-		t.Fatalf("error code = %q, want literal %q", got, ErrTransferFailed)
+	// setup_failed for the same reason as the size check above: the call log
+	// below proves nothing past Inspect ran, so no transfer began.
+	if got := ErrorCodeOf(err); got != ErrSetupFailed {
+		t.Fatalf("error code = %q, want literal %q", got, ErrSetupFailed)
 	}
 	if got := h.calls.snapshot(); !slices.Equal(got, []string{"entropy.Read", "entropy.Read", "source.Inspect"}) {
 		t.Fatalf("calls = %v, want literal rejection before resource acquisition", got)
@@ -1059,5 +1066,31 @@ func TestStageIsRefusedDuringTheTerminalLease(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestStageWithoutAContextIsASetupFailure pins the very first line of Stage.
+//
+// A nil context is a programmer error rather than something a user can cause,
+// and it is unreachable through the bound command surface -- but if it is ever
+// reached it is reached before ready(), before entropy, before any port. The
+// code it reports used to be transfer_failed, whose copy says a transfer
+// stopped before FairDrop finished sending. Nothing asserted it either way, so
+// the first pass of this story fixed the line below it and left this one.
+// Found by review.
+func TestStageWithoutAContextIsASetupFailure(t *testing.T) {
+	h := newHarness(t)
+
+	//lint:ignore SA1012 the nil context is the case under test
+	metadata, err := h.coordinator.Stage(nil, testPath) //nolint:staticcheck // the nil context is the case under test
+
+	if metadata.SessionID != "" {
+		t.Fatalf("a refused Stage returned metadata %+v", metadata)
+	}
+	if got := ErrorCodeOf(err); got != ErrSetupFailed {
+		t.Fatalf("error code = %q, want %q -- nothing ran, so nothing was sent", got, ErrSetupFailed)
+	}
+	if got := portCalls(h); len(got) != 0 {
+		t.Errorf("calls = %v, want none: the guard is the first statement in Stage", got)
 	}
 }

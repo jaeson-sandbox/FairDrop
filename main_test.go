@@ -239,6 +239,45 @@ var registryEntries = []struct {
 // A code or message edited in exactly one of these four fails here, naming
 // the file and the code that disagrees with the literal registryEntries
 // above.
+// TestTheRegistryLiteralCoversEveryCodeTheDomainDefines closes the hole under
+// the pin above.
+//
+// registryEntries is a hand-written literal, and it is the sole driver of every
+// cross-file comparison in this file. A code dropped from it is not reported as
+// missing -- it simply stops being checked anywhere, in every file at once,
+// while the suite stays green. That is precisely the failure this story exists
+// to fix, one level up: two places quietly agreeing because nothing compares
+// them. Found by review.
+func TestTheRegistryLiteralCoversEveryCodeTheDomainDefines(t *testing.T) {
+	// The domain's own list, read from the Go source rather than from a slice
+	// built out of the same constants the literal uses -- a shared helper
+	// would make both sides wrong together.
+	source, err := os.ReadFile(filepath.Join("internal", "transfer", "errors.go"))
+	if err != nil {
+		t.Fatalf("read errors.go: %v", err)
+	}
+	declared := regexp.MustCompile(`ErrorCode = "([a-z_]+)"`).FindAllStringSubmatch(string(source), -1)
+	if len(declared) == 0 {
+		t.Fatal("no ErrorCode constants parsed from errors.go, so this test would pass vacuously")
+	}
+
+	pinned := map[string]bool{}
+	for _, entry := range registryEntries {
+		pinned[entry.code] = true
+	}
+
+	for _, match := range declared {
+		if !pinned[match[1]] {
+			t.Errorf("%q is a declared ErrorCode but is absent from registryEntries, so nothing checks "+
+				"its copy in any of the four files", match[1])
+		}
+	}
+	if len(pinned) != len(declared) {
+		t.Errorf("registryEntries has %d codes and errors.go declares %d: the literal and the domain disagree",
+			len(pinned), len(declared))
+	}
+}
+
 func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 	registry, err := os.ReadFile(filepath.Join(
 		"_bmad-output", "planning-artifacts", "ux-designs", "ux-FairDrop-2026-08-23", "EXPERIENCE.md",

@@ -367,3 +367,45 @@ That is the same shape as the story itself. Four files restating one fact drift 
 compares them; a single file restating one fact twice drifts for exactly the same reason, and is
 easier to miss because it looks like one source rather than two.
 
+## The adversarial layer
+
+Twelve findings. Two were artifacts of the diff the layer was handed rather than defects: the
+orchestrator's patch excluded `EXPERIENCE.md` and `app_test.go`, so the layer correctly reported that
+the change would not build on its own, then checked the real commit and said so. That is the right
+behaviour from a reviewer and a scoping mistake by the orchestrator, recorded because a diff that
+omits the files a change depends on wastes a review pass.
+
+Of the ten real findings, four were fixed here and four deferred. Two more -- the revised `busy` copy
+reading "still finishing" for a transfer that already finished, and the character-level precision of
+the pin -- were checked and left as they are.
+
+**Four more pre-transfer producers the first pass missed.** All four are the story's own subject, and
+three of them sit within a few lines of code the first pass did change:
+
+| Site | Why it is pre-transfer |
+|---|---|
+| `coordinator.go` invalid `LogicalSize` or `Kind` | Its own comment says "before any network, server, QR, or beacon resource is acquired" |
+| `coordinator.go` `Stage`'s nil-context guard | The first statement in the function, above the `ready()` call the first pass fixed |
+| `handler.go` `Prepare` returning `(nil, nil)` | Strictly before `writeDownloadHeaders` |
+| The registry literal itself | See below |
+
+Two of those four had no test asserting the code at all, so changing it and changing it back were
+both green. They are pinned now, and the two existing tests whose expectations moved say in a comment
+that they moved because the behaviour did.
+
+**The registry literal was the pin's own blind spot.** `registryEntries` in `main_test.go` is a
+hand-written list and the sole driver of every cross-file comparison. A code dropped from it is not
+reported missing -- it silently stops being checked in all four files at once. That is this story's
+subject one level up, in the test written to enforce it. It is now compared against the `ErrorCode`
+constants parsed from `errors.go`, and commenting a code out of the literal fails.
+
+**Checked and left alone.** The pin is character-exact: swapping a typographic apostrophe for an ASCII
+one, adding a trailing space, or doubling a space mid-sentence each fail it -- which matters because
+those are the differences a human reviewer reads straight past. And the `NewCoordinator` panic cannot
+fire in a shipped binary: one production caller, supplying all five dependencies. What the layer
+raised about it -- that a future regression would crash before any window exists, invisibly in a
+release build -- is real and is recorded as `D-107`.
+
+Six mutations against the four fixes. Four killed at once; two survived because the paths had no
+assertion at all, and both were killed after the pins were added.
+

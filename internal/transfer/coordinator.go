@@ -320,7 +320,10 @@ func NewCoordinator(deps Dependencies) *Coordinator {
 // lifecycle event, and reports the coded cause instead of metadata.
 func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetadata, error) {
 	if ctx == nil {
-		return FileMetadata{}, NewError(ErrTransferFailed, "staging requires a context")
+		// Before ready(), before any resource, before anything: whatever this
+		// is, no transfer began. Found by review after the first pass fixed
+		// the line below it and not this one.
+		return FileMetadata{}, NewError(ErrSetupFailed, "staging requires a context")
 	}
 	if err := c.ready(); err != nil {
 		return FileMetadata{}, err
@@ -389,10 +392,10 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	// is acquired, regardless of whether the source is a file or directory.
 	const maxSafeInteger int64 = 9007199254740991
 	if item.LogicalSize < 0 || item.LogicalSize > maxSafeInteger {
-		return c.failStage(live, NewError(ErrTransferFailed, "selection logical size cannot be represented safely"))
+		return c.failStage(live, NewError(ErrSetupFailed, "selection logical size cannot be represented safely"))
 	}
 	if item.Kind != ItemFile && item.Kind != ItemDirectory {
-		return c.failStage(live, NewError(ErrTransferFailed, "selection kind is unsupported"))
+		return c.failStage(live, NewError(ErrSetupFailed, "selection kind is unsupported"))
 	}
 	live.item = item
 
