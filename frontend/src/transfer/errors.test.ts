@@ -27,6 +27,7 @@ const backendCodes = [
     'network_unavailable',
     'server_start_failed',
     'qr_failed',
+    'setup_failed',
     'beacon_warning',
     'transfer_failed',
     'shutting_down',
@@ -37,7 +38,7 @@ const backendCodes = [
 // failing test's name instead of hiding it inside one loop.
 const expectedFixedCopies = [
     {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
-    {code: 'busy', message: 'Finish or cancel the current transfer before choosing another item.'},
+    {code: 'busy', message: 'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.'},
     {code: 'cancelled', message: 'Transfer canceled.'},
     {code: 'path_not_found', message: 'That file or folder is no longer available. Choose it again.'},
     {code: 'path_unsupported', message: 'FairDrop can use regular files and folders only. Choose another item.'},
@@ -45,6 +46,7 @@ const expectedFixedCopies = [
     {code: 'network_unavailable', message: 'FairDrop couldn’t find a usable local network. Connect to local Wi-Fi, then try again.'},
     {code: 'server_start_failed', message: 'FairDrop couldn’t open a local transfer connection. Check firewall access, then try again.'},
     {code: 'qr_failed', message: 'FairDrop couldn’t create the QR code. Prepare the item again.'},
+    {code: 'setup_failed', message: 'FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.'},
     {code: 'beacon_warning', message: 'Device discovery isn’t available. The QR code and download link still work.'},
     {code: 'transfer_failed', message: 'The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.'},
     {code: 'shutting_down', message: 'FairDrop is closing. Reopen it to start a transfer.'},
@@ -71,7 +73,7 @@ describe('parseCommandError', () => {
         })
 
         expect(parseCommandError(rejectionCarrying(formatted)).message).toBe(
-            'Finish or cancel the current transfer before choosing another item.',
+            'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
         )
     })
 

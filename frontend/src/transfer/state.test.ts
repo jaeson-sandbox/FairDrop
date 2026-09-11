@@ -318,7 +318,7 @@ describe('terminal scrubbing and retained outcome', () => {
 
     it('rewrites caller-supplied error copy rather than storing what it was handed', () => {
         const forged: PublicError = {code: 'busy', message: 'C:\\private\\report.pdf?token=fedcba98'}
-        const registryCopy = 'Finish or cancel the current transfer before choosing another item.'
+        const registryCopy = 'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.'
 
         const pending = transferReducer(createInitialTransferState(), {
             type: 'stage-requested', generation: 1, itemKind: 'file',

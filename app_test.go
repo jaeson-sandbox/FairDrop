@@ -901,8 +901,8 @@ func TestDialogBeforeStartupIsRefusedRatherThanFatal(t *testing.T) {
 	if got != "" || err == nil {
 		t.Fatalf("SelectFile before startup returned (%q, %v), want a coded refusal", got, err)
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "transfer_failed" {
-		t.Errorf("the refusal crossed as %q, want %q", code, "transfer_failed")
+	if code := string(transfer.ErrorCodeOf(err)); code != "setup_failed" {
+		t.Errorf("the refusal crossed as %q, want %q", code, "setup_failed")
 	}
 	if titles := h.dialogs(); len(titles) != 0 {
 		t.Errorf("a dialog was opened without a window context: %v", titles)
@@ -1380,8 +1380,8 @@ func TestCommandsRefuseBeforeCompositionRatherThanPanicking(t *testing.T) {
 	if metadata != nil || err == nil {
 		t.Fatalf("StageTransfer returned (%v, %v) with no coordinator", metadata, err)
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "transfer_failed" {
-		t.Errorf("the refusal crossed as %q, want %q", code, "transfer_failed")
+	if code := string(transfer.ErrorCodeOf(err)); code != "setup_failed" {
+		t.Errorf("the refusal crossed as %q, want %q", code, "setup_failed")
 	}
 
 	if err := app.CancelTransfer(); err == nil {

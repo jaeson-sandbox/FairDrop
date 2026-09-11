@@ -159,8 +159,10 @@ func TestStageFailsClosedWhenEntropyFails(t *testing.T) {
 
 			metadata, err := h.stage()
 
-			if got := ErrorCodeOf(err); got != ErrTransferFailed {
-				t.Errorf("error code is %q, want %q", got, ErrTransferFailed)
+			// Called before c.mu.Lock(): no state changed and no resource was
+			// acquired, so this is a pre-transfer setup failure (D-025).
+			if got := ErrorCodeOf(err); got != ErrSetupFailed {
+				t.Errorf("error code is %q, want %q", got, ErrSetupFailed)
 			}
 			if metadata.SessionID != "" {
 				t.Errorf("a failed Stage returned metadata %+v", metadata)
@@ -922,16 +924,55 @@ func TestCapabilityURLUsesTheRouteTheServerRegisters(t *testing.T) {
 	}
 }
 
-func TestStageRefusesWithoutItsPorts(t *testing.T) {
-	coordinator := NewCoordinator(Dependencies{})
+// NewCoordinator now refuses to build a coordinator missing a port or the
+// observer (D-029): the one real caller, main.go's compose, always supplies
+// every one, so a missing port is a wiring defect to catch at construction
+// rather than a runtime state Stage or AuthorizeClaim has to report.
+func TestNewCoordinatorRefusesAMissingPortOrObserver(t *testing.T) {
+	full := Dependencies{
+		Source:   &fakeSource{},
+		Network:  &fakeNetwork{},
+		Server:   &fakeServer{},
+		QR:       &fakeQR{},
+		Observer: &fakeObserver{},
+	}
+
+	for _, testCase := range []struct {
+		name string
+		zero func(d Dependencies) Dependencies
+	}{
+		{"no ports at all", func(Dependencies) Dependencies { return Dependencies{} }},
+		{"missing Source", func(d Dependencies) Dependencies { d.Source = nil; return d }},
+		{"missing Network", func(d Dependencies) Dependencies { d.Network = nil; return d }},
+		{"missing Server", func(d Dependencies) Dependencies { d.Server = nil; return d }},
+		{"missing QR", func(d Dependencies) Dependencies { d.QR = nil; return d }},
+		{"missing Observer", func(d Dependencies) Dependencies { d.Observer = nil; return d }},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("NewCoordinator did not panic on a missing port or observer")
+				}
+			}()
+			NewCoordinator(testCase.zero(full))
+		})
+	}
+}
+
+// ready() is the residual, defensive path a *Coordinator assembled some
+// other way than NewCoordinator could still hit -- unreachable through the
+// constructor now, but still honest if ever reached: a missing port means
+// nothing was ever staged or sent, so it must report the pre-transfer setup
+// code rather than borrow the interrupted-transfer one (D-029).
+func TestReadyReportsSetupFailedRatherThanTransferFailed(t *testing.T) {
+	var coordinator Coordinator // zero value: every port and the observer are nil.
 
 	_, err := coordinator.Stage(context.Background(), testPath)
-
-	if got := ErrorCodeOf(err); got != ErrTransferFailed {
-		t.Errorf("error code is %q, want %q", got, ErrTransferFailed)
+	if got := ErrorCodeOf(err); got != ErrSetupFailed {
+		t.Errorf("Stage error code is %q, want %q", got, ErrSetupFailed)
 	}
-	if err := coordinator.AuthorizeClaim(context.Background(), testSessionID); ErrorCodeOf(err) != ErrTransferFailed {
-		t.Errorf("AuthorizeClaim returned %q, want %q", ErrorCodeOf(err), ErrTransferFailed)
+	if err := coordinator.AuthorizeClaim(context.Background(), testSessionID); ErrorCodeOf(err) != ErrSetupFailed {
+		t.Errorf("AuthorizeClaim returned %q, want %q", ErrorCodeOf(err), ErrSetupFailed)
 	}
 }
 

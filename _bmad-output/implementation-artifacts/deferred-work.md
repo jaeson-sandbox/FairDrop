@@ -28,6 +28,34 @@ line.
 > `TestATransferLongerThanEveryTimeoutStillCompletes`, which streams an unknown-length payload through
 > a real listener and asserts the omitted `Content-Length` and the unknown-total terminal snapshot.
 
+> **Discharged (Story 3.5):** all seven ids this story's Closes line names are closed --
+> `D-012`, `D-015`, `D-025`, `D-029`, `D-044`, `D-047`, `D-053`. A new code, `setup_failed`
+> ("Couldn't prepare that item" / "FairDrop couldn't prepare that item. Nothing was sent. Choose it
+> again."), now covers every state where a coded failure fires before any byte is sent: a CSPRNG
+> exhaustion during Stage (D-025, `internal/transfer/coordinator.go`'s `randomHex`), a deadline that
+> expires anywhere inside `Prepare`/`prepareArchive` before headers are written (D-012,
+> `internal/stream/payload.go`'s `prepareContextError`, split from the mid-stream `contextError`
+> so the three post-header call sites inside `WriteTo` are unaffected), an uncoded `SourcePort`
+> error now wrapped at the `Inspect` port call rather than trusted (D-015,
+> `wrapUncodedSourceError`), a malformed Stage acknowledgement (D-053,
+> `frontend/src/transfer/useTransfer.ts`), and both pre-startup/pre-composition refusals (D-047,
+> `app.go`'s `errNotComposed` and `chooseWith`'s nil-context guard). D-029's `ready()` finding a
+> nil port is now unreachable through normal construction -- `NewCoordinator` panics if any port or
+> the observer is nil, since the one real caller (`main.go`'s `compose`) always supplies every one
+> -- and the residual defensive path, reachable only by assembling a `*Coordinator` some other way,
+> reports `setup_failed` rather than `transfer_failed` if it is ever hit. `busy` (D-044) keeps its
+> code; its message is revised to "FairDrop is still finishing the last transfer. Wait a moment, or
+> cancel it, then choose another item.", true both while a transfer is running and while its
+> outcome is held on screen for the three-second terminal lease. `EXPERIENCE.md`,
+> `docs/fairdrop-contracts.md`, `internal/transfer/errors.go` and
+> `frontend/src/transfer/errors.ts` all carry the new code and both revised messages, and
+> `main_test.go`'s `TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage` now pins every code
+> across all four places and every message across the three that carry one (Epic 1 retrospective
+> item 6). One new finding fell out of the audit and is **not** fixed here, because fixing it would
+> mean writing message text the reviewer has not confirmed: see `D-103` below.
+> Mutation tables and gate transcripts live in
+> `evidence-3-5-reconcile-public-error-copy-with-its-states.md`.
+
 > **Discharged (Story 3.4):** all eleven ids this story's Closes line names are closed --
 > `D-017`, `D-019`, `D-022`, `D-024`, `D-027`, `D-030`, `D-032`, `D-036`, `D-037`, `D-087`, `D-090`.
 > Every quiescence wait the coordinator or server performs while holding a lock or lease now ends
@@ -225,7 +253,7 @@ line.
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
   id: D-012
   summary: `transfer_failed`'s fixed public copy misdescribes a deadline that expires during Prepare, before any byte is sent.
-  owner: 3-5-reconcile-public-error-copy-with-its-states
+  owner: discharged
   evidence: Story 1.3 deliberately separates a deadline from a user cancel, but both Prepare-time and stream-time deadlines map to `transfer_failed`, whose registry string is "The transfer stopped before FairDrop finished sending." Prepare runs before headers, so nothing was being sent. The copy registry is fixed by the UX contract, so changing this is a UX decision (EXPERIENCE.md), not an adapter one.
 
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
@@ -243,7 +271,7 @@ line.
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
   id: D-015
   summary: `Prepare` returns a `SourcePort` error verbatim, so the "every Prepare failure is coded" postcondition rests on the adapter rather than being enforced at the boundary.
-  owner: 3-5-reconcile-public-error-copy-with-its-states
+  owner: discharged
   evidence: `internal/source` complies today, but `SourcePort` is an interface and nothing checks. An uncoded error would only be flattened to `transfer_failed` at the UI boundary, losing the specific code. Enforcing it means wrapping unrecognized errors at the port call, which touches the error-code mapping the spec puts behind Ask First.
 
 - source_spec: `spec-1-3-prepare-and-stream-a-regular-file-safely.md`
@@ -303,7 +331,7 @@ line.
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
   id: D-025
   summary: A CSPRNG failure during Stage has no stable code of its own, so it borrows `transfer_failed`, whose fixed copy describes an interrupted transfer that never began.
-  owner: 3-5-reconcile-public-error-copy-with-its-states
+  owner: discharged
   evidence: `Coordinator.newIdentity` maps an exhausted entropy source to `transfer_failed` because the code table has no entry for it and the contract sends everything unrecognized to that fallback. The registry string is "The transfer stopped before FairDrop finished sending," but nothing was staged, advertised, or sent. Same shape as the Story 1.3 entry about a Prepare-time deadline: the copy registry is fixed by the UX contract, so a new code or new copy is a UX decision (EXPERIENCE.md), not a coordinator one. The failure is unreachable in practice on a healthy host.
 
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
@@ -327,7 +355,7 @@ line.
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
   id: D-029
   summary: `AuthorizeClaim` can return `transfer_failed`, which the contract's claim-authorization row does not list.
-  owner: 3-5-reconcile-public-error-copy-with-its-states
+  owner: discharged
   evidence: `ready()` yields `ErrTransferFailed` when a port is missing, but `docs/fairdrop-contracts.md` says claim authorization returns `cancelled` or `shutting_down` only. A missing port is a wiring defect rather than a runtime outcome, so the honest fix may be to make it unrepresentable at construction instead of widening the contract. Related: `Stage(nil ctx)` is `transfer_failed` while `AuthorizeClaim(nil ctx)` is `cancelled`, for one class of programmer error.
 
 - source_spec: `spec-1-5-stage-and-authorize-a-transfer-transactionally.md`
@@ -417,7 +445,7 @@ line.
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
   id: D-044
   summary: `Stage` during the three-second terminal lease is refused with `busy`, whose fixed copy tells the user to finish or cancel a transfer that already ended.
-  owner: 3-5-reconcile-public-error-copy-with-its-states
+  owner: discharged
   evidence: Now covered by `TestStageIsRefusedDuringTheTerminalLease`, so the refusal itself is pinned; what is unresolved is the copy. `busy` renders as "Finish or cancel the current transfer before choosing another item." Nothing is in progress and there is nothing to finish -- the transfer completed and the coordinator is holding its outcome on screen for three seconds. The copy registry is fixed by the UX contract, so a new code or new copy is an EXPERIENCE.md decision, the same shape as the Story 1.3 and 1.5 entries about `transfer_failed` describing a transfer that never began.
 
 - source_spec: `spec-1-6-complete-cancel-and-reset-the-transfer-lifecycle.md`
@@ -435,7 +463,7 @@ line.
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
   id: D-047
   summary: `errNotComposed` and the pre-startup dialog refusal render as "The transfer stopped before FairDrop finished sending", which describes something that never happened.
-  owner: 3-5-reconcile-public-error-copy-with-its-states
+  owner: discharged
   evidence: Both use `ErrTransferFailed`, so `PublicErrorOf` discards their safe messages and selects that fixed copy. Neither state involves a transfer that began. There is no not-ready code in the `ErrorCode` set, and the copy registry is fixed by the UX contract, so this is an EXPERIENCE.md decision -- the same shape as the Story 1.3, 1.5 and 1.6 entries about `transfer_failed` and `busy` describing states they do not fit. Both states are unreachable in a composed binary, since Wails runs `OnStartup` before the webview can call a command.
 
 - source_spec: `spec-1-7-expose-safe-transfer-commands-through-wails.md`
@@ -471,7 +499,7 @@ line.
 - source_spec: `spec-1-8-manage-session-scoped-frontend-state-and-events.md`
   id: D-053
   summary: A malformed Stage acknowledgement is cancelled and reported, but nothing tells the user their selection was refused rather than lost.
-  owner: 3-5-reconcile-public-error-copy-with-its-states
+  owner: discharged
   evidence: `stage()` falls back to `publicError('transfer_failed')`, whose fixed copy says the transfer "stopped before FairDrop finished sending" -- the same mismatch the Story 1.3, 1.5, 1.6 and 1.7 entries record for states where no transfer began. Correct within this story, which may not change copy; it is the fifth instance of one missing code, and the accumulated case belongs to an EXPERIENCE.md decision before Story 1.10 fixes recovery text against it.
 
 - source_spec: `spec-1-8-manage-session-scoped-frontend-state-and-events.md`
@@ -777,3 +805,9 @@ line.
   summary: Only one of the server teardown report's three named waits is ever driven by a test.
   owner: 3-7-execute-the-native-platform-test-matrix
   evidence: Raised by the verification-gap layer reviewing Story 3.4. `teardownTimeoutError` names the accept loop, a request handler, and a tracked connection independently, and only the handler branch is exercised (`TestStopReturnsACodedFailureWhenAHandlerNeverReturns`, `TestStopBoundsAHandlerStuckInAuthorizeClaim`). `assertQuiescent` verifies the other two on the healthy path, so they are not unverified, but no test isolates a timeout where only the accept loop or only a connection is still outstanding -- so the wording of those two branches is unproven.
+
+- source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
+  id: D-103
+  summary: A `Cancel` against a STAGED-but-never-claimed session can render `transfer_failed`'s "the transfer stopped" copy if Story 3.4's bounded teardown wait elapses, even though no transfer ever began.
+  owner: 3-6-make-lost-and-malformed-events-visible
+  evidence: Found while auditing every phase-before-a-transfer-began producer for Story 3.5. `internal/transfer/lifecycle.go`'s `retire` (called by both `Cancel` and `Shutdown`) returns `unwind`'s first bound failure directly as its own error (`return unwindErr`). `unwind`'s bound failures are coded `ErrTransferFailed` (`coordinator.go:656,727,743`, Story 3.4). A `Cancel` issued against a session that reached STAGED but never had `AuthorizeClaim` commit it -- no `transfer-started` was ever published, no byte was ever sent -- that then hits one of those *rare, adapter-misbehavior-only* bounds while stopping the server/beacon or joining the drainer would show the user "The transfer stopped before FairDrop finished sending", the same false-interruption shape Story 3.5's seven named states fixed. Not fixed by that story because it is not one of its seven named states and introducing a message for it is an Ask First change the reviewer has not seen; recorded here instead. `busy`'s revised copy (Story 3.5) does not cover it either -- this is a `Cancel` failing outright, not a `Stage` refusal. See `evidence-3-5-reconcile-public-error-copy-with-its-states.md`'s audit for the full trace.

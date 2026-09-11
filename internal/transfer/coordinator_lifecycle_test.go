@@ -780,7 +780,16 @@ func TestShutdownContendsWithEveryOtherActor(t *testing.T) {
 // function and scheduled nothing would leave every terminal session parked in
 // DONE forever, and the whole suite would still be green.
 func TestTheDefaultResetSchedulerIsARealTimer(t *testing.T) {
-	coordinator := NewCoordinator(Dependencies{})
+	// NewCoordinator now refuses to build without every port and the
+	// observer (D-029), so this test supplies inert fakes: none of their
+	// methods run here, only the default AfterFunc is under test.
+	coordinator := NewCoordinator(Dependencies{
+		Source:   &fakeSource{},
+		Network:  &fakeNetwork{},
+		Server:   &fakeServer{},
+		QR:       &fakeQR{},
+		Observer: &fakeObserver{},
+	})
 	if coordinator.afterFunc == nil {
 		t.Fatal("NewCoordinator installed no reset scheduler")
 	}

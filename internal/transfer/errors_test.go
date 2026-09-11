@@ -16,7 +16,7 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		message string
 	}{
 		{ErrInvalidSelection, "Choose exactly one file or folder."},
-		{ErrBusy, "Finish or cancel the current transfer before choosing another item."},
+		{ErrBusy, "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item."},
 		{ErrCancelled, "Transfer canceled."},
 		{ErrPathNotFound, "That file or folder is no longer available. Choose it again."},
 		{ErrPathUnsupported, "FairDrop can use regular files and folders only. Choose another item."},
@@ -24,6 +24,7 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		{ErrNetworkUnavailable, "FairDrop couldn’t find a usable local network. Connect to local Wi-Fi, then try again."},
 		{ErrServerStartFailed, "FairDrop couldn’t open a local transfer connection. Check firewall access, then try again."},
 		{ErrQRFailed, "FairDrop couldn’t create the QR code. Prepare the item again."},
+		{ErrSetupFailed, "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again."},
 		{ErrBeaconWarning, "Device discovery isn’t available. The QR code and download link still work."},
 		{ErrTransferFailed, "The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link."},
 		{ErrShuttingDown, "FairDrop is closing. Reopen it to start a transfer."},
@@ -94,7 +95,7 @@ func TestIndependentCodedErrorSurvivesWrapping(t *testing.T) {
 	}
 	want := PublicError{
 		Code:    ErrBusy,
-		Message: "Finish or cancel the current transfer before choosing another item.",
+		Message: "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.",
 	}
 	if got := PublicErrorOf(err); got != want {
 		t.Fatalf("PublicErrorOf() = %#v, want %#v", got, want)
@@ -214,7 +215,7 @@ func (e independentCodedError) Code() ErrorCode { return e.code }
 // removed code and misses an added one entirely -- and an added code reaches
 // the Wails boundary as unrecognized, degrading to transfer_failed with the
 // wrong copy and no test failing anywhere. This pins the registry as a set.
-func TestTheCodeRegistryIsExactlyTheseTwelveCodes(t *testing.T) {
+func TestTheCodeRegistryIsExactlyTheseThirteenCodes(t *testing.T) {
 	t.Parallel()
 
 	want := map[ErrorCode]bool{
@@ -227,6 +228,7 @@ func TestTheCodeRegistryIsExactlyTheseTwelveCodes(t *testing.T) {
 		ErrNetworkUnavailable: true,
 		ErrServerStartFailed:  true,
 		ErrQRFailed:           true,
+		ErrSetupFailed:        true,
 		ErrBeaconWarning:      true,
 		ErrTransferFailed:     true,
 		ErrShuttingDown:       true,

@@ -263,7 +263,18 @@ type Coordinator struct {
 var _ ClaimAuthorizer = (*Coordinator)(nil)
 
 // NewCoordinator returns an idle coordinator wired to the given ports.
+//
+// It panics if any port or the observer is nil, rather than building a
+// coordinator that can only discover the gap the first time a command runs.
+// This is what makes ready()'s own nil-port check unreachable through normal
+// construction: the one caller that matters, main.go's compose, always
+// supplies every port, so a missing one is a wiring defect to catch at
+// startup, not a runtime state for Stage or AuthorizeClaim to report (D-029).
 func NewCoordinator(deps Dependencies) *Coordinator {
+	if deps.Source == nil || deps.Network == nil || deps.Server == nil || deps.QR == nil || deps.Observer == nil {
+		panic("transfer: NewCoordinator requires every port and the observer")
+	}
+
 	lease := make(chan struct{}, 1)
 	lease <- struct{}{}
 
@@ -906,9 +917,15 @@ func (c *Coordinator) recordDiagnostic(cause error, message string) {
 }
 
 // ready reports whether every port the coordinator needs was injected.
+//
+// NewCoordinator now refuses to build a coordinator missing one, so this is
+// the residual, defensive path for a *Coordinator assembled some other way --
+// unreachable through the constructor, but still honest if ever reached: a
+// missing port means nothing was ever staged or sent, never an interrupted
+// transfer (D-029).
 func (c *Coordinator) ready() error {
 	if c == nil || c.source == nil || c.network == nil || c.server == nil || c.qr == nil || c.observer == nil {
-		return NewError(ErrTransferFailed, "FairDrop is not ready to stage a transfer")
+		return NewError(ErrSetupFailed, "FairDrop is not ready to stage a transfer")
 	}
 	return nil
 }
@@ -936,9 +953,10 @@ func (c *Coordinator) randomHex() (string, error) {
 	}
 	raw := make([]byte, identityBytes)
 	if _, err := io.ReadFull(source, raw); err != nil {
-		// No stable code describes an exhausted CSPRNG, and the contract maps
-		// everything it does not recognize to the transfer failure fallback.
-		return "", WrapError(ErrTransferFailed, "FairDrop could not create a transfer session", err)
+		// Called from Stage before c.mu.Lock(): no state has changed and no
+		// resource has been acquired, so this is a pre-transfer setup failure,
+		// not an interrupted transfer (D-025).
+		return "", WrapError(ErrSetupFailed, "FairDrop could not create a transfer session", err)
 	}
 	return hex.EncodeToString(raw), nil
 }

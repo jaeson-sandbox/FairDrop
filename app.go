@@ -272,9 +272,11 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 	if ctx == nil {
 		// The real dialog answers a context that did not come from a running
 		// window with log.Fatalf, so this is the difference between a coded
-		// refusal and a process that vanishes.
+		// refusal and a process that vanishes. Unreachable in a composed
+		// binary (Wails runs OnStartup before the webview can call a
+		// command), and no transfer has begun either way (D-047).
 		return "", transfer.NewError(
-			transfer.ErrTransferFailed,
+			transfer.ErrSetupFailed,
 			"FairDrop is not ready to open a chooser",
 		)
 	}
@@ -509,10 +511,12 @@ func (a *App) runtimeContext() context.Context {
 // errNotComposed is the coded refusal a command returns when it is reached
 // before main.go has handed the App its coordinator. It cannot happen in a
 // composed binary; it exists so a command answers with a code rather than a
-// nil dereference if composition is ever reordered.
+// nil dereference if composition is ever reordered. No transfer has begun
+// either way, so it uses the pre-transfer setup code rather than the
+// interrupted-transfer one (D-047).
 func errNotComposed() error {
 	return transfer.NewError(
-		transfer.ErrTransferFailed,
+		transfer.ErrSetupFailed,
 		"FairDrop is not ready to run a transfer command",
 	)
 }

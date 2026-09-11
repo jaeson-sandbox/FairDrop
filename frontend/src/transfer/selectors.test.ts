@@ -169,7 +169,8 @@ describe('state-aware selectors', () => {
         }
 
         expect(selectCommandError(staged)).toEqual({
-            code: 'busy', message: 'Finish or cancel the current transfer before choosing another item.',
+            code: 'busy',
+            message: 'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
         })
         expect(selectOutcome(terminal)).toEqual({
             kind: 'error',

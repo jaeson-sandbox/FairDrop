@@ -1092,7 +1092,7 @@ So that a transfer that silently stops is never mistaken for one I cancelled.
 
 **Why a separate story:** Epic 1's retrospective found a successful transfer that could be announced as "Transfer canceled", and Epic 2's live run found a failure that left no trace at all. Both are the same class of defect -- an event was lost and nothing said so -- and it had been buried among Story 3.4's timing work.
 
-**Closes:** D-020, D-021, D-031, D-034, D-035, D-039, D-042, D-043, D-048, D-049, D-059, D-091, D-092, D-097, D-098, D-100, plus Epic 1 retrospective items 2, 3, 4 and 7.
+**Closes:** D-020, D-021, D-031, D-034, D-035, D-039, D-042, D-043, D-048, D-049, D-059, D-091, D-092, D-097, D-098, D-100, D-103, plus Epic 1 retrospective items 2, 3, 4 and 7.
 
 **Acceptance Criteria:**
 

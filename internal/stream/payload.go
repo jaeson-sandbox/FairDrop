@@ -108,7 +108,7 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 			"payload preparation requires a context",
 		)
 	}
-	if err := contextError(ctx); err != nil {
+	if err := prepareContextError(ctx); err != nil {
 		return nil, err
 	}
 	if item.Kind != transfer.ItemFile && item.Kind != transfer.ItemDirectory {
@@ -133,9 +133,9 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 	// reparse, ancestor, and special-file rules.
 	fresh, err := p.source.Inspect(ctx, item.Path)
 	if err != nil {
-		return nil, err
+		return nil, wrapUncodedSourceError(err)
 	}
-	if err := contextError(ctx); err != nil {
+	if err := prepareContextError(ctx); err != nil {
 		return nil, err
 	}
 	if divergesFromStaged(item, fresh.Kind, fresh.LogicalSize, fresh.ModTime) {
@@ -151,7 +151,7 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 	if err != nil {
 		return nil, err
 	}
-	if err := contextError(ctx); err != nil {
+	if err := prepareContextError(ctx); err != nil {
 		return nil, err
 	}
 
@@ -172,7 +172,7 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 	}
 
 	info, statErr := file.Stat()
-	if err := contextError(ctx); err != nil {
+	if err := prepareContextError(ctx); err != nil {
 		return nil, release(file, err)
 	}
 	if statErr != nil {
@@ -226,7 +226,7 @@ func (p *Payloads) prepareArchive(ctx context.Context, item transfer.StagedItem)
 	if !identity.IsDir() {
 		return nil, sourceChangedError()
 	}
-	if err := contextError(ctx); err != nil {
+	if err := prepareContextError(ctx); err != nil {
 		return nil, err
 	}
 	root, download := archiveNames(item)
@@ -546,6 +546,27 @@ func sourceChangedError() error {
 	)
 }
 
+// wrapUncodedSourceError enforces SourcePort's own postcondition at the call
+// site rather than trusting the adapter to have honoured it (D-015).
+// docs/fairdrop-contracts.md documents Inspect as returning only cancelled,
+// path_not_found, path_unsupported, source_changed, or transfer_failed --
+// every one of those is already a CodedError, so this passes a compliant
+// adapter's error through unchanged. An error that is not coded at all would
+// otherwise reach PublicErrorOf's generic fallback and describe an
+// interrupted transfer, even though Inspect here runs inside Prepare, before
+// any header is written.
+func wrapUncodedSourceError(err error) error {
+	var coded transfer.CodedError
+	if errors.As(err, &coded) {
+		return err
+	}
+	return transfer.WrapError(
+		transfer.ErrSetupFailed,
+		"the source reported an error with no stable code",
+		err,
+	)
+}
+
 func classifyAccessError(err error, safeMessage string) error {
 	if errors.Is(err, fs.ErrNotExist) {
 		return transfer.WrapError(
@@ -561,7 +582,27 @@ func classifyAccessError(err error, safeMessage string) error {
 	)
 }
 
+// contextError classifies ctx for a call already streaming a response:
+// headers are on the wire (or in the case of WriteTo's own checks, about to
+// be), so an expired deadline here is an interrupted transfer.
 func contextError(ctx context.Context) error {
+	return classifyContextError(ctx, transfer.ErrTransferFailed)
+}
+
+// prepareContextError classifies ctx for a call still inside Prepare, before
+// any header has been written (docs/fairdrop-contracts.md's PayloadPort
+// section: "Prepare runs before response headers"). An expired deadline here
+// means FairDrop's own setup timed out, not that a transfer was interrupted
+// -- nothing was ever sent (D-012) -- so it is coded as the pre-transfer
+// setup failure rather than contextError's mid-stream transfer_failed.
+func prepareContextError(ctx context.Context) error {
+	return classifyContextError(ctx, transfer.ErrSetupFailed)
+}
+
+// classifyContextError distinguishes FairDrop's own deadline from a user
+// cancellation. deadlineCode lets each phase give an expired deadline its own
+// meaning; cancellation is always ErrCancelled regardless of phase.
+func classifyContextError(ctx context.Context, deadlineCode transfer.ErrorCode) error {
 	err := ctx.Err()
 	if err == nil {
 		return nil
@@ -571,7 +612,7 @@ func contextError(ctx context.Context) error {
 	// non-error outcome.
 	if errors.Is(err, context.DeadlineExceeded) {
 		return transfer.WrapError(
-			transfer.ErrTransferFailed,
+			deadlineCode,
 			"payload operation exceeded its deadline",
 			err,
 		)

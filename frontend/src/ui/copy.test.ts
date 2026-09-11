@@ -237,6 +237,7 @@ describe('fixed error surface', () => {
             network_unavailable: 'Local network unavailable',
             server_start_failed: 'Couldn’t open a connection',
             qr_failed: 'Couldn’t create the QR code',
+            setup_failed: 'Couldn’t prepare that item',
             beacon_warning: 'Discovery unavailable',
             transfer_failed: 'Transfer stopped',
             shutting_down: 'FairDrop is closing',

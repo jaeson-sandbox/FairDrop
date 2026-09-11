@@ -300,8 +300,8 @@ describe('Stage generations and malformed acknowledgements', () => {
             phase: 'idle',
             retainedOutcome: null,
             commandError: {
-                code: 'transfer_failed',
-                message: 'The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.',
+                code: 'setup_failed',
+                message: 'FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.',
             },
         })
     })

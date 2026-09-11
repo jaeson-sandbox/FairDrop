@@ -22,6 +22,7 @@ export const transferErrorCodes = [
     'network_unavailable',
     'server_start_failed',
     'qr_failed',
+    'setup_failed',
     'beacon_warning',
     'transfer_failed',
     'shutting_down',
@@ -33,7 +34,7 @@ export type {PublicError}
 /** The only public copy allowed to enter frontend state for each stable code. */
 export const fixedErrorMessages: Readonly<Record<TransferErrorCode, string>> = {
     invalid_selection: 'Choose exactly one file or folder.',
-    busy: 'Finish or cancel the current transfer before choosing another item.',
+    busy: 'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
     cancelled: 'Transfer canceled.',
     path_not_found: 'That file or folder is no longer available. Choose it again.',
     path_unsupported: 'FairDrop can use regular files and folders only. Choose another item.',
@@ -41,6 +42,7 @@ export const fixedErrorMessages: Readonly<Record<TransferErrorCode, string>> = {
     network_unavailable: 'FairDrop couldn’t find a usable local network. Connect to local Wi-Fi, then try again.',
     server_start_failed: 'FairDrop couldn’t open a local transfer connection. Check firewall access, then try again.',
     qr_failed: 'FairDrop couldn’t create the QR code. Prepare the item again.',
+    setup_failed: 'FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.',
     beacon_warning: 'Device discovery isn’t available. The QR code and download link still work.',
     transfer_failed:
         'The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.',

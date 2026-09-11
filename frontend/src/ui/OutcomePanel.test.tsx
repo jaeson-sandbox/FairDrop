@@ -59,8 +59,13 @@ describe('the retained outcome node', () => {
 describe('the Error panel', () => {
     it.each([
         ['invalid_selection', 'Choose one item', 'Choose exactly one file or folder.'],
-        ['busy', 'Transfer already active', 'Finish or cancel the current transfer before choosing another item.'],
+        [
+            'busy',
+            'Transfer already active',
+            'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
+        ],
         ['path_not_found', 'Item not found', 'That file or folder is no longer available. Choose it again.'],
+        ['setup_failed', 'Couldn’t prepare that item', 'FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.'],
         ['source_changed', 'Item changed', 'The item changed after it was prepared. Cancel and create a fresh link.'],
         [
             'transfer_failed',
