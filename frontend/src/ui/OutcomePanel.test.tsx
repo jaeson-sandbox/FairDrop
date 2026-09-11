@@ -29,8 +29,22 @@ describe('the Done panel', () => {
         }
     })
 
-    it('carries no Dismiss control while the session is still the current phase', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}} onDismiss={vi.fn()}/>)
+    // Reversed by Story 3.6. A live Done or Error used to render no control
+    // even when a handler was supplied, because the way out was the backend's
+    // three-second reset. The coordinator drops an event it cannot deliver, so
+    // a reset that never arrives left the window with nothing to press
+    // (D-059). The expectation moved because the contract did.
+    it('carries the control a live terminal outcome is given, so a lost reset cannot strand it', () => {
+        const dismiss = vi.fn()
+        render(<OutcomePanel outcome={{kind: 'done', retained: false}} onDismiss={dismiss}/>)
+
+        const control = screen.getByRole('button')
+        fireEvent.click(control)
+        expect(dismiss).toHaveBeenCalledTimes(1)
+    })
+
+    it('offers no control when the caller supplies no handler', () => {
+        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
 
         expect(screen.queryByRole('button')).toBeNull()
     })

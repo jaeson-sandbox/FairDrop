@@ -289,6 +289,32 @@ describe('Stage generations and malformed acknowledgements', () => {
         expect(hook.result.current.state).toEqual({phase: 'idle', retainedOutcome: null, commandError: null})
     })
 
+    /*
+      Epic 1 retrospective item 7: the acknowledgement was parsed twice.
+
+      The controller parsed it, dispatched the parsed record, and the reducer
+      parsed it again -- a second base64 decode and a second full PNG chunk walk
+      of up to 2 MB on the main thread, for a value the first parse had already
+      accepted. Worse than the cost was the disagreement: the reducer's answer
+      to a parse it refused was to return the same state, leaving the window in
+      Pending with no error and no announcement, while the controller's answer
+      was to quiesce the session and report setup_failed.
+
+      Counting `atob` is what makes the claim observable: it is called once per
+      parse, by the PNG check, and by nothing else in this path.
+    */
+    it('parses the acknowledgement once, decoding the QR payload a single time', async () => {
+        const decoded = vi.spyOn(globalThis, 'atob')
+        mocks.stageTransfer.mockResolvedValue(metadata())
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.stage('C:\report.pdf') })
+
+        expect(hook.result.current.state.phase).toBe('staged')
+        expect(decoded).toHaveBeenCalledTimes(1)
+        decoded.mockRestore()
+    })
+
     it('attempts Cancel exactly once for malformed successful metadata', async () => {
         mocks.stageTransfer.mockResolvedValue(metadata({sessionId: ''}))
         const hook = renderHook(() => useTransfer())

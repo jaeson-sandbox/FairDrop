@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest'
+import {selectProgressSnapshot} from './selectors'
 import {parseFileMetadata, parseLifecycleEvent, parseProgressSnapshot, parseWarning} from './validation'
 
 const sessionId = '0123456789abcdef0123456789abcdef'
@@ -147,12 +148,30 @@ describe('progress validation', () => {
         ['negative bytes', progress({bytesSent: -1, percent: -1})],
         ['unsafe bytes', progress({bytesSent: Number.MAX_SAFE_INTEGER + 1})],
         ['bytes beyond total', progress({bytesSent: 101, percent: 100})],
-        ['incoherent percentage', progress({percent: 75})],
         ['invented unknown total', progress({totalKnown: false, totalBytes: 100, percent: 0})],
         ['percentage for unknown total', progress({totalKnown: false, totalBytes: 0, percent: 1})],
         ['bytes for known empty', progress({bytesSent: 1, totalBytes: 0, percent: 0})],
     ])('rejects %s', (_name, raw) => {
         expect(parseProgressSnapshot(raw)).toBeNull()
+    })
+
+    /*
+      A percentage that disagrees with the byte pair is no longer refused.
+
+      This layer used to require `percent` to equal 100 * bytesSent / totalBytes
+      within 8 ULP, which made the frontend depend on an exact float expression
+      evaluated in Go: the day a sender rounded that figure for display, every
+      progress event would have been dropped and the meter would have frozen
+      with no error anywhere (Epic 1 retrospective item 7). The two integers are
+      the authoritative pair, `percent` is checked only for range, and the
+      selector derives what is displayed -- so a disagreeing figure costs
+      nothing and is shown to nobody.
+    */
+    it('accepts a percentage that disagrees with the byte pair, and never displays it', () => {
+        const rounded = progress({percent: 75})
+
+        expect(parseProgressSnapshot(rounded)).toEqual(rounded)
+        expect(selectProgressSnapshot(parseProgressSnapshot(rounded)!).value).toBe(25)
     })
 })
 

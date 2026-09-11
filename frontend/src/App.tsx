@@ -177,7 +177,12 @@ function App() {
                     level={1}
                     phaseView={terminal}
                     focusTarget="outcome"
-                    onDismiss={outcome.retained ? transfer.dismissRetained : undefined}
+                    // A retained outcome dismisses locally; a live terminal
+                    // one cancels, which is what clears the coordinator's
+                    // three-second terminal lease and returns it to Idle. The
+                    // point is that neither leaves the window with no way out
+                    // if the reset event is lost (D-059).
+                    onDismiss={outcome.retained ? transfer.dismissRetained : () => void transfer.cancel()}
                 />
             )}
             {phaseBody(transfer, cancelWon, announceFromStaged)}

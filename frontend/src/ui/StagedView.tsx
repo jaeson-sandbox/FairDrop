@@ -42,6 +42,21 @@ export function StagedView({state, onCancel, onAnnounce}: StagedViewProps) {
         ? `${formatBytes(metadata.size)} ${copy.label.logicalSize}`
         : formatBytes(metadata.size)
 
+    /*
+      A warning arrives with the metadata, never after it, so the transition it
+      belongs to is Stage success -- and that row is focus-owned by the heading
+      below. The announcer row for a warning appearing at an already-staged
+      session stays in the table for a reducer that replaces metadata, but no
+      path produces one today, which is why the warning was silent on the one
+      machine state it exists for (Epic 1 retrospective item 4).
+
+      Describing the heading with the banners is what a focus-owned row can
+      carry without becoming a second owner: the move that announces Stage
+      success reads the warning as part of the same announcement, and the
+      banner keeps its place in the packet for the people who can see it.
+    */
+    const warningIds = warnings.map((_, index) => `fd-warning-${index}`)
+
     /**
      * The copy goes through the bound Go command, not `navigator.clipboard`.
      *
@@ -66,7 +81,12 @@ export function StagedView({state, onCancel, onAnnounce}: StagedViewProps) {
 
     return (
         <div className="fd-region" data-phase-view="staged">
-            <h1 className="fd-state-heading" tabIndex={-1} data-focus-target="staged-heading">
+            <h1
+                className="fd-state-heading"
+                tabIndex={-1}
+                data-focus-target="staged-heading"
+                aria-describedby={warningIds.length === 0 ? undefined : warningIds.join(' ')}
+            >
                 {copy.stage.heading}
             </h1>
             <p className="fd-meta">{copy.qr.instruction}</p>
@@ -77,6 +97,7 @@ export function StagedView({state, onCancel, onAnnounce}: StagedViewProps) {
                     {warnings.map((warning, index) => (
                         <aside
                             key={`${warning.code}-${index}`}
+                            id={warningIds[index]}
                             className="fd-warning-banner"
                             data-warning-code={warning.code}
                         >

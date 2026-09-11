@@ -287,6 +287,40 @@ describe('the non-terminal discovery warning', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         expect(document.querySelector('.fd-warning-banner')).toBeNull()
+        expect(screen.getByRole('heading', {level: 1}).getAttribute('aria-describedby')).toBeNull()
+    })
+
+    /*
+      Epic 1 retrospective item 4: on the one machine state this warning exists
+      for, a screen-reader user was never told discovery was down.
+
+      The warning arrives with the metadata and never after it, so the only
+      transition it belongs to is Stage success -- which the routing table gives
+      to this heading's focus move. The banner sat inside the packet, outside
+      both the focused node and any live region, and the announcer row that
+      would have spoken it fires only when a warnings array grows at an
+      already-staged session, which no reducer path produces.
+
+      Describing the heading with the banner is what that focus-owned row can
+      carry without becoming a second owner: the move that announces Stage
+      success reads the warning as part of the same announcement.
+    */
+    it('describes the focused heading with the warning, so the focus move speaks it', () => {
+        const warning = {
+            code: 'beacon_warning' as const,
+            message: 'Device discovery isn’t available. The QR code and download link still work.',
+        }
+        render(<StagedView state={staged({metadata: metadata({warnings: [warning, warning]})})} onCancel={vi.fn()}/>)
+
+        const heading = screen.getByRole('heading', {level: 1})
+        const described = (heading.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean)
+        expect(described.length).toBe(2)
+
+        for (const id of described) {
+            const banner = document.getElementById(id)
+            expect(banner?.classList.contains('fd-warning-banner')).toBe(true)
+            expect(banner?.textContent).toContain('Device discovery isn’t available.')
+        }
     })
 })
 

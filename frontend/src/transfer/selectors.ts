@@ -39,20 +39,35 @@ export function selectProgress(state: TransferState): ProgressSelection | null {
         : null
 }
 
+/**
+ * The one place a percentage is derived, and the only progress repair layer.
+ *
+ * A `ProgressSnapshot` reaches this function from `parseProgressSnapshot` and
+ * nowhere else, so its fields are already finite, non-negative and internally
+ * coherent -- clamping them again here was a second strategy for a rule the
+ * validator had already settled, and one whose branches could never run.
+ *
+ * The displayed percentage comes from the two authoritative integers rather
+ * than from the wire's `percent`, so a sender that rounds a percentage for
+ * display moves the bar by a rounding error instead of having every snapshot
+ * refused (Epic 1 retrospective item 7). `bytesSent <= totalBytes` is the
+ * validator's, which is what keeps the result inside [0,100]. Only
+ * `known-positive` gets a value at all: an unknown total and an empty payload
+ * have no percentage, and inventing one is what this shape exists to prevent.
+ */
 export function selectProgressSnapshot(progress: ProgressSnapshot): ProgressSelection {
     if (!progress.totalKnown) {
         return {
             mode: 'unknown',
             determinate: false,
             value: 0,
-            bytesSent: finiteNonNegative(progress.bytesSent),
+            bytesSent: progress.bytesSent,
             totalBytes: 0,
-            speedBytesPerSec: finiteNonNegative(progress.speedBytesPerSec),
+            speedBytesPerSec: progress.speedBytesPerSec,
         }
     }
 
-    const totalBytes = finiteNonNegative(progress.totalBytes)
-    if (totalBytes === 0) {
+    if (progress.totalBytes === 0) {
         return {
             mode: 'known-empty',
             determinate: false,
@@ -66,24 +81,15 @@ export function selectProgressSnapshot(progress: ProgressSnapshot): ProgressSele
     return {
         mode: 'known-positive',
         determinate: true,
-        value: clampPercent(progress.percent),
-        bytesSent: finiteNonNegative(progress.bytesSent),
-        totalBytes,
-        speedBytesPerSec: finiteNonNegative(progress.speedBytesPerSec),
+        value: 100 * progress.bytesSent / progress.totalBytes,
+        bytesSent: progress.bytesSent,
+        totalBytes: progress.totalBytes,
+        speedBytesPerSec: progress.speedBytesPerSec,
     }
 }
 
 export function selectMetadata(state: TransferState): FileMetadata | null {
     return state.phase === 'staged' || state.phase === 'transferring' ? state.metadata : null
-}
-
-function clampPercent(value: number): number {
-    if (!Number.isFinite(value)) return 0
-    return Math.min(100, Math.max(0, value))
-}
-
-function finiteNonNegative(value: number): number {
-    return Number.isFinite(value) ? Math.max(0, value) : 0
 }
 
 /** The one terminal outcome a view may render, terminal or retained. */

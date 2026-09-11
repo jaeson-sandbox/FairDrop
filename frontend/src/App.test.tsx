@@ -826,3 +826,29 @@ describe('the routing table still works after mounting under StrictMode', () => 
         expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling…'}))
     })
 })
+
+describe('a live terminal outcome is never a dead end', () => {
+    // D-059: the way out of Done or Error is the coordinator's three-second
+    // reset, and the coordinator drops a lifecycle event it cannot deliver --
+    // so a reset that never arrives used to leave the window with a heading, a
+    // message, and nothing to press. Cancel is what clears the terminal lease
+    // on the backend, which is why that is what the control does here rather
+    // than a local dismissal that would only hide a session still held.
+    it('offers a control on a live Done that cancels the held session', () => {
+        mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done'}} as TransferState)
+
+        fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
+
+        expect(mocks.cancel).toHaveBeenCalledTimes(1)
+        expect(mocks.dismissRetained).not.toHaveBeenCalled()
+    })
+
+    it('still dismisses locally when the outcome is retained', () => {
+        mountWith({phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null} as TransferState)
+
+        fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
+
+        expect(mocks.dismissRetained).toHaveBeenCalledTimes(1)
+        expect(mocks.cancel).not.toHaveBeenCalled()
+    })
+})

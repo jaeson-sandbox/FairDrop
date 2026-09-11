@@ -1024,6 +1024,13 @@ func TestPublishBeforeStartupDropsTheEventWithoutEmitting(t *testing.T) {
 	if got := h.app.undelivered.Load(); got != 1 {
 		t.Errorf("undelivered = %d, want 1: the drop must be recorded", got)
 	}
+	// Counting it is not seeing it. Nothing in a running FairDrop reads the
+	// counter, so a drop that is only counted is still a drop nobody can be
+	// asked about; the line is the observable half of D-049.
+	if lines := h.logged(); len(lines) != 1 ||
+		lines[0] != "fairdrop: undelivered (no window yet) transfer-started seq=1 session="+string(testSessionID) {
+		t.Errorf("logged %v, want one line naming the pre-window drop", lines)
+	}
 	// The coordinator holds its operation lease across this call, so the only
 	// thing that matters is that it got control back -- which reaching this
 	// line proves.
@@ -1043,6 +1050,12 @@ func TestPublishRecoversAnEmitPanicSoTheLeaseIsNotStranded(t *testing.T) {
 
 	if got := h.app.undelivered.Load(); got != 1 {
 		t.Errorf("undelivered = %d, want 1: the failed emission must be recorded", got)
+	}
+	// A recovered panic that logs nothing is indistinguishable from an event
+	// that was delivered -- which is the failure mode recovering it introduces.
+	if lines := h.logged(); len(lines) != 1 ||
+		lines[0] != "fairdrop: undelivered (emit panicked) transfer-progress seq=1 session="+string(testSessionID) {
+		t.Errorf("logged %v, want one line naming the panicking emission", lines)
 	}
 	if calls := h.coordinator.log(); len(calls) != 0 {
 		t.Errorf("Publish called back into the coordinator: %v", calls)

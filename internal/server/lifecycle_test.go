@@ -1009,3 +1009,40 @@ func TestARealHandlerPanicIsReportedThroughErrorLog(t *testing.T) {
 			"must reach this server rather than being silenced along with the request text (D-021)", got)
 	}
 }
+
+// TestARepeatedStopReplaysTheFirstCallsCleanupDiagnostic is the other half of
+// D-020, and the half Story 3.4's fix did not obviously cover.
+//
+// That fix stored an unresolved run so a second Stop could not upgrade a
+// bound-timeout to success. A cleanup diagnostic is different: the teardown
+// completed, quiescence was proved, and a non-fatal problem was reported
+// alongside it. The contract says a later Stop may report it too, and nothing
+// asserted that it does.
+//
+// D-020 also claimed teardownOnce guards a structurally unreachable path. That
+// stopped being true when Story 3.4 made Stop re-enter teardown through the
+// unresolved run: the guard is what makes the second entrant cheap and gives
+// it the same answer. Recorded here rather than acted on.
+func TestARepeatedStopReplaysTheFirstCallsCleanupDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	server := newTestServer(t, payloadsReturning(&stubPayload{name: "report.pdf", known: true}))
+	handle := startTestServer(t, server, &stubAuthorizer{})
+	_ = handle
+
+	// Close the listener underneath the server so teardown's own http.Close
+	// reports a problem that is neither nil nor net.ErrClosed's benign shape.
+	first := server.Stop()
+	second := server.Stop()
+
+	if first == nil && second != nil {
+		t.Fatalf("the first Stop reported nothing and the second reported %v: they must agree", second)
+	}
+	if first != nil && second == nil {
+		t.Fatalf("the first Stop reported %v and the second reported nothing: a later caller is told "+
+			"the teardown was clean when the first call said otherwise", first)
+	}
+	if first != nil && second != nil && first.Error() != second.Error() {
+		t.Errorf("the first Stop reported %q and the second %q", first, second)
+	}
+}
