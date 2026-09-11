@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1423,5 +1424,139 @@ func TestCancelInsideArmResetsWindowLeavesExactlyOneTimerStoppedNotLeaked(t *tes
 	}
 	if live.ctx.Err() == nil {
 		t.Error("Cancel left the session context uncancelled")
+	}
+}
+
+// TestTheBoundsAreTheDocumentedDurationsNotJustSeams pins the values production
+// actually uses.
+//
+// Every other bounded-wait test in this package drives timeouts through the
+// injected BoundTimer, a fake that never sleeps and fires only when a test says
+// so. That is the right way to test the mechanism and it is completely blind to
+// the duration: cutting leaseBound from 45 seconds to 45 milliseconds leaves
+// every one of those tests green while making a healthy teardown on a slow
+// machine report failure. Found by review, confirmed by mutation.
+//
+// The relationship is pinned too, not just the numbers. leaseBound's comment
+// claims it covers every bounded step below it running to its own bound in
+// sequence; that claim is arithmetic, so it can be checked rather than trusted.
+func TestTheBoundsAreTheDocumentedDurationsNotJustSeams(t *testing.T) {
+	t.Parallel()
+
+	for _, bound := range []struct {
+		name string
+		got  time.Duration
+		want time.Duration
+	}{
+		{"adapterCallBound", adapterCallBound, 10 * time.Second},
+		{"drainerJoinBound", drainerJoinBound, 10 * time.Second},
+		{"leaseBound", leaseBound, 45 * time.Second},
+	} {
+		if bound.got != bound.want {
+			t.Errorf("%s = %v, want %v -- production uses this value, and no seam-driven test can see it",
+				bound.name, bound.got, bound.want)
+		}
+		// A bound in milliseconds would be reached by a healthy teardown on a
+		// loaded machine, which turns a working cancel into a reported failure.
+		if bound.got < time.Second {
+			t.Errorf("%s = %v, which is short enough for a healthy teardown to hit", bound.name, bound.got)
+		}
+	}
+
+	// leaseBound must outlast the sequence it is documented to cover: a
+	// StopBeacon and a ServerPort.Stop, each to adapterCallBound, then the
+	// drainer join. Without margin a command could give up on a teardown that
+	// was still making progress within its own bounds.
+	sequential := 2*adapterCallBound + drainerJoinBound
+	if leaseBound <= sequential {
+		t.Errorf("leaseBound = %v but the steps it covers can take %v in sequence: "+
+			"a command would abandon a teardown that was still inside its own bounds",
+			leaseBound, sequential)
+	}
+}
+
+// TestCancelReportsACodedFailureWhenServerStopNeverReturns drives the one
+// bounded wait the story left unexercised.
+//
+// Its sibling on the beacon side is TestAuthorizeClaimCommitsWhenStopBeaconNeverReturns.
+// Both go through callBounded, so the shared helper was covered -- but
+// stopServerBounded builds its own coded failure and records its own
+// diagnostic, and no fake server.stop hook in this package ever blocked, so
+// replacing that whole branch with `return nil` left the package green. Found
+// by review, confirmed by mutation.
+//
+// This is the case D-017 named and the one the story exists for: the real
+// ServerPort.Stop holds no lock the coordinator can see, so a Stop that never
+// returns is exactly how Cancel used to wedge forever.
+func TestCancelReportsACodedFailureWhenServerStopNeverReturns(t *testing.T) {
+	h := newHarness(t)
+	h.transferring()
+	before := len(h.coordinator.diagnostics.snapshot())
+
+	blocked := make(chan struct{})
+	unblock := make(chan struct{})
+	var once sync.Once
+	// The lane closes first, then the call hangs. That ordering is what
+	// isolates this bound: a Stop that blocks without closing the lane also
+	// strands the drainer, so Cancel would report the drainer's bound instead
+	// and this branch could be deleted with the test still green -- which is
+	// exactly what the first version of this test did.
+	h.server.stop = func() error {
+		once.Do(func() {
+			h.server.closeEvents()
+			close(blocked)
+		})
+		<-unblock
+		return nil
+	}
+	t.Cleanup(func() { close(unblock) })
+
+	cancelDone := make(chan error, 1)
+	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
+
+	<-blocked
+
+	// A stuck ServerPort.Stop cascades: the bound on the call itself elapses
+	// first, and then the drainer join has its own bound, because the drainer
+	// only ends when Stop closes the event lane -- which this Stop never does.
+	// So the teardown arms bounds in sequence and each one has to be driven.
+	// Firing once and expecting Cancel to return was this test's own first
+	// mistake, not the code's.
+	var cancelErr error
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		select {
+		case cancelErr = <-cancelDone:
+		default:
+			if time.Now().After(deadline) {
+				t.Fatal("Cancel never returned: some bound did not end its wait")
+			}
+			// fireIfArmed rather than fire: the cascade arms its bounds one
+			// after another, so between two of them there is a moment with
+			// nothing left unfired, and fire() treats that as fatal.
+			if !h.bounds.fireIfArmed() {
+				time.Sleep(200 * time.Microsecond)
+			}
+			continue
+		}
+		break
+	}
+
+	if cancelErr == nil {
+		t.Fatal("Cancel returned success while ServerPort.Stop never came back: " +
+			"a bound that elapses must never report the resource gone")
+	}
+	if code := ErrorCodeOf(cancelErr); code != ErrTransferFailed {
+		t.Errorf("Cancel returned code %q, want %q", code, ErrTransferFailed)
+	}
+	// Named, not merely coded: the drainer's bound carries the same public
+	// code, so without this the failure could be coming from the wrong wait.
+	if !strings.Contains(cancelErr.Error(), "server did not confirm it stopped") {
+		t.Errorf("Cancel reported %q, want the failure to name the server stop that never returned", cancelErr)
+	}
+
+	if got := len(h.coordinator.diagnostics.snapshot()); got <= before {
+		t.Errorf("%d diagnostics recorded, want more than the %d before: a bound that elapsed must leave a trace",
+			got, before)
 	}
 }

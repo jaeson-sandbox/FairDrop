@@ -238,3 +238,52 @@ Every I/O & Edge-Case Matrix row maps to an executed test:
   drives) is survived by the coordinator regardless of which adapter implements the port.
 - Sprint status and the spec's frontmatter are updated to `done` only after this evidence file, the
   full verification transcript above, and the deferred-work closures were all in place.
+
+## Orchestrator mutation pass and the verification-gap layer
+
+Ten mutations run against the implementation before accepting it. Six died immediately; four survived
+and every one was a real gap, three of them named first by the verification-gap review layer.
+
+| # | Mutation | Result |
+|---|---|---|
+| M59 | `awaitBounded` claims success after timing out | killed |
+| M60 | `callBounded` claims the adapter returned cleanly after timing out | killed |
+| M61 | `joinDrainerBounded` swallows its own timeout | killed |
+| M63 | `Server.Stop` holds the mutex across the whole teardown again | **killed by hang** -- caught by the explicit `-timeout`, which for this story is the only honest way to catch it |
+| M65 | `armReset` stops re-checking that the session survived | killed |
+| M58 | Stage advertises the beacon before an address is selected | killed -- three tests, with the exact precondition message |
+| M67 | `stopServerBounded` swallows its own timeout | **survived**, then fixed |
+| M68 | `leaseBound` cut from 45s to 45ms | **survived**, then fixed |
+| M69 | `teardownBound` cut from 10s to 500ms | **survived**, then fixed |
+| M70 | the shutdown-begin log line deleted | **survived**, then fixed |
+
+**M67 is the one worth dwelling on**, because closing it took three attempts and the first two were
+wrong in instructive ways. The sibling bound on `StopBeacon` was tested; the bound on `ServerPort.Stop`
+was not, so replacing that whole branch with `return nil` left the package green -- the exact case
+D-017 named. The first test fired the bound once and failed, because a stuck Stop *cascades*: the call
+bound elapses, and then the drainer join has its own bound, since the drainer only ends when Stop
+closes the lane. The second version drove every bound in the cascade and passed -- and still did not
+kill the mutation, because Cancel was reporting the *drainer's* failure, not the server's. Only when
+the fake closes the lane first and then hangs does the test isolate this branch, and the assertion now
+names the failure rather than accepting any coded error, since both waits carry the same public code.
+
+**M68 and M69 are the same vacuity in the configuration.** Every bounded-wait test drives its timeout
+through an injected seam that never sleeps, which is the right way to test the mechanism and is
+completely blind to the duration. Cutting `leaseBound` from 45 seconds to 45 milliseconds -- long
+enough to make a healthy teardown on a loaded machine report failure -- left every one of those tests
+green. The real values are now pinned, along with the arithmetic `leaseBound`'s comment claims: that it
+outlasts the sequence of sub-bounds it covers.
+
+**One assertion the orchestrator wrote and then withdrew.** A first version also required
+`teardownBound` to outlast `readTimeout`. It failed immediately, and the rule was what was wrong:
+`readTimeout` bounds reading a request, while teardown cancels the data-plane context and force-closes
+the destination *before* it waits at all, so a request still being read is already broken by the time
+that bound starts counting. The two govern different phases. The reason is recorded in the test file
+so the next person does not re-derive the same wrong rule.
+
+**Left open, recorded rather than fixed.** `teardownTimeoutError` names three independently outstanding
+waits -- the accept loop, a request handler, a tracked connection -- and only the handler branch is
+driven by a test. `assertQuiescent` checks the other two on the healthy path, so they are not
+unverified, but no test isolates a timeout in which only the accept loop or only a connection is still
+outstanding.
+

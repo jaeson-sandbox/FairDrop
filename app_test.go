@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1146,6 +1147,14 @@ func TestShutdownDelegatesAndBlocksUntilQuiescent(t *testing.T) {
 	// background one.
 	if h.coordinator.shutdownCtx != hookCtx {
 		t.Error("shutdown did not hand Shutdown the hook's own context")
+	}
+	// D-087: a second launch arriving while this hook is blocked hands off and
+	// exits, and the window it was handed off to is already gone -- so the only
+	// way that relaunch is diagnosable afterwards is this line. Deleting it left
+	// the suite green until this assertion existed.
+	if !slices.Contains(h.logged(), "fairdrop: shutdown begin") {
+		t.Errorf("the shutdown hook logged %v, want a shutdown-begin line: without it a relaunch "+
+			"swallowed during shutdown leaves no trace at all", h.logged())
 	}
 }
 

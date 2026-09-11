@@ -586,6 +586,25 @@ func TestServerConfigurationIsPinned(t *testing.T) {
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	config := server.active.http
 
+	// The teardown bound is configuration too, and it lives in the same const
+	// block as the timeouts below. Every test that drives it goes through the
+	// timeouts seam, which is blind to the real duration: cutting it to 500ms
+	// left this whole package green while making a slow host's healthy teardown
+	// report failure.
+	if got := defaultTimeouts().teardown; got != teardownBound {
+		t.Fatalf("defaultTimeouts().teardown = %v, want %v", got, teardownBound)
+	}
+	if teardownBound != 10*time.Second {
+		t.Fatalf("teardownBound = %v, want 10s -- production uses this value", teardownBound)
+	}
+	// Deliberately not asserted: that teardownBound outlasts readTimeout. That
+	// assertion was written and immediately failed, and the rule was the thing
+	// that was wrong. readTimeout bounds reading a request; teardown cancels
+	// the data-plane context and force-closes the destination before it waits
+	// at all, so any request still being read is already broken by the time
+	// this bound starts counting. The two govern different phases and no
+	// ordering between them is required.
+
 	if config.ReadHeaderTimeout != readHeaderTimeout || config.ReadHeaderTimeout <= 0 {
 		t.Fatalf("ReadHeaderTimeout = %v, want %v", config.ReadHeaderTimeout, readHeaderTimeout)
 	}
