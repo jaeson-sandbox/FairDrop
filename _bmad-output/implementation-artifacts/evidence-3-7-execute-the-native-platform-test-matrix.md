@@ -2,6 +2,90 @@
 
 ## Owner-approved fix continuation — 2026-09-11
 
+### Native harness correction and stronger once-only assertion
+
+Corrected-harness checkpoint local gate: Wails 4.946s; stable bindings/gitkeep;
+gofmt/vet/staticcheck; seven Go packages (stream 10.204s); cgo=1; seven race
+packages (stream 221.791s); 17 frontend files / 498 tests; LF/diff and foreign
+Darwin/Linux build/vet plus Darwin bare staticcheck and root-test compilation:
+all pass. The prior intermediate race run also passed (stream 224.766s).
+The smoke script requires its actual survival marker, so a skipped/renamed test
+cannot pass the CI step. Native execution of this corrected harness is pending.
+
+Second-run conclusions were read explicitly: Windows success, macOS failure,
+Linux failure. Windows includes the complete native/race/frontend/mutation gate;
+the two failed jobs above are retained, not retried away as successful evidence.
+
+Linux second-run race output below proves the ZIP64 suite finished (471.331s)
+but revealed a pre-existing scheduling assumption in the coordinator test. The
+observer records an event before its Publish returns, and `forwardProgress`
+correctly returns the lease only after publication. `awaitEvents` is not a join.
+The test now holds the second progress callback explicitly, asserts lease ownership
+while held, releases it, then sends a foreign-session event over the unbuffered
+lane as a drainer barrier before asserting release. This retains and strengthens
+the postcondition; production coordinator code is unchanged. The test passed
+1,000 race repetitions, then the transfer package passed ten race repetitions.
+A mutation suppressing the second progress lease release fails the named test
+with `the operation lease was not returned after a progress publication`.
+
+```text
+2026-09-11T22:47:55.6840656Z ##[group]Run test "$(go env CGO_ENABLED)" = 1
+2026-09-11T22:47:55.6840809Z test "$(go env CGO_ENABLED)" = 1
+2026-09-11T22:47:55.6840954Z go test -count=1 -race -timeout 1200s ./...
+2026-09-11T22:47:55.6876804Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-11T22:47:55.6876888Z env:
+2026-09-11T22:47:55.6876983Z   WAILS_VERSION: v2.15.0
+2026-09-11T22:47:55.6877086Z   GOTOOLCHAIN: local
+2026-09-11T22:47:55.6877171Z ##[endgroup]
+2026-09-11T22:48:21.4296121Z ok  	fairdrop	2.458s
+2026-09-11T22:48:21.4297046Z ok  	fairdrop/internal/network	1.020s
+2026-09-11T22:48:21.4298061Z ok  	fairdrop/internal/qr	1.846s
+2026-09-11T22:48:23.1290171Z ok  	fairdrop/internal/server	4.156s
+2026-09-11T22:48:23.1291198Z ok  	fairdrop/internal/source	1.125s
+2026-09-11T22:56:12.1487914Z ok  	fairdrop/internal/stream	471.331s
+2026-09-11T22:56:12.1488915Z --- FAIL: TestProgressPublishesContiguousSequences (0.00s)
+2026-09-11T22:56:12.1492026Z     coordinator_outcomes_test.go:46: the operation lease was not returned after a progress publication
+2026-09-11T22:56:12.1492930Z FAIL
+2026-09-11T22:56:12.1493353Z FAIL	fairdrop/internal/transfer	0.444s
+2026-09-11T22:56:12.1493847Z FAIL
+2026-09-11T22:56:12.2161709Z ##[error]Process completed with exit code 1.
+```
+
+Second CI checkpoint `1679a81c7548ce2e0c08eed6388a4531928e2156`, run
+`34655474672`, macOS job `103446806340`, verified the fixture assumption was wrong:
+
+```text
+##[group]Run bash scripts/smoke-darwin-unusable-lock.sh
+bash scripts/smoke-darwin-unusable-lock.sh
+shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+env:
+  WAILS_VERSION: v2.15.0
+  GOTOOLCHAIN: local
+##[endgroup]
+Foundation ignored the isolated TMPDIR; no native lock fixture was modified
+##[error]Process completed with exit code 1.
+```
+
+Foundation ignores the isolated TMPDIR on this runner, so the earlier smoke never
+blocked the actual lock file. Replace that harness, not the working product: an
+explicit GitHub-Actions-only Go test uses the production native path, opens the
+regular runner-owned lock no-follow, takes a nonblocking exclusive lock, refuses
+contention, saves its mode and temporarily denies permissions. It verifies the
+permission refusal before launching the real built app. Cleanup stops only its
+child with bounded TERM/KILL waits, restores the original mode through the same
+descriptor, and closes it. No lock is removed or renamed; no developer machine
+runs this opt-in mutation. Startup output is retained on failure. The temporary
+Foundation probe source is removed; its diagnostic evidence above is preserved.
+
+D-014 mutation audit found a false-green file assertion: removing the file CAS
+still returned transfer_failed and zero output because the first caller had read
+the small fixture to EOF. The folder CAS mutation already failed the named test.
+The file test now counts reads on the actual prepared descriptor and proves the
+loser never reads at all. Removing CAS now fails `concurrent second WriteTo read
+the file instead of refusing ownership`. Restored test passed five race runs,
+then a final race run. Both mutations are added to the native script. Production
+code is restored; this corrects evidence, not a newly discovered product defect.
+
 The owner approved fixing both blockers, choosing the working macOS permissions
 approach, and making manual release observations optional for this personal
 project. `docs/release-policy.md` records that decision; active planning/context

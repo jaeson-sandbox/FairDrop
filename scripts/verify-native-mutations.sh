@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 scratch="$(mktemp -d)"
 platform="$(go env GOOS)"
-files=(internal/source/source.go internal/server/handler.go internal/server/lifecycle.go app.go .github/workflows/verify.yml)
+files=(internal/source/source.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go app.go .github/workflows/verify.yml)
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
   files+=("internal/source/handle_${platform}.go" internal/source/handle_posix.go)
 fi
@@ -62,6 +62,12 @@ fi
 
 perl -0pi -e 's/connection\.terminal = \&event/r.finish(\&event); connection.terminal = \&event/ or die "early terminal mutation did not match\n"' internal/server/handler.go
 expect_named_failure 'publish terminal before response finalization' TestNaturalCompletionWaitsForHTTPFinalization ./internal/server
+
+perl -0pi -e 's/if !p\.streamed\.CompareAndSwap/if false \&\& !p.streamed.CompareAndSwap/ or die "file ownership mutation did not match\n"' internal/stream/payload.go
+expect_named_failure 'allow a concurrent file reader' TestWriteToConcurrentCallersStreamExactlyOnce ./internal/stream
+
+perl -0pi -e 's/if !a\.streamed\.CompareAndSwap/if false \&\& !a.streamed.CompareAndSwap/ or die "archive ownership mutation did not match\n"' internal/stream/archive.go
+expect_named_failure 'allow a concurrent archive writer' TestWriteToConcurrentCallersStreamExactlyOnce ./internal/stream
 
 perl -0pi -e 's/if err == nil \&\& n != len\(p\)/if false \&\& err == nil \&\& n != len(p)/ or die "short-write mutation did not match\n"' internal/server/lifecycle.go
 expect_named_failure 'ignore final short write' TestNaturalCompletionWaitsForHTTPFinalization ./internal/server

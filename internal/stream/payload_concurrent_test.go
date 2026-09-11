@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,6 +17,16 @@ type heldDestination struct {
 	release chan struct{}
 	once    sync.Once
 	body    bytes.Buffer
+}
+
+type countedPayloadFile struct {
+	payloadFile
+	reads atomic.Int64
+}
+
+func (f *countedPayloadFile) Read(p []byte) (int, error) {
+	f.reads.Add(1)
+	return f.payloadFile.Read(p)
 }
 
 func (w *heldDestination) Write(p []byte) (int, error) {
@@ -41,6 +52,12 @@ func TestWriteToConcurrentCallersStreamExactlyOnce(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer prepared.Close()
+			var counted *countedPayloadFile
+			if !folder {
+				filePayload := prepared.(*payload)
+				counted = &countedPayloadFile{payloadFile: filePayload.file}
+				filePayload.file = counted
+			}
 			destination := &heldDestination{entered: make(chan struct{}), release: make(chan struct{})}
 			var releaseOnce sync.Once
 			release := func() { releaseOnce.Do(func() { close(destination.release) }) }
@@ -55,10 +72,20 @@ func TestWriteToConcurrentCallersStreamExactlyOnce(t *testing.T) {
 			// The first caller is definitely still streaming, not merely done
 			// before the second begins. The loser must return without writing.
 			var refused bytes.Buffer
+			var before int64
+			if counted != nil {
+				before = counted.reads.Load()
+			}
 			second := make(chan error, 1)
 			go func() { second <- prepared.WriteTo(context.Background(), &refused) }()
 			select {
 			case err := <-second:
+				// A second read at EOF also returns transfer_failed with zero
+				// output. That is not an ownership refusal: it consumed the
+				// descriptor and would steal bytes from a larger first stream.
+				if counted != nil && counted.reads.Load() != before {
+					t.Fatal("concurrent second WriteTo read the file instead of refusing ownership")
+				}
 				if transfer.ErrorCodeOf(err) != transfer.ErrTransferFailed || refused.Len() != 0 {
 					t.Fatal("concurrent second WriteTo was not refused before writing")
 				}
