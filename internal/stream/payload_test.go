@@ -567,11 +567,10 @@ func TestPrepareArchiveDistinguishesDeadlineExpiryFromCancellation(t *testing.T)
 	defer cancel()
 
 	adapter := &Payloads{
-		source: matchingSource(staged),
-		lstat: func(string) (fs.FileInfo, error) {
-			time.Sleep(60 * time.Millisecond)
-			return fakeFileInfo{name: staged.Name, mode: fs.ModeDir, modTime: staged.ModTime}, nil
-		},
+		source: &scriptedSource{prepare: func(context.Context, string) (transfer.PreparedDirectory, error) {
+			<-ctx.Done()
+			return testPreparedDirectory{}, nil
+		}},
 	}
 
 	prepared, err := adapter.Prepare(ctx, staged)

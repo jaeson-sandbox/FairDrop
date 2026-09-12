@@ -539,7 +539,7 @@ func TestInspectRejectsNegativeAndOverflowingLogicalSizes(t *testing.T) {
 			}
 			factory := newFakeFactory(pathPlan{anchor: "root", rootLabel: "root"}, root)
 			_, err := (&Inspector{handles: factory, sameFile: sameFakeFile}).Inspect(context.Background(), "original")
-			assertCode(t, err, transfer.ErrTransferFailed)
+			assertCode(t, err, transfer.ErrSetupFailed)
 			assertFakeClosed(t, factory)
 		})
 	}
@@ -907,6 +907,9 @@ func (c *fakeContent) Close() error {
 
 func (h *fakeHandle) ReadDir(count int) ([]fs.DirEntry, error) {
 	h.factory.record("read:" + h.node.name)
+	if h.node.oversizedBatch {
+		return []fs.DirEntry{fakeDirEntry{info: h.node.info()}, fakeDirEntry{info: h.node.info()}}, nil
+	}
 	if h.factory.recordOps {
 		h.factory.readSizes = append(h.factory.readSizes, count)
 	}
@@ -963,6 +966,7 @@ type fakeNode struct {
 	closeErr       error
 	closeErrByKind map[string]error
 	repeatEntries  int
+	oversizedBatch bool
 
 	contents        []byte
 	contentOpenErr  error

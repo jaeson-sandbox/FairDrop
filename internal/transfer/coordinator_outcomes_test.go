@@ -7,16 +7,32 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestProgressPublishesContiguousSequences(t *testing.T) {
 	h := newHarness(t)
+	publishing := make(chan struct{})
+	resume := make(chan struct{})
+	release := sync.OnceFunc(func() { close(resume) })
+	defer release()
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferProgress && event.Seq == 3 {
+			close(publishing)
+			<-resume
+		}
+	}
 	metadata := h.transferring()
 
 	h.emit(progressEvent(metadata.SessionID, testProgress(1024, 25)))
 	h.emit(progressEvent(metadata.SessionID, testProgress(2048, 50)))
+	select {
+	case <-publishing:
+	case <-time.After(mutexProbeTimeout):
+		t.Fatal("second progress never reached the observer")
+	}
 	events := h.awaitEvents(3)
 
 	if len(events) != 3 {
@@ -42,6 +58,14 @@ func TestProgressPublishesContiguousSequences(t *testing.T) {
 	if got := h.state(); got != stateTransferring {
 		t.Errorf("state is %q, want %q", got, stateTransferring)
 	}
+	if !h.coordinator.leaseHeld() {
+		t.Error("operation lease was returned before the progress observer returned")
+	}
+	release()
+	// Recording an event is not a join on the observer or drainer. This
+	// unbuffered foreign-session event can be received only after the previous
+	// forwardProgress returned, and is refused without taking a new lease.
+	h.emit(progressEvent("lease-release-barrier", testProgress(3072, 75)))
 	if h.coordinator.leaseHeld() {
 		t.Error("the operation lease was not returned after a progress publication")
 	}

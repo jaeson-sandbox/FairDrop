@@ -7,11 +7,25 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"fairdrop/internal/server"
 	"fairdrop/internal/transfer"
 
 	"github.com/wailsapp/wails/v2/pkg/options"
 )
+
+func TestCoordinatorCleanupOutlastsServerTeardown(t *testing.T) {
+	if server.TeardownBound != 10*time.Second {
+		t.Fatalf("server.TeardownBound = %v, want 10s", server.TeardownBound)
+	}
+	if transfer.AdapterCleanupBound != 15*time.Second {
+		t.Fatalf("transfer.AdapterCleanupBound = %v, want 15s", transfer.AdapterCleanupBound)
+	}
+	if transfer.AdapterCleanupBound <= server.TeardownBound {
+		t.Fatalf("coordinator cleanup bound %v must outlast server teardown bound %v", transfer.AdapterCleanupBound, server.TeardownBound)
+	}
+}
 
 // Phase 1 exists to produce a window that receives native OS file drops.
 // Every other check in this repo -- go build, go vet, npm test, npm run build,
@@ -19,7 +33,7 @@ import (
 // assertion is the only thing between a regression and a binary that silently
 // discards every drop.
 func TestAppOptionsEnablesNativeFileDrop(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.DragAndDrop == nil {
 		t.Fatal("DragAndDrop is nil: native file drop is not configured at all")
@@ -30,7 +44,7 @@ func TestAppOptionsEnablesNativeFileDrop(t *testing.T) {
 }
 
 func TestAppOptionsWindowContract(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.Title != "FairDrop" {
 		t.Errorf("Title = %q, want %q", opts.Title, "FairDrop")
@@ -60,7 +74,7 @@ func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
 		t.Fatalf("style.css no longer declares %q -- update this test and the option together", token)
 	}
 
-	got := appOptions(NewApp()).BackgroundColour
+	got := appOptionsWithLockProbe(NewApp(), func() bool { return true }).BackgroundColour
 	if got == nil {
 		t.Fatal("BackgroundColour is nil: the window would paint the platform default, not the canvas")
 	}
@@ -71,7 +85,7 @@ func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
 }
 
 func TestAppOptionsRegistersLifecycleHooks(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.OnStartup == nil {
 		t.Error("OnStartup is nil: a.ctx would never be captured, so runtime.EventsEmit fails in later phases")
@@ -88,7 +102,7 @@ func TestAppOptionsRegistersLifecycleHooks(t *testing.T) {
 // only inside main.go, and OnSecondInstanceLaunch is asserted present so a
 // second launch always has somewhere to hand its window off to.
 func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.SingleInstanceLock == nil {
 		t.Fatal("SingleInstanceLock is nil: a second launch would start a competing coordinator, listener and beacon")
@@ -103,6 +117,24 @@ func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
 	}
 }
 
+func TestAppOptionsDefaultUsesNativeLockProbe(t *testing.T) {
+	data, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.ReplaceAll(string(data), "\r\n", "\n"), "return appOptionsWithLockProbe(app, nativeSingleInstanceLockUsable)") {
+		t.Fatal("production appOptions bypasses the native lock probe")
+	}
+	app := NewApp()
+	var logged int
+	app.logf = func(string, ...any) { logged++ }
+	calls := 0
+	opts := appOptionsWithLockProbe(app, func() bool { calls++; return false })
+	if calls != 1 || opts.SingleInstanceLock != nil || logged != 1 {
+		t.Fatal("degraded options must run the probe, disable locking and report once")
+	}
+}
+
 // The non-nil check above is satisfied by any callback, including a stub
 // func(options.SecondInstanceData) {} that restores nothing -- appOptions
 // could swap in one and every test would stay green. This drives the callback
@@ -111,7 +143,7 @@ func TestAppOptionsEnforcesSingleInstance(t *testing.T) {
 // App -- can pass.
 func TestAppOptionsSecondInstanceCallbackRestoresTheWindow(t *testing.T) {
 	h := newHarness(t)
-	opts := appOptions(h.app)
+	opts := appOptionsWithLockProbe(h.app, func() bool { return true })
 
 	opts.SingleInstanceLock.OnSecondInstanceLaunch(options.SecondInstanceData{Args: []string{testPath}})
 
@@ -134,7 +166,7 @@ func TestAppOptionsSecondInstanceCallbackRestoresTheWindow(t *testing.T) {
 // either by, say, answering "" or panicking instead of counting the drop.
 func TestAppOptionsSecondInstanceCallbackBeforeStartupIsSafe(t *testing.T) {
 	h := newUnstartedHarness(t)
-	opts := appOptions(h.app)
+	opts := appOptionsWithLockProbe(h.app, func() bool { return true })
 
 	opts.SingleInstanceLock.OnSecondInstanceLaunch(options.SecondInstanceData{})
 
@@ -155,7 +187,7 @@ func TestAppOptionsSecondInstanceCallbackBeforeStartupIsSafe(t *testing.T) {
 // string. Compilation cannot catch its absence, so it is pinned here beside
 // the drop and window options.
 func TestAppOptionsRegistersTheErrorFormatter(t *testing.T) {
-	opts := appOptions(NewApp())
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
 
 	if opts.ErrorFormatter == nil {
 		t.Fatal("ErrorFormatter is nil: rejections would carry raw adapter text and no stable code")
@@ -460,7 +492,7 @@ func voiceToneMessageFor(t *testing.T, fullRegistry, key string) string {
 // load-bearing only when this story gave the App its first exported method.
 func TestAppOptionsBindsTheApp(t *testing.T) {
 	app := NewApp()
-	opts := appOptions(app)
+	opts := appOptionsWithLockProbe(app, func() bool { return true })
 
 	if len(opts.Bind) != 1 {
 		t.Fatalf("Bind holds %d entries, want exactly the App", len(opts.Bind))
@@ -550,6 +582,46 @@ func TestEveryDeferredEntryHasALiveOwner(t *testing.T) {
 // deferredIDPattern matches the stable ids deferred-work.md assigns and
 // epics.md cites.
 var deferredIDPattern = regexp.MustCompile(`D-\d{3}`)
+
+// Read each entry independently: an absent id must not inherit its neighbour's
+// id or silently bypass the owning-story checks. Field order is not a contract.
+type deferredEntry struct{ id, owner string }
+
+func deferredEntries(t *testing.T, content []byte) []deferredEntry {
+	t.Helper()
+	blocks := strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n- source_spec:")
+	if len(blocks) < 2 {
+		t.Fatal("no deferred entries parsed")
+	}
+	seen := map[string]bool{}
+	var entries []deferredEntry
+	for index, block := range blocks[1:] {
+		var entry deferredEntry
+		var ids, owners int
+		for _, line := range strings.Split(block, "\n") {
+			if value, ok := strings.CutPrefix(line, "  id:"); ok {
+				entry.id = strings.TrimSpace(value)
+				ids++
+			}
+			if value, ok := strings.CutPrefix(line, "  owner:"); ok {
+				entry.owner = strings.TrimSpace(value)
+				owners++
+			}
+		}
+		if ids != 1 || len(entry.id) != 5 || deferredIDPattern.FindString(entry.id) != entry.id {
+			t.Fatalf("deferred entry %d must have exactly one stable D-NNN id (got %q, count %d)", index+1, entry.id, ids)
+		}
+		if seen[entry.id] {
+			t.Fatalf("duplicate deferred id %s", entry.id)
+		}
+		seen[entry.id] = true
+		if owners != 1 || entry.owner == "" {
+			t.Fatalf("%s must have exactly one non-empty owner", entry.id)
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
 
 // splitLines normalises CRLF so a Windows checkout parses the same as a macOS
 // one. The workflow's line-ending check keeps the repository LF, and this makes
@@ -648,19 +720,9 @@ func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
 	}
 
 	var open int
-	var id string
-	for _, line := range splitLines(deferred) {
-		if rest, found := strings.CutPrefix(line, "  id:"); found {
-			id = strings.TrimSpace(rest)
-			continue
-		}
-		rest, found := strings.CutPrefix(line, "  owner:")
-		if !found {
-			continue
-		}
-		owner := strings.TrimSpace(rest)
-		if id == "" || owner == "discharged" || owner == "accepted" {
-			id = ""
+	for _, entry := range deferredEntries(t, deferred) {
+		id, owner := entry.id, entry.owner
+		if owner == "discharged" || owner == "accepted" {
 			continue
 		}
 		open++
@@ -675,7 +737,6 @@ func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
 			t.Errorf("%s is still open but its owner %q is already done: "+
 				"the finding belongs to nobody", id, owner)
 		}
-		id = ""
 	}
 
 	if open == 0 {

@@ -43,7 +43,7 @@ const (
 	// machine, never a ceiling any real cleanup step approaches. It cannot be
 	// hit by a real Wi-Fi transfer because it only bounds teardown, which
 	// starts after the transfer is already over or being abandoned.
-	adapterCallBound = 10 * time.Second
+	AdapterCleanupBound = 15 * time.Second
 
 	// drainerJoinBound bounds how long unwind waits for the event drainer to
 	// end once the adapter call above has already returned, timed out, or
@@ -299,7 +299,15 @@ type Coordinator struct {
 	closing    bool
 	session    *session
 
-	diagnostics diagnosticSink
+	diagnostics   diagnosticSink
+	cleanupMu     sync.Mutex
+	serverCleanup *boundedCall
+	beaconCleanup *boundedCall
+}
+
+type boundedCall struct {
+	done chan struct{}
+	err  error
 }
 
 var _ ClaimAuthorizer = (*Coordinator)(nil)
@@ -392,6 +400,13 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	if c.state != stateIdle {
 		c.mu.Unlock()
 		return FileMetadata{}, NewError(ErrBusy, "a transfer is already in progress")
+	}
+	// This check belongs in the same critical section as state/lease admission.
+	// A check before entropy generation leaves a window where an old teardown
+	// can time out after the check and before this session is installed.
+	if c.cleanupPending() {
+		c.mu.Unlock()
+		return FileMetadata{}, NewError(ErrBusy, "the previous transfer is still being released")
 	}
 	if !c.acquireLease() {
 		// IDLE while the lease is still held means the previous session's
@@ -789,13 +804,17 @@ func (c *Coordinator) callBounded(bound time.Duration, call func() error) (resul
 // diagnostic exactly as before and never surfaces as a command failure of its
 // own: cleanup errors stay diagnostics on the healthy path.
 func (c *Coordinator) stopServerBounded() error {
-	err, completed := c.callBounded(adapterCallBound, c.server.Stop)
+	err, completed := c.callAdapterBounded(&c.serverCleanup, AdapterCleanupBound, c.server.Stop)
 	if !completed {
 		timeoutErr := NewError(ErrTransferFailed, "the transfer server did not confirm it stopped before its bound")
 		c.recordDiagnostic(timeoutErr, "transfer server cleanup did not finish before its bound")
 		return timeoutErr
 	}
 	if err != nil {
+		if IsUnquiescent(err) {
+			c.recordDiagnostic(err, "transfer server cleanup did not prove quiescence")
+			return err
+		}
 		c.recordDiagnostic(err, "transfer server cleanup reported a problem")
 	}
 	return nil
@@ -805,7 +824,7 @@ func (c *Coordinator) stopServerBounded() error {
 // mirroring stopServerBounded exactly: a bound hit is reported, an adapter
 // error that arrives in time stays a diagnostic.
 func (c *Coordinator) stopBeaconBounded() error {
-	err, completed := c.callBounded(adapterCallBound, c.network.StopBeacon)
+	err, completed := c.callAdapterBounded(&c.beaconCleanup, AdapterCleanupBound, c.network.StopBeacon)
 	if !completed {
 		timeoutErr := NewError(ErrTransferFailed, "device discovery did not confirm it stopped before its bound")
 		c.recordDiagnostic(timeoutErr, "device discovery cleanup did not finish before its bound")
@@ -815,6 +834,53 @@ func (c *Coordinator) stopBeaconBounded() error {
 		c.recordDiagnostic(err, "device discovery cleanup reported a problem")
 	}
 	return nil
+}
+
+func (c *Coordinator) callAdapterBounded(slot **boundedCall, bound time.Duration, call func() error) (error, bool) {
+	c.cleanupMu.Lock()
+	pending := *slot
+	if pending == nil {
+		pending = &boundedCall{done: make(chan struct{})}
+		*slot = pending
+		go func() {
+			pending.err = call()
+			close(pending.done)
+		}()
+	}
+	c.cleanupMu.Unlock()
+
+	timedOut := make(chan struct{})
+	stop := c.boundTimer(bound, func() { close(timedOut) })
+	select {
+	case <-pending.done:
+		stop()
+		c.cleanupMu.Lock()
+		if *slot == pending {
+			*slot = nil
+		}
+		c.cleanupMu.Unlock()
+		return pending.err, true
+	case <-timedOut:
+		return nil, false
+	}
+}
+
+func (c *Coordinator) cleanupPending() bool {
+	c.cleanupMu.Lock()
+	defer c.cleanupMu.Unlock()
+	pending := false
+	for _, slot := range []**boundedCall{&c.serverCleanup, &c.beaconCleanup} {
+		if *slot == nil {
+			continue
+		}
+		select {
+		case <-(*slot).done:
+			*slot = nil
+		default:
+			pending = true
+		}
+	}
+	return pending
 }
 
 // afterStep reacquires the state mutex and revalidates the operation after an

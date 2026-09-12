@@ -1,5 +1,10 @@
 # Release evidence
 
+> **Owner policy change, 2026-09-11:** manual observations below are optional for
+> personal development/releases, not blocking sign-off. Automated native gates
+> remain mandatory. See `docs/release-policy.md`. Earlier gate wording below is
+> historical and superseded; pending rows have not been converted into passes.
+
 Human-observed results on real devices, one row per scenario. Story 3.9 owns the full template
 and the rules for it; this file is started early so the first observation is not lost.
 

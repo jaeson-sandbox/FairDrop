@@ -34,16 +34,29 @@ type SourceEntry struct {
 // content is nil for a directory. For a regular file it is a reader borrowed
 // for exactly the duration of the call: the source owns the descriptor behind
 // it and releases it as soon as the visitor returns, so a retained reader is a
-// use-after-close and reads nothing. A non-nil return stops the walk; the
+// use-after-close returning fs.ErrClosed. Reads and revocation synchronize;
+// revocation joins in-flight reads before the source closes the handle.
+// A non-nil return stops the walk; the
 // source unwinds every handle it owns and reports that error unchanged unless
 // cancellation or a close failure takes precedence.
 type SourceVisitor func(entry SourceEntry, content io.Reader) error
+
+// PreparedDirectory owns a search handle pinned at preparation. Walk validates
+// the path again and refuses replacement before visiting entries. Close joins
+// any active walk and releases the pin, including when Walk was never called.
+type PreparedDirectory interface {
+	Walk(ctx context.Context, visit SourceVisitor) error
+	Close() error
+}
 
 // SourcePort validates and describes a selected source path, and walks a
 // selected directory without ever handing out a descriptor it does not close.
 type SourcePort interface {
 	// Inspect describes the selection without opening its contents.
 	Inspect(ctx context.Context, absolutePath string) (StagedItem, error)
+	// PrepareDirectory retains one no-follow search handle without enumerating.
+	// Its capability pins identity from this call, not from an earlier Inspect.
+	PrepareDirectory(ctx context.Context, absolutePath string) (PreparedDirectory, error)
 	// Walk re-validates absolutePath under the same link, reparse, special-file
 	// and identity rules as Inspect, then calls visit once for every entry
 	// beneath it. Preflight is not a snapshot, so every entry is re-checked
@@ -51,6 +64,9 @@ type SourcePort interface {
 	// it holds one enumeration handle per active depth plus the entry it is
 	// visiting, and it closes every handle it opened, in reverse order, on
 	// every exit. A selection that is not a directory is path_unsupported.
+	// Lexical ancestors, enumeration frames and any prepared pin share a limit
+	// of 64 retained directory handles, with at most three transient handles.
+	// Inspect reserves the future pin so accepted unchanged trees can stream.
 	Walk(ctx context.Context, absolutePath string, visit SourceVisitor) error
 }
 

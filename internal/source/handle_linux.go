@@ -4,15 +4,8 @@ package source
 
 import "golang.org/x/sys/unix"
 
-func nativeMetadataFlags() int {
-	return unix.O_PATH | unix.O_NOFOLLOW | unix.O_CLOEXEC
-}
-
-// nativeMetadataFallbackFlags reports that Linux needs no second attempt.
-// O_PATH already opens a directory carrying execute permission but not read
-// permission, which is the case darwin needs a fallback for.
-func nativeMetadataFallbackFlags() (int, bool) {
-	return 0, false
+func openNativeMetadata(locator posixLocator) (metadataHandle, error) {
+	return openPosixNode(locator, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, false)
 }
 
 func nativeSearchFlags() int {
@@ -23,7 +16,7 @@ func nativeEnumerationFlags() int {
 	return unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC | unix.O_DIRECTORY
 }
 
-// nativeContentFlags is the only read-granting open in the package. O_NONBLOCK
+// nativeContentFlags is the only file-content open in the package. O_NONBLOCK
 // is what stops a FIFO substituted for a regular file from parking the
 // traversal forever; the caller clears it after fstat proves the object
 // regular.

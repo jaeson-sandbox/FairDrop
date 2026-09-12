@@ -26,16 +26,13 @@ var errArchiveHalted = errors.New("archive halted before completion")
 
 // archive is one staged directory bound to exactly one response.
 //
-// It holds no descriptor. Every handle the stream needs is opened, used, and
-// closed inside SourcePort.Walk, which returns only after releasing all of
-// them, so there is nothing for Close to release and nothing that can outlive
-// WriteTo.
+// Its source-owned capability pins one search handle until Close. Every
+// traversal handle is opened and released inside PreparedDirectory.Walk.
 type archive struct {
 	name       string
 	root       string
-	path       string
 	modTime    time.Time
-	source     transfer.SourcePort
+	prepared   transfer.PreparedDirectory
 	bufferSize int
 
 	streamed  atomic.Bool
@@ -159,11 +156,23 @@ func (a *archive) produce(ctx context.Context, writer *io.PipeWriter) error {
 // authoritative copy the join collects.
 func (a *archive) drain(ctx context.Context, dst io.Writer, src io.Reader) (destinationErr, pipeErr error) {
 	buffer := make([]byte, a.bufferSize)
+	stalls := 0
 	for {
 		if err := contextError(ctx); err != nil {
 			return err, nil
 		}
 		read, readErr := src.Read(buffer)
+		if err := contextError(ctx); err != nil {
+			return err, nil
+		}
+		if read == 0 && readErr == nil {
+			stalls++
+			if stalls > maxEmptyReads {
+				return transfer.WrapError(transfer.ErrTransferFailed, "payload archive stopped making progress", io.ErrNoProgress), nil
+			}
+			continue
+		}
+		stalls = 0
 		if read > 0 {
 			// Re-check before writing: a cancellation that lands during the read
 			// must not put another chunk on the wire.
@@ -198,6 +207,9 @@ func (a *archive) drain(ctx context.Context, dst io.Writer, src io.Reader) (dest
 // writeEntries emits the archive: one top-level directory, then every entry the
 // source walk reaches, each below that directory.
 func (a *archive) writeEntries(ctx context.Context, out *zip.Writer) error {
+	if !transfer.SafeArchiveSegment(a.root) {
+		return unsafeArchiveEntryName()
+	}
 	// The root entry is written even for an empty folder, so an empty selection
 	// still arrives as a folder rather than as an archive of nothing.
 	if err := writeArchiveDirectory(out, a.root+"/", a.modTime); err != nil {
@@ -206,7 +218,7 @@ func (a *archive) writeEntries(ctx context.Context, out *zip.Writer) error {
 	// One buffer for every entry in the tree: nothing here is sized from, or
 	// grows with, the number of entries or the bytes inside them.
 	buffer := make([]byte, a.bufferSize)
-	return a.source.Walk(ctx, a.path, func(entry transfer.SourceEntry, content io.Reader) error {
+	return a.prepared.Walk(ctx, func(entry transfer.SourceEntry, content io.Reader) error {
 		if err := contextError(ctx); err != nil {
 			return err
 		}
@@ -228,13 +240,15 @@ func (a *archive) writeEntries(ctx context.Context, out *zip.Writer) error {
 	})
 }
 
-// Close releases nothing because the payload holds nothing: the tree walk owns
-// every descriptor and has already closed them by the time WriteTo returns. It
-// stays idempotent and callable without a preceding WriteTo so the server's
-// single-Close ownership rule needs no special case for a directory.
+// Close releases the prepared search pin, including when WriteTo never ran.
+// The source capability joins an active walk before releasing that handle.
 func (a *archive) Close() error {
-	a.closeOnce.Do(func() { a.closed.Store(true) })
-	return nil
+	var err error
+	a.closeOnce.Do(func() {
+		a.closed.Store(true)
+		err = a.prepared.Close()
+	})
+	return err
 }
 
 // haltableWriter refuses everything after halt. It is what lets a failed
@@ -292,11 +306,13 @@ func writeArchiveFile(
 	// No size is declared up front: the ZIP writer emits a data descriptor
 	// after the entry instead, which is what lets a file be compressed while it
 	// is being read rather than measured first.
-	entry, err := out.CreateHeader(&zip.FileHeader{
+	header := &zip.FileHeader{
 		Name:     name,
 		Method:   zip.Deflate,
 		Modified: modTime,
-	})
+	}
+	header.SetMode(0o644)
+	entry, err := out.CreateHeader(header)
 	if err != nil {
 		return transfer.WrapError(
 			transfer.ErrTransferFailed,
@@ -367,35 +383,18 @@ func writeArchiveFile(
 // bearing entry name is a path-traversal primitive on the receiving side, and
 // the cost of proving it here is a string scan per entry.
 func archiveEntryName(root, relative string) (string, error) {
-	if relative == "" ||
+	if !transfer.SafeArchiveSegment(root) || relative == "" ||
 		strings.ContainsAny(relative, "\\\x00") ||
 		strings.HasPrefix(relative, "/") ||
 		strings.HasSuffix(relative, "/") {
 		return "", unsafeArchiveEntryName()
 	}
 	for _, segment := range strings.Split(relative, "/") {
-		if segment == "" || segment == "." || segment == ".." || volumeQualified(segment) {
+		if !transfer.SafeArchiveSegment(segment) {
 			return "", unsafeArchiveEntryName()
 		}
 	}
 	return root + "/" + relative, nil
-}
-
-// volumeQualified reports whether a segment begins with a Windows volume
-// prefix such as "C:".
-//
-// filepath.VolumeName cannot answer this, and used to be asked: it is a no-op
-// on POSIX, so the identical entry name was refused when the sender ran Windows
-// and accepted when it ran macOS or Linux. The risk is entirely receiver-side
-// -- whoever extracts the archive may well be on Windows -- so the sender's
-// platform must not decide it. A directory named "C:" is perfectly legal on
-// macOS and Linux, which is what makes this reachable rather than theoretical.
-func volumeQualified(segment string) bool {
-	if len(segment) < 2 || segment[1] != ':' {
-		return false
-	}
-	letter := segment[0]
-	return (letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')
 }
 
 // unsafeArchiveEntryName names no path: the entry name is derived from the

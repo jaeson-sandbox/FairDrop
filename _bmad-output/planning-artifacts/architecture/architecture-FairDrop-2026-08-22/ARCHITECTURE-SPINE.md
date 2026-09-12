@@ -7,7 +7,7 @@ paradigm: ports-and-adapters with a single lifecycle coordinator
 scope: FairDrop desktop application across Phases 2-6
 status: final
 created: '2026-08-22'
-updated: '2026-09-08'
+updated: '2026-09-12'
 binds: [FR1-FR24, NFR1-NFR15]
 sources:
   - docs/fairdrop-spec.md
@@ -20,6 +20,12 @@ companions:
 ---
 
 # Architecture Spine — FairDrop
+
+> **Owner policy, 2026-09-11:** `docs/release-policy.md` supersedes earlier
+> mandatory-human-release wording in this document. Automated verification remains
+> required; manual device/browser, screen-reader, firewall and visual observations
+> are optional for personal releases. Unobserved behavior is not a verified pass,
+> and known functional failures are not waived.
 
 > **Amendments (2026-09-08, after Epic 2).** The Structural Seed below is corrected to the packages as built: `internal/qr` (not `qrcode`), `internal/source` added, and `frontend/src/ui` (not `components`). Framer Motion is removed from the Stack -- Story 1.10 deleted it. `binds` now covers the reconciled FR1-FR24 / NFR1-NFR15 inventory in `epics.md`. AD-6's bounded-memory rule is read with the qualification Story 2.2 measured and the SPEC now states: a streamed ZIP necessarily retains one central-directory record per entry (~250 bytes), so payload memory is O(buffer) in payload *bytes*, never a second per-entry index.
 
@@ -48,7 +54,7 @@ flowchart LR
 
 - **Binds:** all packages and Phase 1 contracts
 - **Prevents:** Wails, HTTP, discovery, and streaming concerns becoming mutually dependent or accumulating in `app.go`
-- **Rule:** `main.go` composes adapters; `app.go` translates Wails calls/events only; `internal/transfer` contains the coordinator and consumer-owned network/server ports. `internal/server` consumes the streaming port. Adapters may depend inward on contracts; the coordinator imports no Wails API and no concrete adapter. The provider-owned Phase 1 interfaces are compile-only transitional scaffolding: replace each before its first implementation and do not retain duplicate public interfaces.
+- **Rule:** `main.go` composes adapters; `app.go` translates Wails calls/events only; `internal/transfer` contains the coordinator and consumer-owned network/server ports. `internal/server` consumes the streaming port. Adapters may depend inward on contracts; the coordinator imports no Wails API and no concrete adapter. The provider-owned Phase 1 interfaces have been retired; do not recreate duplicate public interfaces.
 
 ### AD-2 — One owner serializes transfer state
 
@@ -83,7 +89,7 @@ stateDiagram-v2
 
 - **Binds:** FR3, FR5, FR11, FR13-FR14, NFR3, NFR8
 - **Prevents:** orphan listeners, beacons, timers, goroutines, and double-close failures
-- **Rule:** `App.ctx` remains the application-lifetime Wails runtime context. The coordinator derives a fresh cancellable child context per Stage; a live session owns that context/cancel, random session ID, distinct capability token, listener, beacon, and immutable staged metadata. A single per-session operation lease alone calls adapter Start/Stop/unwind; Cancel/Shutdown cancels then joins that cleanup. Setup unwinds in reverse on failure. The synchronous claim gate stops the beacon before authorization, events, headers, or bytes. Stop force-closes and is quiescent on every return, including error. DONE/ERROR retain only a terminal UI lease and generation-checked reset timer derived from application lifetime; Shutdown cancels it.
+- **Rule:** `App.ctx` remains the application-lifetime Wails runtime context. The coordinator derives a fresh cancellable child context per Stage; a live session owns that context/cancel, random session ID, distinct capability token, listener, beacon, and immutable staged metadata. A single per-session operation lease alone calls adapter Start/Stop/unwind; Cancel/Shutdown cancels then joins that cleanup. Setup unwinds in reverse on failure. The synchronous claim gate stops the beacon before authorization, events, headers, or bytes. Stop force-closes and waits on documented bounds. Successful teardown proves quiescence; an elapsed bound reports coded failure and leaves resource quiescence unproven. The coordinator may return to IDLE, but one retained in-flight call per adapter keeps Stage busy until that call returns; the server separately fences reuse until its accept loop, handlers and connections really end. The server's marked 10-second failure propagates through the coordinator's 15-second bound; cleanup diagnostics after proven quiescence remain diagnostic-only (Stories 3.4/3.8). DONE/ERROR retain only a terminal UI lease and generation-checked reset timer derived from application lifetime; Shutdown cancels it.
 
 ### AD-5 — Single-use capability HTTP protocol
 
@@ -97,10 +103,15 @@ stateDiagram-v2
 - **Prevents:** payload-sized memory, temporary archives, zip traversal, symlink escape, corrupt central directories, and cancellation leaks
 - **Rule:** regular files use context-aware bounded-buffer copying. Directories use `io.Pipe`; close `zip.Writer` before the pipe writer. Reject symlinks and non-regular entries, normalize relative ZIP names beneath one root, and revalidate during streaming. Treat spaces, Unicode, Windows long paths, and UNC paths as supported wherever native Go filesystem APIs permit—never shell-interpolate or destructively normalize them—and return typed path errors otherwise. A post-header failure reports ERROR then aborts via `http.ErrAbortHandler`.
 
+Story 3.7 selection admission uses a coordinator-facing SourcePort decorator: resolve lexical ancestors only after admission, preserve the selected leaf and grammar refusals, and pass the canonical staged path to the stream's raw inspector. Cancellation releases the waiting caller without claiming the OS call stopped; only one unresolved call per decorator can remain and retries refuse busy. Darwin no-follow metadata snapshots compare device/inode, generation and birth time with later opened descriptors. Identical/zero generation and birth fields retain residual fingerprint collision risk; snapshots never claim to pin an inode.
+
+Story 3.8 checkpoint 1 adds a source-owned PreparedDirectory capability: one search-only pin from Prepare through Close, freshly compared before walking the validated root. It is not a Stage snapshot. Lexical ancestors, enumeration frames and the pin share 64 retained handles plus at most three transient handles; Inspect reserves the future pin. Borrowed reads and revocation share a lock across native I/O; Close joins Walk. Portable unsafe segments are rejected in both source and ZIP boundaries, never silently renamed; modes are 0755/0644. No case/normalization collision index or source-permission backup is promised. Inspection arithmetic/batch faults use setup_failed; streaming faults use transfer_failed. Empty read 101 fails with wrapped io.ErrNoProgress in file, ZIP-entry and archive-drain lanes; progress resets the count. Blocking OS I/O is not made interruptible.
+
 ### AD-7 — Honest, wire-level progress
 
 - **Binds:** FR9, FR17, NFR7
 - **Prevents:** NaN JSON, fabricated directory percentages, excessive UI events, and source-byte/wire-byte ambiguity
+- **Story 3.7 finalization:** Complete follows real HTTP final body/framing writes, observed through connection write errors and `StateClosed` with keep-alives disabled. Short/error final writes report failure. TCP CloseWrite remains available for unread-body and oversized-header responses. Preparation failure finalizes its empty 410 before terminal publication; streaming failure and cancellation retain force-close behavior. This is sender-observed transport success, never proof of receiver saving.
 - **Rule:** count only bytes successfully written to the response and throttle to at most 4 Hz, plus a terminal snapshot when required by AD-8. `percent` is finite and clamped to `[0,100]`: for a known positive total it is `100*bytesSent/totalBytes`, while unknown and known-empty totals use zero. Add `totalKnown`; directory streams use `false/0/0`, while known zero-byte files use `true/0/0`. Speed is a rolling wire-byte rate and unknown totals render indeterminately.
 
 ### AD-8 — Backend-authoritative, session-scoped UI events
@@ -131,6 +142,7 @@ stateDiagram-v2
 
 - **Binds:** Phases 2-6 and all adapter seams
 - **Prevents:** independently compliant packages choosing incompatible value types, callback models, error codes, lifecycle ordering, or shutdown postconditions
+- **Story 3.7 metadata:** Windows attribute handles and Linux `O_PATH` remain; Darwin uses parent-relative `fstatat(AT_SYMLINK_NOFOLLOW)` snapshots without read access or a pinned leaf. Separate search/enumeration/content opens must match snapshot device/inode before use. Borrowed parents stay traversal-owned, and cancellation/no-follow/mode/replacement checks remain enforced.
 - **Rule:** `docs/fairdrop-contracts.md` is binding. It owns the canonical session/item/metadata/progress/event/error shapes, consumer-owned port signatures, command/state table, synchronous claim handshake, queued terminal-signal model, HTTP matrix, source-mutation policy, and readiness/quiescence guarantees. Phase specs may narrow but may not fork these types or semantics without an architecture update.
 
 ## Consistency Conventions
@@ -152,7 +164,7 @@ Verified against the working tree, local module metadata, lockfile, and upstream
 
 | Name | Version |
 | --- | --- |
-| Go module floor | 1.25.0 |
+| Go module floor | 1.26.0 |
 | Verified Go toolchain | 1.26.7 |
 | Wails | 2.15.0 |
 | React / React DOM | 19.2.8 |
@@ -160,7 +172,7 @@ Verified against the working tree, local module metadata, lockfile, and upstream
 | Vite | 7.3.6 |
 | Tailwind CSS | 4.3.3 |
 | Vitest | 4.1.11 |
-| Node.js | 24.19.0 LTS (pin lands in Story 3.2) |
+| Node.js | 24 LTS (major pinned in `.nvmrc` and CI; local audit: 24.15.0) |
 | hashicorp/mdns | 1.0.7 |
 | boombuler/barcode | 1.1.0 |
 | golang.org/x/sys | 0.46.0 (Story 2.1: native no-follow handles) |
@@ -195,7 +207,7 @@ flowchart LR
 
 | Capability / Area | Lives in | Governed by |
 | --- | --- | --- |
-| FR1, FR4, FR14-FR18 — commands and UI | `app.go`, `frontend/src/transfer`, components | AD-3, AD-7, AD-8, AD-11 |
+| FR1, FR4, FR14-FR18 — commands and UI | `app.go`, `frontend/src/transfer`, `frontend/src/ui` | AD-3, AD-7, AD-8, AD-11 |
 | FR2, FR5 — LAN identity and discovery | `internal/network` | AD-4, AD-9 |
 | FR3, FR8-FR13 — server and lifecycle | `internal/transfer`, `internal/server` | AD-2, AD-4, AD-5, AD-8 |
 | FR6-FR7 — payload delivery | `internal/server`, `internal/stream` | AD-5, AD-6 |

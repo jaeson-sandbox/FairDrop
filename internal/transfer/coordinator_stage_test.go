@@ -10,9 +10,51 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+type gatedEntropy struct {
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (r *gatedEntropy) Read(p []byte) (int, error) {
+	r.once.Do(func() { close(r.entered) })
+	<-r.release
+	clear(p)
+	return len(p), nil
+}
+
+func TestStageRechecksOutstandingCleanupAtAdmission(t *testing.T) {
+	h := newHarness(t)
+	entropy := &gatedEntropy{entered: make(chan struct{}), release: make(chan struct{})}
+	h.coordinator.entropy = entropy
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := h.coordinator.Stage(context.Background(), testPath)
+		result <- err
+	}()
+	<-entropy.entered
+	pending := &boundedCall{done: make(chan struct{})}
+	var pendingOnce sync.Once
+	t.Cleanup(func() { pendingOnce.Do(func() { close(pending.done) }) })
+	h.coordinator.cleanupMu.Lock()
+	h.coordinator.serverCleanup = pending
+	h.coordinator.cleanupMu.Unlock()
+	close(entropy.release)
+
+	if err := <-result; ErrorCodeOf(err) != ErrBusy {
+		t.Fatalf("Stage across cleanup-admission race = %v, want busy", err)
+	}
+	if got := adapterCalls(h); len(got) != 0 {
+		t.Fatalf("Stage touched adapters after cleanup became outstanding: %v", got)
+	}
+	pendingOnce.Do(func() { close(pending.done) })
+}
 
 func TestStageCommitsOnlyWhenEveryResourceIsLive(t *testing.T) {
 	h := newHarness(t)

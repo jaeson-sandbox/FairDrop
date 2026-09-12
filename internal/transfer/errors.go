@@ -36,6 +36,28 @@ type CodedError interface {
 	Code() ErrorCode
 }
 
+type unquiescentError struct{ error }
+
+func (e *unquiescentError) Unwrap() error { return e.error }
+func (e *unquiescentError) Unquiescent()  {}
+
+// MarkUnquiescent distinguishes a cleanup failure that left live work from a
+// diagnostic returned after cleanup completed. Both may use transfer_failed;
+// callers must not infer ownership from the public code alone.
+func MarkUnquiescent(err error) error {
+	if err == nil || IsUnquiescent(err) {
+		return err
+	}
+	return &unquiescentError{error: err}
+}
+
+// IsUnquiescent reports whether cleanup returned without proving its owned
+// work ended. It follows ordinary error wrapping and errors.Join chains.
+func IsUnquiescent(err error) bool {
+	var marked interface{ Unquiescent() }
+	return errors.As(err, &marked)
+}
+
 // DomainError carries a stable code, safe local message, and optional cause.
 // The cause is deliberately excluded from Error because filesystem causes
 // routinely contain selected paths (and other adapters may contain tokens).

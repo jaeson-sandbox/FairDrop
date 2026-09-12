@@ -83,6 +83,7 @@ func TestATransferLongerThanEveryTimeoutStillCompletes(t *testing.T) {
 		t.Fatalf("received %d bytes, want %d", len(body), want)
 	}
 
+	awaitNaturalCompletion(t, server)
 	if err := server.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}

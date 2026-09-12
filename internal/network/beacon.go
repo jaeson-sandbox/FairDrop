@@ -35,25 +35,37 @@ func (m *Manager) StartBeacon(ctx context.Context, request transfer.BeaconReques
 	if err := m.acquireSelectionGate(ctx, beaconContextError); err != nil {
 		return err
 	}
-	defer m.releaseSelectionGate()
 	if err := beaconContextError(ctx); err != nil {
+		m.releaseSelectionGate()
 		return err
 	}
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if err := beaconContextError(ctx); err != nil {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
 		return err
 	}
 	if m.selected == nil {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
 		return transfer.NewError(transfer.ErrBeaconWarning, "select a local network address before starting discovery")
 	}
 	if beaconHandlePresent(m.beacon) {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
 		return transfer.NewError(transfer.ErrBeaconWarning, "device discovery is already active")
+	}
+	if m.stopping != nil {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
+		return transfer.NewError(transfer.ErrBeaconWarning, "previous device discovery cleanup is still running")
 	}
 
 	identity, err := m.processIdentityLocked(ctx)
 	if err != nil {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
 		return err
 	}
 	instance := identityLabel(request.Instance, identity.host, identity.suffix)
@@ -69,9 +81,13 @@ func (m *Manager) StartBeacon(ctx context.Context, request transfer.BeaconReques
 		[]string{transfer.BeaconVersionTXT},
 	)
 	if err != nil {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
 		return transfer.WrapError(transfer.ErrBeaconWarning, "device discovery configuration failed", err)
 	}
 	if err := beaconContextError(ctx); err != nil {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
 		return err
 	}
 
@@ -83,16 +99,20 @@ func (m *Manager) StartBeacon(ctx context.Context, request transfer.BeaconReques
 	}
 	handle, startErr := m.deps.start(config)
 	if contextErr := beaconContextError(ctx); contextErr != nil {
-		return cleanupFailedStart(handle, errors.Join(startErr, contextErr))
+		return m.cleanupFailedStartLocked(handle, errors.Join(startErr, contextErr))
 	}
 	if startErr != nil {
-		return cleanupFailedStart(handle, startErr)
+		return m.cleanupFailedStartLocked(handle, startErr)
 	}
 	if !beaconHandlePresent(handle) {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
 		return transfer.NewError(transfer.ErrBeaconWarning, "device discovery did not start")
 	}
 
 	m.beacon = handle
+	m.mu.Unlock()
+	m.releaseSelectionGate()
 	return nil
 }
 
@@ -100,21 +120,38 @@ func (m *Manager) StartBeacon(ctx context.Context, request transfer.BeaconReques
 // including when Shutdown reports a diagnostic.
 func (m *Manager) StopBeacon() error {
 	<-m.selectionGate
-	defer m.releaseSelectionGate()
-
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	if pending := m.stopping; pending != nil {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
+		if m.deps.stopJoined != nil {
+			m.deps.stopJoined()
+		}
+		<-pending.done
+		return pending.err
+	}
 	if !beaconHandlePresent(m.beacon) {
 		m.beacon = nil
+		m.mu.Unlock()
+		m.releaseSelectionGate()
 		return nil
 	}
 
 	handle := m.beacon
 	m.beacon = nil
-	if err := handle.Shutdown(); err != nil {
-		return transfer.WrapError(transfer.ErrBeaconWarning, "device discovery cleanup reported a problem", err)
+	pending := &beaconStop{done: make(chan struct{})}
+	m.stopping = pending
+	m.mu.Unlock()
+	m.releaseSelectionGate()
+
+	pending.err = beaconCleanupError(handle.Shutdown())
+	close(pending.done)
+	m.mu.Lock()
+	if m.stopping == pending {
+		m.stopping = nil
 	}
-	return nil
+	m.mu.Unlock()
+	return pending.err
 }
 
 func validateBeaconRequest(request transfer.BeaconRequest) error {
@@ -230,14 +267,40 @@ func beaconContextError(ctx context.Context) error {
 	return nil
 }
 
-func cleanupFailedStart(handle beaconHandle, cause error) error {
-	if beaconHandlePresent(handle) {
-		cause = errors.Join(cause, handle.Shutdown())
+func (m *Manager) cleanupFailedStartLocked(handle beaconHandle, cause error) error {
+	if !beaconHandlePresent(handle) {
+		m.mu.Unlock()
+		m.releaseSelectionGate()
+		return failedStartError(cause)
 	}
+	pending := &beaconStop{done: make(chan struct{})}
+	m.stopping = pending
+	m.mu.Unlock()
+	m.releaseSelectionGate()
+
+	cause = errors.Join(cause, handle.Shutdown())
+	pending.err = failedStartError(cause)
+	close(pending.done)
+	m.mu.Lock()
+	if m.stopping == pending {
+		m.stopping = nil
+	}
+	m.mu.Unlock()
+	return pending.err
+}
+
+func failedStartError(cause error) error {
 	if cause == nil {
 		cause = errors.New("device discovery start failed")
 	}
 	return transfer.WrapError(transfer.ErrBeaconWarning, "device discovery did not start", cause)
+}
+
+func beaconCleanupError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return transfer.WrapError(transfer.ErrBeaconWarning, "device discovery cleanup reported a problem", err)
 }
 
 func beaconHandlePresent(handle beaconHandle) bool {

@@ -12,17 +12,17 @@ type pathPlan struct {
 	hadTrailingSep bool
 }
 
-// statHandle is the one operation shared by every handle kind: describe the
-// object this descriptor is bound to. Identity and kind checks take it so they
-// run against metadata, search, enumeration, and content handles alike.
+// statHandle describes an object through a metadata snapshot or an opened
+// descriptor. Identity and kind checks compare the snapshot with later opens.
 type statHandle interface {
 	Stat() (fs.FileInfo, error)
 }
 
-// metadataHandle owns a no-follow handle that can read metadata but cannot
-// read file contents or enumerate a directory. The absence of Read is the
-// guarantee, not a convention: no metadata, search, or enumeration handle in
-// this package exposes a way to pull bytes out of the object it describes.
+// metadataHandle owns a no-follow metadata view that cannot read contents or
+// enumerate a directory. Linux/Windows pin a descriptor; Darwin snapshots stat
+// metadata relative to an owned ancestor descriptor and does not pin the leaf.
+// Later search/enumeration/content opens must pass an identity check. No view
+// exposes Read; Close releases its resources without closing borrowed parents.
 type metadataHandle interface {
 	statHandle
 	OpenChildMetadata(name string) (metadataHandle, error)

@@ -215,35 +215,36 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 // out is the claim-time root check, because Prepare is the last moment a
 // failure can still choose an HTTP status instead of breaking a live download.
 func (p *Payloads) prepareArchive(ctx context.Context, item transfer.StagedItem) (server.PreparedPayload, error) {
-	identity, err := p.pinIdentity(item.Path)
+	prepared, err := p.source.PrepareDirectory(ctx, item.Path)
 	if err != nil {
-		return nil, err
+		return nil, wrapUncodedSourceError(err)
 	}
-	// Kind is the only staged field a directory can be held to: its contents,
-	// size, and modification time are expected to move between staging and
-	// claim, and the unsnapshotted policy covers that. A root that stopped
-	// being a directory is a different object under the same name.
-	if !identity.IsDir() {
-		return nil, sourceChangedError()
+	if prepared == nil {
+		return nil, transfer.NewError(transfer.ErrSetupFailed, "prepared directory is unavailable")
 	}
 	if err := prepareContextError(ctx); err != nil {
+		_ = prepared.Close()
 		return nil, err
 	}
 	root, download := archiveNames(item)
+	if !transfer.SafeArchiveSegment(root) {
+		_ = prepared.Close()
+		return nil, unsafeArchiveEntryName()
+	}
 	return &archive{
 		name:       download,
 		root:       root,
-		path:       item.Path,
-		modTime:    identity.ModTime(),
-		source:     p.source,
+		modTime:    item.ModTime,
+		prepared:   prepared,
 		bufferSize: p.bufferLength(),
 	}, nil
 }
 
-// pinIdentity is the claim-time re-Lstat both payload kinds share. It carries
+// pinIdentity is the regular-file claim-time re-Lstat. It carries
 // the link-like refusal with it: without that, a junction or symlink created
-// inside the validate-to-open window would surface as source_changed, or for a
-// directory not at all, when the contract promises path_unsupported.
+// inside the validate-to-open window would surface as source_changed when
+// the contract promises path_unsupported. Directory preparation instead uses
+// the source-owned no-follow capability.
 func (p *Payloads) pinIdentity(path string) (fs.FileInfo, error) {
 	identity, err := p.lstatPath(path)
 	if err != nil {

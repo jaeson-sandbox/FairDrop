@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -64,7 +65,7 @@ const (
 	// host, never a ceiling a real transfer could approach, because teardown
 	// only starts after Stop is called -- the transfer's own bytes are never
 	// what this bound waits on.
-	teardownBound = 10 * time.Second
+	TeardownBound = 10 * time.Second
 )
 
 // listenFunc is the bind seam. Tests use it to bind loopback instead of every
@@ -125,7 +126,7 @@ func defaultTimeouts() serverTimeouts {
 		readHeader: readHeaderTimeout,
 		read:       readTimeout,
 		idle:       idleTimeout,
-		teardown:   teardownBound,
+		teardown:   TeardownBound,
 	}
 }
 
@@ -232,6 +233,9 @@ type run struct {
 	teardownOnce sync.Once
 	teardownDone chan struct{}
 	teardownErr  error
+	quiesceOnce  sync.Once
+	handlersDone <-chan struct{}
+	connsDone    <-chan struct{}
 }
 
 // Start binds the listener and makes the download route live. It returns only
@@ -270,6 +274,12 @@ func (s *Server) Start(
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.unresolved != nil {
+		if !s.unresolved.quiesced() || !s.unresolved.teardownFinished() {
+			return transfer.ServerHandle{}, startError("the previous transfer server is still being released", nil)
+		}
+		s.unresolved = nil
+	}
 	if s.active != nil {
 		return transfer.ServerHandle{}, startError("the transfer server is already running", nil)
 	}
@@ -304,7 +314,7 @@ func (s *Server) Start(
 		ctx:          dataCtx,
 		cancel:       cancel,
 		mux:          http.NewServeMux(),
-		listener:     &onceCloseListener{Listener: listener},
+		listener:     &onceCloseListener{Listener: &finalizingListener{Listener: listener}},
 		lane:         newEventLane(),
 		serveDone:    make(chan struct{}),
 		conns:        make(map[net.Conn]struct{}),
@@ -326,6 +336,9 @@ func (s *Server) Start(
 		IdleTimeout:       s.timeouts.idle,
 		MaxHeaderBytes:    maxHeaderBytes,
 		ConnState:         active.trackConnection,
+		ConnContext: func(ctx context.Context, conn net.Conn) context.Context {
+			return context.WithValue(ctx, responseConnectionKey{}, conn.(*finalizingConn))
+		},
 		// net/http logs connection and panic diagnostics that can quote a
 		// request. Nothing about this server's traffic is safe to print: the
 		// path carries the capability token. But net/http also writes a
@@ -382,18 +395,34 @@ func (s *Server) Stop() error {
 		unresolved := s.unresolved
 		s.mu.Unlock()
 		if unresolved != nil {
+			if !unresolved.teardownFinished() {
+				return unresolved.teardown()
+			}
+			if transfer.IsUnquiescent(unresolved.teardownErr) && unresolved.quiesced() {
+				s.mu.Lock()
+				if s.unresolved == unresolved {
+					s.unresolved = nil
+				}
+				s.mu.Unlock()
+				return nil
+			}
 			return unresolved.teardown()
 		}
 		return nil
 	}
 	active := s.active
 	s.active = nil
+	active.beginStop()
+	active.initQuiescence()
+	s.unresolved = active
 	s.mu.Unlock()
 
 	err := active.teardown()
-	if err != nil {
+	if err == nil {
 		s.mu.Lock()
-		s.unresolved = active
+		if s.unresolved == active {
+			s.unresolved = nil
+		}
 		s.mu.Unlock()
 	}
 	return err
@@ -466,13 +495,13 @@ func (r *run) teardown() error {
 // of a bound at all, not a new one, and it is why the report names exactly
 // what is still outstanding rather than only saying "timed out".
 func (r *run) awaitQuiescence() error {
-	handlersDone := doneChannel(r.handlers.Wait)
-	connsDone := doneChannel(r.awaitConnections)
+	r.initQuiescence()
 
 	bound := time.NewTimer(r.timeoutsOrDefault())
 	defer bound.Stop()
 
-	serveDone, thisHandlersDone, thisConnsDone := r.serveDone, handlersDone, connsDone
+	var serveDone <-chan struct{} = r.serveDone
+	thisHandlersDone, thisConnsDone := r.handlersDone, r.connsDone
 	for serveDone != nil || thisHandlersDone != nil || thisConnsDone != nil {
 		select {
 		case <-serveDone:
@@ -482,10 +511,61 @@ func (r *run) awaitQuiescence() error {
 		case <-thisConnsDone:
 			thisConnsDone = nil
 		case <-bound.C:
-			return teardownTimeoutError(serveDone != nil, thisHandlersDone != nil, thisConnsDone != nil)
+			// A ready completion and the timer may be selectable together. Recheck
+			// each lane so scheduling cannot make the diagnostic name work that
+			// had already finished before the bound was observed.
+			serveDone = pendingChannel(serveDone)
+			thisHandlersDone = pendingChannel(thisHandlersDone)
+			thisConnsDone = pendingChannel(thisConnsDone)
+			if serveDone == nil && thisHandlersDone == nil && thisConnsDone == nil {
+				return nil
+			}
+			return transfer.MarkUnquiescent(teardownTimeoutError(serveDone != nil, thisHandlersDone != nil, thisConnsDone != nil))
 		}
 	}
 	return nil
+}
+
+func pendingChannel(done <-chan struct{}) <-chan struct{} {
+	if done == nil {
+		return nil
+	}
+	select {
+	case <-done:
+		return nil
+	default:
+		return done
+	}
+}
+
+func (r *run) initQuiescence() {
+	r.quiesceOnce.Do(func() {
+		r.handlersDone = doneChannel(r.handlers.Wait)
+		r.connsDone = doneChannel(r.awaitConnections)
+	})
+}
+
+func (r *run) quiesced() bool {
+	if r == nil || r.handlersDone == nil || r.connsDone == nil {
+		return false
+	}
+	for _, done := range []<-chan struct{}{r.serveDone, r.handlersDone, r.connsDone} {
+		select {
+		case <-done:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func (r *run) teardownFinished() bool {
+	select {
+	case <-r.teardownDone:
+		return true
+	default:
+		return false
+	}
 }
 
 // timeoutsOrDefault covers a *run built without going through Server.Start,
@@ -494,7 +574,7 @@ func (r *run) timeoutsOrDefault() time.Duration {
 	if r.timeouts.teardown > 0 {
 		return r.timeouts.teardown
 	}
-	return teardownBound
+	return TeardownBound
 }
 
 // doneChannel runs a blocking wait on its own goroutine and reports
@@ -560,6 +640,24 @@ func (r *run) leave() {
 // this the point where that goroutine is known to be gone.
 func (r *run) trackConnection(conn net.Conn, state http.ConnState) {
 	r.mu.Lock()
+	stopping := r.stopping
+	r.mu.Unlock()
+	// Keep-alives are disabled. StateClosed follows net/http's finishRequest,
+	// including its final buffer flush and terminating chunk, on the serving
+	// goroutine. A handler return (or its Flush) is too early to claim success.
+	// Keep the connection tracked until its final event has been published,
+	// so a concurrent Stop cannot close the lane while this callback produces.
+	if state == http.StateClosed && !stopping && r.ctx.Err() == nil {
+		if tracked, ok := conn.(*finalizingConn); ok && tracked.terminal != nil {
+			event := *tracked.terminal
+			if tracked.writeErr != nil && event.Kind == transfer.ServerComplete {
+				event = failedEvent(r.sessionID, *event.Progress, transfer.WrapError(
+					transfer.ErrTransferFailed, "the HTTP response could not be finalized", tracked.writeErr))
+			}
+			r.finish(&event)
+		}
+	}
+	r.mu.Lock()
 	defer r.mu.Unlock()
 	switch state {
 	case http.StateNew:
@@ -570,6 +668,48 @@ func (r *run) trackConnection(conn net.Conn, state http.ConnState) {
 			r.connsGone.Broadcast()
 		}
 	}
+}
+
+type responseConnectionKey struct{}
+
+// finalizingConn observes every real connection write, including writes made
+// by net/http after our handler returns. Its fields belong to the serving
+// goroutine; concurrent Stop only closes the embedded connection.
+type finalizingConn struct {
+	net.Conn
+	writeErr error
+	terminal *transfer.ServerEvent
+}
+
+// net/http half-closes responses with unread bodies or oversized headers
+// before its final close, so the receiver can read the rejection before a
+// pending request body causes a reset. Embedding net.Conn hides TCP CloseWrite.
+func (c *finalizingConn) CloseWrite() error {
+	if half, ok := c.Conn.(interface{ CloseWrite() error }); ok {
+		return half.CloseWrite()
+	}
+	return nil
+}
+
+func (c *finalizingConn) Write(p []byte) (int, error) {
+	n, err := c.Conn.Write(p)
+	if err == nil && n != len(p) {
+		err = io.ErrShortWrite
+	}
+	if err != nil && c.writeErr == nil {
+		c.writeErr = err
+	}
+	return n, err
+}
+
+type finalizingListener struct{ net.Listener }
+
+func (l *finalizingListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return &finalizingConn{Conn: conn}, nil
 }
 
 func (r *run) awaitConnections() {

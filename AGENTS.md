@@ -111,10 +111,20 @@ as historical narrative and apply all corrections and supersessions before using
   verification.
 - Preserve complete failing-test output. Truncated logs destroyed the only
   evidence for an unreproduced Epic 1 failure.
-- Browser-unit tests do not prove native interaction. Keep a real built-app,
-  nearby-device QR/download smoke test in each epic until Story 3.2 automates it.
+- Browser-unit tests do not prove native interaction. Manual nearby-device smoke
+  observations are optional under the owner-approved personal-project policy below;
+  record unverified behavior honestly and keep automated native checks mandatory.
 
 <!-- /bmad:context -->
+
+## Owner-approved personal release policy (2026-09-11)
+
+`docs/release-policy.md` supersedes older mandatory-human-release gates. Automated
+verification is required; manual phone/browser, screen-reader, firewall and visual
+checks are optional for this personal project. Never fabricate manual passes or
+waive known functional failures. Story 3.7 includes the newly approved D-110 HTTP
+finalization fix and replacement of Darwin O_EVTONLY metadata acquisition with
+supported no-follow queries; preserve content-read separation and identity checks.
 
 ## Environment and verification pitfalls
 
@@ -166,6 +176,22 @@ as historical narrative and apply all corrections and supersessions before using
   `Cancel` return early while a listener was still live would have been a worse defect than the hang
   it replaced, so a hit bound is reported honestly rather than absorbed as quiescence.
 
+- Story 3.8 directory streaming uses `SourcePort.PrepareDirectory`, not a fresh
+  path-only `Walk`: preserve the Prepare-to-WriteTo root identity pin and its
+  Close ownership. Lexical ancestors, enumeration frames and the pin share a
+  64-retained-handle budget (plus three transient); Inspect reserves the future
+  pin. Source and ZIP names share `transfer.SafeArchiveSegment` on every OS.
+  Borrowed reader revocation must synchronize across native Read, not just a
+  returned flag. These do not snapshot contents or interrupt blocked OS reads.
+
+## Subagent model budget
+
+- Owner preference (2026-09-12): use `gpt-5.6-sol` for implementation subagents
+  and `gpt-5.6-luna` for smaller bounded tasks. Keep review and integration with
+  the main agent; when a BMAD workflow requires independent review subagents,
+  use Sol or Luna for those too. Do not inherit the main agent's more expensive
+  model by default.
+
 ## Git workflow
 
 <!-- Outside the bmad:context block on purpose: kept across `bmad-project-context` refreshes. -->
@@ -204,6 +230,12 @@ ordered by how much they cost.
   purpose and confirm a test fails and *names* it. If nothing fails, the guarantee is
   decoration. This is how all of the above were found, and how each fix was confirmed.
 
+- Scoped mutation proof must be derived from the canonical script, not a hand-copied
+  case list. Story 3.8 reported 22 passing local cases while a 23rd committed case
+  was never exercised locally; that mutation left an unused import and failed CI
+  at compilation. Audit the exact case inventory and retain unique logs. A scoped
+  pass proves only its executed cases, never an omitted canonical mutation.
+
 - **Write the test that does not exist yet.** The largest single find in Story 1.5 —
   Stage committing a live session for a command the user had abandoned — came from
   writing a caller-context test, not from reading code. Ask "what does no test
@@ -218,6 +250,11 @@ ordered by how much they cost.
 - **`context.AfterFunc` is eventually consistent.** Its callback runs on a *new*
   goroutine, so a derived context still reads clean for a moment after the parent is
   cancelled. Where the answer must be immediate, check the caller's context directly.
+
+- **A context test double must obey the Context contract.** `Err` must stay nil until
+  `Done` closes. Story 3.7 briefly used a non-nil `Err` with an open `Done` to force a
+  select branch; its mutation failed, but the proof was invalid. Use a real cancelled
+  context at the production result-acceptance helper and pin the caller's wiring.
 
 - **A concurrency test that accepts either outcome cannot fail.** Tally the outcomes
   and log the distribution. But do not then *assert* both: FairDrop's claim race

@@ -340,7 +340,7 @@ func TestComposeWiresTheSixRealAdapters(t *testing.T) {
 
 	value := reflect.ValueOf(coordinator).Elem()
 	for _, want := range []struct{ field, dynamic string }{
-		{"source", "*source.Inspector"},
+		{"source", "*main.selectionSource"},
 		{"network", "*network.Manager"},
 		{"server", "*server.Server"},
 		{"qr", "*qr.Encoder"},
@@ -356,6 +356,20 @@ func TestComposeWiresTheSixRealAdapters(t *testing.T) {
 	serverValue := value.FieldByName("server").Elem().Elem()
 	if got := dynamicTypeOf(t, serverValue, "payloads"); got != "*stream.Payloads" {
 		t.Errorf("server payload port holds %s, want *stream.Payloads", got)
+	}
+	boundary := value.FieldByName("source").Elem().Elem()
+	if got := dynamicTypeOf(t, boundary, "SourcePort"); got != "*source.Inspector" {
+		t.Fatal("selection boundary does not wrap the raw inspector")
+	}
+	if boundary.FieldByName("resolve").Pointer() != reflect.ValueOf(resolveSelectionAncestors).Pointer() {
+		t.Fatal("selection boundary lost its production ancestor resolver")
+	}
+	payloads := serverValue.FieldByName("payloads").Elem().Elem()
+	if got := dynamicTypeOf(t, payloads, "source"); got != "*source.Inspector" {
+		t.Fatal("stream must use the raw inspector, not selection resolution")
+	}
+	if boundary.FieldByName("SourcePort").Elem().Pointer() != payloads.FieldByName("source").Elem().Pointer() {
+		t.Fatal("staging and streaming must share the same raw inspector")
 	}
 }
 
