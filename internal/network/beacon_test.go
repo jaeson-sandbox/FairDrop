@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -559,6 +560,8 @@ func TestStopBeaconIsIdempotentConcurrentAndForgetsCleanupErrors(t *testing.T) {
 	cleanupFailure := errors.New("cleanup diagnostic")
 	entered := make(chan struct{})
 	release := make(chan struct{})
+	var releaseOnce sync.Once
+	t.Cleanup(func() { releaseOnce.Do(func() { close(release) }) })
 	handle := &fakeBeacon{err: cleanupFailure, entered: entered, release: release}
 	manager := beaconTestManager(t, bytes.NewReader(make([]byte, processSuffixBytes)), func(*mdns.Config) (beaconHandle, error) {
 		return handle, nil
@@ -571,19 +574,205 @@ func TestStopBeaconIsIdempotentConcurrentAndForgetsCleanupErrors(t *testing.T) {
 	go func() { results <- manager.StopBeacon() }()
 	<-entered
 	go func() { results <- manager.StopBeacon() }()
-	close(release)
+	releaseOnce.Do(func() { close(release) })
 	first, second := <-results, <-results
 	if transfer.ErrorCodeOf(first) != transfer.ErrBeaconWarning && transfer.ErrorCodeOf(second) != transfer.ErrBeaconWarning {
-		t.Fatalf("concurrent StopBeacon calls did not report cleanup diagnostic: %v, %v", first, second)
-	}
-	if first != nil && second != nil {
-		t.Fatalf("both concurrent StopBeacon calls returned errors: %v, %v", first, second)
+		t.Fatalf("concurrent StopBeacon calls lost the cleanup diagnostic: %v, %v", first, second)
 	}
 	if handle.calls() != 1 || manager.beacon != nil {
 		t.Fatalf("StopBeacon ownership mismatch: shutdown calls=%d active=%v", handle.calls(), manager.beacon)
 	}
 	if err := manager.StopBeacon(); err != nil {
 		t.Fatalf("repeated StopBeacon() = %v", err)
+	}
+}
+
+func TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	cleanupFailure := errors.New("joined cleanup failure")
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	joined := make(chan struct{})
+	var joinedOnce sync.Once
+	var factoryCalls atomic.Int32
+	handle := &fakeBeacon{err: cleanupFailure, entered: entered, release: release}
+	manager := beaconTestManager(t, bytes.NewReader(make([]byte, processSuffixBytes)), func(*mdns.Config) (beaconHandle, error) {
+		factoryCalls.Add(1)
+		return handle, nil
+	})
+	manager.deps.stopJoined = func() { joinedOnce.Do(func() { close(joined) }) }
+	if err := manager.StartBeacon(context.Background(), validBeaconRequest()); err != nil {
+		t.Fatal(err)
+	}
+
+	results := make(chan error, 2)
+	go func() { results <- manager.StopBeacon() }()
+	<-entered
+	go func() { results <- manager.StopBeacon() }()
+	<-joined
+	if err := manager.StartBeacon(context.Background(), validBeaconRequest()); transfer.ErrorCodeOf(err) != transfer.ErrBeaconWarning {
+		t.Fatalf("overlapping StartBeacon = %v, want beacon_warning", err)
+	}
+	if got := factoryCalls.Load(); got != 1 {
+		t.Fatalf("overlap invoked the start factory %d times, want the original one only", got)
+	}
+	close(release)
+	first, second := <-results, <-results
+	if first == nil || second == nil || first != second {
+		t.Fatalf("owner and joined StopBeacon results = (%v, %v), want the same non-nil wrapped error", first, second)
+	}
+	if !errors.Is(first, cleanupFailure) || transfer.ErrorCodeOf(first) != transfer.ErrBeaconWarning {
+		t.Fatalf("joined result = %v, want wrapped cleanup cause and beacon_warning", first)
+	}
+}
+
+func TestStopBeaconJoinsFailedStartCleanupAndRecovery(t *testing.T) {
+	t.Parallel()
+
+	startFailure := errors.New("start failed")
+	cleanupFailure := errors.New("partial handle cleanup failed")
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	joined := make(chan struct{})
+	var joinedOnce sync.Once
+	var factoryCalls atomic.Int32
+	firstHandle := &fakeBeacon{err: cleanupFailure, entered: entered, release: release}
+	manager := beaconTestManager(t, bytes.NewReader(make([]byte, 2*processSuffixBytes)), func(*mdns.Config) (beaconHandle, error) {
+		if factoryCalls.Add(1) == 1 {
+			return firstHandle, startFailure
+		}
+		return &fakeBeacon{}, nil
+	})
+	manager.deps.stopJoined = func() { joinedOnce.Do(func() { close(joined) }) }
+
+	owner := make(chan error, 1)
+	go func() { owner <- manager.StartBeacon(context.Background(), validBeaconRequest()) }()
+	<-entered
+	joiner := make(chan error, 1)
+	go func() { joiner <- manager.StopBeacon() }()
+	<-joined
+	if err := manager.StartBeacon(context.Background(), validBeaconRequest()); transfer.ErrorCodeOf(err) != transfer.ErrBeaconWarning {
+		t.Fatalf("overlapping StartBeacon = %v, want beacon_warning", err)
+	}
+	if got := factoryCalls.Load(); got != 1 {
+		t.Fatalf("failed-start overlap invoked the factory %d times, want one", got)
+	}
+	close(release)
+	ownerErr, joinerErr := <-owner, <-joiner
+	if ownerErr == nil || joinerErr == nil || ownerErr != joinerErr {
+		t.Fatalf("failed-start owner and StopBeacon joiner = (%v, %v), want the same non-nil wrapped error", ownerErr, joinerErr)
+	}
+	if !errors.Is(ownerErr, startFailure) || !errors.Is(ownerErr, cleanupFailure) {
+		t.Fatalf("failed-start result = %v, want both start and cleanup causes", ownerErr)
+	}
+	if got := firstHandle.calls(); got != 1 {
+		t.Fatalf("partial-handle Shutdown calls = %d, want one", got)
+	}
+	if err := manager.StartBeacon(context.Background(), validBeaconRequest()); err != nil {
+		t.Fatalf("StartBeacon after failed-start cleanup = %v", err)
+	}
+	if got := factoryCalls.Load(); got != 2 {
+		t.Fatalf("recovery factory calls = %d, want two", got)
+	}
+	if err := manager.StopBeacon(); err != nil {
+		t.Fatalf("recovered StopBeacon = %v", err)
+	}
+}
+
+func TestWedgedStopDetachesAndCoalescesWithoutPoisoningSelection(t *testing.T) {
+	t.Parallel()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	t.Cleanup(func() { releaseOnce.Do(func() { close(release) }) })
+	handle := &fakeBeacon{entered: entered, release: release}
+	manager := beaconTestManager(t, bytes.NewReader(make([]byte, processSuffixBytes)), func(*mdns.Config) (beaconHandle, error) {
+		return handle, nil
+	})
+	if err := manager.StartBeacon(context.Background(), validBeaconRequest()); err != nil {
+		t.Fatal(err)
+	}
+
+	stops := make(chan error, 2)
+	go func() { stops <- manager.StopBeacon() }()
+	<-entered
+	if !manager.mu.TryLock() {
+		t.Fatal("StopBeacon retained the manager mutex across Shutdown")
+	}
+	manager.mu.Unlock()
+	select {
+	case <-manager.selectionGate:
+		manager.releaseSelectionGate()
+	default:
+		t.Fatal("StopBeacon retained the selection gate across Shutdown")
+	}
+	go func() { stops <- manager.StopBeacon() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := manager.GetLocalIP(ctx); err != nil {
+		t.Fatalf("GetLocalIP while Shutdown is wedged = %v", err)
+	}
+	if err := manager.StartBeacon(ctx, validBeaconRequest()); transfer.ErrorCodeOf(err) != transfer.ErrBeaconWarning {
+		t.Fatalf("StartBeacon while Shutdown is wedged = %v, want beacon_warning", err)
+	}
+	if handle.calls() != 1 {
+		t.Fatalf("wedged Shutdown calls = %d, want one coalesced call", handle.calls())
+	}
+
+	releaseOnce.Do(func() { close(release) })
+	if err := <-stops; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-stops; err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.StartBeacon(context.Background(), validBeaconRequest()); err != nil {
+		t.Fatalf("StartBeacon after cleanup = %v", err)
+	}
+}
+
+func TestFailedStartCleanupDoesNotHoldManagerLocksOrAdmitAResponder(t *testing.T) {
+	t.Parallel()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	t.Cleanup(func() { releaseOnce.Do(func() { close(release) }) })
+	handle := &fakeBeacon{entered: entered, release: release}
+	manager := beaconTestManager(t, bytes.NewReader(make([]byte, processSuffixBytes)), func(*mdns.Config) (beaconHandle, error) {
+		return handle, errors.New("start failed")
+	})
+	startDone := make(chan error, 1)
+	go func() { startDone <- manager.StartBeacon(context.Background(), validBeaconRequest()) }()
+	<-entered
+	if !manager.mu.TryLock() {
+		t.Fatal("failed StartBeacon retained the manager mutex across partial-handle Shutdown")
+	}
+	manager.mu.Unlock()
+	select {
+	case <-manager.selectionGate:
+		manager.releaseSelectionGate()
+	default:
+		t.Fatal("failed StartBeacon retained the selection gate across partial-handle Shutdown")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := manager.GetLocalIP(ctx); err != nil {
+		t.Fatalf("GetLocalIP during failed-start cleanup = %v", err)
+	}
+	if err := manager.StartBeacon(ctx, validBeaconRequest()); transfer.ErrorCodeOf(err) != transfer.ErrBeaconWarning {
+		t.Fatalf("overlapping StartBeacon = %v, want beacon_warning", err)
+	}
+	if handle.calls() != 1 {
+		t.Fatalf("failed-start Shutdown calls = %d, want one", handle.calls())
+	}
+	releaseOnce.Do(func() { close(release) })
+	if err := <-startDone; transfer.ErrorCodeOf(err) != transfer.ErrBeaconWarning {
+		t.Fatalf("failed StartBeacon = %v", err)
 	}
 }
 

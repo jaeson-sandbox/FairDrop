@@ -65,7 +65,7 @@ const (
 	// host, never a ceiling a real transfer could approach, because teardown
 	// only starts after Stop is called -- the transfer's own bytes are never
 	// what this bound waits on.
-	teardownBound = 10 * time.Second
+	TeardownBound = 10 * time.Second
 )
 
 // listenFunc is the bind seam. Tests use it to bind loopback instead of every
@@ -126,7 +126,7 @@ func defaultTimeouts() serverTimeouts {
 		readHeader: readHeaderTimeout,
 		read:       readTimeout,
 		idle:       idleTimeout,
-		teardown:   teardownBound,
+		teardown:   TeardownBound,
 	}
 }
 
@@ -233,6 +233,9 @@ type run struct {
 	teardownOnce sync.Once
 	teardownDone chan struct{}
 	teardownErr  error
+	quiesceOnce  sync.Once
+	handlersDone <-chan struct{}
+	connsDone    <-chan struct{}
 }
 
 // Start binds the listener and makes the download route live. It returns only
@@ -271,6 +274,12 @@ func (s *Server) Start(
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.unresolved != nil {
+		if !s.unresolved.quiesced() || !s.unresolved.teardownFinished() {
+			return transfer.ServerHandle{}, startError("the previous transfer server is still being released", nil)
+		}
+		s.unresolved = nil
+	}
 	if s.active != nil {
 		return transfer.ServerHandle{}, startError("the transfer server is already running", nil)
 	}
@@ -386,18 +395,34 @@ func (s *Server) Stop() error {
 		unresolved := s.unresolved
 		s.mu.Unlock()
 		if unresolved != nil {
+			if !unresolved.teardownFinished() {
+				return unresolved.teardown()
+			}
+			if transfer.IsUnquiescent(unresolved.teardownErr) && unresolved.quiesced() {
+				s.mu.Lock()
+				if s.unresolved == unresolved {
+					s.unresolved = nil
+				}
+				s.mu.Unlock()
+				return nil
+			}
 			return unresolved.teardown()
 		}
 		return nil
 	}
 	active := s.active
 	s.active = nil
+	active.beginStop()
+	active.initQuiescence()
+	s.unresolved = active
 	s.mu.Unlock()
 
 	err := active.teardown()
-	if err != nil {
+	if err == nil {
 		s.mu.Lock()
-		s.unresolved = active
+		if s.unresolved == active {
+			s.unresolved = nil
+		}
 		s.mu.Unlock()
 	}
 	return err
@@ -470,13 +495,13 @@ func (r *run) teardown() error {
 // of a bound at all, not a new one, and it is why the report names exactly
 // what is still outstanding rather than only saying "timed out".
 func (r *run) awaitQuiescence() error {
-	handlersDone := doneChannel(r.handlers.Wait)
-	connsDone := doneChannel(r.awaitConnections)
+	r.initQuiescence()
 
 	bound := time.NewTimer(r.timeoutsOrDefault())
 	defer bound.Stop()
 
-	serveDone, thisHandlersDone, thisConnsDone := r.serveDone, handlersDone, connsDone
+	var serveDone <-chan struct{} = r.serveDone
+	thisHandlersDone, thisConnsDone := r.handlersDone, r.connsDone
 	for serveDone != nil || thisHandlersDone != nil || thisConnsDone != nil {
 		select {
 		case <-serveDone:
@@ -486,10 +511,61 @@ func (r *run) awaitQuiescence() error {
 		case <-thisConnsDone:
 			thisConnsDone = nil
 		case <-bound.C:
-			return teardownTimeoutError(serveDone != nil, thisHandlersDone != nil, thisConnsDone != nil)
+			// A ready completion and the timer may be selectable together. Recheck
+			// each lane so scheduling cannot make the diagnostic name work that
+			// had already finished before the bound was observed.
+			serveDone = pendingChannel(serveDone)
+			thisHandlersDone = pendingChannel(thisHandlersDone)
+			thisConnsDone = pendingChannel(thisConnsDone)
+			if serveDone == nil && thisHandlersDone == nil && thisConnsDone == nil {
+				return nil
+			}
+			return transfer.MarkUnquiescent(teardownTimeoutError(serveDone != nil, thisHandlersDone != nil, thisConnsDone != nil))
 		}
 	}
 	return nil
+}
+
+func pendingChannel(done <-chan struct{}) <-chan struct{} {
+	if done == nil {
+		return nil
+	}
+	select {
+	case <-done:
+		return nil
+	default:
+		return done
+	}
+}
+
+func (r *run) initQuiescence() {
+	r.quiesceOnce.Do(func() {
+		r.handlersDone = doneChannel(r.handlers.Wait)
+		r.connsDone = doneChannel(r.awaitConnections)
+	})
+}
+
+func (r *run) quiesced() bool {
+	if r == nil || r.handlersDone == nil || r.connsDone == nil {
+		return false
+	}
+	for _, done := range []<-chan struct{}{r.serveDone, r.handlersDone, r.connsDone} {
+		select {
+		case <-done:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func (r *run) teardownFinished() bool {
+	select {
+	case <-r.teardownDone:
+		return true
+	default:
+		return false
+	}
 }
 
 // timeoutsOrDefault covers a *run built without going through Server.Start,
@@ -498,7 +574,7 @@ func (r *run) timeoutsOrDefault() time.Duration {
 	if r.timeouts.teardown > 0 {
 		return r.timeouts.teardown
 	}
-	return teardownBound
+	return TeardownBound
 }
 
 // doneChannel runs a blocking wait on its own goroutine and reports

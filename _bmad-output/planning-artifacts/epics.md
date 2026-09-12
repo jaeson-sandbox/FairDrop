@@ -1182,6 +1182,8 @@ So that a deep tree, a swapped root, or a misused reader cannot break a live dow
 
 **Checkpoint 1, 2026-09-12:** D-077/079/080/081/082/105 and archive-drain are discharged by c87940bf26454eaa03e647387e30cd418e15744b, native Verify 34682893871 (Windows/macOS/Linux adapter success). Keep Story 3.8 in progress: D-096/099/101/102 cleanup work and formal whole-story review remain. See `evidence-3-8-harden-the-directory-stream.md` for reasoning, proof and limits; no acceptance scope is waived.
 
+**Checkpoint 2, 2026-09-12:** D-096/099/101/102 implementation and local proof are complete: cleanup calls coalesce, retries stay fenced until real completion, nested bounds preserve the inner failure, and every named server wait is isolated. Formal whole-story review and final native verification remain before Story 3.8 is done; see `evidence-3-8-harden-the-directory-stream.md`.
+
 **Routing update (2026-09-11):** D-110 was initially routed here; the owner approved
 bringing it into 3.7 to unblock that story's failing full-stack matrix. It is no
 longer an acceptance item for 3.8.

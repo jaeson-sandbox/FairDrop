@@ -184,6 +184,14 @@ supported no-follow queries; preserve content-read separation and identity check
   Borrowed reader revocation must synchronize across native Read, not just a
   returned flag. These do not snapshot contents or interrupt blocked OS reads.
 
+## Subagent model budget
+
+- Owner preference (2026-09-12): use `gpt-5.6-sol` for implementation subagents
+  and `gpt-5.6-luna` for smaller bounded tasks. Keep review and integration with
+  the main agent; when a BMAD workflow requires independent review subagents,
+  use Sol or Luna for those too. Do not inherit the main agent's more expensive
+  model by default.
+
 ## Git workflow
 
 <!-- Outside the bmad:context block on purpose: kept across `bmad-project-context` refreshes. -->

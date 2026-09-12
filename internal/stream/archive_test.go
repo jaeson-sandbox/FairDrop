@@ -56,6 +56,37 @@ func TestPrepareDirectoryIsLazyAndReportsAnUnknownLength(t *testing.T) {
 	}
 }
 
+func TestArchiveCloseDelegatesOnceAndPreservesThePreparedCause(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("prepared directory close sentinel")
+	diagnostic := transfer.WrapError(transfer.ErrTransferFailed, "prepared directory close failed", cause)
+	var calls atomic.Int32
+	payload := &archive{
+		prepared: testPreparedDirectory{
+			walk: func(context.Context, transfer.SourceVisitor) error { return nil },
+			close: func() error {
+				calls.Add(1)
+				return diagnostic
+			},
+		},
+	}
+
+	first := payload.Close()
+	if !errors.Is(first, cause) || transfer.ErrorCodeOf(first) != transfer.ErrTransferFailed {
+		t.Fatalf("first archive Close = %v, want the prepared close cause and transfer_failed code preserved", first)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("first archive Close delegated %d times, want exactly one", got)
+	}
+	if second := payload.Close(); second != nil {
+		t.Fatalf("repeated archive Close = %v, want nil after the first delegated result", second)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("repeated archive Close delegated %d times, want exactly one total", got)
+	}
+}
+
 func TestWriteToProducesOneTopLevelRootWithAValidCentralDirectory(t *testing.T) {
 	t.Parallel()
 

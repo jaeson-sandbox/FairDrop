@@ -7,11 +7,25 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"fairdrop/internal/server"
 	"fairdrop/internal/transfer"
 
 	"github.com/wailsapp/wails/v2/pkg/options"
 )
+
+func TestCoordinatorCleanupOutlastsServerTeardown(t *testing.T) {
+	if server.TeardownBound != 10*time.Second {
+		t.Fatalf("server.TeardownBound = %v, want 10s", server.TeardownBound)
+	}
+	if transfer.AdapterCleanupBound != 15*time.Second {
+		t.Fatalf("transfer.AdapterCleanupBound = %v, want 15s", transfer.AdapterCleanupBound)
+	}
+	if transfer.AdapterCleanupBound <= server.TeardownBound {
+		t.Fatalf("coordinator cleanup bound %v must outlast server teardown bound %v", transfer.AdapterCleanupBound, server.TeardownBound)
+	}
+}
 
 // Phase 1 exists to produce a window that receives native OS file drops.
 // Every other check in this repo -- go build, go vet, npm test, npm run build,

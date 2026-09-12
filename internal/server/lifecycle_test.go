@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -339,6 +340,7 @@ func TestStopReturnsACodedFailureWhenAHandlerNeverReturns(t *testing.T) {
 
 	blocked := make(chan struct{})
 	unblock := make(chan struct{})
+	var unblockOnce sync.Once
 	var closeOnce sync.Once
 	payload := &stubPayload{
 		name: "report.pdf", size: 4, known: true,
@@ -357,7 +359,7 @@ func TestStopReturnsACodedFailureWhenAHandlerNeverReturns(t *testing.T) {
 		teardown: 100 * time.Millisecond,
 	}
 	handle := startTestServer(t, server, &stubAuthorizer{})
-	t.Cleanup(func() { close(unblock) })
+	t.Cleanup(func() { unblockOnce.Do(func() { close(unblock) }) })
 
 	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
@@ -389,8 +391,8 @@ func TestStopReturnsACodedFailureWhenAHandlerNeverReturns(t *testing.T) {
 		t.Fatalf("Stop() took %v, want it bounded near the shrunk teardown timeout", elapsed)
 	}
 
-	// s.mu was released before the wait (see Stop's own comment), so a later
-	// Start is never blocked by this still-running handler.
+	// s.mu was released before the wait, but a later Start is refused rather
+	// than exposing a new run while the old handler remains alive.
 	startDone := make(chan error, 1)
 	go func() {
 		_, err := server.Start(context.Background(), startRequest(), &stubAuthorizer{})
@@ -398,16 +400,31 @@ func TestStopReturnsACodedFailureWhenAHandlerNeverReturns(t *testing.T) {
 	}()
 	select {
 	case err := <-startDone:
-		if err != nil {
-			t.Fatalf("Start() after a stuck teardown = %v", err)
+		if transfer.ErrorCodeOf(err) != transfer.ErrServerStartFailed {
+			t.Fatalf("Start() after a stuck teardown = %v, want server_start_failed", err)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Start() after a stuck teardown deadlocked on Stop's mutex")
 	}
+
+	unblockOnce.Do(func() { close(unblock) })
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if err := server.Stop(); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("Stop did not recover after the old handler actually quiesced")
+		}
+		runtime.Gosched()
+	}
+	if _, err := server.Start(context.Background(), startRequest(), &stubAuthorizer{}); err != nil {
+		t.Fatalf("Start() after actual quiescence = %v", err)
+	}
 	t.Cleanup(func() { _ = server.Stop() })
 }
 
-// TestStopReleasesItsMutexBeforeWaitingSoAConcurrentStartIsNeverBlocked is
+// TestStopReleasesItsMutexBeforeWaitingAndFencesAConcurrentStart is
 // the other half of D-017. The test above only proves Start works *after*
 // Stop has already returned, which every implementation satisfies trivially
 // -- a deferred Unlock always runs before the function returns to its
@@ -418,7 +435,7 @@ func TestStopReturnsACodedFailureWhenAHandlerNeverReturns(t *testing.T) {
 // enough (several seconds) that "s.mu released immediately" and "s.mu held
 // across the wait" are trivially different by wall clock, not a coin flip
 // against scheduler noise.
-func TestStopReleasesItsMutexBeforeWaitingSoAConcurrentStartIsNeverBlocked(t *testing.T) {
+func TestStopReleasesItsMutexBeforeWaitingAndFencesAConcurrentStart(t *testing.T) {
 	t.Parallel()
 
 	blocked := make(chan struct{})
@@ -469,12 +486,12 @@ func TestStopReleasesItsMutexBeforeWaitingSoAConcurrentStartIsNeverBlocked(t *te
 
 	select {
 	case err := <-startDone:
-		if err != nil {
-			t.Fatalf("Start() while a prior Stop was still in flight = %v", err)
+		if transfer.ErrorCodeOf(err) != transfer.ErrServerStartFailed {
+			t.Fatalf("Start() while a prior Stop was still in flight = %v, want server_start_failed", err)
 		}
 	case <-time.After(1 * time.Second):
-		t.Fatal("Start() did not proceed while a prior Stop was still in flight -- " +
-			"s.mu is being held across the bounded wait instead of being released before it")
+		t.Fatal("Start() did not refuse promptly while a prior Stop was still in flight -- " +
+			"s.mu may be held across the bounded wait")
 	}
 
 	select {
@@ -593,11 +610,11 @@ func TestServerConfigurationIsPinned(t *testing.T) {
 	// timeouts seam, which is blind to the real duration: cutting it to 500ms
 	// left this whole package green while making a slow host's healthy teardown
 	// report failure.
-	if got := defaultTimeouts().teardown; got != teardownBound {
-		t.Fatalf("defaultTimeouts().teardown = %v, want %v", got, teardownBound)
+	if got := defaultTimeouts().teardown; got != TeardownBound {
+		t.Fatalf("defaultTimeouts().teardown = %v, want %v", got, TeardownBound)
 	}
-	if teardownBound != 10*time.Second {
-		t.Fatalf("teardownBound = %v, want 10s -- production uses this value", teardownBound)
+	if TeardownBound != 10*time.Second {
+		t.Fatalf("TeardownBound = %v, want 10s -- production uses this value", TeardownBound)
 	}
 	// Deliberately not asserted: that teardownBound outlasts readTimeout. That
 	// assertion was written and immediately failed, and the rule was the thing
@@ -1027,14 +1044,19 @@ func TestARealHandlerPanicIsReportedThroughErrorLog(t *testing.T) {
 func TestARepeatedStopReplaysTheFirstCallsCleanupDiagnostic(t *testing.T) {
 	t.Parallel()
 
-	server := newTestServer(t, payloadsReturning(&stubPayload{name: "report.pdf", known: true}))
-	handle := startTestServer(t, server, &stubAuthorizer{})
-	_ = handle
+	diagnostic := transfer.WrapError(transfer.ErrTransferFailed, "cleanup diagnostic fixture", errors.New("close failed"))
+	done := make(chan struct{})
+	close(done)
+	active := &run{teardownDone: done, teardownErr: diagnostic, serveDone: done, handlersDone: done, connsDone: done}
+	active.teardownOnce.Do(func() {})
+	active.quiesceOnce.Do(func() {})
+	server := &Server{active: active}
 
-	// Close the listener underneath the server so teardown's own http.Close
-	// reports a problem that is neither nil nor net.ErrClosed's benign shape.
 	first := server.Stop()
 	second := server.Stop()
+	if first == nil {
+		t.Fatal("the injected cleanup diagnostic was not reported")
+	}
 
 	if first == nil && second != nil {
 		t.Fatalf("the first Stop reported nothing and the second reported %v: they must agree", second)
@@ -1045,5 +1067,84 @@ func TestARepeatedStopReplaysTheFirstCallsCleanupDiagnostic(t *testing.T) {
 	}
 	if first != nil && second != nil && first.Error() != second.Error() {
 		t.Errorf("the first Stop reported %q and the second %q", first, second)
+	}
+}
+
+func TestEachServerTeardownWaitIsNamedInIsolation(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		open int
+		want string
+	}{
+		{name: "accept loop", open: 0, want: "transfer_failed: transfer server teardown did not finish before its bound: the accept loop did not return"},
+		{name: "handler", open: 1, want: "transfer_failed: transfer server teardown did not finish before its bound: a request handler did not return"},
+		{name: "connection", open: 2, want: "transfer_failed: transfer server teardown did not finish before its bound: a connection did not return"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			channels := []chan struct{}{make(chan struct{}), make(chan struct{}), make(chan struct{})}
+			for index := range channels {
+				if index != testCase.open {
+					close(channels[index])
+				}
+			}
+			r := &run{serveDone: channels[0], handlersDone: channels[1], connsDone: channels[2], timeouts: serverTimeouts{teardown: time.Millisecond}}
+			r.quiesceOnce.Do(func() {})
+			err := r.awaitQuiescence()
+			if !transfer.IsUnquiescent(err) {
+				t.Fatalf("awaitQuiescence() = %v, want structurally unquiescent failure", err)
+			}
+			if err.Error() != testCase.want {
+				t.Fatalf("awaitQuiescence() = %q, want exact isolated diagnostic %q", err, testCase.want)
+			}
+			close(channels[testCase.open])
+		})
+	}
+}
+
+func TestInitQuiescenceTracksRealHandlerAndConnectionWaitState(t *testing.T) {
+	t.Parallel()
+
+	serveDone := make(chan struct{})
+	close(serveDone)
+	active := &run{serveDone: serveDone, conns: make(map[net.Conn]struct{})}
+	active.connsGone = sync.NewCond(&active.mu)
+	active.handlers.Add(1)
+	left, right := net.Pipe()
+	t.Cleanup(func() {
+		_ = left.Close()
+		_ = right.Close()
+	})
+	active.trackConnection(left, http.StateNew)
+	active.beginStop()
+	active.initQuiescence()
+
+	assertStillOpen := func(name string, done <-chan struct{}) {
+		t.Helper()
+		select {
+		case <-done:
+			t.Fatalf("%s quiescence channel closed while its real work was still present", name)
+		case <-time.After(25 * time.Millisecond):
+			// Remaining open across a scheduling turn proves the waiter is tied
+			// to the real state, rather than merely not having run yet.
+		}
+	}
+	assertStillOpen("handler", active.handlersDone)
+	assertStillOpen("connection", active.connsDone)
+
+	active.handlers.Done()
+	awaitClosed(t, "handler quiescence channel", active.handlersDone)
+	active.trackConnection(left, http.StateClosed)
+	awaitClosed(t, "connection quiescence channel", active.connsDone)
+	if !active.quiesced() {
+		t.Fatal("run did not report quiescent after the real handler and connection state was released")
+	}
+}
+
+func awaitClosed(t *testing.T, name string, done <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatalf("%s did not close after its real wait state was released", name)
 	}
 }

@@ -810,7 +810,8 @@ line.
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-096
   summary: `network.Manager.StopBeacon` holds the selection gate across its own blocking Shutdown, so one hung mDNS shutdown degrades every later transfer in the process.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 2; StopBeacon detaches/coalesces normal and failed-start cleanup outside both locks, with assertion-validated mutations recorded in evidence-3-8-harden-the-directory-stream.md.
   evidence: Raised by the Blind Hunter layer reviewing Story 3.4 and verified against HEAD. `internal/network/beacon.go` takes `m.selectionGate` and `m.mu` and releases them by `defer`, after `handle.Shutdown()` returns. Story 3.4 bounded the coordinator's *wait* for `StopBeacon`, which stops the coordinator wedging -- but the adapter itself is unchanged, so a genuinely hung `Shutdown` leaves the gate held forever and every later `GetLocalIP` on the shared `Manager` blocks on it. `acquireSelectionGate` does honour its context, so an explicit Cancel can still unstick a later Stage, but nothing does that automatically. `internal/server.Server.Stop` received exactly this treatment in 3.4 -- detach, release the lock, then wait -- and the network adapter did not. The same fix shape applies. Not done in 3.4 because `internal/network` was outside that story's Code Map and the coordinator-side bound already removed the wedge the story was scoped to remove.
 
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
@@ -828,7 +829,8 @@ line.
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-099
   summary: The coordinator's bound on ServerPort.Stop equals the server's own teardown bound, so the outer wait can give up on an inner one that was about to succeed.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 2; the server's marked 10s inner timeout propagates through the coordinator's pinned 15s outer bound, with a root relationship test.
   evidence: Raised independently by the orchestrator and the Blind Hunter layer while reviewing Story 3.4. `adapterCallBound` is 10s in `internal/transfer/coordinator.go` and `teardownBound` is 10s in `internal/server/lifecycle.go`. The outer bound therefore races the inner one rather than outlasting it: the coordinator can report "the transfer server did not confirm it stopped" for a `Stop` that was about to return its own, more specific coded failure naming which wait was outstanding. Both values are now pinned by tests, but to their own literals -- nothing ties them to each other, because `internal/server` imports `internal/transfer` and the reverse import would be a cycle, and both constants are unexported. Fixing it means either exporting them for a root-package pin or giving the coordinator a margin above whatever the server documents. Harmless today in that both answers are honest failures; it costs the more precise message.
 
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
@@ -840,13 +842,15 @@ line.
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-101
   summary: `callBounded` abandons one goroutine per timed-out adapter call with no cap, so repeated attempts against a wedged device accumulate them.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 2; one retained in-flight call per adapter coalesces retries and Stage remains busy until late completion.
   evidence: Raised by the Blind Hunter layer reviewing Story 3.4. `callBounded` spawns a goroutine per bounded adapter call and abandons it when the bound elapses -- Go offers no way to make a function return, which the code documents honestly. The consequence the code does not address is accumulation: `NetworkPort.StopBeacon` takes no context and, per D-096, can hang forever, so a user retrying Cancel or Stage against the same broken device leaks one goroutine each time with no cap, backoff, or circuit breaker. Bounded in practice by how many times a person retries, and each goroutine is idle rather than spinning, which is why this is recorded rather than fixed in 3.4.
 
 - source_spec: `spec-3-4-bound-every-lifecycle-wait-and-prove-quiescence.md`
   id: D-102
   summary: Only one of the server teardown report's three named waits is ever driven by a test.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 2; accept-loop, handler and connection waits have exact isolated diagnostic assertions and separate name-removal mutations.
   evidence: Raised by the verification-gap layer reviewing Story 3.4. `teardownTimeoutError` names the accept loop, a request handler, and a tracked connection independently, and only the handler branch is exercised (`TestStopReturnsACodedFailureWhenAHandlerNeverReturns`, `TestStopBoundsAHandlerStuckInAuthorizeClaim`). `assertQuiescent` verifies the other two on the healthy path, so they are not unverified, but no test isolates a timeout where only the accept loop or only a connection is still outstanding -- so the wording of those two branches is unproven.
 
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`

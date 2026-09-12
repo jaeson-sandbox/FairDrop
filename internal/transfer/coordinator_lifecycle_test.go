@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -1267,13 +1268,14 @@ func TestAuthorizeClaimCommitsWhenStopBeaconNeverReturns(t *testing.T) {
 
 	blocked := make(chan struct{})
 	unblock := make(chan struct{})
+	var unblockOnce sync.Once
 	var once sync.Once
 	h.network.stopBeacon = func() error {
 		once.Do(func() { close(blocked) })
 		<-unblock
 		return nil
 	}
-	t.Cleanup(func() { close(unblock) })
+	t.Cleanup(func() { unblockOnce.Do(func() { close(unblock) }) })
 
 	claimDone := make(chan error, 1)
 	go func() { claimDone <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
@@ -1468,7 +1470,7 @@ func TestTheBoundsAreTheDocumentedDurationsNotJustSeams(t *testing.T) {
 		got  time.Duration
 		want time.Duration
 	}{
-		{"adapterCallBound", adapterCallBound, 10 * time.Second},
+		{"AdapterCleanupBound", AdapterCleanupBound, 15 * time.Second},
 		{"drainerJoinBound", drainerJoinBound, 10 * time.Second},
 		{"leaseBound", leaseBound, 45 * time.Second},
 	} {
@@ -1484,10 +1486,10 @@ func TestTheBoundsAreTheDocumentedDurationsNotJustSeams(t *testing.T) {
 	}
 
 	// leaseBound must outlast the sequence it is documented to cover: a
-	// StopBeacon and a ServerPort.Stop, each to adapterCallBound, then the
+	// StopBeacon and a ServerPort.Stop, each to AdapterCleanupBound, then the
 	// drainer join. Without margin a command could give up on a teardown that
 	// was still making progress within its own bounds.
-	sequential := 2*adapterCallBound + drainerJoinBound
+	sequential := 2*AdapterCleanupBound + drainerJoinBound
 	if leaseBound <= sequential {
 		t.Errorf("leaseBound = %v but the steps it covers can take %v in sequence: "+
 			"a command would abandon a teardown that was still inside its own bounds",
@@ -1581,6 +1583,101 @@ func TestCancelReportsACodedFailureWhenServerStopNeverReturns(t *testing.T) {
 	}
 }
 
+func TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes(t *testing.T) {
+	h := newHarness(t)
+	h.stageSuccessfully()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	var stopCalls atomic.Int32
+	h.server.stop = func() error {
+		if stopCalls.Add(1) == 1 {
+			close(entered)
+		}
+		<-release
+		return nil
+	}
+	t.Cleanup(func() { releaseOnce.Do(func() { close(release) }) })
+
+	cancelDone := make(chan error, 1)
+	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
+	<-entered
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		select {
+		case err := <-cancelDone:
+			if ErrorCodeOf(err) != ErrTransferFailed {
+				t.Fatalf("Cancel() = %v, want the forced server stop bound", err)
+			}
+			goto cancelled
+		default:
+			if time.Now().After(deadline) {
+				t.Fatal("Cancel did not return after its forced bounds")
+			}
+			if !h.bounds.fireIfArmed() {
+				time.Sleep(200 * time.Microsecond)
+			}
+		}
+	}
+
+cancelled:
+	beforeJoinedBound := h.bounds.armed()
+	joinedStop := make(chan error, 1)
+	go func() { joinedStop <- h.coordinator.stopServerBounded() }()
+	deadline = time.Now().Add(5 * time.Second)
+	for h.bounds.armed() == beforeJoinedBound {
+		if time.Now().After(deadline) {
+			t.Fatal("joined server cleanup did not arm its own bound")
+		}
+		runtime.Gosched()
+	}
+	h.bounds.fire()
+	if err := <-joinedStop; ErrorCodeOf(err) != ErrTransferFailed {
+		t.Fatalf("joined server cleanup = %v, want the pending call's forced bound", err)
+	}
+	if err := h.coordinator.Cancel(context.Background()); err != nil {
+		t.Fatalf("repeated Cancel while server cleanup is pending = %v", err)
+	}
+	if _, err := h.coordinator.Stage(context.Background(), testPath); ErrorCodeOf(err) != ErrBusy {
+		t.Fatalf("Stage while the timed-out production ServerPort.Stop still runs = %v, want busy", err)
+	}
+	if got := stopCalls.Load(); got != 1 {
+		t.Fatalf("pending server cleanup launched %d ServerPort.Stop calls, want one coalesced call", got)
+	}
+
+	releaseOnce.Do(func() { close(release) })
+	deadline = time.Now().Add(5 * time.Second)
+	for h.coordinator.cleanupPending() {
+		if time.Now().After(deadline) {
+			t.Fatal("server cleanup did not become quiescent after the real Stop call returned")
+		}
+		runtime.Gosched()
+	}
+	if _, err := h.coordinator.Stage(context.Background(), testPath); err != nil {
+		t.Fatalf("Stage after the production ServerPort.Stop completed = %v", err)
+	}
+	if got := stopCalls.Load(); got != 1 {
+		t.Fatalf("late cleanup touched the newer run: ServerPort.Stop calls = %d before its teardown, want one", got)
+	}
+}
+
+func TestCoordinatorPropagatesAnInnerUnquiescentServerFailure(t *testing.T) {
+	h := newHarness(t)
+	h.stageSuccessfully()
+	h.server.stop = func() error {
+		return MarkUnquiescent(NewError(ErrTransferFailed, "inner server wait named a connection"))
+	}
+
+	err := h.coordinator.Cancel(context.Background())
+	if !IsUnquiescent(err) {
+		t.Fatalf("Cancel() = %v, want the inner unquiescent marker preserved", err)
+	}
+	if !strings.Contains(err.Error(), "inner server wait named a connection") {
+		t.Fatalf("Cancel() = %v, want the inner server failure rather than an outer timeout", err)
+	}
+}
+
 // TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown pins that a bound which
 // elapsed is not recorded as a release.
 //
@@ -1598,6 +1695,7 @@ func TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown(t *testing.T) {
 	var hang atomic.Bool
 	hang.Store(true)
 	unblock := make(chan struct{})
+	var unblockOnce sync.Once
 	blocked := make(chan struct{})
 	var once sync.Once
 	h.network.stopBeacon = func() error {
@@ -1608,7 +1706,7 @@ func TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown(t *testing.T) {
 		<-unblock
 		return nil
 	}
-	t.Cleanup(func() { close(unblock) })
+	t.Cleanup(func() { unblockOnce.Do(func() { close(unblock) }) })
 
 	claimDone := make(chan error, 1)
 	go func() { claimDone <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
@@ -1626,20 +1724,40 @@ func TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown(t *testing.T) {
 		t.Fatal("AuthorizeClaim never returned")
 	}
 
-	// The beacon answers normally from here, so teardown's own attempt is the
-	// thing being observed rather than a second hang.
-	hang.Store(false)
-
 	before := strings.Count(strings.Join(portCalls(h), " "), "network.StopBeacon")
-	if err := h.coordinator.Cancel(context.Background()); err != nil {
-		t.Fatalf("Cancel returned %v", err)
+	beforeBounds := h.bounds.armed()
+	cancelDone := make(chan error, 1)
+	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for h.bounds.armed() == beforeBounds {
+		if time.Now().After(deadline) {
+			t.Fatal("the coalesced cleanup wait did not arm its own bound")
+		}
+		runtime.Gosched()
+	}
+	h.bounds.fire()
+	if err := <-cancelDone; ErrorCodeOf(err) != ErrTransferFailed {
+		t.Fatalf("Cancel returned %v, want the coalesced stop bound", err)
 	}
 	after := strings.Count(strings.Join(portCalls(h), " "), "network.StopBeacon")
+	if after != before {
+		t.Errorf("teardown launched another StopBeacon (%d then %d), want one coalesced outstanding call", before, after)
+	}
+	if _, err := h.coordinator.Stage(context.Background(), testPath); ErrorCodeOf(err) != ErrBusy {
+		t.Fatalf("Stage during outstanding cleanup = %v, want busy", err)
+	}
 
-	if after <= before {
-		t.Errorf("teardown made no further StopBeacon attempt (%d then %d): a beacon whose stop "+
-			"timed out was never confirmed stopped, so it must not be booked as released",
-			before, after)
+	hang.Store(false)
+	unblockOnce.Do(func() { close(unblock) })
+	deadline = time.Now().Add(5 * time.Second)
+	for h.coordinator.cleanupPending() {
+		if time.Now().After(deadline) {
+			t.Fatal("beacon cleanup did not become quiescent after StopBeacon returned")
+		}
+		runtime.Gosched()
+	}
+	if _, err := h.coordinator.Stage(context.Background(), testPath); err != nil {
+		t.Fatalf("Stage after cleanup completed = %v", err)
 	}
 }
 

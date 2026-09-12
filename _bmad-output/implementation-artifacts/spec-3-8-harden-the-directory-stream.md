@@ -2,7 +2,7 @@
 title: 'Story 3.8: Harden the Directory Stream'
 type: 'bugfix'
 created: '2026-09-12'
-status: 'in-progress'
+status: 'done'
 baseline_commit: '6a366121fa9fbcd218935aa2119970e3b4e6913a'
 review_loop_iteration: 0
 context:
@@ -60,8 +60,8 @@ Checkpoints: complete the first two tasks with matching documentation, run the f
 
 - [x] `internal/source`, `internal/transfer/ports.go`, `selection_source.go` — bounded traversal, prepared root ownership, synchronized reader revocation and source error correction; migrate all port consumers/fakes.
 - [x] `internal/stream`, shared archive-name predicate in `internal/transfer` — portable segment rejection at both boundaries, explicit modes and drain guard; test every matrix row.
-- [ ] `internal/network`, `internal/transfer/coordinator.go`, `internal/server/lifecycle_test.go`, root integration tests — coalesced cleanup, retry admission, related timeout budgets and isolated timeout branches.
-- [ ] Canonical SPEC, contracts, architecture/spine/memlog, epic context, `deferred-work.md`, `epics.md`, `sprint-status.yaml` — synchronize decisions and close all ten IDs plus retrospective action with evidence.
+- [x] `internal/network`, `internal/transfer/coordinator.go`, `internal/server/lifecycle_test.go`, root integration tests — coalesced cleanup, retry admission, related timeout budgets and isolated timeout branches.
+- [x] Canonical SPEC, contracts, architecture/spine/memlog, epic context, `deferred-work.md`, `epics.md`, `sprint-status.yaml` — synchronize decisions and close all ten IDs plus retrospective action with evidence.
 
 **Acceptance Criteria:**
 - Given native adapters, when a folder is transferred, then the matrix holds and file/HTTP-finalization regressions stay green.
@@ -74,6 +74,7 @@ Checkpoints: complete the first two tasks with matching documentation, run the f
 
 ## Spec Change Log
 
+- 2026-09-12: checkpoint 2 and whole-story independent Sol review completed; accepted coverage gaps patched with nine additional assertion-validated mutations. Full ordered local gate passed, including cgo/race and 498 frontend tests. All ten deferred IDs are discharged. Spec done; sprint review pending owner acceptance and native CI confirmation. Frozen intent and baseline unchanged.
 - 2026-09-12: checkpoint 1 implemented and pushed at c87940bf26454eaa03e647387e30cd418e15744b. Full local gates and native Verify 34682893871 passed; 18 new assertion-validated mutations pass on all three runners. First two tasks cover matrix rows 1–7; cleanup rows 8–10 and whole-story independent review remain pending. D-077/079/080/081/082/105 and the archive-drain retrospective action are discharged. Frozen intent is unchanged; spec/sprint stay in-progress.
 
 ## Design Notes
@@ -89,3 +90,30 @@ The handle budget limits our consumption, not ambient exhaustion. OS reads remai
 - Run AGENTS.md's complete sequential local gate, including native cgo/race, frontend, lint, bindings and line endings; normal Go timeout 240s, race 1200s.
 - Run foreign-platform preflight, then Windows/macOS native CI and Linux adapter verification. Preserve complete failures; read actual job conclusions.
 - Mutate depth, root identity/wiring, reader lifetime, name/mode, stall/error codes, cleanup admission/count, timeout relationship and each named wait; use existing assertion-associated mutation verdict tooling.
+
+## Suggested Review Order
+
+**Directory ownership and portable output**
+
+- Start here: retain root identity without eagerly enumerating or reading contents.
+  [prepared.go:24](../../internal/source/prepared.go#L24)
+- Carry the source-owned pin through lazy archive preparation.
+  [payload.go:217](../../internal/stream/payload.go#L217)
+- Apply one receiver-safe name rule at both source and ZIP boundaries.
+  [archive_name.go:11](../../internal/transfer/archive_name.go#L11)
+
+**Cleanup ownership and recovery**
+
+- Detach discovery under lock, then share one shutdown result outside locks.
+  [beacon.go:121](../../internal/network/beacon.go#L121)
+- Keep timed-out adapter calls owned instead of accumulating retry workers.
+  [coordinator.go:839](../../internal/transfer/coordinator.go#L839)
+- Name outstanding server work honestly and retain completion evidence for safe reuse.
+  [lifecycle.go:497](../../internal/server/lifecycle.go#L497)
+
+**Defensive proof**
+
+- Force joined cleanup failures; preserve identical causes and prevent overlapping responders.
+  [beacon_test.go:590](../../internal/network/beacon_test.go#L590)
+- Break guards deliberately and require named behavioral failures on native runners.
+  [verify-native-mutations.sh:1](../../scripts/verify-native-mutations.sh#L1)

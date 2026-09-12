@@ -26,6 +26,7 @@ type managerDependencies struct {
 	hostname   func() (string, error)
 	entropy    io.Reader
 	start      func(*mdns.Config) (beaconHandle, error)
+	stopJoined func()
 }
 
 type selection struct {
@@ -38,6 +39,11 @@ type processIdentity struct {
 	suffix string
 }
 
+type beaconStop struct {
+	done chan struct{}
+	err  error
+}
+
 // Manager deterministically selects one LAN endpoint and owns at most one
 // matching mDNS responder.
 type Manager struct {
@@ -48,6 +54,7 @@ type Manager struct {
 	selected      *selection
 	identity      *processIdentity
 	beacon        beaconHandle
+	stopping      *beaconStop
 }
 
 var _ transfer.NetworkPort = (*Manager)(nil)

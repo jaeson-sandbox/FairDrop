@@ -26,7 +26,7 @@ portable segment rejection, explicit ZIP modes, and the archive-drain stall guar
 Checkpoint 1 is verified at c87940bf26454eaa03e647387e30cd418e15744b: Verify
 34682893871 succeeded on Windows, macOS and Linux adapters; D-077/079/080/081/082/105
 and archive-drain are discharged. See `evidence-3-8-harden-the-directory-stream.md`;
-cleanup D-096/099/101/102 and formal whole-story review remain outstanding.
+cleanup D-096/099/101/102 implementation and local mutation proof are complete; formal whole-story review and final native verification remain outstanding. Checkpoint 2 retains one in-flight cleanup call per adapter, fences Stage/server reuse until actual completion, detaches network Shutdown from locks (including failed Start), and propagates the marked server 10-second timeout through a 15-second coordinator bound.
 Epic 3 is not complete.
 
 **Owner-approved resumption (2026-09-11):** fix both newly found blockers in

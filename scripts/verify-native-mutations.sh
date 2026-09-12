@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 scratch="$(mktemp -d)"
 platform="$(go env GOOS)"
-files=(internal/source/source.go internal/source/prepared.go internal/transfer/archive_name.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go selection_source.go single_instance_darwin.go .github/workflows/verify.yml)
+files=(internal/source/source.go internal/source/prepared.go internal/transfer/archive_name.go internal/transfer/coordinator.go internal/transfer/errors.go internal/network/beacon.go internal/network/network.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go selection_source.go single_instance_darwin.go .github/workflows/verify.yml)
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
   files+=("internal/source/handle_${platform}.go" internal/source/handle_posix.go)
 fi
@@ -57,6 +57,20 @@ baseline TestArchivePortableNamesAreRejectedAtBothBoundaries ./internal/stream
 baseline TestPrepareValidatesSanitizedArchiveRootAndReleasesPin ./internal/stream
 baseline TestArchiveEmitsExplicitPortableModes ./internal/stream
 baseline TestEmptyReadGuardsFailOnRead101AndResetOnProgress ./internal/stream
+# Story 3.8 checkpoint 2: cleanup ownership, retry fencing and nested bounds.
+baseline TestWedgedStopDetachesAndCoalescesWithoutPoisoningSelection ./internal/network
+baseline TestFailedStartCleanupDoesNotHoldManagerLocksOrAdmitAResponder ./internal/network
+baseline TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic ./internal/network
+baseline TestStopBeaconJoinsFailedStartCleanupAndRecovery ./internal/network
+baseline TestStageRechecksOutstandingCleanupAtAdmission ./internal/transfer
+baseline TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown ./internal/transfer
+baseline TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes ./internal/transfer
+baseline TestCoordinatorPropagatesAnInnerUnquiescentServerFailure ./internal/transfer
+baseline TestStopReleasesItsMutexBeforeWaitingAndFencesAConcurrentStart ./internal/server
+baseline TestEachServerTeardownWaitIsNamedInIsolation ./internal/server
+baseline TestInitQuiescenceTracksRealHandlerAndConnectionWaitState ./internal/server
+baseline TestCoordinatorCleanupOutlastsServerTeardown .
+baseline TestArchiveCloseDelegatesOnceAndPreservesThePreparedCause ./internal/stream
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
   baseline TestPOSIXContentOpenRefusesFIFOAfterMetadataWithoutBlocking ./internal/source
   baseline TestNativeChildNameRefusesReceiverVolumePrefixes ./internal/source
@@ -222,3 +236,72 @@ expect_named_failure 'remove archive drain stall guard' TestEmptyReadGuardsFailO
 
 perl -0pi -e 's/stalls = 0/stalls = stalls/ or die "archive drain reset mutation did not match\n"' internal/stream/archive.go
 expect_named_failure 'do not reset archive drain stalls' TestEmptyReadGuardsFailOnRead101AndResetOnProgress ./internal/stream 'drain did not reset empty-read count after progress'
+
+perl -0pi -e 's/if m\.stopping != nil/if false \&\& m.stopping != nil/ or die "network overlap mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'admit responder during outstanding cleanup' TestWedgedStopDetachesAndCoalescesWithoutPoisoningSelection ./internal/network 'want beacon_warning'
+
+perl -0pi -e 's/<-pending\.done\n\t\treturn pending\.err/<-pending.done\n\t\treturn nil/ or die "beacon join result mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'drop normal beacon joiner result' TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic ./internal/network 'want the same non-nil wrapped error'
+
+perl -0pi -e 's/<-pending\.done\n\t\treturn pending\.err/<-pending.done\n\t\treturn nil/ or die "failed-start join result mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'drop failed-start beacon joiner result' TestStopBeaconJoinsFailedStartCleanupAndRecovery ./internal/network 'want the same non-nil wrapped error'
+
+perl -0pi -e 's/if m\.stopping != nil \{/if m.stopping != nil { _, _ = m.deps.start(nil);/ or die "overlap factory mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'invoke beacon factory before cleanup refusal' TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic ./internal/network 'want the original one only'
+
+perl -0pi -e 's/if m\.stopping != nil \{/if m.stopping != nil { _, _ = m.deps.start(nil);/ or die "failed-start overlap factory mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'invoke beacon factory before failed-start refusal' TestStopBeaconJoinsFailedStartCleanupAndRecovery ./internal/network 'want one'
+
+perl -0pi -e 's/m\.mu\.Unlock\(\)\n\tm\.releaseSelectionGate\(\)\n\n\tpending\.err = beaconCleanupError/m.releaseSelectionGate()\n\n\tpending.err = beaconCleanupError/ or die "stop mutex mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'retain network mutex across Shutdown' TestWedgedStopDetachesAndCoalescesWithoutPoisoningSelection ./internal/network 'StopBeacon retained the manager mutex across Shutdown'
+
+perl -0pi -e 's/m\.mu\.Unlock\(\)\n\tm\.releaseSelectionGate\(\)\n\n\tpending\.err = beaconCleanupError/m.mu.Unlock()\n\n\tpending.err = beaconCleanupError/ or die "stop gate mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'retain selection gate across Shutdown' TestWedgedStopDetachesAndCoalescesWithoutPoisoningSelection ./internal/network 'StopBeacon retained the selection gate across Shutdown'
+
+perl -0pi -e 's/m\.mu\.Unlock\(\)\n\tm\.releaseSelectionGate\(\)\n\n\tcause = errors\.Join/m.releaseSelectionGate()\n\n\tcause = errors.Join/ or die "failed-start mutex mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'retain network mutex across failed-start cleanup' TestFailedStartCleanupDoesNotHoldManagerLocksOrAdmitAResponder ./internal/network 'failed StartBeacon retained the manager mutex across partial-handle Shutdown'
+
+perl -0pi -e 's/m\.mu\.Unlock\(\)\n\tm\.releaseSelectionGate\(\)\n\n\tcause = errors\.Join/m.mu.Unlock()\n\n\tcause = errors.Join/ or die "failed-start gate mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'retain selection gate across failed-start cleanup' TestFailedStartCleanupDoesNotHoldManagerLocksOrAdmitAResponder ./internal/network 'failed StartBeacon retained the selection gate across partial-handle Shutdown'
+
+perl -0pi -e 's/if c\.cleanupPending\(\)/if false \&\& c.cleanupPending()/ or die "stage cleanup admission mutation did not match\n"' internal/transfer/coordinator.go
+expect_named_failure 'admit Stage across outstanding cleanup' TestStageRechecksOutstandingCleanupAtAdmission ./internal/transfer 'Stage across cleanup-admission race'
+
+perl -0pi -e 's/pending := \*slot/pending := (*boundedCall)(nil)/ or die "cleanup coalescing mutation did not match\n"' internal/transfer/coordinator.go
+expect_named_failure 'launch repeated adapter cleanup workers' TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown ./internal/transfer 'teardown launched another StopBeacon'
+
+perl -0pi -e 's/c\.callAdapterBounded\(&c\.serverCleanup,/c.callAdapterBounded(new(*boundedCall),/ or die "server cleanup slot mutation did not match\n"' internal/transfer/coordinator.go
+expect_named_failure 'detach production server cleanup slot' TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes ./internal/transfer 'want busy'
+
+perl -0pi -e 's/pending := \*slot/pending := (*boundedCall)(nil)/ or die "server cleanup coalescing mutation did not match\n"' internal/transfer/coordinator.go
+expect_named_failure 'duplicate production server cleanup calls' TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes ./internal/transfer 'want one coalesced call'
+
+perl -0pi -e 's/AdapterCleanupBound = 15 \* time\.Second/AdapterCleanupBound = 10 * time.Second/ or die "outer bound mutation did not match\n"' internal/transfer/coordinator.go
+expect_named_failure 'equalize nested cleanup bounds' TestCoordinatorCleanupOutlastsServerTeardown . 'want 15s'
+
+perl -0pi -e 's/if IsUnquiescent\(err\)/if false \&\& IsUnquiescent(err)/ or die "inner timeout propagation mutation did not match\n"' internal/transfer/coordinator.go
+expect_named_failure 'absorb inner unquiescent failure as diagnostic' TestCoordinatorPropagatesAnInnerUnquiescentServerFailure ./internal/transfer 'want the inner unquiescent marker preserved'
+
+perl -0pi -e 's/return transfer\.MarkUnquiescent\(teardownTimeoutError\(([^\n]+)\)\)/return teardownTimeoutError($1)/ or die "unquiescent marker mutation did not match\n"' internal/server/lifecycle.go
+expect_named_failure 'erase server unquiescent marker' TestEachServerTeardownWaitIsNamedInIsolation ./internal/server 'want structurally unquiescent failure'
+
+perl -0pi -e 's/s\.unresolved = active/s.unresolved = nil/ or die "server retry fence mutation did not match\n"' internal/server/lifecycle.go
+expect_named_failure 'admit server run during prior teardown' TestStopReleasesItsMutexBeforeWaitingAndFencesAConcurrentStart ./internal/server 'want server_start_failed'
+
+perl -0pi -e 's/return transfer\.NewError\(\n\t\ttransfer\.ErrTransferFailed,\n\t\t"transfer server teardown did not finish before its bound: "\+strings\.Join\(outstanding, ", "\)\+" did not return",\n\t\)/return transfer.NewError(transfer.ErrTransferFailed, "transfer server teardown did not finish before its bound: the accept loop, a request handler, a connection did not return")/ or die "isolated wait mutation did not match\n"' internal/server/lifecycle.go
+expect_named_failure 'always name every server wait' TestEachServerTeardownWaitIsNamedInIsolation ./internal/server 'want exact isolated diagnostic'
+
+perl -0pi -e 's/if acceptLoop \{/if false \&\& acceptLoop {/ or die "accept-loop name mutation did not match\n"' internal/server/lifecycle.go
+expect_named_failure 'omit isolated accept-loop timeout name' TestEachServerTeardownWaitIsNamedInIsolation ./internal/server 'want exact isolated diagnostic'
+
+perl -0pi -e 's/if connections \{/if false \&\& connections {/ or die "connection name mutation did not match\n"' internal/server/lifecycle.go
+expect_named_failure 'omit isolated connection timeout name' TestEachServerTeardownWaitIsNamedInIsolation ./internal/server 'want exact isolated diagnostic'
+
+perl -0pi -e 's/r\.handlersDone = doneChannel\(r\.handlers\.Wait\)/r.handlersDone = doneChannel(func() {})/ or die "handler waiter wiring mutation did not match\n"' internal/server/lifecycle.go
+expect_named_failure 'detach real handler quiescence waiter' TestInitQuiescenceTracksRealHandlerAndConnectionWaitState ./internal/server 'handler quiescence channel closed while its real work was still present'
+
+perl -0pi -e 's/r\.connsDone = doneChannel\(r\.awaitConnections\)/r.connsDone = doneChannel(func() {})/ or die "connection waiter wiring mutation did not match\n"' internal/server/lifecycle.go
+expect_named_failure 'detach real connection quiescence waiter' TestInitQuiescenceTracksRealHandlerAndConnectionWaitState ./internal/server 'connection quiescence channel closed while its real work was still present'
+
+perl -0pi -e 's/err = a\.prepared\.Close\(\)/_ = a.prepared.Close()/ or die "archive close error mutation did not match\n"' internal/stream/archive.go
+expect_named_failure 'drop prepared directory close error' TestArchiveCloseDelegatesOnceAndPreservesThePreparedCause ./internal/stream 'want the prepared close cause and transfer_failed code preserved'
