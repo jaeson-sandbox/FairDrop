@@ -1642,6 +1642,15 @@ cancelled:
 	if _, err := h.coordinator.Stage(context.Background(), testPath); ErrorCodeOf(err) != ErrBusy {
 		t.Fatalf("Stage while the timed-out production ServerPort.Stop still runs = %v, want busy", err)
 	}
+	// Both this observation and the one after quiescence below prove the same
+	// property -- exactly one ServerPort.Stop was ever launched for this run --
+	// and which of them catches a broken coalescer is pure scheduling: the
+	// mutated call increments its counter inside the goroutine callAdapterBounded
+	// starts, which need not have run by the time this line executes. Measured
+	// at 8 of 10 here and 2 of 10 there on one machine, which is why they name
+	// the same property in the same words: the native mutation proof requires a
+	// named assertion, and a proof that depends on which goroutine ran first is
+	// a flake, not evidence.
 	if got := stopCalls.Load(); got != 1 {
 		t.Fatalf("pending server cleanup launched %d ServerPort.Stop calls, want one coalesced call", got)
 	}
@@ -1658,7 +1667,7 @@ cancelled:
 		t.Fatalf("Stage after the production ServerPort.Stop completed = %v", err)
 	}
 	if got := stopCalls.Load(); got != 1 {
-		t.Fatalf("late cleanup touched the newer run: ServerPort.Stop calls = %d before its teardown, want one", got)
+		t.Fatalf("late cleanup touched the newer run: ServerPort.Stop calls = %d, want one coalesced call", got)
 	}
 }
 
@@ -1864,5 +1873,33 @@ func TestAnObserverThatNeverReturnsCannotHoldACommand(t *testing.T) {
 	}
 	if !reported {
 		t.Errorf("no diagnostic says an event went unconfirmed; the seam saw %+v", h.diagnosed.snapshot())
+	}
+}
+
+// TestTheLeaseOutlastsTheWholeCleanupChain pins the claim leaseBound's own
+// comment makes: that it "covers the worst case of every bounded step above
+// running to its own bound in sequence (StopBeacon, ServerPort.Stop, the
+// drainer join) plus margin".
+//
+// Story 3.8 raised AdapterCleanupBound to 15s so the coordinator outlasts the
+// server's own 10s teardown (D-099), and pinned that pair in the root package.
+// It left the next pair in the same chain unpinned: one unwind can spend
+// AdapterCleanupBound twice and drainerJoinBound once, all while holding the
+// lease, and a concurrent Cancel or Shutdown waits leaseBound for it. Today
+// that is 40s against 45s. Raising AdapterCleanupBound by three seconds
+// inverts it, and the failure is the same shape D-099 described one level up:
+// the joiner gives up and reports the lease bound over a teardown that was
+// about to finish and would have reported which resource was actually stuck.
+//
+// In-package because leaseBound is unexported, and it should stay that way:
+// nothing outside this package has any business waiting on the lease.
+func TestTheLeaseOutlastsTheWholeCleanupChain(t *testing.T) {
+	chain := 2*AdapterCleanupBound + drainerJoinBound
+
+	if chain >= leaseBound {
+		t.Fatalf("one unwind can hold the lease for %v (StopBeacon %v + ServerPort.Stop %v + drainer join %v) "+
+			"while a joining Cancel or Shutdown waits only %v: the joiner would report the lease bound over a "+
+			"teardown still inside its own budget",
+			chain, AdapterCleanupBound, AdapterCleanupBound, drainerJoinBound, leaseBound)
 	}
 }
