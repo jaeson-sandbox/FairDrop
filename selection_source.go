@@ -45,11 +45,17 @@ func (s *selectionSource) Inspect(ctx context.Context, path string) (transfer.St
 	case <-ctx.Done():
 		return transfer.StagedItem{}, selectionResolutionCancelled()
 	case canonical := <-result:
-		if ctx.Err() != nil {
-			return transfer.StagedItem{}, selectionResolutionCancelled()
-		}
-		return s.SourcePort.Inspect(ctx, canonical)
+		return s.inspectResolved(ctx, canonical)
 	}
+}
+
+// Cancellation can race result delivery. Keep this acceptance gate separate
+// from select's nondeterministic choice when both channels are ready.
+func (s *selectionSource) inspectResolved(ctx context.Context, canonical string) (transfer.StagedItem, error) {
+	if ctx.Err() != nil {
+		return transfer.StagedItem{}, selectionResolutionCancelled()
+	}
+	return s.SourcePort.Inspect(ctx, canonical)
 }
 
 func selectionResolutionCancelled() error {
@@ -66,6 +72,23 @@ func resolveSelectionAncestors(selection string) string {
 func resolveAncestorsWith(selection string, eval func(string) (string, error)) string {
 	if !filepath.IsAbs(selection) {
 		return selection // The source owns invalid/missing-path classifications.
+	}
+	// EvalSymlinks clamps '..' at the root. The source deliberately refuses
+	// that spelling, so never canonicalize away an attempted root escape.
+	depth := 0
+	for _, component := range strings.FieldsFunc(selection[len(filepath.VolumeName(selection)):], func(r rune) bool {
+		return r < 128 && os.IsPathSeparator(uint8(r))
+	}) {
+		switch component {
+		case ".":
+		case "..":
+			if depth == 0 {
+				return selection
+			}
+			depth--
+		default:
+			depth++
+		}
 	}
 	if os.PathSeparator == '\\' {
 		// Device/extended namespaces have a stricter source grammar. Do not

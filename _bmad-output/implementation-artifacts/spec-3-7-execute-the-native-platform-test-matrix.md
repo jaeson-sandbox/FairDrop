@@ -2,7 +2,7 @@
 title: 'Story 3.7: Execute the Native Platform Test Matrix'
 type: 'chore'
 created: '2026-09-11'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 'd43aa69db42c19324bae9f837b909649ca608099'
 review_loop_iteration: 1
 context:
@@ -59,7 +59,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Review loop 1: implement the corrected admission, lock, identity, half-close, ZIP64-offset and CI-proof requirements above; full-stack matrix observes matching natural Complete before cleanup and tests Unicode/space leaf names, returned metadata, HTTP filename and ZIP entry names. Record independent review triage and new mutation/native results in evidence.
+- [x] Review loop 1: implement the corrected admission, lock, identity, half-close, ZIP64-offset and CI-proof requirements above; full-stack matrix observes matching natural Complete before cleanup and tests Unicode/space leaf names, returned metadata, HTTP filename and ZIP entry names. Record independent review triage and new mutation/native results in evidence.
 - [x] `internal/server` — close D-110 with deterministic framing/final-write tests and full-stack file/folder regression coverage.
 - [x] `internal/source` — supported Darwin no-read metadata inspection with native permissions, identity, no-follow and content-read separation tests; retain Linux O_PATH.
 - [x] `.github/workflows/verify.yml` — a Linux job running vet and the Go suite, labelled adapter verification and not release proof; no `wails build`, no frontend steps.

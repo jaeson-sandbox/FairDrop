@@ -134,11 +134,19 @@ func TestDarwinLockPreflightDisablesWailsForUnusablePath(t *testing.T) {
 }
 
 func TestDarwinNativeLockTemporaryDirectoryIsUsable(t *testing.T) {
-	if nativeLockTempDir() == "" {
-		t.Fatal("Foundation returned no lock temporary directory")
-	}
-	if !nativeSingleInstanceLockUsable() {
+	usable := nativeLockTempDir() != "" && nativeSingleInstanceLockUsable()
+	if !usable && os.Getenv("GITHUB_ACTIONS") == "true" {
 		t.Fatal("native Wails lock location is unusable on this runner")
+	}
+	app := NewApp()
+	logged := false
+	app.logf = func(string, ...any) { logged = true }
+	option := singleInstanceOption(app, func() bool { return usable })
+	if (option != nil) != usable || logged == usable {
+		t.Fatal("native lock usability did not select the matching launch behavior")
+	}
+	if !usable {
+		t.Log("local native lock is unusable; degraded launch behavior verified, not counted as usable-location proof")
 	}
 }
 

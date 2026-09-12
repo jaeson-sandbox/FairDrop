@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -111,12 +112,89 @@ func TestSelectionResolutionRetryAfterFilesystemReturns(t *testing.T) {
 	if err := os.WriteFile(file, []byte("native matrix payload"), 0o600); err != nil {
 		t.Fatal("fixture write failed")
 	}
-	// The production default must canonicalize before Inspect and preserve the
-	// raw inspector for later streaming; native matrix tests exercise that path.
-	if _, err := app.StageTransfer(file); err != nil {
-		t.Fatal("healthy resolution failed")
+	entered, release := make(chan struct{}), make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(release) })
+	defer unblock()
+	inspector.selection.resolve = func(path string) string {
+		close(entered)
+		<-release
+		return resolveSelectionAncestors(path)
 	}
-	if inspector.calls.Load() != 1 || inspector.networkCalls.Load() != 1 {
-		t.Fatal("healthy selection did not inspect before network")
+	staged := make(chan error, 1)
+	go func() { _, err := app.StageTransfer(file); staged <- err }()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("abandoned resolver never entered")
+	}
+	if err := app.CancelTransfer(); err != nil {
+		t.Fatal("blocked selection cancellation failed")
+	}
+	select {
+	case err := <-staged:
+		if err == nil {
+			t.Fatal("abandoned selection staged")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled Stage waited for filesystem")
+	}
+	if _, err := app.StageTransfer(file); transfer.ErrorCodeOf(err) != transfer.ErrBusy {
+		t.Fatal("retry did not remain busy while resolver outstanding")
+	}
+	unblock()
+	deadline := time.After(5 * time.Second)
+	for inspector.selection.resolving.Load() {
+		select {
+		case <-deadline:
+			t.Fatal("returned resolver retained ownership")
+		default:
+			runtime.Gosched()
+		}
+	}
+	if inspector.calls.Load() != 0 || inspector.networkCalls.Load() != 0 {
+		t.Fatal("abandoned resolution reached Inspect or network")
+	}
+	// The worker has returned; a fresh Stage must now traverse the production
+	// resolver and complete a real HTTP transfer on this same coordinator.
+	inspector.selection.resolve = resolveSelectionAncestors
+	// Ignore lifecycle events belonging to the abandoned attempt.
+	for len(inspector.events) != 0 {
+		<-inspector.events
+	}
+	assertNativeDownloadWithApp(t, app, inspector, file, false)
+	// Stage inspects once; the real payload preparation revalidates once.
+	if inspector.calls.Load() != 2 || inspector.networkCalls.Load() != 1 {
+		t.Fatal("fresh selection and real download did not inspect and revalidate exactly once")
+	}
+}
+
+func TestSelectionResolutionCancellationImmediatelyBeforeResult(t *testing.T) {
+	_, inspector := nativeMatrixApp(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cancel()
+	// Drive the exact production result-acceptance gate with a real cancelled
+	// context. This deterministically tests that gate, not select's random arm.
+	_, err := inspector.selection.inspectResolved(ctx, "private selection")
+	if transfer.ErrorCodeOf(err) != transfer.ErrCancelled || inspector.calls.Load() != 0 || inspector.networkCalls.Load() != 0 {
+		t.Fatal("cancelled result reached raw Inspect or network instead of cancelled refusal")
+	}
+	data, err := os.ReadFile("selection_source.go")
+	if err != nil {
+		t.Fatal("selection result wiring source unavailable")
+	}
+	if !strings.Contains(strings.ReplaceAll(string(data), "\r\n", "\n"), "case canonical := <-result:\n\t\treturn s.inspectResolved(ctx, canonical)") {
+		t.Fatal("production result arm bypasses cancellation acceptance gate")
+	}
+}
+
+func TestSelectionResolutionCancellationAtResolverReturn(t *testing.T) {
+	_, inspector := nativeMatrixApp(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	inspector.selection.resolve = func(path string) string { cancel(); return path }
+	_, err := inspector.selection.Inspect(ctx, "private selection")
+	if transfer.ErrorCodeOf(err) != transfer.ErrCancelled || inspector.calls.Load() != 0 || inspector.networkCalls.Load() != 0 {
+		t.Fatal("cancelled result reached raw Inspect or network instead of cancelled refusal")
 	}
 }

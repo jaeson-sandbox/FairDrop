@@ -20,9 +20,10 @@ trap restore EXIT
 
 baseline() {
   local test_name="$1" package="$2" status=0
-  go test -count=1 -v -timeout 60s -run "^$test_name$" "$package" > "$scratch/baseline-$test_name.log" 2>&1 || status=$?
+  go test -count=1 -json -timeout 60s -run "^$test_name$" "$package" > "$scratch/baseline-$test_name.log" 2>&1 || status=$?
   cat "$scratch/baseline-$test_name.log"
   go run ./scripts/mutationverdict -mode baseline -test "$test_name" -status "$status" -log "$scratch/baseline-$test_name.log"
+  echo "BASELINE PASSED: $test_name (structured test and package pass)"
 }
 
 # A failing or skipped fixture cannot establish the mutation's baseline.
@@ -32,6 +33,11 @@ baseline TestHTTPRejectionsPreserveTCPHalfClose ./internal/server
 baseline TestWriteToConcurrentCallersStreamExactlyOnce ./internal/stream
 baseline TestStageTransferRefusesSelectedSymlinkAndPreservesTraversalRefusals .
 baseline TestSelectionResolutionHonoursAdmissionAndCancellation .
+baseline TestSelectionResolutionCancellationImmediatelyBeforeResult .
+baseline TestSelectionResolutionCancellationAtResolverReturn .
+baseline TestNativeRootEscapeRemainsPathUnsupported .
+baseline TestHeaderOnlyFinalizationWaitsAndRetainsFailureCodes ./internal/server
+baseline TestVerifyWorkflowExecutesGateCommandsInActiveFields .
 baseline TestVerifyWorkflowLinuxJobIsAdapterVerificationOnly .
 baseline TestVerifyWorkflowPinsNativeProofGatesToTheirJobsAndPlatforms .
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
@@ -49,10 +55,12 @@ fi
 
 expect_named_failure() {
   local label="$1" test_name="$2" package="$3" evidence="$4" status=0
-  go test -count=1 -v -timeout 60s -run "^${test_name}$" "$package" > "$scratch/result.log" 2>&1 || status=$?
-  cat "$scratch/result.log"
-  go run ./scripts/mutationverdict -mode mutation -test "$test_name" -assert "$evidence" -status "$status" -log "$scratch/result.log"
-  echo "KILLED: $label by $test_name"
+  echo "EXPECTED INJECTED FAILURE: $label; requires '$evidence' in a failing test/subtest of $test_name"
+  local result="$scratch/mutation-${test_name}-${label// /_}.log"
+  go test -count=1 -json -timeout 60s -run "^${test_name}$" "$package" > "$result" 2>&1 || status=$?
+  cat "$result"
+  go run ./scripts/mutationverdict -mode mutation -test "$test_name" -assert "$evidence" -status "$status" -log "$result"
+  echo "KILLED: $label by $test_name (expected injected assertion failure, not a product failure)"
   restore
 }
 
@@ -101,7 +109,7 @@ perl -0pi -e 's/if !p\.streamed\.CompareAndSwap/if false \&\& !p.streamed.Compar
 expect_named_failure 'allow a concurrent file reader' TestWriteToConcurrentCallersStreamExactlyOnce ./internal/stream 'concurrent second WriteTo read the file instead of refusing ownership'
 
 perl -0pi -e 's/if !a\.streamed\.CompareAndSwap/if false \&\& !a.streamed.CompareAndSwap/ or die "archive ownership mutation did not match\n"' internal/stream/archive.go
-expect_named_failure 'allow a concurrent archive writer' TestWriteToConcurrentCallersStreamExactlyOnce ./internal/stream 'concurrent second WriteTo was not refused before writing'
+expect_named_failure 'allow a concurrent archive writer' TestWriteToConcurrentCallersStreamExactlyOnce ./internal/stream 'concurrent second WriteTo walked or consumed source bytes instead of refusing ownership'
 
 perl -0pi -e 's/if err == nil \&\& n != len\(p\)/if false \&\& err == nil \&\& n != len(p)/ or die "short-write mutation did not match\n"' internal/server/lifecycle.go
 expect_named_failure 'ignore final short write' TestNaturalCompletionWaitsForHTTPFinalization ./internal/server 'failed final write was not reported as transfer_failed'
@@ -110,7 +118,7 @@ perl -0pi -e 's/r\.finalizeAfterResponse\(request, event\)/r.finish(\&event)/ or
 expect_named_failure 'publish preparation failure before 410 finalization' TestPreparationFailureFinalizes410BeforeTerminalTeardown ./internal/server 'unexpected failed event'
 
 perl -0pi -e 's/return filepath\.Join\(parent, leaf\) \+ selection\[len\(leafPath\):\]/resolved, _ := filepath.EvalSymlinks(filepath.Join(parent, leaf)); return resolved + selection[len(leafPath):]/ or die "leaf mutation did not match\n"' selection_source.go
-expect_named_failure 'resolve the selected leaf' TestStageTransferRefusesSelectedSymlinkAndPreservesTraversalRefusals . 'entry resolution bypassed an existing traversal refusal'
+expect_named_failure 'resolve the selected leaf' TestStageTransferRefusesSelectedSymlinkAndPreservesTraversalRefusals . 'entry resolution changed traversal refusal'
 
 perl -0pi -e 's/\n  linux-adapters:.*\z/\n/s or die "Linux job mutation did not match\n"' .github/workflows/verify.yml
 expect_named_failure 'remove Linux adapter job' TestVerifyWorkflowLinuxJobIsAdapterVerificationOnly . 'Linux adapter verification job is missing'
@@ -127,3 +135,18 @@ expect_named_failure 'hide TCP half-close' TestHTTPRejectionsPreserveTCPHalfClos
 
 perl -0pi -e 's/if !s\.resolving\.CompareAndSwap\(false, true\)/if false \&\& !s.resolving.CompareAndSwap(false, true)/ or die "resolution ownership mutation did not match\n"' selection_source.go
 expect_named_failure 'admit multiple unresolved calls' TestSelectionResolutionHonoursAdmissionAndCancellation . 'retry admitted additional unresolved filesystem work'
+
+perl -0pi -e 's/if ctx\.Err\(\) != nil/if false \&\& ctx.Err() != nil/ or die "post-result cancellation mutation did not match\n"' selection_source.go
+expect_named_failure 'ignore cancellation at result delivery' TestSelectionResolutionCancellationImmediatelyBeforeResult . 'cancelled result reached raw Inspect or network instead of cancelled refusal'
+
+perl -0pi -e 's/return s\.inspectResolved\(ctx, canonical\)/return s.SourcePort.Inspect(ctx, canonical)/ or die "result wiring mutation did not match\n"' selection_source.go
+expect_named_failure 'bypass result acceptance gate' TestSelectionResolutionCancellationImmediatelyBeforeResult . 'production result arm bypasses cancellation acceptance gate'
+
+perl -0pi -e 's/if depth == 0/if false \&\& depth == 0/ or die "root-escape mutation did not match\n"' selection_source.go
+expect_named_failure 'canonicalize away root escape' TestNativeRootEscapeRemainsPathUnsupported . 'root escape must remain path_unsupported'
+
+perl -0pi -e 's/if err == nil \&\& n != len\(p\)/if false \&\& err == nil \&\& n != len(p)/ or die "empty short-write mutation did not match\n"' internal/server/lifecycle.go
+expect_named_failure 'ignore empty-file header short write' TestHeaderOnlyFinalizationWaitsAndRetainsFailureCodes ./internal/server 'failed empty-file final write was not reported as transfer_failed'
+
+perl -0pi -e 's/run: go vet \.\/\.\.\./run: true # go vet .\/.../ or die "comment-only gate mutation did not match\n"' .github/workflows/verify.yml
+expect_named_failure 'replace executable vet with comment' TestVerifyWorkflowExecutesGateCommandsInActiveFields . 'executable gate fields differ'

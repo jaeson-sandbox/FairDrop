@@ -94,6 +94,11 @@ func nativeMatrixApp(t *testing.T) (*App, *inspectedNativeSource) {
 func assertNativeDownload(t *testing.T, selected string, folder bool) {
 	t.Helper()
 	app, inspector := nativeMatrixApp(t)
+	assertNativeDownloadWithApp(t, app, inspector, selected, folder)
+}
+
+func assertNativeDownloadWithApp(t *testing.T, app *App, inspector *inspectedNativeSource, selected string, folder bool) {
+	t.Helper()
 	metadata, err := app.StageTransfer(selected)
 	if err != nil {
 		t.Fatalf("native stage refused: code=%s", transfer.ErrorCodeOf(err))
@@ -310,12 +315,50 @@ func TestStageTransferRefusesSelectedSymlinkAndPreservesTraversalRefusals(t *tes
 	}
 	link := filepath.Join(base, "selected-link")
 	nativeMatrixDirectoryLink(t, target, link)
+	fileLink := filepath.Join(base, "selected-file-link")
+	nativeMatrixDirectoryLink(t, file, fileLink)
 	sep := string(os.PathSeparator)
-	for index, selected := range []string{link, link + sep, link + sep + ".", link + sep + "..", file + sep, file + sep + ".." + sep + "report.txt"} {
-		t.Run(fmt.Sprint(index), func(t *testing.T) {
+	for _, tc := range []struct{ name, selected, code string }{
+		{"directory-link", link, "path_unsupported"},
+		{"file-link", fileLink, "path_unsupported"},
+		{"trailing-link", link + sep, "path_unsupported"},
+		{"link-dot", link + sep + ".", "path_unsupported"},
+		{"link-parent", link + sep + "..", "path_unsupported"},
+		{"trailing-file", file + sep, "path_unsupported"},
+		{"file-parent", file + sep + ".." + sep + "report.txt", "path_unsupported"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			app, _ := nativeMatrixApp(t)
-			if _, err := app.StageTransfer(selected); err == nil {
-				t.Fatal("entry resolution bypassed an existing traversal refusal")
+			if _, err := app.StageTransfer(tc.selected); string(transfer.ErrorCodeOf(err)) != tc.code {
+				t.Fatalf("entry resolution changed traversal refusal: code=%s want=%s", transfer.ErrorCodeOf(err), tc.code)
+			}
+		})
+	}
+}
+
+func TestNativeRootEscapeRemainsPathUnsupported(t *testing.T) {
+	file, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal("native canonical fixture unavailable")
+	}
+	file = filepath.Join(file, "report.txt")
+	if err := os.WriteFile(file, []byte("native matrix payload"), 0o600); err != nil {
+		t.Fatal("native fixture write failed")
+	}
+	paths := []string{file}
+	if runtime.GOOS == "windows" {
+		if unc := os.Getenv("FAIRDROP_TEST_UNC_FILE"); unc != "" {
+			paths = append(paths, unc)
+		}
+	}
+	for index, path := range paths {
+		t.Run(fmt.Sprint(index), func(t *testing.T) {
+			volume := filepath.VolumeName(path)
+			rest := path[len(volume):]
+			selected := volume + string(os.PathSeparator) + ".." + rest
+			app, _ := nativeMatrixApp(t)
+			if _, err := app.StageTransfer(selected); transfer.ErrorCodeOf(err) != transfer.ErrPathUnsupported {
+				t.Fatalf("root escape must remain path_unsupported: code=%s", transfer.ErrorCodeOf(err))
 			}
 		})
 	}

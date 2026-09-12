@@ -3,6 +3,7 @@ package stream
 import (
 	"bytes"
 	"context"
+	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -22,6 +23,33 @@ type heldDestination struct {
 type countedPayloadFile struct {
 	payloadFile
 	reads atomic.Int64
+}
+
+type countedWalkSource struct {
+	transfer.SourcePort
+	walks atomic.Int64
+	bytes atomic.Int64
+}
+
+func (s *countedWalkSource) Walk(ctx context.Context, path string, visit transfer.SourceVisitor) error {
+	s.walks.Add(1)
+	return s.SourcePort.Walk(ctx, path, func(entry transfer.SourceEntry, content io.Reader) error {
+		if content != nil {
+			content = countedWalkReader{Reader: content, bytes: &s.bytes}
+		}
+		return visit(entry, content)
+	})
+}
+
+type countedWalkReader struct {
+	io.Reader
+	bytes *atomic.Int64
+}
+
+func (r countedWalkReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	r.bytes.Add(int64(n))
+	return n, err
 }
 
 func (f *countedPayloadFile) Read(p []byte) (int, error) {
@@ -47,7 +75,8 @@ func TestWriteToConcurrentCallersStreamExactlyOnce(t *testing.T) {
 				selected = fixtureDir(t)
 				writeTree(t, selected, map[string]string{"content.txt": "single winner"})
 			}
-			prepared, err := New(source.New()).Prepare(context.Background(), stage(t, selected))
+			walkSource := &countedWalkSource{SourcePort: source.New()}
+			prepared, err := New(walkSource).Prepare(context.Background(), stage(t, selected))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -72,6 +101,10 @@ func TestWriteToConcurrentCallersStreamExactlyOnce(t *testing.T) {
 			// The first caller is definitely still streaming, not merely done
 			// before the second begins. The loser must return without writing.
 			var refused bytes.Buffer
+			walksBefore, bytesBefore := walkSource.walks.Load(), walkSource.bytes.Load()
+			if folder && (walksBefore != 1 || bytesBefore != 13) {
+				t.Fatal("folder winner did not finish its source reads before the destination gate")
+			}
 			var before int64
 			if counted != nil {
 				before = counted.reads.Load()
@@ -80,6 +113,9 @@ func TestWriteToConcurrentCallersStreamExactlyOnce(t *testing.T) {
 			go func() { second <- prepared.WriteTo(context.Background(), &refused) }()
 			select {
 			case err := <-second:
+				if folder && (walkSource.walks.Load() != walksBefore || walkSource.bytes.Load() != bytesBefore) {
+					t.Fatal("concurrent second WriteTo walked or consumed source bytes instead of refusing ownership")
+				}
 				// A second read at EOF also returns transfer_failed with zero
 				// output. That is not an ownership refusal: it consumed the
 				// descriptor and would steal bytes from a larger first stream.

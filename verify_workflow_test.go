@@ -163,11 +163,80 @@ func verifyStep(job, name string) string {
 	if !found {
 		return ""
 	}
-	block, _, _ = strings.Cut(block, "      - name:")
+	block, _, _ = strings.Cut(block, "\n      - ")
 	return block
 }
 
+// These pins cover the workflow's deliberately narrow block-style syntax.
+// Read fields only at their owning indentation, not comments, step names, or
+// an env/with field that merely repeats an expected executable string.
+func executableWorkflow(text string) string {
+	var lines []string
+	for _, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+		var quote rune
+		escaped := false
+		for index, char := range line {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if char == '\\' && quote == '"' {
+				escaped = true
+				continue
+			}
+			if quote != 0 {
+				if char == quote {
+					quote = 0
+				}
+				continue
+			}
+			if char == '\'' || char == '"' {
+				quote = char
+				continue
+			}
+			if char == '#' && (index == 0 || line[index-1] == ' ') {
+				line = line[:index]
+				break
+			}
+		}
+		lines = append(lines, strings.TrimRight(line, " \t"))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func workflowField(block, field string, indent int) string {
+	prefix := strings.Repeat(" ", indent) + field + ":"
+	lines := strings.Split(block, "\n")
+	value, found := "", false
+	for index, line := range lines {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		if found {
+			return "<duplicate field>"
+		}
+		found = true
+		value = strings.TrimSpace(strings.TrimPrefix(line, prefix))
+		if value == "|" {
+			var body []string
+			for _, next := range lines[index+1:] {
+				if strings.TrimSpace(next) == "" {
+					body = append(body, "")
+					continue
+				}
+				if !strings.HasPrefix(next, strings.Repeat(" ", indent+2)) {
+					break
+				}
+				body = append(body, strings.TrimPrefix(next, strings.Repeat(" ", indent+2)))
+			}
+			value = strings.TrimSpace(strings.Join(body, "\n"))
+		}
+	}
+	return value
+}
+
 func nativeProofGaps(workflow string) []string {
+	workflow = executableWorkflow(workflow)
 	desktop, linux := verifyJob(workflow, "verify"), verifyJob(workflow, "linux-adapters")
 	var gaps []string
 	for _, pin := range []struct{ job, step, command, condition string }{
@@ -178,7 +247,13 @@ func nativeProofGaps(workflow string) []string {
 		{desktop, "Provision native Windows UNC fixtures", "New-SmbShare -Name FairDropNativeMatrix", "if: runner.os == 'Windows'"},
 	} {
 		step := verifyStep(pin.job, pin.step)
-		if !strings.Contains(step, pin.command) || (pin.condition != "" && !strings.Contains(step, pin.condition)) || (pin.condition == "" && strings.Contains(step, "if:")) {
+		command := strings.TrimPrefix(pin.command, "run: ")
+		run := workflowField(step, "run", 8)
+		commandMatches := run == command
+		if pin.step == "Provision native Windows UNC fixtures" {
+			commandMatches = strings.Contains("\n"+run, "\n"+command+" -Path $fixture -FullAccess ([Security.Principal.WindowsIdentity]::GetCurrent().Name) | Out-Null") && workflowField(step, "shell", 8) == "pwsh"
+		}
+		if !commandMatches || workflowField(step, "if", 8) != strings.TrimPrefix(pin.condition, "if: ") || workflowField(pin.job, "if", 4) != "" {
 			gaps = append(gaps, pin.step)
 		}
 	}
@@ -199,10 +274,97 @@ func TestVerifyWorkflowNativeProofPinsRejectRemovalAndWrongPlatform(t *testing.T
 		{"run: bash scripts/verify-native-mutations.sh", "run: true"},
 		{"if: runner.os == 'Windows'", "if: runner.os == 'macOS'"},
 		{"  linux-adapters:", "  misplaced-adapters:"},
+		{"run: bash scripts/smoke-darwin-unusable-lock.sh", "run: true # run: bash scripts/smoke-darwin-unusable-lock.sh"},
+		{"run: bash scripts/verify-native-mutations.sh", "# run: bash scripts/verify-native-mutations.sh\n        run: true"},
+		{"if: always()", "if: false # if: always()"},
+		{"if: runner.os == 'macOS'", "env:\n          if: runner.os == 'macOS'"},
+		{"  verify:\n", "  verify:\n    if: false\n"},
 	} {
 		changed := strings.ReplaceAll(workflow, mutation.before, mutation.after)
 		if changed == workflow || len(nativeProofGaps(changed)) == 0 {
 			t.Fatal("native proof workflow pin accepted a removed or misplaced gate")
+		}
+	}
+}
+
+func executableGateGaps(workflow string) []string {
+	workflow = executableWorkflow(workflow)
+	var gaps []string
+	for _, pin := range []struct{ job, step, command, directory string }{
+		{"verify", "wails build", "wails build", ""},
+		{"verify", "Check for bindings drift and a restored .gitkeep", `if [ ! -f frontend/dist/.gitkeep ]; then
+  echo "frontend/dist/.gitkeep is missing after wails build" >&2
+  exit 1
+fi
+if ! git -c core.fileMode=false diff --quiet -- frontend/wailsjs; then
+  echo "wails build changed frontend/wailsjs -- the committed bindings are stale:" >&2
+  git -c core.fileMode=false diff -- frontend/wailsjs >&2
+  exit 1
+fi`, ""},
+		{"verify", "gofmt -l", `unformatted="$(gofmt -l .)"
+if [ -n "$unformatted" ]; then
+  echo "gofmt found unformatted files:" >&2
+  echo "$unformatted" >&2
+  exit 1
+fi`, ""},
+		{"verify", "Confirm cgo is enabled", `enabled="$(go env CGO_ENABLED)"
+if [ "$enabled" != "1" ]; then
+  echo "CGO_ENABLED=$enabled, want 1: no C toolchain was detected for this runner" >&2
+  exit 1
+fi
+probe="$RUNNER_TEMP/fairdrop_cgo_probe.go"
+cat > "$probe" <<'EOF'
+package main
+
+//
+import "C"
+
+func main() {}
+EOF
+if ! go run "$probe"; then
+  echo "CGO_ENABLED=1 but a trivial cgo program failed to build and run: the C toolchain is broken or missing" >&2
+  exit 1
+fi`, ""},
+		{"verify", "Line-ending check", `bad="$(git ls-files --eol | grep -E '(i|w)/(crlf|mixed)' || true)"
+if [ -n "$bad" ]; then
+  echo "non-LF line endings found:" >&2
+  echo "$bad" >&2
+  exit 1
+fi`, ""},
+		{"verify", "go vet", "go vet ./...", ""},
+		{"verify", "staticcheck", "go tool staticcheck ./...", ""},
+		{"verify", "go test", "go test -count=1 -timeout 240s ./...", ""},
+		{"verify", "go test -race", "go test -count=1 -race -timeout 1200s ./...", ""},
+		{"verify", "Frontend suite", "npm test", "frontend"},
+		{"linux-adapters", "Vet Go adapters", "go vet ./...", ""},
+		{"linux-adapters", "Execute Go suite and report capability skips", "go test -count=1 -v -timeout 240s ./...", ""},
+		{"linux-adapters", "Execute adapter race suite", "test \"$(go env CGO_ENABLED)\" = 1\ngo test -count=1 -race -timeout 1200s ./...", ""},
+	} {
+		job := verifyJob(workflow, pin.job)
+		step := verifyStep(job, pin.step)
+		if workflowField(step, "run", 8) != pin.command || workflowField(step, "if", 8) != "" || workflowField(job, "if", 4) != "" || workflowField(step, "working-directory", 8) != pin.directory {
+			gaps = append(gaps, pin.job+"/"+pin.step)
+		}
+	}
+	return gaps
+}
+
+func TestVerifyWorkflowExecutesGateCommandsInActiveFields(t *testing.T) {
+	workflow := readVerifyWorkflow(t)
+	if gaps := executableGateGaps(workflow); len(gaps) != 0 {
+		t.Fatalf("executable gate fields differ: %v", gaps)
+	}
+	for _, tc := range []struct{ before, after string }{
+		{"run: go vet ./...", "run: true # go vet ./..."},
+		{"run: go tool staticcheck ./...", "# run: go tool staticcheck ./...\n        run: true"},
+		{"run: go test -count=1 -timeout 240s ./...", "env:\n          run: go test -count=1 -timeout 240s ./...\n        run: true"},
+		{"run: wails build", "if: false\n        run: wails build"},
+		{"working-directory: frontend", "env:\n          working-directory: frontend"},
+		{"  linux-adapters:\n", "  linux-adapters:\n    if: false\n"},
+	} {
+		changed := strings.ReplaceAll(workflow, tc.before, tc.after)
+		if changed == workflow || len(executableGateGaps(changed)) == 0 {
+			t.Fatal("executable gate pin accepted a comment, disabled gate or misplaced field")
 		}
 	}
 }

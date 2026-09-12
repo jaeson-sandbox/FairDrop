@@ -141,6 +141,92 @@ func TestPreparationFailureFinalizes410BeforeTerminalTeardown(t *testing.T) {
 	}
 }
 
+func TestHeaderOnlyFinalizationWaitsAndRetainsFailureCodes(t *testing.T) {
+	for _, preparationFailure := range []bool{false, true} {
+		name, statusLine, wantStatus := "empty-file", "HTTP/1.1 200 OK\r\n", 200
+		if preparationFailure {
+			name, statusLine, wantStatus = "preparation-failure", "HTTP/1.1 410 Gone\r\n", 410
+		}
+		for _, outcome := range []string{"success", "write-error", "short-write", "cancel"} {
+			t.Run(name+"/"+outcome, func(t *testing.T) {
+				payload := &stubPayload{name: "empty", known: true, size: 0, stream: func(context.Context, io.Writer) error { return nil }}
+				payloads := payloadsReturning(payload)
+				if preparationFailure {
+					payloads = payloadsFailing(transfer.NewError(transfer.ErrSourceChanged, "source changed"))
+				}
+				server := newTestServer(t, payloads)
+				gate := installFinalWriteGate(server, 1, outcome)
+				handle := startTestServer(t, server, &stubAuthorizer{})
+				t.Cleanup(gate.release)
+				type result struct {
+					response *http.Response
+					err      error
+				}
+				ready := make(chan result, 1)
+				go func() {
+					response, err := testClient().Get(downloadURL(handle.Port, string(testToken)))
+					ready <- result{response, err}
+				}()
+				wire := awaitFinalWrite(t, gate)
+				if !bytes.HasPrefix(wire, []byte(statusLine)) || !bytes.HasSuffix(wire, []byte("\r\n\r\n")) {
+					t.Fatal("gate did not intercept the header-only response")
+				}
+				assertNoEvents(t, handle.Events)
+				if outcome == "cancel" {
+					stopped := make(chan error, 1)
+					go func() { stopped <- server.Stop() }()
+					select {
+					case err := <-stopped:
+						if err != nil {
+							t.Fatal("header-only cancellation failed")
+						}
+					case <-time.After(5 * time.Second):
+						t.Fatal("Stop waited for blocked header-only finalization")
+					}
+					if len(drainEvents(t, handle.Events)) != 0 {
+						t.Fatal("cancelled header-only response published a natural terminal")
+					}
+				} else {
+					gate.release()
+					terminal := awaitEvent(t, handle.Events, 5*time.Second)
+					if err := server.Stop(); err != nil {
+						t.Fatal("terminal teardown failed")
+					}
+					if preparationFailure {
+						if terminal.Kind != transfer.ServerFailed || transfer.ErrorCodeOf(terminal.Err) != transfer.ErrSourceChanged {
+							t.Fatal("header-only preparation failure lost its original coded cause")
+						}
+					} else if outcome == "success" {
+						if terminal.Kind != transfer.ServerComplete {
+							t.Fatal("finalized known-empty file did not complete")
+						}
+					} else if terminal.Kind != transfer.ServerFailed || transfer.ErrorCodeOf(terminal.Err) != transfer.ErrTransferFailed {
+						t.Fatal("failed empty-file final write was not reported as transfer_failed")
+					}
+				}
+				select {
+				case got := <-ready:
+					if got.response != nil {
+						defer got.response.Body.Close()
+					}
+					if outcome == "success" {
+						if got.err != nil || got.response.StatusCode != wantStatus || len(readBody(t, got.response)) != 0 {
+							t.Fatal("terminal teardown changed the complete header-only response")
+						}
+					} else if got.err == nil {
+						t.Fatal("failed header-only write looked complete to receiver")
+					}
+				case <-time.After(5 * time.Second):
+					t.Fatal("header-only request did not return")
+				}
+				if !preparationFailure {
+					payload.assertOwnedOnce(t)
+				}
+			})
+		}
+	}
+}
+
 type finalWriteGate struct {
 	entered  chan []byte
 	proceed  chan struct{}

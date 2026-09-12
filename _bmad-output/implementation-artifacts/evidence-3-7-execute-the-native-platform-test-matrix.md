@@ -1,6 +1,100 @@
 # Story 3.7 evidence
 
-## Current verdict: independent review requires implementation loop 1
+## Current verdict: native gates green; second review patches in progress
+
+Fresh context-free Blind Hunter, Edge Case Hunter and Verification Gap reviews read the full 363,167-character cumulative diff through 709ee4ea64dcc88ba0ab104b64a7d300496d5f5f. Verification Gap found no gaps. Edge Case Hunter found root-escaping `..` normalization; Blind Hunter supplied ten findings. No exact duplicate claims/actions in this round. The implementation below remains the last green checkpoint, not proof for pending patches.
+
+| Accepted finding | Severity | Route |
+|---|---|---|
+| Ancestor normalization clamps a root-escaping `..` instead of preserving refusal | high | patch: preserve original spelling on root escape; native coded-refusal regression |
+| Native lock-location test assumes every legitimate local host is usable | medium | patch: isolate mandatory usable-location assertion to controlled CI; ordinary fallback test remains deterministic |
+| Retry-after-resolution test never performs a retry after abandonment | medium | patch: extend cancellation scenario through successful fresh Stage/download |
+| Cancellation just before resolver result has no focused proof | medium | patch: exercise post-result cancellation refusal and no inspector/network activity |
+| Concurrent folder loser can perform unnoticed source work | medium | patch: assert no second Walk or content read |
+| Selected symlink tests accept arbitrary errors and lack file-link fixture | medium | patch: exact path_unsupported checks for file and directory links, appropriate literal code per other refusal |
+| Header-only completion/failure paths lack delayed/failing/cancelled finalization fixtures | medium | patch: empty file and preparation-failure response coverage |
+| Mutation assertion can be borrowed from a passing sibling subtest | medium | patch: associate assertion output with its failing test/subtest using structured Go test events; negative fixture |
+| Commented-out or disabled workflow commands can satisfy substring pins | medium | patch: require active job/step fields and reject comments/disabled conditions |
+
+One additional UI-copy decision is pending owner input: a cancelled but still-blocked OS resolver intentionally limits outstanding work, so retries return busy; the existing public busy copy suggests cancellation as recovery although restart may be needed. New public copy is Ask First / Story 3.11 in the approved spec. Asked whether to bring that copy fix forward, without blocking the other code/test patches.
+
+Written-byte accounting remains governed by docs/fairdrop-architecture.md's explicit ResponseWriter.Write boundary, not receiver acknowledgement or storage; a finalization failure is reported as failure even if the previously accepted response-body count reached its total. Changing that metric to parse TCP/HTTP wire framing is not part of the approved contract. Existing comments overstating receiver receipt predate this story and are not evidence of such a guarantee.
+
+## Second-review patch execution (2026-09-11)
+
+All eight requested patch areas are implemented sequentially: lexical root-escape refusal (native drive/POSIX root plus CI UNC fixture), deterministic local lock fallback with mandatory controlled-CI usable location, abandoned resolver through fresh Stage and HTTP download, delayed cancellation notification forcing the post-result guard, folder loser Walk/source-byte counters, literal selected file/directory-link and traversal refusal codes, empty-file/preparation-410 delayed/failed/cancelled header-only finalization, structured mutation assertions owned by the failing test/subtest, and exact active executable workflow fields with comment/disabled/misplaced negative fixtures. No public copy or error code changed.
+
+Focused verification passed after correcting two test-development expectations. The real retry download adds payload preparation's reinspection (two total Inspect calls, not the old Stage-only one); the exact cgo script fixture initially omitted its two blank lines. Complete outputs from both failed focused runs follow; these were test-expectation defects, not product failures:
+
+```text
+--- FAIL: TestSelectionResolutionRetryAfterFilesystemReturns (0.01s)
+    selection_source_test.go:165: healthy selection did not inspect before network
+FAIL
+FAIL	fairdrop	0.090s
+ok  	fairdrop/internal/server	0.395s
+ok  	fairdrop/internal/stream	0.248s
+ok  	fairdrop/scripts/mutationverdict	0.171s
+FAIL
+
+--- FAIL: TestVerifyWorkflowExecutesGateCommandsInActiveFields (0.00s)
+    verify_workflow_test.go:353: executable gate fields differ: [verify/Confirm cgo is enabled]
+FAIL
+FAIL	fairdrop	0.091s
+ok  	fairdrop/internal/server	0.389s
+ok  	fairdrop/internal/stream	0.243s
+ok  	fairdrop/scripts/mutationverdict	0.171s
+FAIL
+```
+
+Complete logs are retained in `C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-7-review-loop-2/`: `focused-initial.log`, `focused-fixed.log`, `focused-green.log`, `mutations.log`, and `local-mutations.log`, followed by the full ordered build/lint/test/race/frontend logs. The strict full mutation script correctly rejected this local Windows host's selected-link baseline skip (no symlink privilege); that skip is NOT a pass. Its complete JSON transcript is retained in `mutations.log`. All 14 other local mutations were run with passing named baselines and killed by assertion output attached to an actual failing test/subtest. The temporary local capability-exclusion script was removed; committed CI still runs the unchanged full platform mutation set and requires symlink capability. Expected injected failures are explicitly labelled in the harness; compiler/setup errors, timeout/panic, skips, and a passing sibling's assertion output do not count.
+
+### Cancellation-proof correction (2026-09-12)
+
+Main inspection rejected `delayedCancellationNotification`: Go's Context contract requires Err to remain nil until Done closes. The asynchronous-close note does not permit the contradictory test double. The earlier post-result mutation result is **invalid evidence**, notwithstanding its green baseline and named assertion. Removed that double and extracted `selectionSource.inspectResolved`, called by the actual result arm. The focused test now invokes that production acceptance gate with an actually cancelled standard-library context, checks no raw Inspect/network work, and separately pins its production result-arm wiring. A real cancellation-at-resolver-return journey remains. Both guard-removal and wiring-bypass mutations must now fail their own assertions. Full ordered gates and native CI are rerun on the corrected implementation; prior race output (193.944s stream) is historical, not final proof.
+
+Corrected local verification (2026-09-12): focused suite passed; 15 locally executable mutations killed with passing named baselines, including valid post-result guard and production-wiring mutations. Selected-symlink capability remains unavailable locally and is not claimed proved here. Full ordered gate passed: Wails build; bindings/.gitkeep; gofmt; vet; fixed staticcheck; uncached Go (stream 9.476s); explicit CGO_ENABLED=1; full race (stream 205.580s); frontend 17 files / 498 tests; all-LF and diff checks. Darwin arm64 build/vet/bare-staticcheck and Linux amd64 build/vet preflight passed, not native release proof. Complete corrected transcripts use `corrected-` prefixes in the same review-loop-2 directory; preflight logs are named by OS/check. No local failures occurred after the context-proof correction.
+
+Final native verdict and closing checkpoint remain pending below; the prior checkpoint is preserved, not treated as acceptance of these patches.
+
+## Prior green checkpoint
+
+Implementation commit `709ee4ea64dcc88ba0ab104b64a7d300496d5f5f` passed
+[Verify run 34660574925](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34660574925).
+The run conclusion and every job conclusion were read explicitly with
+`gh run view --json status,conclusion,jobs`; all are **success**.
+
+| Native job | Job ID | Result | Stream race duration | Baseline-validated mutations |
+|---|---|---|---|---|
+| Windows | 103462032342 | success | 421.741s | 11 killed |
+| macOS | 103462032332 | success | 479.317s | 22 killed |
+| Linux adapters, not release proof | 103462032236 | success | 485.769s | 14 killed |
+
+Both desktop jobs passed Wails build, bindings/gitkeep, gofmt, vet/staticcheck,
+ordinary Go tests, explicit native tests, cgo-backed race tests, all 498 frontend
+tests, LF checks and mutation proof. Native Windows now passes both UNC journeys
+with returned metadata, HTTP filename, ZIP names and natural Complete checked.
+macOS passes the actual built-process unusable-lock smoke, system-alias selections,
+no-read metadata, unlink/recreate and recycled-identity checks, FIFO/symlink lock
+probes and every matching mutation. Linux passes its Go-only adapter gates.
+The real >4 GiB entry and full entry-count fixtures remain intact; the separate
+virtual-prefix offset fixture proves offsets and CRC without claiming a multi-GiB
+compressed stream.
+
+No native permission or symlink capability skip fired. Explicit skips are only
+platform-exclusive scenarios, the opt-in real-folder diagnosis, and the general
+macOS suite's guarded process-smoke test, which ran and passed separately in its
+dedicated step. In particular, macOS records “built native process survives
+unusable lock; window visibility is unobserved.” Window/focus, nearby-device,
+screen-reader and other manual observations remain optional and unverified.
+
+Complete final job transcripts are retained in `final-windows-full.log`,
+`final-macos-full.log` and `final-linux-full.log` under
+`C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-7-review-loop-1`.
+The story remains in-progress for a fresh independent review. This evidence-only
+closing update is left for the main agent's review checkpoint; no acceptance or
+manual pass is implied.
+
+## Independent review that required implementation loop 1
 
 All three BMAD review layers completed after their first attempts failed with a usage-limit error (no findings existed from those failed attempts). Verification-gap returned no gaps. Blind Hunter returned ten findings; Edge Case Hunter returned the lock FIFO and TCP half-close findings independently. Deduplicated only those two exact claims/actions. The full 293,214-character cumulative diff from d43aa69db42c19324bae9f837b909649ca608099 was delivered as a temporary diff file, read completely by each reviewer; no reviewer edited the shared worktree.
 
@@ -19,7 +113,7 @@ All three BMAD review layers completed after their first attempts failed with a 
 
 The loop counter is now 1. Frozen intent remains approved and unchanged. Verified code is preserved in adc492cfb656f888c9a284c89df445086a326ab7; code changes are reverted for BMAD re-derivation with positive KEEP instructions in the spec. Documentation and evidence remain intact. The earlier green native gate below proves that checkpoint, not the upcoming review fixes. Story 3.7 is not done.
 
-## Review loop 1 re-derivation (2026-09-11, verification in progress)
+## Review loop 1 re-derivation (2026-09-11, implementation verified)
 
 Reconstructed the KEEP implementation from adc492cfb656f888c9a284c89df445086a326ab7,
 then corrected each of the ten routed findings. App delegates Stage unchanged;
@@ -58,7 +152,7 @@ multiple outstanding resolvers, removed Linux job, removed native lock smoke,
 and removed mutation gates. Complete baseline/mutation transcripts are retained
 under C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-7-review-loop-1.
 Native mutations subsequently passed: Windows 11, Linux 14, macOS 22. The final
-all-green run after the UNC expectation correction remains pending.
+all-green run after the UNC expectation correction is recorded above.
 
 ### First re-derivation CI conclusions
 
