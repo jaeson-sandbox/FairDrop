@@ -14,7 +14,13 @@ for file in "${files[@]}"; do
   cp "$file" "$scratch/$file"
 done
 restore() {
-  for file in "${files[@]}"; do cp "$scratch/$file" "$file"; done
+  for file in "${files[@]}"; do
+    for attempt in 1 2 3 4 5; do
+      cp "$scratch/$file" "$file" 2>/dev/null && break
+      sleep 0.2
+    done
+    cmp -s "$scratch/$file" "$file"
+  done
 }
 trap restore EXIT
 
@@ -288,7 +294,7 @@ expect_named_failure 'erase server unquiescent marker' TestEachServerTeardownWai
 perl -0pi -e 's/s\.unresolved = active/s.unresolved = nil/ or die "server retry fence mutation did not match\n"' internal/server/lifecycle.go
 expect_named_failure 'admit server run during prior teardown' TestStopReleasesItsMutexBeforeWaitingAndFencesAConcurrentStart ./internal/server 'want server_start_failed'
 
-perl -0pi -e 's/return transfer\.NewError\(\n\t\ttransfer\.ErrTransferFailed,\n\t\t"transfer server teardown did not finish before its bound: "\+strings\.Join\(outstanding, ", "\)\+" did not return",\n\t\)/return transfer.NewError(transfer.ErrTransferFailed, "transfer server teardown did not finish before its bound: the accept loop, a request handler, a connection did not return")/ or die "isolated wait mutation did not match\n"' internal/server/lifecycle.go
+perl -0pi -e 's/teardownTimeoutError\(serveDone != nil, thisHandlersDone != nil, thisConnsDone != nil\)/teardownTimeoutError(true, true, true)/ or die "isolated wait mutation did not match\n"' internal/server/lifecycle.go
 expect_named_failure 'always name every server wait' TestEachServerTeardownWaitIsNamedInIsolation ./internal/server 'want exact isolated diagnostic'
 
 perl -0pi -e 's/if acceptLoop \{/if false \&\& acceptLoop {/ or die "accept-loop name mutation did not match\n"' internal/server/lifecycle.go

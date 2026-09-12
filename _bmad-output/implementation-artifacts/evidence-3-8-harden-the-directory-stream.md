@@ -2,6 +2,21 @@
 
 ## Final local gate and handoff
 
+**Proof-script follow-up:** Verify 34718755785 for
+`f603fea6dfe7e54d91e8c957670a62171a4f06a1` completed failure on all three jobs,
+each at the same unused-import mutation compile error. Ordinary/race and desktop
+frontend gates passed before that invalid injection; no green overall CI is
+claimed for that commit. Complete job logs are retained locally as
+`ci-{linux,macos,windows}-f603fea-complete.log`, and GitHub retains the native run.
+The corrected canonical inventory is **23**, all executed with named assertions
+in `canonical-checkpoint2-23-aggregate-3.log`, not the earlier incomplete 22-case
+subset. Parent then repeated the full ordered local gate successfully in
+`reviewed-gate-2-transcript.log` and `reviewed-gate-2/` (race stream 195.658s;
+frontend 498/498; all lint/build/binding/LF/foreign checks passed). Only the proof
+script and documentation changed; the application/test code is identical to
+`f603fea6dfe7e54d91e8c957670a62171a4f06a1`. The follow-up push requires its own
+native CI verdict; consult the commit's Verify check rather than assuming success.
+
 Parent ran the complete ordered gate without interruption after the accepted
 review-fix batch. `reviewed-gate-1-transcript.log` and `reviewed-gate-1/` under
 `C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-8-checkpoint-2/` retain the results:
@@ -21,7 +36,9 @@ No release, main merge or next-story implementation is implied by this milestone
 
 **Latest:** implementation and independent review are complete. The full ordered
 local gate passed on the reviewed code; spec is `done`, sprint is `review` for
-owner acceptance. Native CI confirmation follows the checkpoint push. The
+owner acceptance. Native CI at `f603fea` passed ordinary and race tests on Linux
+and macOS, then failed on an invalid mutation edit; correction proof follows
+below, so that run is not a green checkpoint. The
 checkpoint history below preserves earlier states and must not override this one.
 
 Checkpoint 1 is verified and pushed. Checkpoint 2 implementation, accepted review
@@ -322,6 +339,7 @@ failure. Logs are under `C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-8-checkpoi
 | Absorb inner unquiescent result | `TestCoordinatorPropagatesAnInnerUnquiescentServerFailure` | `inner unquiescent marker` | `cleanup-mutation-propagate.log` |
 | Erase server unquiescent marker | `TestEachServerTeardownWaitIsNamedInIsolation` | `structurally unquiescent` | `cleanup-mutation-marker.log` |
 | Admit unresolved server retry | `TestStopReleasesItsMutexBeforeWaitingAndFencesAConcurrentStart` | `want server_start_failed` | `cleanup-mutation-server-fence.log` |
+| Always name every server wait | `TestEachServerTeardownWaitIsNamedInIsolation` | `exact isolated diagnostic` | `canonical-checkpoint2-23/mutation-TestEachServerTeardownWaitIsNamedInIsolation-always_name_every_server_wait.log` |
 | Omit accept-loop timeout name | `TestEachServerTeardownWaitIsNamedInIsolation` | `exact isolated diagnostic` | `cleanup-mutation-accept-name.log` |
 | Omit connection timeout name | same | `exact isolated diagnostic` | `cleanup-mutation-connection-name.log` |
 | Drop normal beacon join result | `TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic` | `same non-nil wrapped error` | `review-fix-mutation-normal-join-result.log` |
@@ -334,7 +352,25 @@ failure. Logs are under `C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-8-checkpoi
 | Detach real handler waiter | `TestInitQuiescenceTracksRealHandlerAndConnectionWaitState` | `handler quiescence channel closed` | `review-fix-mutation-handler-waiter.log` |
 | Detach real connection waiter | same | `connection quiescence channel closed` | `review-fix-mutation-connection-waiter.log` |
 
-Round-1 patch proof is complete: five new baselines and 9/9 new mutations passed
+The earlier 13+9 scoped accounting omitted the pre-existing always-name-all case.
+A runner derived from the current canonical script asserted and executed the
+actual inventory: 13 unique baselines and **23/23** mutations. The complete
+aggregate is `canonical-checkpoint2-23-aggregate-3.log`; its uniquely durable
+baseline/mutation outputs are in `canonical-checkpoint2-23/`. Working-diff hashes
+before and after restoration both equal
+`c5b544175219c5ec7b76adf48b7d22cfa6316803`.
+
+Linux and macOS logs `ci-linux-f603fea-complete.log` and
+`ci-macos-f603fea-complete.log` show the native failure precisely: the former
+always-name-all mutation replaced the whole diagnostic construction, leaving the
+production `strings` import unused. That was an invalid build failure, not an
+assertion-associated kill. The canonical mutation now changes only the existing
+helper call's three boolean arguments to `true`, retaining the helper/import; its
+durable output fails the exact isolated diagnostic in all three subtests. The
+canonical restore also retries transient Windows overwrite failures and verifies
+every restored file byte-for-byte.
+
+Round-1 patch proof remains valid historical evidence: five new baselines and 9/9 new mutations passed
 in `review-fix-mutations-11.log`; its working-diff hashes before and after
 restoration are both `3ab0994cac9d385f4e981362a430f88da4e75f39`.
 Named rows pass in `review-fixes-final-scoped-normal-2.log` and with

@@ -230,6 +230,12 @@ ordered by how much they cost.
   purpose and confirm a test fails and *names* it. If nothing fails, the guarantee is
   decoration. This is how all of the above were found, and how each fix was confirmed.
 
+- Scoped mutation proof must be derived from the canonical script, not a hand-copied
+  case list. Story 3.8 reported 22 passing local cases while a 23rd committed case
+  was never exercised locally; that mutation left an unused import and failed CI
+  at compilation. Audit the exact case inventory and retain unique logs. A scoped
+  pass proves only its executed cases, never an omitted canonical mutation.
+
 - **Write the test that does not exist yet.** The largest single find in Story 1.5 —
   Stage committing a live session for a command the user had abandoned — came from
   writing a caller-context test, not from reading code. Ask "what does no test
