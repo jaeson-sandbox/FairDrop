@@ -10,11 +10,22 @@ Make FairDrop shippable through locked-toolchain native Windows/macOS verificati
 
 **2026-09-12 handoff:** Story 3.7 implementation and both independent review rounds
 are complete; all in-scope patches passed native Verify 34678146639 at
-5506a81663419b62c073c595c8c9e61ee79c7a82. The build workflow leaves its spec `done`
-and sprint entry `review` at the handoff checkpoint. D-111 (generic busy recovery
+5506a81663419b62c073c595c8c9e61ee79c7a82. The owner accepted the checkpoint with
+"nice, lets keep going"; final documentation Verify 34679085296 also passed at
+6a366121fa9fbcd218935aa2119970e3b4e6913a. Spec and sprint entry are now `done`.
+D-111 (generic busy recovery
 copy for an outstanding filesystem lookup) remains explicitly owned by Story 3.11;
 wait/restart guidance is in docs/release-policy.md. Next implementation is Story
-3.8, Harden the Directory Stream; do not infer that Epic 3 is complete.
+3.8, Harden the Directory Stream. The owner approved its smaller-checkpoint
+approach after party discussion: folder safety first, full verification and push,
+then cleanup/retry hardening. Root identity covers Prepare-to-WriteTo, not original
+Stage; contents remain unsnapshotted and segment checks do not guarantee receiver
+case/normalization collision safety. Checkpoint 1 code now uses PreparedDirectory,
+a shared 64-retained-handle budget, synchronized borrowed-reader revocation,
+portable segment rejection, explicit ZIP modes, and the archive-drain stall guard.
+See `evidence-3-8-harden-the-directory-stream.md` for actual verification status;
+cleanup D-096/099/101/102 and formal whole-story review remain outstanding.
+Epic 3 is not complete.
 
 **Owner-approved resumption (2026-09-11):** fix both newly found blockers in
 Story 3.7: response finalization (D-110, brought forward from 3.8) and supported

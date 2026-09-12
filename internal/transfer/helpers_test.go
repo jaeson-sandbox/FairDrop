@@ -325,6 +325,10 @@ type fakeSource struct {
 	walks []string
 }
 
+func (f *fakeSource) PrepareDirectory(context.Context, string) (PreparedDirectory, error) {
+	return nil, NewError(ErrTransferFailed, "coordinator must not prepare a directory")
+}
+
 func (f *fakeSource) Inspect(ctx context.Context, absolutePath string) (StagedItem, error) {
 	f.h.enter("source.Inspect")
 	f.mu.Lock()

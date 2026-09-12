@@ -176,6 +176,14 @@ supported no-follow queries; preserve content-read separation and identity check
   `Cancel` return early while a listener was still live would have been a worse defect than the hang
   it replaced, so a hit bound is reported honestly rather than absorbed as quiescence.
 
+- Story 3.8 directory streaming uses `SourcePort.PrepareDirectory`, not a fresh
+  path-only `Walk`: preserve the Prepare-to-WriteTo root identity pin and its
+  Close ownership. Lexical ancestors, enumeration frames and the pin share a
+  64-retained-handle budget (plus three transient); Inspect reserves the future
+  pin. Source and ZIP names share `transfer.SafeArchiveSegment` on every OS.
+  Borrowed reader revocation must synchronize across native Read, not just a
+  returned flag. These do not snapshot contents or interrupt blocked OS reads.
+
 ## Git workflow
 
 <!-- Outside the bmad:context block on purpose: kept across `bmad-project-context` refreshes. -->

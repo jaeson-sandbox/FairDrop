@@ -267,7 +267,12 @@ func TestWriteToClosesEveryBorrowedEntryBeforeReturning(t *testing.T) {
 
 	tracker := &borrowTracker{inner: source.New()}
 	payload := newTestArchive(t, tracker, filepath.Base(root))
-	payload.path = root
+	prepared, err := tracker.PrepareDirectory(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload.prepared = prepared
+	defer payload.Close()
 
 	if err := payload.WriteTo(context.Background(), io.Discard); err != nil {
 		t.Fatalf("WriteTo() error = %v", err)
@@ -517,18 +522,12 @@ func TestPrepareRejectsARootThatDisappeared(t *testing.T) {
 	assertNoDisclosure(t, err, root)
 }
 
-// The claim-time Lstat is the only check a directory gets before headers, so a
-// root swapped for a link between staging and claim has to be refused there,
-// with the code the contract promises rather than one that merely happens to
-// stop the transfer.
+// The source-owned capability refuses link-like roots before headers. Native
+// and deterministic handle tests in source prove symlink/reparse detection.
 func TestPrepareRejectsALinkLikeRootWithPathUnsupported(t *testing.T) {
 	t.Parallel()
 
-	for name, kind := range map[string]struct{ symlink, reparse bool }{
-		"symlink": {symlink: true},
-		"reparse": {reparse: true},
-	} {
-		kind := kind
+	for _, name := range []string{"symlink", "reparse"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			staged := transfer.StagedItem{
@@ -536,15 +535,10 @@ func TestPrepareRejectsALinkLikeRootWithPathUnsupported(t *testing.T) {
 				Name: "folder",
 				Kind: transfer.ItemDirectory,
 			}
-			mode := fs.ModeDir
-			if kind.symlink {
-				mode = fs.ModeSymlink
-			}
 			adapter := &Payloads{
-				source: sourceFunc(matchingSource(staged)),
-				lstat: func(string) (fs.FileInfo, error) {
-					return fakeFileInfo{name: staged.Name, mode: mode, reparse: kind.reparse}, nil
-				},
+				source: &scriptedSource{prepare: func(context.Context, string) (transfer.PreparedDirectory, error) {
+					return nil, transfer.NewError(transfer.ErrPathUnsupported, "source refused a link-like root")
+				}},
 			}
 
 			prepared, err := adapter.Prepare(context.Background(), staged)
@@ -616,6 +610,7 @@ func TestArchiveStreamingErrorsDoNotDiscloseTheSourcePath(t *testing.T) {
 // for -- an entry that turns unsafe halfway through, or a name the source
 // should never emit at all.
 type scriptedSource struct {
+	prepare func(context.Context, string) (transfer.PreparedDirectory, error)
 	inspect func(ctx context.Context, absolutePath string) (transfer.StagedItem, error)
 	walk    func(ctx context.Context, absolutePath string, visit transfer.SourceVisitor) error
 }
@@ -724,12 +719,12 @@ func (w *recordingWriter) length() int {
 
 func newTestArchive(t *testing.T, port transfer.SourcePort, root string) *archive {
 	t.Helper()
+	path := filepath.Join(fixtureDir(t), root)
 	return &archive{
 		name:       root + archiveExtension,
 		root:       root,
-		path:       filepath.Join(fixtureDir(t), root),
 		modTime:    time.Unix(1_700_000_000, 0),
-		source:     port,
+		prepared:   testPreparedDirectory{walk: func(ctx context.Context, visit transfer.SourceVisitor) error { return port.Walk(ctx, path, visit) }},
 		bufferSize: defaultBufferSize,
 	}
 }

@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 scratch="$(mktemp -d)"
 platform="$(go env GOOS)"
-files=(internal/source/source.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go selection_source.go single_instance_darwin.go .github/workflows/verify.yml)
+files=(internal/source/source.go internal/source/prepared.go internal/transfer/archive_name.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go selection_source.go single_instance_darwin.go .github/workflows/verify.yml)
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
   files+=("internal/source/handle_${platform}.go" internal/source/handle_posix.go)
 fi
@@ -40,6 +40,23 @@ baseline TestHeaderOnlyFinalizationWaitsAndRetainsFailureCodes ./internal/server
 baseline TestVerifyWorkflowExecutesGateCommandsInActiveFields .
 baseline TestVerifyWorkflowLinuxJobIsAdapterVerificationOnly .
 baseline TestVerifyWorkflowPinsNativeProofGatesToTheirJobsAndPlatforms .
+# Story 3.8 checkpoint 1: baseline every named defense on this native runner.
+baseline TestDirectoryHandleBudgetIncludesAncestorsAndPreparedPin ./internal/source
+baseline TestLexicalHandleBudgetRefusesBeforeSearchOpen ./internal/source
+baseline TestPreparedDirectoryOwnsOnlyLazyPinAndRejectsReplacement ./internal/source
+baseline TestPreparedDirectoryNativeReplacementNeverReadsNewBytes ./internal/source
+baseline TestPreparedDirectoryClosesWithoutWalkingAndOnPreparationFailure ./internal/source
+baseline TestPreparedCloseJoinsActiveWalk ./internal/source
+baseline TestBorrowedReaderRevocationJoinsAnInFlightRead ./internal/source
+baseline TestWalkRevokesBorrowBeforeOwnedClose ./internal/source
+baseline TestSourceArithmeticAndBatchFaultsArePhaseCorrect ./internal/source
+baseline TestSourceRejectsPortableNamesDuringInspectionAndWalk ./internal/source
+baseline TestPortableArchiveSegmentsRejectAmbiguousReceiverNames ./internal/transfer
+baseline TestPreparedArchiveNativeRootReplacementIsRefused ./internal/stream
+baseline TestArchivePortableNamesAreRejectedAtBothBoundaries ./internal/stream
+baseline TestPrepareValidatesSanitizedArchiveRootAndReleasesPin ./internal/stream
+baseline TestArchiveEmitsExplicitPortableModes ./internal/stream
+baseline TestEmptyReadGuardsFailOnRead101AndResetOnProgress ./internal/stream
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
   baseline TestPOSIXContentOpenRefusesFIFOAfterMetadataWithoutBlocking ./internal/source
   baseline TestNativeChildNameRefusesReceiverVolumePrefixes ./internal/source
@@ -72,7 +89,7 @@ if [[ "$platform" == linux || "$platform" == darwin ]]; then
   expect_named_failure 'drop regular-file refusal' TestPOSIXContentOpenRefusesFIFOAfterMetadataWithoutBlocking ./internal/source 'FIFO received a content handle'
 
   # This regression is only observable on a POSIX sender.
-  perl -0pi -e 's/volumeQualified\(name\)/filepath.IsAbs(name) || filepath.VolumeName(name) != ""/ or die "volume mutation did not match\n"' internal/source/source.go
+  perl -0pi -e 's/!transfer\.SafeArchiveSegment\(name\)/filepath.IsAbs(name) || filepath.VolumeName(name) != ""/ or die "volume mutation did not match\n"' internal/source/source.go
   expect_named_failure 'host-dependent source volume predicate' TestNativeChildNameRefusesReceiverVolumePrefixes ./internal/source 'unsafe fixture name accepted'
 fi
 
@@ -150,3 +167,58 @@ expect_named_failure 'ignore empty-file header short write' TestHeaderOnlyFinali
 
 perl -0pi -e 's/run: go vet \.\/\.\.\./run: true # go vet .\/.../ or die "comment-only gate mutation did not match\n"' .github/workflows/verify.yml
 expect_named_failure 'replace executable vet with comment' TestVerifyWorkflowExecutesGateCommandsInActiveFields . 'executable gate fields differ'
+
+# Every injected break below must fail an assertion, not compilation or timeout.
+perl -0pi -e 's/maxRetainedDirectoryHandles = 64/maxRetainedDirectoryHandles = 65/ or die "depth cap mutation did not match\n"' internal/source/source.go
+expect_named_failure 'exceed retained handle cap' TestDirectoryHandleBudgetIncludesAncestorsAndPreparedPin ./internal/source 'want "path_unsupported"'
+
+perl -0pi -e 's/withSelectionRetained\(ctx, absolutePath, 1,/withSelectionRetained(ctx, absolutePath, 0,/ or die "pin reservation mutation did not match\n"' internal/source/source.go
+expect_named_failure 'omit future pin reservation' TestDirectoryHandleBudgetIncludesAncestorsAndPreparedPin ./internal/source 'want "path_unsupported"'
+
+perl -0pi -e 's/if retained\+len\(stack\) >= maxRetainedDirectoryHandles/if false \&\& retained+len(stack) >= maxRetainedDirectoryHandles/ or die "lexical admission mutation did not match\n"' internal/source/source.go
+expect_named_failure 'acquire beyond lexical budget' TestLexicalHandleBudgetRefusesBeforeSearchOpen ./internal/source 'lexical guard acquired a forbidden search handle'
+
+perl -0pi -e 's/if _, err := p\.inspector\.verifyOpened\(ctx, selected\.info, p\.pin, true\); err != nil/if _, err := p.inspector.verifyOpened(ctx, selected.info, p.pin, true); false \&\& err != nil/ or die "prepared identity mutation did not match\n"' internal/source/prepared.go
+expect_named_failure 'ignore prepared root replacement' TestPreparedDirectoryNativeReplacementNeverReadsNewBytes ./internal/source 'want "source_changed"'
+
+perl -0pi -e 's/prepared:   prepared,/prepared:   unpinnedDirectory{PreparedDirectory: prepared, source: p.source, path: item.Path},/ or die "prepared wiring mutation did not match\n"; $_ .= "\ntype unpinnedDirectory struct { transfer.PreparedDirectory; source transfer.SourcePort; path string }\nfunc (p unpinnedDirectory) Walk(ctx context.Context, visit transfer.SourceVisitor) error { return p.source.Walk(ctx, p.path, visit) }\n"' internal/stream/payload.go
+expect_named_failure 'bypass prepared capability during ZIP walk' TestPreparedArchiveNativeRootReplacementIsRefused ./internal/stream 'want code "source_changed"'
+
+perl -0pi -e 's/return closeChecked\(context\.Background\(\), pin\)/_ = pin; return nil/ or die "prepared close mutation did not match\n"' internal/source/prepared.go
+expect_named_failure 'leak prepared pin without streaming' TestPreparedDirectoryClosesWithoutWalkingAndOnPreparationFailure ./internal/source 'handles opened/closed/active'
+
+perl -0pi -e 's/p\.mu\.Lock\(\)\r?\n\tdefer p\.mu\.Unlock\(\)// or die "prepared walk ownership mutation did not match\n"' internal/source/prepared.go
+expect_named_failure 'drop prepared Walk ownership' TestPreparedCloseJoinsActiveWalk ./internal/source 'prepared Walk did not retain ownership through visitor return'
+
+perl -0pi -e 's/b\.mu\.Lock\(\)\r?\n\tdefer b\.mu\.Unlock\(\)// or die "borrowed gate mutation did not match\n"' internal/source/source.go
+expect_named_failure 'remove shared native-read revocation gate' TestBorrowedReaderRevocationJoinsAnInFlightRead ./internal/source 'borrowed Read did not retain the revocation lock during native I/O'
+
+perl -0pi -e 's/borrowed\.release\(\)// or die "borrowed wiring mutation did not match\n"' internal/source/source.go
+expect_named_failure 'omit visitor-return revocation' TestWalkRevokesBorrowBeforeOwnedClose ./internal/source 'visitor-return wiring did not revoke before owned close'
+
+perl -0pi -e 's/code := transfer\.ErrSetupFailed/code := transfer.ErrTransferFailed/ or die "source phase mutation did not match\n"' internal/source/prepared.go
+expect_named_failure 'misclassify inspection arithmetic and batch faults' TestSourceArithmeticAndBatchFaultsArePhaseCorrect ./internal/source 'want "setup_failed"'
+
+perl -0pi -e 's/stem = strings\.TrimRight\(stem, " "\)/stem = stem/ or die "device stem mutation did not match\n"' internal/transfer/archive_name.go
+expect_named_failure 'accept spaced device stem before extension' TestPortableArchiveSegmentsRejectAmbiguousReceiverNames ./internal/transfer 'unsafe archive segment accepted: "NUL .txt"'
+
+perl -0pi -e 's/if !transfer\.SafeArchiveSegment\(name\)/if false \&\& !transfer.SafeArchiveSegment(name)/ or die "source name boundary mutation did not match\n"' internal/source/source.go
+expect_named_failure 'bypass source portable-name refusal' TestSourceRejectsPortableNamesDuringInspectionAndWalk ./internal/source 'want "path_unsupported"'
+
+perl -0pi -e 's/if !transfer\.SafeArchiveSegment\(segment\)/if false \&\& !transfer.SafeArchiveSegment(segment)/ or die "ZIP segment boundary mutation did not match\n"' internal/stream/archive.go
+expect_named_failure 'bypass ZIP segment refusal' TestArchivePortableNamesAreRejectedAtBothBoundaries ./internal/stream 'unsafe nested ZIP name accepted'
+
+perl -0pi -e 's/if !transfer\.SafeArchiveSegment\(root\)/if false \&\& !transfer.SafeArchiveSegment(root)/ or die "prepared root name mutation did not match\n"' internal/stream/payload.go
+expect_named_failure 'accept unsafe sanitized ZIP root' TestPrepareValidatesSanitizedArchiveRootAndReleasesPin ./internal/stream 'want code "path_unsupported"'
+
+perl -0pi -e 's/header\.SetMode\(0o644\)/header.SetMode(0o600)/ or die "ZIP file mode mutation did not match\n"' internal/stream/archive.go
+expect_named_failure 'change portable file mode' TestArchiveEmitsExplicitPortableModes ./internal/stream 'ZIP mode for'
+
+perl -0pi -e 's/fs\.ModeDir \| 0o755/fs.ModeDir | 0o700/ or die "ZIP directory mode mutation did not match\n"' internal/stream/archive.go
+expect_named_failure 'change portable directory mode' TestArchiveEmitsExplicitPortableModes ./internal/stream 'ZIP mode for'
+
+perl -0pi -e 's/if stalls > maxEmptyReads/if false \&\& stalls > maxEmptyReads/ or die "archive drain stall mutation did not match\n"' internal/stream/archive.go
+expect_named_failure 'remove archive drain stall guard' TestEmptyReadGuardsFailOnRead101AndResetOnProgress ./internal/stream 'drain empty-read guard returned'
+
+perl -0pi -e 's/stalls = 0/stalls = stalls/ or die "archive drain reset mutation did not match\n"' internal/stream/archive.go
+expect_named_failure 'do not reset archive drain stalls' TestEmptyReadGuardsFailOnRead101AndResetOnProgress ./internal/stream 'drain did not reset empty-read count after progress'

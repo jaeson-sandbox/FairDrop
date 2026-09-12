@@ -7,7 +7,7 @@ paradigm: ports-and-adapters with a single lifecycle coordinator
 scope: FairDrop desktop application across Phases 2-6
 status: final
 created: '2026-08-22'
-updated: '2026-09-11'
+updated: '2026-09-12'
 binds: [FR1-FR24, NFR1-NFR15]
 sources:
   - docs/fairdrop-spec.md
@@ -104,6 +104,8 @@ stateDiagram-v2
 - **Rule:** regular files use context-aware bounded-buffer copying. Directories use `io.Pipe`; close `zip.Writer` before the pipe writer. Reject symlinks and non-regular entries, normalize relative ZIP names beneath one root, and revalidate during streaming. Treat spaces, Unicode, Windows long paths, and UNC paths as supported wherever native Go filesystem APIs permit—never shell-interpolate or destructively normalize them—and return typed path errors otherwise. A post-header failure reports ERROR then aborts via `http.ErrAbortHandler`.
 
 Story 3.7 selection admission uses a coordinator-facing SourcePort decorator: resolve lexical ancestors only after admission, preserve the selected leaf and grammar refusals, and pass the canonical staged path to the stream's raw inspector. Cancellation releases the waiting caller without claiming the OS call stopped; only one unresolved call per decorator can remain and retries refuse busy. Darwin no-follow metadata snapshots compare device/inode, generation and birth time with later opened descriptors. Identical/zero generation and birth fields retain residual fingerprint collision risk; snapshots never claim to pin an inode.
+
+Story 3.8 checkpoint 1 adds a source-owned PreparedDirectory capability: one search-only pin from Prepare through Close, freshly compared before walking the validated root. It is not a Stage snapshot. Lexical ancestors, enumeration frames and the pin share 64 retained handles plus at most three transient handles; Inspect reserves the future pin. Borrowed reads and revocation share a lock across native I/O; Close joins Walk. Portable unsafe segments are rejected in both source and ZIP boundaries, never silently renamed; modes are 0755/0644. No case/normalization collision index or source-permission backup is promised. Inspection arithmetic/batch faults use setup_failed; streaming faults use transfer_failed. Empty read 101 fails with wrapped io.ErrNoProgress in file, ZIP-entry and archive-drain lanes; progress resets the count. Blocking OS I/O is not made interruptible.
 
 ### AD-7 — Honest, wire-level progress
 

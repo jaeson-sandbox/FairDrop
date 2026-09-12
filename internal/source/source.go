@@ -10,7 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"strings"
+	"sync"
 
 	"fairdrop/internal/transfer"
 )
@@ -19,6 +19,11 @@ type sameFileFunc func(fs.FileInfo, fs.FileInfo) bool
 type unreachableNetworkFunc func(error) bool
 
 const directoryReadBatchSize = 1
+
+// Lexical ancestors, enumeration frames and a prepared root share this cap.
+// Metadata, candidate search/enumeration and file content use at most three
+// additional transient handles, released before the next entry.
+const maxRetainedDirectoryHandles = 64
 
 // Inspector is the local source adapter. Production uses native no-follow
 // handles. The private seams allow deterministic algorithm tests without
@@ -37,15 +42,20 @@ func New() *Inspector { return &Inspector{} }
 // logical size; nothing it contains is opened for reading.
 func (i *Inspector) Inspect(ctx context.Context, absolutePath string) (transfer.StagedItem, error) {
 	var item transfer.StagedItem
-	err := i.withSelection(ctx, absolutePath, func(selected selection) error {
+	// Reserve the later prepared-root pin so an unchanged accepted directory
+	// does not exceed the same cap only after response headers are sent.
+	err := i.withSelectionRetained(ctx, absolutePath, 1, func(selected selection) error {
 		if selected.isFile {
+			if selected.info.Size() < 0 {
+				return sourceFault(nil, "selection logical size is invalid")
+			}
 			item = transfer.StagedItem{
 				Path: absolutePath, Name: selected.name, Kind: transfer.ItemFile,
 				LogicalSize: selected.info.Size(), ModTime: selected.info.ModTime(),
 			}
 			return nil
 		}
-		logicalSize, err := i.walkDirectory(ctx, selected.handle, selected.info, nil)
+		logicalSize, err := i.walkDirectory(ctx, selected.handle, selected.info, nil, selected.retained)
 		if err != nil {
 			return err
 		}
@@ -74,7 +84,7 @@ func (i *Inspector) Walk(ctx context.Context, absolutePath string, visit transfe
 		if selected.isFile {
 			return transfer.NewError(transfer.ErrPathUnsupported, "selection walk requires a directory")
 		}
-		_, err := i.walkDirectory(ctx, selected.handle, selected.info, visit)
+		_, err := i.walkDirectory(ctx, selected.handle, selected.info, visit, selected.retained)
 		return err
 	})
 }
@@ -84,10 +94,11 @@ func (i *Inspector) Walk(ctx context.Context, absolutePath string, visit transfe
 // handle for a directory selection and nil for a file, whose own metadata
 // handle is already closed by the time use runs.
 type selection struct {
-	handle metadataHandle
-	info   fs.FileInfo
-	name   string
-	isFile bool
+	handle   metadataHandle
+	info     fs.FileInfo
+	name     string
+	isFile   bool
+	retained int
 }
 
 // withSelection parses the path, opens the anchor, walks the components on a
@@ -95,6 +106,10 @@ type selection struct {
 // handle it opened is closed in reverse order before it returns, whatever use
 // did, so no caller can outlive a descriptor it did not open.
 func (i *Inspector) withSelection(ctx context.Context, absolutePath string, use func(selection) error) (returnedErr error) {
+	return i.withSelectionRetained(ctx, absolutePath, 0, use)
+}
+
+func (i *Inspector) withSelectionRetained(ctx context.Context, absolutePath string, retained int, use func(selection) error) (returnedErr error) {
 	if ctx == nil {
 		return transfer.NewError(transfer.ErrTransferFailed, "selection inspection requires a context")
 	}
@@ -193,6 +208,9 @@ func (i *Inspector) withSelection(ctx context.Context, absolutePath string, use 
 		currentInfo = info
 
 		if info.IsDir() {
+			if retained+len(stack) >= maxRetainedDirectoryHandles {
+				return closeMetadataHandles(ctx, []metadataHandle{metadata}, directoryDepthError())
+			}
 			search, searchErr := metadata.OpenSearch()
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return closeMetadataHandles(ctx, []metadataHandle{metadata, search}, cancelledError(ctxErr))
@@ -235,7 +253,7 @@ func (i *Inspector) withSelection(ctx context.Context, absolutePath string, use 
 	if !currentInfo.IsDir() {
 		return transfer.NewError(transfer.ErrPathUnsupported, "selection is not a regular file or directory")
 	}
-	return use(selection{handle: stack[len(stack)-1], info: currentInfo, name: selectedName})
+	return use(selection{handle: stack[len(stack)-1], info: currentInfo, name: selectedName, retained: retained + len(stack)})
 }
 
 // walkDirectory is the one tree traversal in the package. Inspect runs it with
@@ -248,7 +266,10 @@ func (i *Inspector) withSelection(ctx context.Context, absolutePath string, use 
 // an entry name is accumulated as the walk descends rather than reconstructed
 // from a path afterwards. State is one enumeration handle per active depth plus
 // the single entry being visited: nothing per-entry survives the iteration.
-func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, inspected fs.FileInfo, visit transfer.SourceVisitor) (size int64, returnedErr error) {
+func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, inspected fs.FileInfo, visit transfer.SourceVisitor, retained int) (size int64, returnedErr error) {
+	if retained >= maxRetainedDirectoryHandles {
+		return 0, directoryDepthError()
+	}
 	opened, err := root.OpenEnumeration()
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return 0, closeMetadataHandles(ctx, []metadataHandle{opened}, cancelledError(ctxErr))
@@ -297,7 +318,7 @@ func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, insp
 			continue
 		}
 		if len(entries) != 1 {
-			return 0, transfer.NewError(transfer.ErrTransferFailed, "selection enumeration exceeded its fixed batch")
+			return 0, sourceFault(visit, "selection enumeration exceeded its fixed batch")
 		}
 
 		// Read out of the frame before anything can append to the stack: growing
@@ -330,6 +351,9 @@ func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, insp
 		switch {
 		case info.Mode().IsRegular():
 			entrySize := info.Size()
+			if entrySize < 0 || size > math.MaxInt64-entrySize {
+				return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, sourceFault(visit, "selection logical size is invalid"))
+			}
 			if visit != nil {
 				if emitErr := i.emitFile(ctx, parent, entryName, relative, info, visit); emitErr != nil {
 					return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, emitErr)
@@ -339,11 +363,11 @@ func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, insp
 			if closeErr != nil {
 				return 0, closeErr
 			}
-			if entrySize < 0 || size > math.MaxInt64-entrySize {
-				return 0, transfer.NewError(transfer.ErrTransferFailed, "selection logical size is invalid")
-			}
 			size += entrySize
 		case info.IsDir():
+			if retained+len(stack) >= maxRetainedDirectoryHandles {
+				return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, directoryDepthError())
+			}
 			child, childErr := metadata.OpenEnumeration()
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return 0, closeMetadataHandles(ctx, []metadataHandle{metadata, child}, cancelledError(ctxErr))
@@ -418,6 +442,9 @@ func (i *Inspector) emitFile(
 		return closeContentHandle(ctx, content, primary)
 	}
 	borrowed := &borrowedContent{handle: content}
+	if openedInfo.Size() < 0 {
+		return closeContentHandle(ctx, content, sourceFault(visit, "selection logical size is invalid"))
+	}
 	entry := transfer.SourceEntry{
 		RelativePath: relative,
 		Kind:         transfer.ItemFile,
@@ -433,18 +460,37 @@ func (i *Inspector) emitFile(
 // nothing else, so a visitor cannot close, stat, or seek a descriptor this
 // package still owns, and it stops reading the moment the loan ends.
 type borrowedContent struct {
+	mu       sync.Mutex
 	handle   contentHandle
 	returned bool
 }
 
 func (b *borrowedContent) Read(p []byte) (int, error) {
-	if b == nil || b.returned || b.handle == nil {
+	if b == nil {
 		return 0, fs.ErrClosed
 	}
-	return b.handle.Read(p)
+	return b.withLock(func() (int, error) {
+		if b.returned || b.handle == nil {
+			return 0, fs.ErrClosed
+		}
+		return b.handle.Read(p)
+	})
 }
 
-func (b *borrowedContent) release() { b.returned = true }
+// Read and revocation share this gate, so revocation joins every native read
+// admitted before it and prevents any subsequent one from reaching the handle.
+func (b *borrowedContent) withLock(operation func() (int, error)) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return operation()
+}
+
+func (b *borrowedContent) release() {
+	_, _ = b.withLock(func() (int, error) {
+		b.returned = true
+		return 0, nil
+	})
+}
 
 // childRelativeName accumulates one entry's root-relative, slash-separated
 // name. Directory entry names come from the filesystem, so they are checked
@@ -452,10 +498,7 @@ func (b *borrowedContent) release() { b.returned = true }
 // volume-qualified, or NUL-bearing would become a traversal primitive once it
 // reached an archive a receiver extracts.
 func childRelativeName(parent, name string) (string, error) {
-	if name == "" || name == "." || name == ".." ||
-		strings.ContainsAny(name, "/\\") ||
-		strings.IndexByte(name, 0) >= 0 ||
-		volumeQualified(name) {
+	if !transfer.SafeArchiveSegment(name) {
 		return "", transfer.NewError(transfer.ErrPathUnsupported, "selection contains an unsupported entry name")
 	}
 	slashed := filepath.ToSlash(name)
@@ -463,16 +506,6 @@ func childRelativeName(parent, name string) (string, error) {
 		return slashed, nil
 	}
 	return parent + "/" + slashed, nil
-}
-
-// Match the archive's receiver-side Windows drive predicate on every sender.
-// Host filepath.VolumeName is empty for C:evil.txt on POSIX.
-func volumeQualified(segment string) bool {
-	if len(segment) < 2 || segment[1] != ':' {
-		return false
-	}
-	letter := segment[0]
-	return (letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')
 }
 
 func closeContentHandle(ctx context.Context, handle contentHandle, primary error) error {

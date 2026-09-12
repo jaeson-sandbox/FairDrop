@@ -86,6 +86,8 @@ Audit, mutation tables and gate transcripts live in
 
 ## Spec Change Log
 
+- 2026-09-12: owner accepted the handoff with "nice, lets keep going". Final documentation Verify 34679085296 succeeded on all three jobs at 6a366121fa9fbcd218935aa2119970e3b4e6913a; sprint moved from review to done. Story 3.8 planning begins, with no change to this story's frozen intent or baseline.
+
 - 2026-09-12: implementation and two independent review rounds complete; native Verify 34678146639 is green at 5506a81663419b62c073c595c8c9e61ee79c7a82. Frozen intent and original baseline remain preserved. Existing recovery-copy limitation D-111 stays with Story 3.11; no new public wording was authorized. Build step 05 sets spec done and sprint review for handoff.
 
 - 2026-09-11 (review loop 1, bad_spec): ancestor resolution before Stage bypassed lifecycle refusal and cancellation; non-frozen Code Map now places a bounded, cancellable selection decorator behind admission and before the raw inspector. Clarified snapshot reuse identity, nonblocking lock probing, preserved TCP half-close, ZIP64 offset proof and gate-verdict requirements. Frozen user intent is unchanged. KEEP: all verified implementation at adc492cfb656f888c9a284c89df445086a326ab7 except the identified flawed details; reconstruct from that Git checkpoint, not from historical interfaces. Preserve real HTTP finalization ordering/force-close cancellation, Darwin no-read/no-follow metadata, Linux O_PATH, native path/ZIP64/concurrency fixtures, fixed private diagnostics, optional manual policy, full failed logs and ten stable deferred IDs. Re-derive the code against this corrected map, with no dependency/public API/refusal-policy change. Other accepted review patches are carried into the same derivation.

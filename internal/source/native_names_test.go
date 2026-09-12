@@ -11,7 +11,7 @@ func TestNativeChildNameRefusesReceiverVolumePrefixes(t *testing.T) {
 			t.Errorf("unsafe fixture name accepted: result=%q code=%q", got, transfer.ErrorCodeOf(err))
 		}
 	}
-	for _, name := range []string{"ordinary.txt", "résumé with spaces.txt", "1:ordinary"} {
+	for _, name := range []string{"ordinary.txt", "résumé with spaces.txt", "1 ordinary"} {
 		if _, err := childRelativeName("parent", name); err != nil {
 			t.Fatalf("safe fixture refused: %v", err)
 		}
