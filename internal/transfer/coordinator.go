@@ -35,12 +35,15 @@ const (
 	// handful at most, and the sink exists to be inspected, not to grow.
 	maxDiagnostics = 32
 
-	// adapterCallBound is the ceiling on one external port call the operation
+	// AdapterCleanupBound is the ceiling on one external port call the operation
 	// lease holds across: ServerPort.Stop and NetworkPort.StopBeacon. Neither
 	// adapter's own teardown work is expected to take more than milliseconds
 	// on a healthy host -- Stop force-closes every connection and StopBeacon
-	// unregisters one mDNS record -- so ten seconds is headroom for a slow
-	// machine, never a ceiling any real cleanup step approaches. It cannot be
+	// unregisters one mDNS record -- so fifteen seconds is headroom for a slow
+	// machine, never a ceiling any real cleanup step approaches. It is also
+	// deliberately longer than the server's own TeardownBound, so the outer
+	// wait cannot give up on an inner one that was about to return the more
+	// specific failure naming which resource is stuck (D-099). It cannot be
 	// hit by a real Wi-Fi transfer because it only bounds teardown, which
 	// starts after the transfer is already over or being abandoned.
 	AdapterCleanupBound = 15 * time.Second
@@ -49,7 +52,7 @@ const (
 	// end once the adapter call above has already returned, timed out, or
 	// been skipped. The drainer ends the instant ServerPort.Stop closes its
 	// event channel, which a healthy adapter does well inside
-	// adapterCallBound, so this only fires when the drainer goroutine itself
+	// AdapterCleanupBound, so this only fires when the drainer goroutine itself
 	// -- not the adapter call already accounted for -- is what is still
 	// running.
 	drainerJoinBound = 10 * time.Second
@@ -797,7 +800,7 @@ func (c *Coordinator) callBounded(bound time.Duration, call func() error) (resul
 	}
 }
 
-// stopServerBounded stops the transfer server within adapterCallBound. A
+// stopServerBounded stops the transfer server within AdapterCleanupBound. A
 // returned error means the bound was hit and the server did not confirm it
 // stopped in time -- the coded failure Cancel, Shutdown, or a claim must
 // report. An adapter error that arrives within the bound is recorded as a
@@ -820,7 +823,7 @@ func (c *Coordinator) stopServerBounded() error {
 	return nil
 }
 
-// stopBeaconBounded stops the discovery beacon within adapterCallBound,
+// stopBeaconBounded stops the discovery beacon within AdapterCleanupBound,
 // mirroring stopServerBounded exactly: a bound hit is reported, an adapter
 // error that arrives in time stays a diagnostic.
 func (c *Coordinator) stopBeaconBounded() error {

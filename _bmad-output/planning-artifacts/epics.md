@@ -1300,7 +1300,7 @@ So that the contract describes what the code does and the copy describes what ha
 
 **Ordering:** numbered last, required before Story 3.9. Three of the seven change what a user reads, so release evidence cannot record a pass against copy that is still wrong.
 
-**Closes:** D-035, D-039, D-048, D-097, D-103, D-104, D-106, D-111.
+**Closes:** D-035, D-039, D-048, D-097, D-103, D-104, D-106, D-111, D-112.
 
 **Acceptance Criteria:**
 
