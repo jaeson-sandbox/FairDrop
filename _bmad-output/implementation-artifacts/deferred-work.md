@@ -686,7 +686,8 @@ line.
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
   id: D-077
   summary: Bound traversal depth so descriptor exhaustion cannot land mid-response.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 1, native Verify 34682893871 at c87940bf26454eaa03e647387e30cd418e15744b; see D-077 in evidence-3-8-harden-the-directory-stream.md, Checkpoint 1 native verdict.
   evidence: `walkDirectory` holds one enumeration handle per active level with no cap, and `classifyMetadataError` renders `EMFILE` as `path_unsupported`. Under Story 2.1 that failed during preflight, where it could still choose an HTTP status; under 2.2 the same exhaustion breaks a live download after headers, with a misleading code. The deepest fixture is twelve levels.
 
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
@@ -699,25 +700,29 @@ line.
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
   id: D-079
   summary: Reconcile ZIP entry-name hardening with the download-name sanitizer.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 1, native Verify 34682893871 at c87940bf26454eaa03e647387e30cd418e15744b; see D-079 in evidence-3-8-harden-the-directory-stream.md, Checkpoint 1 native verdict.
   evidence: `sanitizeDownloadName` strips control and format characters, quotes, semicolons, colons, and trailing dots and spaces. `archiveEntryName` refuses only empty, separator, NUL, volume-qualified and dot segments. Both land on a receiver's filesystem, but an entry name may still carry a Windows reserved device name, a trailing dot or space, or a bidi override. The asymmetry is unexplained rather than deliberate.
 
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
   id: D-080
   summary: Make the borrowed content reader safe to touch from another goroutine, or prove it cannot be.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 1, native Verify 34682893871 at c87940bf26454eaa03e647387e30cd418e15744b; see D-080 in evidence-3-8-harden-the-directory-stream.md, Checkpoint 1 native verdict.
   evidence: `borrowedContent.returned` is a plain bool written after `visit` returns, and the platform `Close` implementations nil their file without synchronisation. The port comment promises a retained reader 'reads nothing', but a visitor that hands the reader to another goroutine gets a data race instead of a clean `fs.ErrClosed`. The existing test retains readers only sequentially, so `-race` never observes it.
 
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
   id: D-081
   summary: Decide whether archive entries should carry a file mode.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 1, native Verify 34682893871 at c87940bf26454eaa03e647387e30cd418e15744b; see D-081 in evidence-3-8-harden-the-directory-stream.md, Checkpoint 1 native verdict.
   evidence: `writeArchiveDirectory` sets `fs.ModeDir | 0o755`; `writeArchiveFile` sets no mode at all, so extracted files take whatever default the extractor picks and an executable bit is dropped. No test asserts an extracted mode on either kind.
 
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
   id: D-082
   summary: Pin the selected root's identity across the Prepare-to-WriteTo window, or record why it is not pinned.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 1, native Verify 34682893871 at c87940bf26454eaa03e647387e30cd418e15744b; see D-082 in evidence-3-8-harden-the-directory-stream.md, Checkpoint 1 native verdict.
   evidence: `prepareArchive` pins identity with an `Lstat` but the archive keeps only the path, so `Walk` re-resolves by name. A root replaced between claim and streaming is streamed under the approved download name and root entry. The unsnapshotted policy covers contents changing; it does not obviously cover the root becoming a different object. `os.Lstat` also follows ancestors, so an ancestor swapped for a symlink passes Prepare and is refused only after headers.
 
 - source_spec: `spec-2-2-stream-a-safe-directory-zip.md`
@@ -859,7 +864,8 @@ line.
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
   id: D-105
   summary: A mis-coded error from the source port passes the Prepare boundary untouched, because the wrap only catches uncoded ones.
-  owner: 3-8-harden-the-directory-stream
+  owner: discharged
+  resolution: Story 3.8 checkpoint 1, native Verify 34682893871 at c87940bf26454eaa03e647387e30cd418e15744b; see D-105 in evidence-3-8-harden-the-directory-stream.md, Checkpoint 1 native verdict.
   evidence: Raised by the adversarial layer reviewing Story 3.5. `wrapUncodedSourceError` enforces the port's postcondition by wrapping errors that carry no code, and deliberately passes coded ones through. But `internal/source`'s own `walkDirectory` returns a fully coded `ErrTransferFailed` for "selection enumeration exceeded its fixed batch" and "selection logical size is invalid", and both are reachable from `Prepare`'s re-`Inspect` before any header is written. They are coded, so the wrap does nothing, and the user sees the pre-transfer copy this story exists to eliminate. The fix is not a broader wrap -- remapping every coded error at a boundary would destroy the specific codes the contract promises -- but for `internal/source` to stop using `transfer_failed` for two conditions that are neither transfers nor failures of one.
 
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`

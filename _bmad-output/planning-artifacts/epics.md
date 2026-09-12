@@ -1180,6 +1180,8 @@ So that a deep tree, a swapped root, or a misused reader cannot break a live dow
 
 **Closes:** D-077, D-079, D-080, D-081, D-082, D-096, D-099, D-101, D-102, D-105, plus Epic 2 retrospective item 4 (give `archive.drain` the stall guard its sibling loops carry).
 
+**Checkpoint 1, 2026-09-12:** D-077/079/080/081/082/105 and archive-drain are discharged by c87940bf26454eaa03e647387e30cd418e15744b, native Verify 34682893871 (Windows/macOS/Linux adapter success). Keep Story 3.8 in progress: D-096/099/101/102 cleanup work and formal whole-story review remain. See `evidence-3-8-harden-the-directory-stream.md` for reasoning, proof and limits; no acceptance scope is waived.
+
 **Routing update (2026-09-11):** D-110 was initially routed here; the owner approved
 bringing it into 3.7 to unblock that story's failing full-stack matrix. It is no
 longer an acceptance item for 3.8.

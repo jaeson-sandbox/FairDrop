@@ -23,7 +23,9 @@ Stage; contents remain unsnapshotted and segment checks do not guarantee receive
 case/normalization collision safety. Checkpoint 1 code now uses PreparedDirectory,
 a shared 64-retained-handle budget, synchronized borrowed-reader revocation,
 portable segment rejection, explicit ZIP modes, and the archive-drain stall guard.
-See `evidence-3-8-harden-the-directory-stream.md` for actual verification status;
+Checkpoint 1 is verified at c87940bf26454eaa03e647387e30cd418e15744b: Verify
+34682893871 succeeded on Windows, macOS and Linux adapters; D-077/079/080/081/082/105
+and archive-drain are discharged. See `evidence-3-8-harden-the-directory-stream.md`;
 cleanup D-096/099/101/102 and formal whole-story review remain outstanding.
 Epic 3 is not complete.
 

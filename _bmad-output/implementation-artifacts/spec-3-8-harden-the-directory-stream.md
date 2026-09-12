@@ -58,8 +58,8 @@ context:
 **Execution:**
 Checkpoints: complete the first two tasks with matching documentation, run the full gate, commit/push, and report before starting cleanup. Then complete remaining tasks and repeat verification. Keep one story; no findings waived.
 
-- [ ] `internal/source`, `internal/transfer/ports.go`, `selection_source.go` — bounded traversal, prepared root ownership, synchronized reader revocation and source error correction; migrate all port consumers/fakes.
-- [ ] `internal/stream`, shared archive-name predicate in `internal/transfer` — portable segment rejection at both boundaries, explicit modes and drain guard; test every matrix row.
+- [x] `internal/source`, `internal/transfer/ports.go`, `selection_source.go` — bounded traversal, prepared root ownership, synchronized reader revocation and source error correction; migrate all port consumers/fakes.
+- [x] `internal/stream`, shared archive-name predicate in `internal/transfer` — portable segment rejection at both boundaries, explicit modes and drain guard; test every matrix row.
 - [ ] `internal/network`, `internal/transfer/coordinator.go`, `internal/server/lifecycle_test.go`, root integration tests — coalesced cleanup, retry admission, related timeout budgets and isolated timeout branches.
 - [ ] Canonical SPEC, contracts, architecture/spine/memlog, epic context, `deferred-work.md`, `epics.md`, `sprint-status.yaml` — synchronize decisions and close all ten IDs plus retrospective action with evidence.
 
@@ -73,6 +73,8 @@ Checkpoints: complete the first two tasks with matching documentation, run the f
 [Implementation evidence](evidence-3-8-harden-the-directory-stream.md) is created in step 03.
 
 ## Spec Change Log
+
+- 2026-09-12: checkpoint 1 implemented and pushed at c87940bf26454eaa03e647387e30cd418e15744b. Full local gates and native Verify 34682893871 passed; 18 new assertion-validated mutations pass on all three runners. First two tasks cover matrix rows 1–7; cleanup rows 8–10 and whole-story independent review remain pending. D-077/079/080/081/082/105 and the archive-drain retrospective action are discharged. Frozen intent is unchanged; spec/sprint stay in-progress.
 
 ## Design Notes
 

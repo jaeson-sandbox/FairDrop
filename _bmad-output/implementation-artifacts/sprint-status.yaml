@@ -145,5 +145,5 @@ action_items:
     action: "Give archive.drain the stall guard its two sibling loops carry, or record
       why it does not need one."
     owner: "3-8-harden-the-directory-stream"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"

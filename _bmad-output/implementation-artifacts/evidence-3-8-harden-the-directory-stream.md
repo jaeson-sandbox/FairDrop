@@ -2,7 +2,7 @@
 
 ## Current status
 
-Implementation started, not accepted. Baseline:
+Checkpoint 1 verified and pushed; whole story still in progress. Baseline:
 `6a366121fa9fbcd218935aa2119970e3b4e6913a`.
 
 The owner approved retaining all assigned findings with smaller, separately
@@ -32,9 +32,9 @@ matrix audit follow implementation, not this planning discussion.
 
 ## Verification ledger
 
-Checkpoint 1 implementation and full ordered local verification are complete;
-native CI is pending. Tasks and deferred IDs remain open until native proof is
-recorded. No cleanup implementation or independent whole-story review has run.
+Checkpoint 1 implementation, full ordered local verification and native CI are
+complete. First two tasks and six scoped IDs are discharged below. No cleanup
+implementation or independent whole-story review has run.
 
 ### Implementation and reasoning
 
@@ -68,7 +68,7 @@ recorded. No cleanup implementation or independent whole-story review has run.
 
 ### Matrix coverage (checkpoint 1 only)
 
-| Frozen row | Executed targeted tests / remaining full-gate obligation |
+| Frozen row | Passing native coverage at c87940bf26454eaa03e647387e30cd418e15744b |
 | --- | --- |
 | Healthy folder / modes | Existing empty/nested/Unicode/ZIP64 suites; TestArchiveEmitsExplicitPortableModes |
 | Depth | TestDirectoryHandleBudgetIncludesAncestorsAndPreparedPin; TestLexicalHandleBudgetRefusesBeforeSearchOpen |
@@ -114,5 +114,57 @@ Full logs (including failed attempts) are retained at
   package `ok`), 498 frontend tests in 17 files, LF and diff checks. Darwin arm64
   build/vet/bare-staticcheck and Linux amd64 build/vet passed as preflight only.
 
-Native Windows/macOS and Linux adapter conclusions: pending push/CI. Cross-build
-checks, even when green, are not native proof.
+### Checkpoint 1 native verdict
+
+Implementation commit: `c87940bf26454eaa03e647387e30cd418e15744b`, pushed to
+`origin/epic-3-run-reliably-on-supported-desktops`.
+[Verify 34682893871](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34682893871)
+completed **success**. Main read `gh run view --json status,conclusion,headSha,jobs`
+and confirmed that exact SHA and all three explicit job conclusions, rather than
+trusting the watch command's exit status.
+
+| Native job | Conclusion | Valid killed mutations |
+| --- | --- | --- |
+| Windows desktop | success | 34 |
+| macOS desktop | success | 45 |
+| Linux adapters (not desktop release proof) | success | 37 |
+
+All 18 new mutations ran on every runner with passing unskipped baselines and
+the required assertion-associated failures. The full native logs are retained in
+`native-ci.log` beside the local gate logs. Windows UNC/symlink capability and
+macOS built-process lock smoke remained mandatory and passed. Windows/macOS
+frontend suites each passed 498 tests; Go normal/race, lint and native builds
+passed. No new manual device or UI observation is claimed.
+
+| Closed finding | Verified resolution |
+| --- | --- |
+| D-077 | 64 retained handles plus three transient; lexical admission and future-pin reservation tested/mutated |
+| D-079 | Shared portable source/ZIP predicate and sanitized-root validation; spaced device stems, source/ZIP/root boundary mutations |
+| D-080 | Native-read/revocation shared synchronization and actual visitor-return close wiring; race and both mutations passed |
+| D-081 | Literal 0755/0644 ZIP mode assertions and both mode mutations |
+| D-082 | Search-only prepared identity pin, native replacement refusal, production ZIP capability-wiring mutation, Close ownership |
+| D-105 | Inspection arithmetic/batch setup_failed versus streaming transfer_failed; phase mutation caught |
+| Epic 2 archive-drain action | Failure on empty read 101, reset after progress; guard and reset mutations caught without hanging |
+
+Before the documentation milestone, the complete ordered local gate was repeated
+successfully with no production changes; logs are in the `handoff/` subdirectory.
+The first race stream run took 204.535 seconds. Foreign Darwin/Linux checks remain
+preflight only; the native results above are the platform proof.
+
+### Resume checkpoint 2
+
+- Spec and sprint stay **in-progress**. D-096/099/101/102 remain live Story 3.8
+  work; do not mark the story done or skip independent review.
+- StopBeacon must detach under lock, wait outside it and retain outstanding-stop
+  ownership; retries must not create additional stuck workers or let a late stop
+  touch a newer responder/session.
+- Coordinate server 10-second, coordinator 15-second and outer lease budgets;
+  propagate an inner timeout as failure, not an ordinary cleanup diagnostic.
+  Prove accept-loop, handler and connection timeout branches independently.
+- Distinguish an adapter call still running from a call that returned a coded
+  unquiescent failure; never infer the underlying resource stopped from either
+  a caller timeout or merely a completed function. Preserve Story 3.4's honest
+  quiescence semantics and Story 3.7's finalization/selection guards.
+- After cleanup implementation: repeat ordered gates and mutation proof, audit
+  every frozen matrix row, then run BMAD step 04's independent parallel reviews.
+  Party-mode discussion was not that review.
