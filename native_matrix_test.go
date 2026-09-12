@@ -98,7 +98,7 @@ func assertNativeDownload(t *testing.T, selected string, folder bool) {
 	if err != nil {
 		t.Fatalf("native stage refused: code=%s", transfer.ErrorCodeOf(err))
 	}
-	name := filepath.Base(selected)
+	name := nativeExpectedSelectionName(selected)
 	if metadata.Name != name || metadata.Size != 21 || metadata.IsDir != folder || metadata.SessionID == "" || metadata.QR == "" {
 		t.Fatal("native returned metadata differs from selected fixture")
 	}
@@ -190,6 +190,29 @@ func nativeFixtureLeaf(directory string) string {
 		return "报告 résumé 🌍.txt"
 	default:
 		return "report.txt"
+	}
+}
+
+func nativeExpectedSelectionName(selected string) string {
+	// A UNC share root is a filepath volume, so filepath.Base returns a
+	// separator rather than the share's display name. Our fixture expects
+	// the final lexical component, including when that component is a share.
+	if runtime.GOOS == "windows" {
+		selected = strings.ReplaceAll(selected, `\`, "/")
+	}
+	selected = strings.TrimRight(selected, "/")
+	return selected[strings.LastIndex(selected, "/")+1:]
+}
+
+func TestNativeUNCFixtureExpectedName(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("UNC volume semantics are Windows-only")
+	}
+	if nativeExpectedSelectionName(`\\localhost\FairDropNativeMatrix`) != "FairDropNativeMatrix" {
+		t.Fatal("UNC fixture expectation lost the share name")
+	}
+	if nativeExpectedSelectionName(`\\localhost\FairDropNativeMatrix\report.txt`) != "report.txt" {
+		t.Fatal("UNC fixture expectation lost the file name")
 	}
 }
 

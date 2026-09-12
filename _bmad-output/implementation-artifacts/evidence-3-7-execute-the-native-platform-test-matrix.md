@@ -57,7 +57,24 @@ concurrent file ownership, concurrent ZIP ownership, hidden TCP half-close and
 multiple outstanding resolvers, removed Linux job, removed native lock smoke,
 and removed mutation gates. Complete baseline/mutation transcripts are retained
 under C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-7-review-loop-1.
-Native-only mutations and corrected CI conclusions remain pending.
+Native mutations subsequently passed: Windows 11, Linux 14, macOS 22. The final
+all-green run after the UNC expectation correction remains pending.
+
+### First re-derivation CI conclusions
+
+Run 34659883151 concluded failure solely because Windows' new UNC-root expectation
+was wrong (full failure below). macOS job 103459984374 and Linux adapter job
+103459984265 both concluded success, read explicitly through gh run view JSON.
+macOS passed Wails build, the built-process degraded-lock smoke, ordinary/race
+tests, frontend tests and all 22 mutations. Its race stream fixture took 459.460s.
+Linux passed ordinary/race suites and all 14 mutations; stream race 484.946s.
+No native permission/link capability skip fired on these runners. The macOS
+general platform report skipped Windows namespace semantics and the opt-in smoke
+test; the smoke had already executed successfully in its dedicated guarded step.
+Linux skipped only Windows/macOS-exclusive scenarios and opt-in folder diagnosis.
+Full job logs are retained alongside local transcripts as native-macos-full.log
+and native-linux-full.log. The local gate after correcting the UNC expectation
+passed again, including cgo race (stream 251.219s) and all 498 frontend tests.
 
 ### Complete new ordinary-gate failure, corrected before retry
 
@@ -99,6 +116,38 @@ vet.exe: internal\source\handle_darwin.go:151:73: status.Birthtim undefined (typ
 
 Story acceptance and independent review remain pending. No manual observation or
 foreign-platform preflight is counted as native execution.
+
+### Native Windows UNC expectation correction
+
+Commit `43d0f58dc64dd7c4ea959b00ef92fd1fda7155b3` triggered Verify run
+[34659883151](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34659883151).
+Windows job `103459984395` failed the new metadata assertion for the UNC share
+root; its ordinary and explicit-platform runs reported the same named failure.
+The helper used filepath.Base, which treats an entire UNC share as a volume and
+returns a separator. Production correctly uses the share name. The expectation
+now uses the fixture's final lexical component and has a literal Windows UNC-root
+unit check. This changes no application behavior or metadata/header/ZIP assertion.
+All eleven Windows native mutations passed named baselines and their expected
+assertion failures on this run, including selected-leaf refusal. Full Windows job
+output is retained in native-windows-full.log under the local transcript directory
+above; the complete ordinary-gate output follows.
+
+```text
+2026-09-11T23:58:04.6395476Z 2026/09/11 23:58:04 fairdrop: shutdown begin
+2026-09-11T23:58:04.6396336Z --- FAIL: TestNativeUNCStageAndDownload (0.07s)
+2026-09-11T23:58:04.6402488Z     --- FAIL: TestNativeUNCStageAndDownload/folder (0.02s)
+2026-09-11T23:58:04.6404325Z         native_matrix_test.go:240: native returned metadata differs from selected fixture
+2026-09-11T23:58:04.6405357Z FAIL
+2026-09-11T23:58:04.6405903Z FAIL	fairdrop	0.475s
+2026-09-11T23:58:04.6406599Z ok  	fairdrop/internal/network	0.059s
+2026-09-11T23:58:04.6408169Z ok  	fairdrop/internal/qr	0.105s
+2026-09-11T23:58:08.8667698Z ok  	fairdrop/internal/server	4.286s
+2026-09-11T23:58:08.8668211Z ok  	fairdrop/internal/source	0.209s
+2026-09-11T23:58:25.5155765Z ok  	fairdrop/internal/stream	20.407s
+2026-09-11T23:58:25.5156532Z ok  	fairdrop/internal/transfer	0.345s
+2026-09-11T23:58:25.5157058Z ok  	fairdrop/scripts/mutationverdict	0.025s
+2026-09-11T23:58:25.5157361Z FAIL
+```
 
 ## Prior implementation verdict: step 03 complete before independent review
 

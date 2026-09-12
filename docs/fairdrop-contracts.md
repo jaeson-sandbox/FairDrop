@@ -376,7 +376,7 @@ The Wails adapter emits the event-specific payload without the internal `Kind` f
 
 ## Native single-instance lock availability
 
-On macOS, composition checks the same `NSTemporaryDirectory` location, fixed UUID lock file, open flags and nonblocking `flock` that Wails v2.15.0 uses. Contention still enables the Wails handoff. Any other preflight failure disables that option so Wails cannot mistake an unusable lock for a running first instance and exit silently; stderr reports a fixed degraded-protection diagnostic with no filesystem cause or path. Windows locking is unchanged. The probe releases its descriptor before Wails acquires its own; a filesystem change between those opens remains a race, and the probe is not a replacement lock owner.
+On macOS, composition checks Wails v2.15.0's exact `NSTemporaryDirectory` location and fixed UUID lock file. The probe adds nonblocking/no-follow open flags and requires a regular descriptor before nonblocking `flock`, so a FIFO or symlink cannot block or impersonate a usable lock. Contention still enables the Wails handoff. Any other preflight failure disables that option so Wails cannot mistake an unusable lock for a running first instance and exit silently; stderr reports a fixed degraded-protection diagnostic with no filesystem cause or path. Windows locking is unchanged. The probe releases its descriptor before Wails acquires its own; a filesystem change between those opens remains a race, and the probe is not a replacement lock owner.
 
 ## Update rule
 
