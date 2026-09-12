@@ -22,3 +22,14 @@ Story 3.9 now consolidates automated release evidence, limitations, optional man
 checks and its existing documentation fixes; it no longer requires a person to
 complete a device matrix. Story 3.12's automatable accessibility checks remain in
 scope. Historical observations are retained rather than rewritten as successes.
+
+## Recovery while a filesystem lookup is stuck
+
+If selecting an unavailable network folder remains stuck, cancel the selection.
+Cancellation stops FairDrop waiting, but cannot interrupt the operating system's
+filesystem call. Until that call returns, FairDrop refuses another selection with
+`busy` to prevent accumulating background work. Wait for the network lookup to
+finish, or close and restart FairDrop, then choose a reachable item. Repeatedly
+pressing Cancel will not terminate the underlying OS call. Public wording for this
+case is tracked as D-111 in Story 3.11; this guidance is not a claim it is fixed in
+the UI already.

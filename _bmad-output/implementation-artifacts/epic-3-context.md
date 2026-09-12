@@ -8,6 +8,14 @@ Make FairDrop shippable through locked-toolchain native Windows/macOS verificati
 
 ## Stories
 
+**2026-09-12 handoff:** Story 3.7 implementation and both independent review rounds
+are complete; all in-scope patches passed native Verify 34678146639 at
+5506a81663419b62c073c595c8c9e61ee79c7a82. The build workflow leaves its spec `done`
+and sprint entry `review` at the handoff checkpoint. D-111 (generic busy recovery
+copy for an outstanding filesystem lookup) remains explicitly owned by Story 3.11;
+wait/restart guidance is in docs/release-policy.md. Next implementation is Story
+3.8, Harden the Directory Stream; do not infer that Epic 3 is complete.
+
 **Owner-approved resumption (2026-09-11):** fix both newly found blockers in
 Story 3.7: response finalization (D-110, brought forward from 3.8) and supported
 Darwin no-follow metadata queries in place of O_EVTONLY (D-074). The owner approved

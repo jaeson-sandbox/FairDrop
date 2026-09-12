@@ -229,6 +229,11 @@ ordered by how much they cost.
   goroutine, so a derived context still reads clean for a moment after the parent is
   cancelled. Where the answer must be immediate, check the caller's context directly.
 
+- **A context test double must obey the Context contract.** `Err` must stay nil until
+  `Done` closes. Story 3.7 briefly used a non-nil `Err` with an open `Done` to force a
+  select branch; its mutation failed, but the proof was invalid. Use a real cancelled
+  context at the production result-acceptance helper and pin the caller's wiring.
+
 - **A concurrency test that accepts either outcome cannot fail.** Tally the outcomes
   and log the distribution. But do not then *assert* both: FairDrop's claim race
   resolves one way ~49 times in 50, so requiring both would fail at random. Force

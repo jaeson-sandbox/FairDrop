@@ -2,7 +2,7 @@
 title: 'Story 3.7: Execute the Native Platform Test Matrix'
 type: 'chore'
 created: '2026-09-11'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'd43aa69db42c19324bae9f837b909649ca608099'
 review_loop_iteration: 1
 context:
@@ -86,6 +86,8 @@ Audit, mutation tables and gate transcripts live in
 
 ## Spec Change Log
 
+- 2026-09-12: implementation and two independent review rounds complete; native Verify 34678146639 is green at 5506a81663419b62c073c595c8c9e61ee79c7a82. Frozen intent and original baseline remain preserved. Existing recovery-copy limitation D-111 stays with Story 3.11; no new public wording was authorized. Build step 05 sets spec done and sprint review for handoff.
+
 - 2026-09-11 (review loop 1, bad_spec): ancestor resolution before Stage bypassed lifecycle refusal and cancellation; non-frozen Code Map now places a bounded, cancellable selection decorator behind admission and before the raw inspector. Clarified snapshot reuse identity, nonblocking lock probing, preserved TCP half-close, ZIP64 offset proof and gate-verdict requirements. Frozen user intent is unchanged. KEEP: all verified implementation at adc492cfb656f888c9a284c89df445086a326ab7 except the identified flawed details; reconstruct from that Git checkpoint, not from historical interfaces. Preserve real HTTP finalization ordering/force-close cancellation, Darwin no-read/no-follow metadata, Linux O_PATH, native path/ZIP64/concurrency fixtures, fixed private diagnostics, optional manual policy, full failed logs and ten stable deferred IDs. Re-derive the code against this corrected map, with no dependency/public API/refusal-policy change. Other accepted review patches are carried into the same derivation.
 
 - 2026-09-11 (owner approval): "Lets fix them all" and "MacOS perms ... best option ... get the application to work" authorize bringing D-110 into 3.7 and replacing Darwin metadata acquisition. Owner also makes human release observations optional for personal development. Frozen intent/matrix amended explicitly on that approval, not weakened to match a test. Baseline is preserved. Prior paused-checkpoint notes below are historical.
@@ -109,3 +111,39 @@ Audit, mutation tables and gate transcripts live in
 - Foreign-platform preflight: Darwin arm64 and Linux amd64 `go build ./...` and `go vet ./...`, plus Darwin arm64 bare `staticcheck ./...` (not `go tool staticcheck` under a foreign GOOS). These are type checks, not native proof.
 - The CI run itself, read with `gh run view --json conclusion,jobs` — never `gh run watch`, which has exited 0 on a failed run
 - Mutations: drop `O_NONBLOCK` from `nativeContentFlags`; drop the `S_IFREG` refusal; revert `childRelativeName` to `filepath.VolumeName`; resolve the leaf as well as the ancestors; remove the Linux job — each must fail a named test
+
+
+## Suggested Review Order
+
+**Admission and cancellation**
+
+- Admit first; cancel waiting without accumulating unresolved filesystem calls.
+  [selection_source.go:25](../../selection_source.go#L25)
+
+- Share the raw inspector while resolving only admitted selections.
+  [main.go:40](../../main.go#L40)
+
+**Native safety and response completion**
+
+- Publish natural outcomes after final writes; preserve forced cancellation and TCP half-close.
+  [lifecycle.go:565](../../internal/server/lifecycle.go#L565)
+
+- Compare metadata fingerprints without requiring file-content access.
+  [handle_darwin.go:126](../../internal/source/handle_darwin.go#L126)
+
+- Reject unsafe lock objects without blocking launch.
+  [single_instance_darwin.go:24](../../single_instance_darwin.go#L24)
+
+**Proof and CI**
+
+- Force final-write success, failure, and cancellation.
+  [finalization_test.go:23](../../internal/server/finalization_test.go#L23)
+
+- Verify large offsets separately from real large-entry readback.
+  [archive_zip64_test.go:164](../../internal/stream/archive_zip64_test.go#L164)
+
+- Associate mutation assertions with failing tests, rejecting unrelated failures.
+  [mutationverdict/main.go:13](../../scripts/mutationverdict/main.go#L13)
+
+- Require executable native gates, not comments resembling commands.
+  [verify_workflow_test.go:238](../../verify_workflow_test.go#L238)

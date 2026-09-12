@@ -12,7 +12,7 @@ Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the wi
 | --- | --- | --- |
 | 1 — Share one file | Native drop or browse, QR/direct URL, one-shot download, honest progress, cancel, accessibility contract | Done, verified on a real phone, merged to `main` |
 | 2 — Share one folder | Safe directory staging through native no-follow handles; streamed ZIP with no temp archive | Done and merged; receiver-side observations remain recorded as incomplete |
-| 3 — Run reliably on supported desktops | Twelve stories covering native CI/releases, lifecycle and platform hardening, error/event handling, and verification evidence | Stories 3.1–3.6 done; 3.7 in progress |
+| 3 — Run reliably on supported desktops | Twelve stories covering native CI/releases, lifecycle and platform hardening, error/event handling, and verification evidence | Stories 3.1–3.6 done; 3.7 implemented and verified, at BMAD review checkpoint |
 
 This is a personal project. [Automated verification is the release gate](docs/release-policy.md);
 manual device/browser and accessibility observations are optional, not invented

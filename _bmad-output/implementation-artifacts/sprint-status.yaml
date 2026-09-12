@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 2026-09-11
+last_updated: 2026-09-12
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -60,7 +60,7 @@ development_status:
   3-4-bound-every-lifecycle-wait-and-prove-quiescence: done
   3-5-reconcile-public-error-copy-with-its-states: done
   3-6-make-lost-and-malformed-events-visible: done
-  3-7-execute-the-native-platform-test-matrix: in-progress
+  3-7-execute-the-native-platform-test-matrix: review
   3-8-harden-the-directory-stream: backlog
   3-9-record-human-release-evidence: backlog
   3-10-settle-the-release-blocking-platform-decisions: backlog

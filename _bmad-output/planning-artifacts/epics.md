@@ -1296,7 +1296,7 @@ So that the contract describes what the code does and the copy describes what ha
 
 **Ordering:** numbered last, required before Story 3.9. Three of the seven change what a user reads, so release evidence cannot record a pass against copy that is still wrong.
 
-**Closes:** D-035, D-039, D-048, D-097, D-103, D-104, D-106.
+**Closes:** D-035, D-039, D-048, D-097, D-103, D-104, D-106, D-111.
 
 **Acceptance Criteria:**
 
@@ -1317,6 +1317,11 @@ So that the contract describes what the code does and the copy describes what ha
 **Given** a malformed Stage acknowledgement whose cleanup call fails
 **When** the user is told nothing was sent
 **Then** either the cleanup is guaranteed or the failure is surfaced, so the next Stage cannot be refused `busy` for a session the user was told did not exist (D-106).
+
+**Given** cancellation leaves an operating-system filesystem lookup outstanding
+**When** another selection is refused while that lookup remains blocked
+**Then** the public copy explains applicable recovery (wait for the lookup, or restart FairDrop), rather than suggesting another Cancel will stop the OS call (D-111)
+**And** any new code/string moves through the UX registry, contract, Go and TypeScript mirrors together; the one-outstanding-call bound and successful retry after return remain tested.
 
 ### Story 3.12: Capture the Accessibility Evidence a Runner Can Produce
 

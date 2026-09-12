@@ -340,7 +340,7 @@ After Stage acknowledgement, the coordinator owns one synchronous emission lane.
 
 No progress is accepted or emitted after terminal acceptance. Natural Complete carries the authoritative final snapshot; for a known file it matches the prepared length. Failed carries an authoritative snapshot when bytes were written and `nil` otherwise. React initializes `(sessionId, lastSeq=0)` only from a successful Stage result, ignores an obsolete Stage promise after local request cancellation/unmount, and ignores events with another session ID or `seq <= lastSeq`.
 
-`ProgressSnapshot.Percent` is always finite and clamped to `[0,100]`. When `TotalKnown && TotalBytes > 0`, it equals `100 * BytesSent / TotalBytes`; a successful known non-empty completion is exactly `100`. Unknown totals and known empty totals use zero. A failed snapshot applies the same formula to its final written-byte count.
+`ProgressSnapshot.Percent` is always finite and clamped to `[0,100]`. When `TotalKnown && TotalBytes > 0`, it equals `100 * BytesSent / TotalBytes`; a successful known non-empty completion is exactly `100`. Unknown totals and known empty totals use zero. A failed snapshot applies the same formula to its final written-byte count. As specified by the architecture, that count is bytes accepted by `http.ResponseWriter.Write`, not receiver acknowledgement or storage; a subsequent finalization failure can therefore carry a full accepted-body count without being a successful transfer.
 
 Event payload validity at the Wails boundary:
 

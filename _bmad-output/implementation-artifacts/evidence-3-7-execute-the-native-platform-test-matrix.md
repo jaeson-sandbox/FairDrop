@@ -1,8 +1,18 @@
 # Story 3.7 evidence
 
-## Current verdict: native gates green; second review patches in progress
+## Current verdict: implementation and independent review complete
 
-Fresh context-free Blind Hunter, Edge Case Hunter and Verification Gap reviews read the full 363,167-character cumulative diff through 709ee4ea64dcc88ba0ab104b64a7d300496d5f5f. Verification Gap found no gaps. Edge Case Hunter found root-escaping `..` normalization; Blind Hunter supplied ten findings. No exact duplicate claims/actions in this round. The implementation below remains the last green checkpoint, not proof for pending patches.
+Main independently confirmed all job conclusions in native Verify 34678146639 are success at implementation commit 5506a81663419b62c073c595c8c9e61ee79c7a82. All twelve execution tasks and five acceptance criteria are satisfied; every frozen matrix row has executed passing native coverage. Ten scoped deferred IDs are discharged: D-007, D-014, D-074, D-076, D-078, D-084, D-089, D-094, D-095, D-110. Both independent review rounds are complete; accepted patch findings are implemented and verified, including the replacement of invalid context-double proof. No third implementation derivation was required for second-round patches.
+
+BMAD build step 05 sets the spec to `done` and the sprint story to `review` as its handoff checkpoint; Epic 3 remains in-progress. The spec ends with a Suggested Review Order. Manual observations remain optional/unverified, not fabricated passes. No release/tag or main-branch merge is performed. The user-provided AGENTS.md milestone-push requirement overrides the workflow's no-auto-push default.
+
+Closing checkpoint verification (2026-09-12): Wails build 4.743s; bindings/.gitkeep; gofmt; vet; pinned staticcheck; full uncached Go suite; explicit cgo=1 and full race (stream 207.612s); frontend 17 files / 498 tests; LF/diff checks; Darwin arm64 build/vet/bare-staticcheck and Linux amd64 build/vet all passed. The final changes are documentation/tracking only; implementation remains 5506a81, already native-verified above. An extra root-only ownership/workflow check inadvertently overlapped the closing race run; that extra invocation is not ordered-gate evidence and was rerun after the pipeline finished. No Wails/frontend build ran alongside Go tests. The source/contract metric clarification preserves the existing ResponseWriter accounting boundary; it introduces no new metric or public copy. The spec was sent to VS Code with the repository root and its Suggested Review Order.
+
+The existing generic busy/recovery-copy limitation is `defer`, severity medium, explicitly routed as D-111 to Story 3.11 and cited in its Closes line and acceptance criteria. This retains the approved public-copy boundary, not an unowned waiver. Baseline synchronous Inspect and bounded Cancel lease-wait already permitted an OS call that outlasted cancellation; Story 3.7 supplies concrete bounded-resolution/retry evidence for that older copy assumption. docs/release-policy.md now explains wait/restart recovery. The request to bring new public wording forward received no authorization; no public code/string changed. Story 3.11 remains required before release-evidence consolidation.
+
+## Second independent review record
+
+Fresh context-free Blind Hunter, Edge Case Hunter and Verification Gap reviews read the full 363,167-character cumulative diff through 709ee4ea64dcc88ba0ab104b64a7d300496d5f5f. Verification Gap found no gaps. Edge Case Hunter found root-escaping `..` normalization; Blind Hunter supplied ten findings. No exact duplicate claims/actions in this round. All nine accepted patch findings below are now implemented and verified by the later 5506a81 native run, with detailed evidence retained below.
 
 | Accepted finding | Severity | Route |
 |---|---|---|
@@ -16,7 +26,7 @@ Fresh context-free Blind Hunter, Edge Case Hunter and Verification Gap reviews r
 | Mutation assertion can be borrowed from a passing sibling subtest | medium | patch: associate assertion output with its failing test/subtest using structured Go test events; negative fixture |
 | Commented-out or disabled workflow commands can satisfy substring pins | medium | patch: require active job/step fields and reject comments/disabled conditions |
 
-One additional UI-copy decision is pending owner input: a cancelled but still-blocked OS resolver intentionally limits outstanding work, so retries return busy; the existing public busy copy suggests cancellation as recovery although restart may be needed. New public copy is Ask First / Story 3.11 in the approved spec. Asked whether to bring that copy fix forward, without blocking the other code/test patches.
+The additional existing UI-copy limitation is routed as D-111 to Story 3.11, as recorded in the current verdict. It is not claimed fixed by the resolver's bounded-work guard.
 
 Written-byte accounting remains governed by docs/fairdrop-architecture.md's explicit ResponseWriter.Write boundary, not receiver acknowledgement or storage; a finalization failure is reported as failure even if the previously accepted response-body count reached its total. Changing that metric to parse TCP/HTTP wire framing is not part of the approved contract. Existing comments overstating receiver receipt predate this story and are not evidence of such a guarantee.
 
@@ -54,7 +64,21 @@ Main inspection rejected `delayedCancellationNotification`: Go's Context contrac
 
 Corrected local verification (2026-09-12): focused suite passed; 15 locally executable mutations killed with passing named baselines, including valid post-result guard and production-wiring mutations. Selected-symlink capability remains unavailable locally and is not claimed proved here. Full ordered gate passed: Wails build; bindings/.gitkeep; gofmt; vet; fixed staticcheck; uncached Go (stream 9.476s); explicit CGO_ENABLED=1; full race (stream 205.580s); frontend 17 files / 498 tests; all-LF and diff checks. Darwin arm64 build/vet/bare-staticcheck and Linux amd64 build/vet preflight passed, not native release proof. Complete corrected transcripts use `corrected-` prefixes in the same review-loop-2 directory; preflight logs are named by OS/check. No local failures occurred after the context-proof correction.
 
-Final native verdict and closing checkpoint remain pending below; the prior checkpoint is preserved, not treated as acceptance of these patches.
+### Final native verification of second-review patches
+
+Pushed implementation checkpoint: `5506a81663419b62c073c595c8c9e61ee79c7a82`. [Verify run 34678146639](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34678146639) explicitly reports `status: completed`, `conclusion: success`; each job's conclusion was read with `gh run view 34678146639 --json status,conclusion,jobs`, never inferred from a watch exit code.
+
+| Native job | Job ID | Conclusion | Full stream race | Mutation verdicts |
+|---|---|---|---|---|
+| Windows release verification | 103511623501 | success | 461.890s | 16 killed |
+| macOS release verification | 103511623574 | success | 417.265s | 27 killed |
+| Linux adapter verification, not release proof | 103511623584 | success | 496.276s | 19 killed |
+
+Both desktop gates passed Wails, bindings/.gitkeep, formatting/vet/staticcheck, uncached Go, cgo/race, frontend (17 files / 498 tests), line endings, native verbose coverage and mutations. macOS's guarded built-process unusable-lock smoke and controlled native usable-lock-location test passed. Windows's real UNC downloads and UNC-root escaping-parent refusal passed. Selected file/directory symlinks were created and refused with the literal expected code on native runners; no required permissions or symlink-capability test skipped. Only platform-exclusive tests and opt-in diagnostic/built-smoke invocations skipped outside their applicable step; the dedicated macOS built-smoke step did execute and pass. The verbose platform-only filter reports no matching stream tests, but the full ordinary/race suites and dedicated archive mutation baseline execute that package separately.
+
+Complete native transcripts are retained in `C:/Users/jaeso/AppData/Local/Temp/fairdrop-3-7-review-loop-2/native-windows-full.log`, `native-macos-full.log`, and `native-linux-full.log`. All injected mutation failures in those transcripts are expected negative controls, accepted only after named passing baselines and mutation-specific assertion output belonging to failing tests/subtests. No unmutated native test failed in this run.
+
+This final evidence append is intentionally left uncommitted for main's closing review/documentation checkpoint. Automated verification is complete; story acceptance is not claimed by the implementer. Main retains the Story 3.11 public busy/recovery-copy routing decision. No new public code/copy was introduced. Optional manual visual/focus, phone/browser and accessibility observations remain unverified, as under the approved release policy.
 
 ## Prior green checkpoint
 
