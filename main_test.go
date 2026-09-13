@@ -783,3 +783,127 @@ func TestComposeWiresTheDiagnosticSeam(t *testing.T) {
 			"a shipped binary records reaches nothing a person can read")
 	}
 }
+
+// TestTheReleaseRecordCannotClaimAnUnevidencedPass is the one mechanical guard
+// on a file that is otherwise prose.
+//
+// `release-evidence.md` is where this project says what it actually verified,
+// and its whole value is that a reader can trust the word "pass". Two ways that
+// erodes, both cheap to check and neither caught by any other gate:
+//
+// A row that reads "pending" says someone owes the check. Under
+// docs/release-policy.md nobody does -- manual observation is optional -- so
+// "pending" is a promise the project has stopped making, and a row carrying it
+// invites a later editor to discharge it by writing "pass".
+//
+// And a pass with nothing behind it is the failure mode every one of this
+// repo's own lessons points at: a green suite has hidden a defect here more
+// than once, and `gh run watch --exit-status` once exited 0 over a failed run.
+// So a claimed pass must carry either a named reviewer, in a table that has
+// that column, or a workflow run this file cites by id.
+func TestTheReleaseRecordCannotClaimAnUnevidencedPass(t *testing.T) {
+	path := filepath.Join("_bmad-output", "implementation-artifacts", "release-evidence.md")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	document := string(content)
+
+	if !strings.Contains(document, "actions/runs/") {
+		t.Error("the release record cites no workflow run at all, so nothing in it can be re-checked at its source")
+	}
+
+	var header []string
+	rows, passes := 0, 0
+	for _, line := range splitLines(content) {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "|") {
+			header = nil
+			continue
+		}
+		cells := markdownCells(trimmed)
+		if header == nil {
+			header = cells
+			continue
+		}
+		// The `|---|` separator under every header.
+		if strings.HasPrefix(strings.TrimLeft(cells[0], " "), "---") || strings.Contains(cells[0], "---:") {
+			continue
+		}
+		rows++
+
+		result := strings.ToLower(cellNamed(header, cells, "Result"))
+		if result == "" {
+			continue
+		}
+		if strings.Contains(result, "pending") {
+			t.Errorf("a row's result reads %q: the policy replaced pending with optional / unverified, "+
+				"because nobody owes an optional check", result)
+		}
+		if !strings.Contains(result, "pass") && !strings.Contains(result, "success") {
+			continue
+		}
+		passes++
+
+		// Which evidence a pass owes depends on who could have produced it.
+		// A table with a Reviewer column records what a person observed, so
+		// the person is the evidence; the machine table has no such column,
+		// and its evidence is the run. Accepting either everywhere would let
+		// the word "run" appearing anywhere in a prose cell discharge a
+		// manual row -- which is the shape of the mistake this test exists
+		// to stop, not a spelling of it.
+		if columnIndex(header, "Reviewer") >= 0 {
+			reviewer := strings.TrimSpace(cellNamed(header, cells, "Reviewer"))
+			if reviewer == "" || reviewer == "-" || reviewer == "—" {
+				t.Errorf("a row claims %q without naming who observed it: %s", result, trimmed)
+			}
+			continue
+		}
+		joined := strings.ToLower(strings.Join(cells, " "))
+		if !strings.Contains(joined, "actions/runs/") && !strings.Contains(joined, "the same run") {
+			t.Errorf("a row claims %q without citing the run that produced it: %s", result, trimmed)
+		}
+	}
+
+	// Vacuity: a file whose tables stopped parsing would satisfy every rule
+	// above by having nothing to check.
+	if rows < 15 {
+		t.Errorf("parsed %d table rows, want the record's own rows: the parser or the file shape changed", rows)
+	}
+	if passes == 0 {
+		t.Error("parsed no claimed pass at all, so this test proved nothing about how a pass is evidenced")
+	}
+}
+
+// markdownCells splits one table row into its cells, dropping the empty
+// fields the leading and trailing pipes produce.
+func markdownCells(row string) []string {
+	parts := strings.Split(strings.Trim(row, "|"), "|")
+	cells := make([]string, 0, len(parts))
+	for _, part := range parts {
+		cells = append(cells, strings.TrimSpace(part))
+	}
+	return cells
+}
+
+// cellNamed returns the cell under a header, or "" when this table has no such
+// column -- which is how one pass of the file covers tables of different shapes.
+func cellNamed(header, cells []string, name string) string {
+	index := columnIndex(header, name)
+	if index < 0 || index >= len(cells) {
+		return ""
+	}
+	return cells[index]
+}
+
+// columnIndex distinguishes a column this table does not have from one whose
+// cell is empty. The two owe different evidence, so the test cannot conflate
+// them the way a bare lookup would.
+func columnIndex(header []string, name string) int {
+	for index, column := range header {
+		if strings.EqualFold(strings.TrimSpace(column), name) {
+			return index
+		}
+	}
+	return -1
+}

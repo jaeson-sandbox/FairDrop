@@ -660,7 +660,8 @@ line.
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
   id: D-073
   summary: `DESIGN.md` gained nine contrast pairs as prose beside the table that would have held them, and does not say a test now owns the figures.
-  owner: 3-9-record-human-release-evidence
+  owner: discharged
+  resolution: Story 3.9; the nine text pairs moved from prose into their own table beside the load-bearing one, and the stale hand-recheck instruction was replaced by a note that `frontend/src/ui/styles.test.ts` derives and pins every figure. Verified by mutation: rounding one published figure fails `publishes every figure it proves, unrounded, in DESIGN.md`.
   evidence: Eighteen figures were added as one run-on sentence under a formatted contrast table. Separately, the retained instruction "Re-run unrounded automated checks if opacity, blending, color-mix, or adjacent surfaces change" predates `styles.test.ts` recomputing and pinning these ratios, so an editor following the spine's own instruction would hand-edit values a test derives -- and the test would then fail against the document it is meant to serve.
 
 - source_spec: `spec-2-1-validate-and-stage-one-directory.md`
@@ -747,7 +748,8 @@ line.
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
   id: D-086
   summary: Windows may refuse to bring the restored window to the foreground, leaving it behind with a flashing taskbar button.
-  owner: 3-9-record-human-release-evidence
+  owner: discharged
+  resolution: Story 3.9; decided rather than observed. Restoration means the window is unminimised with its session, transfer and keyboard focus intact and no second coordinator, listener or beacon started; coming to the front is a platform courtesy Windows may withhold, so a flashing taskbar button is the expected Windows outcome and the `AlwaysOnTop` workaround is deliberately not pursued. Recorded in `release-evidence.md` with the fact that no native second launch has been observed on either platform.
   evidence: `WindowShow` calls `SetForegroundWindow`, which Windows refuses from a process that is not the foreground process -- and by the time the first instance handles the second launch, the second process has already exited, so the first is not in the foreground. The window would unminimise and stay behind, taskbar flashing. Only a native second launch can show whether this happens; the `AlwaysOnTop` toggle workaround waits on that observation and on a decision about whether a flash counts as restored.
 
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
