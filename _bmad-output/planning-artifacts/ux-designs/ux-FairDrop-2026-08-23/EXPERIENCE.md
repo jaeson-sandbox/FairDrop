@@ -286,6 +286,26 @@ Recovery remains available from Idle and Staged:
 | Theme | Follow OS light/dark; no preference persistence or opposite-theme flash. Forced colors take precedence. |
 | V1 roles | Windows/Mac native sender → one supported same-LAN browser receiver. iPhone is receiver-only. |
 | Roadmap | Native iPhone sender → Windows receiver is later scope and is not represented as a V1 surface. |
+| macOS webview capability | WKWebView loads FairDrop over a custom `wails://` scheme, which is not a secure context, so every browser API gated on one is absent there while working on Windows' `http://wails.localhost`. Any such capability is routed through Go or it does not exist on macOS. |
+
+## Platform Limits
+
+Recorded so a designer meets them here rather than in a bug report.
+
+**macOS: no secure context (D-064, settled 2026-09-12).** Wails' macOS frontend serves this app
+through `setURLSchemeHandler:` on a custom `wails://` scheme, and registers no secure scheme
+anywhere; Windows' WebView2 serves `http://wails.localhost/`, which Chromium treats as
+trustworthy. The asymmetry is not a bug to fix in FairDrop and it is not visible at development
+time: a feature written against `navigator.clipboard`, `crypto.subtle`, `navigator.geolocation`,
+media capture or a service worker works in `wails dev` on Windows and is silently inert on macOS,
+with no error the frontend can catch.
+
+What it costs the user: nothing today, because the one capability FairDrop needed -- copying the
+direct link -- goes through the Wails runtime's clipboard rather than the browser's. What it would
+cost is a feature that half the supported platforms cannot run, discovered after release. The rule
+is therefore the table row above: route it through Go, or it does not exist. `AGENTS.md` carries
+the same warning for implementers, which is the half that stops a story reaching for one of these
+APIs before anyone checks.
 
 ## Compatibility and Evidence Gates
 

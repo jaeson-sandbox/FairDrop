@@ -318,7 +318,8 @@ line.
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
   id: D-018
   summary: CORS is configured for the 200 only, and the receiver page cannot read the filename it was encoded to carry.
-  owner: 3-10-settle-the-release-blocking-platform-decisions
+  owner: discharged
+  resolution: Story 3.10; all three headers, decided by the owner on 2026-09-12. `Access-Control-Allow-Origin: *` now joins `writeStatus` so a cross-origin receiver page reads the coded status instead of an opaque failure, `Access-Control-Expose-Headers: Content-Disposition` joins the authorized response so that page can read the filename, and `Accept-Ranges: none` states on the wire what the architecture already said in prose. The identical-body rule is untouched. `docs/fairdrop-architecture.md` and `docs/fairdrop-spec.md` moved with it, and `renderResponse` was widened so every existing response assertion sees the new headers.
   evidence: `Access-Control-Allow-Origin: *` is set in `writeDownloadHeaders` but not by `writeStatus`, so a cross-origin receiver sees an opaque failure instead of 404/410/423. There is no `Access-Control-Expose-Headers: Content-Disposition`, so that page cannot read the name, and no `Accept-Ranges: none`, so a download manager may attempt a range retry against a consumed capability. The frozen matrix fixes the exact header set, so adding any of these is an Ask First change.
 
 - source_spec: `spec-1-4-serve-a-one-shot-capability-download.md`
@@ -540,7 +541,8 @@ line.
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   id: D-055
   summary: The native window paints a single background colour, so one of the two themes still gets a one-frame flash.
-  owner: 3-10-settle-the-release-blocking-platform-decisions
+  owner: discharged
+  resolution: Story 3.10; the OS theme is read before the Wails options are built -- `AppsUseLightTheme` under HKCU on Windows, `AppleInterfaceStyle` through `defaults` on macOS, light elsewhere -- and `canvasFor` returns the matching `--color-canvas`. Both tokens are now pinned, the dark one is checked to live inside the `prefers-color-scheme` block, and a second test pins that the production path passes the native probe rather than a constant.
   evidence: `main.go` takes one `options.RGBA` and Wails offers no per-theme value, so the constant now tracks the light `--color-canvas` and a dark-mode OS gets one light frame before the webview paints. Before this story it tracked a Tailwind class the story deleted, so light mode flashed slate-900 on every launch and nothing failed -- `main_test.go` now pins the constant to the token and names the coupling. Closing the residual means reading the OS theme in Go before building the options: on Windows that is one `golang.org/x/sys/windows/registry` read of `AppsUseLightTheme` (already an indirect dependency), with a build-tag sibling for macOS. That is platform code Story 1.9 was not scoped for, and Story 3.3's release evidence is where a first-paint check belongs.
 
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
@@ -594,7 +596,8 @@ line.
 - source_spec: `spec-1-9-render-the-paper-relay-transfer-views.md`
   id: D-064
   summary: Wails' custom `wails://` scheme is not a secure context, so every browser API gated on one is unavailable on macOS.
-  owner: 3-10-settle-the-release-blocking-platform-decisions
+  owner: discharged
+  resolution: Story 3.10; recorded in `EXPERIENCE.md` as a platform limit with what it costs, alongside a Responsive & Platform row stating the rule: a capability gated on a secure context is routed through Go or it does not exist on macOS. `AGENTS.md` already carried the implementer-facing half.
   evidence: WKWebView loads `wails://wails/` through `setURLSchemeHandler:`, and Wails 2.15.0 registers no secure scheme anywhere in its darwin frontend; WebView2 loads `http://wails.localhost/`, which Chromium treats as trustworthy. The clipboard hit this first and is fixed by routing through `runtime.ClipboardSetText`, but the asymmetry is general: `crypto.subtle`, `navigator.geolocation`, media capture and service workers are gated the same way, and a frontend feature that works in `wails dev` on Windows can be inert on macOS with no error. Worth a line in the project's agent instructions before another story reaches for a browser API, and worth confirming on a real Mac during Story 3.3's release evidence.
 
 - source_spec: `spec-1-10-meet-the-accessibility-and-recovery-contract.md`
@@ -761,7 +764,8 @@ line.
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
   id: D-088
   summary: Wails' Windows lock falls through to a full second instance when the mutex exists but cannot be used, and the mutex is session-local.
-  owner: 3-10-settle-the-release-blocking-platform-decisions
+  owner: discharged
+  resolution: Story 3.10; a per-user advisory lock under `os.UserConfigDir()/FairDrop/instance.lock`, taken before `wails.Run`. A process that cannot take it does not compose a coordinator, so neither of Wails' two Windows fallthroughs can start a competing listener or beacon, while Wails' own handoff still restores the existing window on the ordinary path. Per-user by design: two logged-in Windows users keep one instance each. Advisory rather than a lock file's existence, so a crashed holder releases it.
   evidence: `SetupSingleInstance` treats any `CreateMutex` error other than `ERROR_ALREADY_EXISTS` as "no other instance" (an elevated first instance is the common case), and returns without exiting when `FindWindowW` finds no event window (a tight double-launch), so two coordinators, listeners and beacons can run. Separately the mutex lives in the logon session, so two logged-in Windows users each get an instance. An app-owned backstop lock under `os.UserConfigDir` is the candidate fix; it is a release-platform decision, not this story's.
 
 - source_spec: `spec-3-1-enforce-one-running-fairdrop-instance.md`
@@ -883,7 +887,8 @@ line.
 - source_spec: `spec-3-5-reconcile-public-error-copy-with-its-states.md`
   id: D-107
   summary: A wiring regression in compose would crash FairDrop before any window exists, invisibly in a release build.
-  owner: 3-10-settle-the-release-blocking-platform-decisions
+  owner: discharged
+  resolution: Story 3.10; the owner chose a native dialog over a written crash line on 2026-09-12. `reportWiringPanic` shows one fixed sentence -- no port, no path, nothing the panic carried -- through a build-tagged seam (`MessageBoxW` on Windows, `osascript` on macOS, nothing on Linux), then lets the panic continue so the runtime still prints its stack trace for a developer and a half-composed process never keeps running.
   evidence: Raised by the adversarial layer reviewing Story 3.5. `NewCoordinator` now panics when a port is nil, which is what makes `ready()`'s nil-port branch unreachable and was the right trade for D-029. The only production caller supplies all five, so it cannot fire today. What is unexamined is the failure shape if it ever does: `compose` runs in `main()` before `wails.Run`, no `recover` covers that path, and a release Wails build has no console -- so the process would vanish with no window, no dialog, and no visible message. A panic is the right answer for a wiring defect; whether it should be preceded by something a user can see belongs with the release-platform decisions.
 
 - source_spec: `spec-3-7-execute-the-native-platform-test-matrix.md`

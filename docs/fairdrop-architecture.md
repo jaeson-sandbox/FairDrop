@@ -121,6 +121,9 @@ Response rules:
 - `Content-Disposition: attachment` with a sanitized ASCII fallback and RFC 5987 `filename*` for Unicode.
 - `Content-Length` only for a regular file.
 - `Cache-Control: no-store`, `Access-Control-Allow-Origin: *`, and `X-Content-Type-Options: nosniff`.
+- `Access-Control-Allow-Origin: *` on rejections as well as the authorized response (D-018, decided 2026-09-12). The capability is the token, not the origin, so a receiver page fetched from anywhere may read the status it was already allowed to provoke. Without it every rejection reads as one opaque network error and the page cannot tell a wrong token from a consumed one from a busy sender. Rejection bodies stay empty and byte-identical, so the status the contract already defines remains the only distinction.
+- `Access-Control-Expose-Headers: Content-Disposition` on the authorized response, because a cross-origin reader sees only the CORS-safelisted response headers unless the server names the rest.
+- `Accept-Ranges: none` on the authorized response, stating the rule below on the wire so a download manager does not range-retry a capability the first request consumed.
 - Bounded request-header and idle timeouts, bounded maximum headers, no request body, and no whole-transfer write deadline.
 - No range/resume behavior in v1.
 

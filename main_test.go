@@ -64,23 +64,73 @@ func TestAppOptionsWindowContract(t *testing.T) {
 // deleted, leaving every light-mode start painting slate-900 and repainting
 // cream.
 func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
-	const token = "--color-canvas: #F7F0E7;"
-
 	stylesheet, err := os.ReadFile(filepath.Join("frontend", "src", "style.css"))
 	if err != nil {
 		t.Fatalf("read stylesheet: %v", err)
 	}
-	if !strings.Contains(string(stylesheet), token) {
-		t.Fatalf("style.css no longer declares %q -- update this test and the option together", token)
+	declared := string(stylesheet)
+
+	// Both modes, because Wails paints one colour and the OS decides which one
+	// it should be. Before D-055 only the light token was pinned and a
+	// dark-mode machine got a light frame at every launch -- a defect no test
+	// could see, since the dark token was never read on the Go side at all.
+	for _, theme := range []struct {
+		name  string
+		dark  bool
+		token string
+		want  options.RGBA
+	}{
+		{"light", false, "--color-canvas: #F7F0E7;", options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1}},
+		{"dark", true, "--color-canvas: #1C1916;", options.RGBA{R: 0x1C, G: 0x19, B: 0x16, A: 1}},
+	} {
+		t.Run(theme.name, func(t *testing.T) {
+			if !strings.Contains(declared, theme.token) {
+				t.Fatalf("style.css no longer declares %q -- update this test and canvasFor together", theme.token)
+			}
+
+			got := appOptionsWith(NewApp(), func() bool { return true }, func() bool { return theme.dark }).BackgroundColour
+			if got == nil {
+				t.Fatal("BackgroundColour is nil: the window would paint the platform default, not the canvas")
+			}
+			if *got != theme.want {
+				t.Errorf("BackgroundColour = %+v, want %+v (the %s --color-canvas)", *got, theme.want, theme.name)
+			}
+		})
 	}
 
-	got := appOptionsWithLockProbe(NewApp(), func() bool { return true }).BackgroundColour
-	if got == nil {
-		t.Fatal("BackgroundColour is nil: the window would paint the platform default, not the canvas")
+	// The dark token lives inside the prefers-color-scheme block, so a
+	// stylesheet that declared it at :root would satisfy the loop above while
+	// meaning something else entirely.
+	_, darkBlock, found := strings.Cut(declared, "@media (prefers-color-scheme: dark)")
+	if !found {
+		t.Fatal("style.css has no dark-scheme block, so the dark token above is not the dark theme's")
 	}
-	want := options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1}
-	if *got != want {
-		t.Errorf("BackgroundColour = %+v, want %+v (the light --color-canvas)", *got, want)
+	if !strings.Contains(darkBlock, "--color-canvas: #1C1916;") {
+		t.Error("the dark canvas token is not declared inside the prefers-color-scheme block")
+	}
+}
+
+// TestTheNativeThemeProbeIsWiredToTheOptions pins the half a fake cannot: that
+// the composed options ask the operating system at all.
+//
+// appOptionsWith takes the probe, so every test above can drive both themes
+// without either OS -- and that is exactly what would let the production path
+// keep a hardcoded light canvas while the suite stayed green, the same shape as
+// Story 3.3's workflow_call and Story 3.6's diagnostic seam.
+func TestTheNativeThemeProbeIsWiredToTheOptions(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+	found := false
+	for _, line := range splitLines(source) {
+		if strings.Contains(line, "return appOptionsWith(app, usable, nativeOSPrefersDarkTheme)") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("appOptionsWithLockProbe does not pass nativeOSPrefersDarkTheme, so a shipped FairDrop " +
+			"never reads the OS theme however well the seam is tested")
 	}
 }
 
@@ -906,4 +956,123 @@ func columnIndex(header []string, name string) int {
 		}
 	}
 	return -1
+}
+
+// TestTheInstanceLockIsExclusiveWithinThisUser drives the backstop against
+// itself: the second acquisition of the same file must fail while the first
+// still holds it, and succeed once it is released.
+//
+// This is the whole of D-088's guarantee that a test can reach. Wails' two
+// Windows fallthroughs need an elevated process or a scheduling race to
+// produce, and neither is something a unit test should try to stage; what it
+// can prove is that when a second process does get past Wails, this lock
+// refuses it.
+func TestTheInstanceLockIsExclusiveWithinThisUser(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, instanceLockName)
+
+	first, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatalf("open the lock file: %v", err)
+	}
+	if !lockFileExclusive(first) {
+		t.Fatal("the first holder could not take an uncontended lock")
+	}
+
+	second, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatalf("reopen the lock file: %v", err)
+	}
+	if lockFileExclusive(second) {
+		t.Error("a second holder took the lock while the first still held it: a competing coordinator would start")
+	}
+	if err := second.Close(); err != nil {
+		t.Errorf("close the second descriptor: %v", err)
+	}
+
+	// Released by closing the descriptor, which is also what a crashed process
+	// gets from the operating system for free -- the reason this is an advisory
+	// lock rather than a file whose existence means "running".
+	if err := first.Close(); err != nil {
+		t.Fatalf("close the first descriptor: %v", err)
+	}
+
+	third, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatalf("reopen the lock file after release: %v", err)
+	}
+	t.Cleanup(func() { _ = third.Close() })
+	if !lockFileExclusive(third) {
+		t.Error("the lock was not released when its holder closed: every later launch would be refused")
+	}
+}
+
+// TestAnUnheldInstanceLockLeavesTheAppUncomposed pins what the backstop is for.
+// An App without a coordinator refuses every command, which is exactly the
+// outcome D-088 wants for a process Wails failed to stop: no listener, no
+// beacon, nothing competing for a port.
+func TestAnUnheldInstanceLockLeavesTheAppUncomposed(t *testing.T) {
+	app := buildApp(false)
+
+	app.mu.RLock()
+	installed := app.transfers
+	app.mu.RUnlock()
+
+	if installed != nil {
+		t.Error("a process that lost the instance lock still composed a coordinator, so it would start a " +
+			"second listener and a second beacon")
+	}
+
+	if got := buildApp(true); got == nil {
+		t.Fatal("holding the lock produced no App at all")
+	}
+}
+
+// TestAWiringPanicReachesTheUserBeforeItKillsTheProcess is D-107.
+//
+// The dialog is a seam so this can drive it; the panic continuing is asserted
+// because swallowing it would leave a half-composed process running, and the
+// runtime's stack trace is what a developer needs even though a release build
+// has no console to print it to.
+func TestAWiringPanicReachesTheUserBeforeItKillsTheProcess(t *testing.T) {
+	var shown []string
+	continued := false
+
+	func() {
+		defer func() {
+			if recover() != nil {
+				continued = true
+			}
+		}()
+		defer reportWiringPanic(func(message string) { shown = append(shown, message) })
+		panic("transfer: dependencies are incomplete: " + testPath)
+	}()
+
+	if !continued {
+		t.Error("the panic was swallowed: a half-composed FairDrop would keep running")
+	}
+	if len(shown) != 1 {
+		t.Fatalf("showed %v, want exactly one message", shown)
+	}
+	if shown[0] != fatalWiringMessage {
+		t.Errorf("showed %q, want the fixed message", shown[0])
+	}
+	// AD-9: the panic carried a path, and nothing the user sees may.
+	if strings.Contains(shown[0], testPath) {
+		t.Errorf("the dialog disclosed what the panic carried: %q", shown[0])
+	}
+}
+
+// TestNoWiringPanicShowsNothing is the other half: the deferred reporter runs
+// on every composition, and a healthy one must be silent.
+func TestNoWiringPanicShowsNothing(t *testing.T) {
+	shown := 0
+
+	func() {
+		defer reportWiringPanic(func(string) { shown++ })
+	}()
+
+	if shown != 0 {
+		t.Errorf("showed %d dialogs with nothing wrong", shown)
+	}
 }
