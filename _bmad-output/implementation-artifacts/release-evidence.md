@@ -48,7 +48,7 @@ makes a named test fail. Everything a machine cannot observe is below.
 
 ## Artifact identity
 
-**v0.2.0 — drafted 2026-09-13, not yet published.** Built by Release
+**v0.2.0 — published 2026-09-13, the current release.** Built by Release
 [34734499181](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34734499181) from
 `7b59c373164c8bacdd4ae7c367ad3a231385a474`, each artifact on its own native runner after the full
 gate passed on both.
@@ -58,21 +58,26 @@ gate passed on both.
 | `fairdrop.exe` | 13,704,704 | `7480b1dc6ae19a0df646a600a2d4ac8f5dc655de95195b61b190cd8d56b620f6` |
 | `fairdrop-macos.zip` | 4,578,680 | `fe6fff303e77fbf2a44735818667ed18dad526ad57c74dad977f4269f03c2853` |
 
-The workflow stops at a draft on purpose: this repository is public, so making a release visible
-stays a person's act. Until someone publishes it, **v0.1.0 is still the only release anybody can
-download.**
+The workflow built it as a draft, because making a release visible on a public repository stays a
+person's act; the owner published it on 2026-09-13. What is downloadable now is this build.
 
-**v0.1.0 — published 2026-09-10,** built from `cc9ce580aa63281b5bd8cc4c6de685b0ac79068f`.
+**v0.1.0 — published 2026-09-10, superseded,** built from
+`cc9ce580aa63281b5bd8cc4c6de685b0ac79068f`. Still downloadable, and still described here because a
+copy someone already has is not recalled by a newer release.
 
 | Artifact | Size | SHA-256 |
 | --- | ---: | --- |
 | `fairdrop.exe` | 13,617,152 | `9785404b3b6373b9763756366c04edb71679bff94f7e58ad3b8c7d199c143fa5` |
 | `fairdrop-macos.zip` | 4,548,773 | `9f1039bfd75083cda3d26619d507d6efd2da442e73c39494195b7a678a897689` |
 
-It is **52 commits behind `main`** and predates Stories 3.4 through 3.10 entirely: no bounded
-lifecycle waits, no visible-failure work, no reconciled error copy, no native platform matrix, no
-directory-stream hardening, and none of the platform decisions. Any observation recorded against
-`v0.1.0` describes that build and not the current tree.
+It was **52 commits behind `main`** when v0.2.0 replaced it, and predates Stories 3.4 through 3.10
+entirely: no bounded lifecycle waits, no visible-failure work, no reconciled error copy, no native
+platform matrix, no directory-stream hardening, and none of the platform decisions. Any observation
+recorded against `v0.1.0` describes that build and not the current tree.
+
+The Windows artifact was downloaded from the published release on 2026-09-13 and
+`sha256sum --check` passed against its published `.sha256`, so the file a person gets is the file
+the runner built.
 
 Neither checksum is a signature. Both are produced by the same pipeline as the binary, so they
 prove a download arrived intact and say nothing about whether that pipeline was tampered with.
@@ -109,8 +114,9 @@ behaviour above is what Story 3.1 proved against fake runtime seams.
 ## Optional manual checks
 
 Optional under the release policy. Each row says what would have to be observed, so that anyone
-who does run one can fill it in, and against which build -- `v0.2.0` is drafted and carries every
-story through 3.10, while `v0.1.0` is what is currently downloadable and predates most of them.
+who does run one can fill it in, and against which build. `v0.2.0` is the current release and
+carries every story through 3.10; `v0.1.0` is still downloadable and predates most of them, so a
+row recorded against it says little about the code today.
 
 Three rows are worth more now than they were: rows 2, 4 and 12 exercise the theme read, the
 instance lock and the wiring dialog Story 3.10 added, and those are precisely the three things no
