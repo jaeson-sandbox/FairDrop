@@ -842,18 +842,29 @@ func (c *Coordinator) stopBeaconBounded() error {
 func (c *Coordinator) callAdapterBounded(slot **boundedCall, bound time.Duration, call func() error) (error, bool) {
 	c.cleanupMu.Lock()
 	pending := *slot
-	if pending == nil {
+	owned := pending == nil
+	if owned {
 		pending = &boundedCall{done: make(chan struct{})}
 		*slot = pending
+	}
+	c.cleanupMu.Unlock()
+
+	// Armed before the call is launched, for the reason callBounded gives
+	// above: arming after races the spawned goroutine for which one reaches a
+	// test's call log first, and that is not a detail a test should have to
+	// tolerate. This function launched first and armed second until a Windows
+	// runner caught it, so the claim is now in two places that must agree.
+	// Registering the slot above and launching below is deliberate too -- a
+	// joining caller may briefly find a call that has not started, and waits
+	// on the same done channel either way.
+	timedOut := make(chan struct{})
+	stop := c.boundTimer(bound, func() { close(timedOut) })
+	if owned {
 		go func() {
 			pending.err = call()
 			close(pending.done)
 		}()
 	}
-	c.cleanupMu.Unlock()
-
-	timedOut := make(chan struct{})
-	stop := c.boundTimer(bound, func() { close(timedOut) })
 	select {
 	case <-pending.done:
 		stop()

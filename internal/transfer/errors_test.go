@@ -321,3 +321,75 @@ func TestEveryDiagnosticMessageIsAFixedLiteral(t *testing.T) {
 		t.Fatal("no recordDiagnostic calls parsed, so this test would pass vacuously")
 	}
 }
+
+// TestEveryBoundedCallArmsItsBoundBeforeLaunching pins an ordering that was
+// written down, explained, and then quietly reversed one function later.
+//
+// callBounded arms its timer before it launches the call, and says why: arming
+// afterwards races the spawned goroutine for which one reaches a test's call
+// log first. Story 3.8's callAdapterBounded launched first and armed second,
+// which reintroduced exactly that race -- and no local run found it. A Windows
+// CI runner did, after the change had already merged, with
+// TestAuthorizeClaimCommitsAndPublishesStarted reporting the two calls in the
+// other order.
+//
+// A comment could not stop that and did not. This reads the source: in each of
+// these functions the BoundTimer call must appear before the `go` statement.
+// It is a structural claim, so it is checked structurally -- the behavioural
+// alternative is a test that fails only on the scheduler's bad days, which is
+// how this defect reached main in the first place.
+func TestEveryBoundedCallArmsItsBoundBeforeLaunching(t *testing.T) {
+	fileSet := token.NewFileSet()
+	parsed, err := parser.ParseFile(fileSet, "coordinator.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse coordinator.go: %v", err)
+	}
+
+	checked := map[string]bool{"callBounded": false, "callAdapterBounded": false}
+	for _, declaration := range parsed.Decls {
+		function, isFunction := declaration.(*ast.FuncDecl)
+		if !isFunction || function.Body == nil {
+			continue
+		}
+		if _, wanted := checked[function.Name.Name]; !wanted {
+			continue
+		}
+		checked[function.Name.Name] = true
+
+		armed, launched := token.NoPos, token.NoPos
+		ast.Inspect(function.Body, func(node ast.Node) bool {
+			switch typed := node.(type) {
+			case *ast.CallExpr:
+				selector, isSelector := typed.Fun.(*ast.SelectorExpr)
+				if isSelector && selector.Sel.Name == "boundTimer" && armed == token.NoPos {
+					armed = typed.Pos()
+				}
+			case *ast.GoStmt:
+				if launched == token.NoPos {
+					launched = typed.Pos()
+				}
+			}
+			return true
+		})
+
+		if armed == token.NoPos {
+			t.Errorf("%s arms no bound at all, so nothing here is bounded", function.Name.Name)
+			continue
+		}
+		if launched == token.NoPos {
+			t.Errorf("%s launches no call, so this test would pass vacuously for it", function.Name.Name)
+			continue
+		}
+		if armed > launched {
+			t.Errorf("%s launches its call at %s before arming its bound at %s: the call's position in a "+
+				"test's log becomes a coin flip, and the call runs unbounded until the timer is armed",
+				function.Name.Name, fileSet.Position(launched), fileSet.Position(armed))
+		}
+	}
+
+	for name, found := range checked {
+		if !found {
+			t.Errorf("%s was not found in coordinator.go, so this test silently stopped covering it", name)
+		}
+	}
+}
