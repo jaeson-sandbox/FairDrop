@@ -1333,6 +1333,11 @@ So that the contract describes what the code does and the copy describes what ha
 **Then** the public copy explains applicable recovery (wait for the lookup, or restart FairDrop), rather than suggesting another Cancel will stop the OS call (D-111)
 **And** any new code/string moves through the UX registry, contract, Go and TypeScript mirrors together; the one-outstanding-call bound and successful retry after return remain tested.
 
+**Given** a folder holding one entry whose name a receiving device cannot save
+**When** the sender chooses that folder
+**Then** the refusal says a name is the problem rather than claiming FairDrop can use regular files and folders only -- which the folder plainly is -- and says what makes a name unsendable (D-112)
+**And** the refusal discloses no path; whether a single offending segment may be echoed is decided explicitly rather than assumed.
+
 ### Story 3.12: Capture the Accessibility Evidence a Runner Can Produce
 
 As a maintainer,
