@@ -30,7 +30,7 @@ Against `c3a80064640db97c94188dce25e39a9211dbccf2` (`main`, 2026-09-12).
 | --- | --- | --- | --- |
 | Full gate, native Windows | `verify (windows-latest)` | [Verify 34726508196](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34726508196) at `c3a8006` | **success** |
 | Full gate, native macOS | `verify (macos-latest)` | the same run | **success** |
-| Go adapter suite, Linux | `Linux adapter verification (not release proof)` | the same run | **success** — executes the `O_PATH` branch that both desktop runners skip; explicitly not release proof |
+| Go adapter suite, Linux | `Linux adapter verification (not release proof)` | the same run | **success** — executes the `O_PATH` branch of `handle_linux.go`, which neither desktop runner compiles, let alone runs; explicitly not release proof |
 | Go tests | every runner in the same run | 502 test functions across 8 packages | **pass** |
 | Go tests under `-race` with cgo | every runner in the same run | the same, with a compiled cgo probe first so a cgo-less runner fails loudly instead of reporting a clean race run | **pass** |
 | Frontend suite | every runner in the same run | 498 tests in 17 files | **pass** |
