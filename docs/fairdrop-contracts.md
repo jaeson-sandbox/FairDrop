@@ -55,6 +55,10 @@ const (
     ErrSetupFailed        ErrorCode = "setup_failed"
     ErrBeaconWarning      ErrorCode = "beacon_warning"
     ErrTransferFailed     ErrorCode = "transfer_failed"
+    ErrCleanupUnconfirmed ErrorCode = "cleanup_unconfirmed"
+    ErrNotReady           ErrorCode = "not_ready"
+    ErrClipboardFailed    ErrorCode = "clipboard_failed"
+    ErrNameUnsupported    ErrorCode = "name_unsupported"
     ErrShuttingDown       ErrorCode = "shutting_down"
 )
 
@@ -110,7 +114,7 @@ Stable domain error codes are:
 | Code | Meaning |
 | --- | --- |
 | `invalid_selection` | zero/multiple paths or empty path at an input boundary |
-| `busy` | Stage requested outside IDLE |
+| `busy` | Stage requested outside IDLE, or while an uninterruptible filesystem call from a previous selection is still outstanding |
 | `cancelled` | Stage/claim/transfer lost to Cancel or Shutdown |
 | `path_not_found` | selected root or nested entry disappears during inspection or preparation |
 | `path_unsupported` | link, reparse point, special file, or host-unsupported path |
@@ -121,6 +125,10 @@ Stable domain error codes are:
 | `setup_failed` | a coded failure before any byte was sent: inspection arithmetic/batch faults, entropy exhaustion, a Prepare-time deadline, an uncoded `SourcePort` error, a malformed Stage acknowledgement, a pre-startup/pre-composition refusal, or `ready()` finding a missing port |
 | `beacon_warning` | HTTP/QR are ready but mDNS publication failed; non-terminal |
 | `transfer_failed` | streaming size arithmetic/batch faults, handle-close, read, ZIP, connection, or post-header stream failure; inspection arithmetic/batch faults use `setup_failed` |
+| `cleanup_unconfirmed` | a teardown bound elapsed with nothing sent: a Cancel of a staged-but-never-claimed session, or a malformed Stage acknowledgement whose best-effort cleanup also failed. The session may still be held, so the next attempt may be refused `busy` |
+| `not_ready` | a command reached the App before a window exists, or with no coordinator composed -- the state Story 3.10's single-instance backstop leaves a second process in deliberately |
+| `clipboard_failed` | the Wails runtime clipboard write failed; the staged session is unaffected and the link is still on screen |
+| `name_unsupported` | an entry name inside a selected folder cannot be saved by a receiving device; the selection itself is a supported regular folder |
 | `shutting_down` | command rejected after application shutdown begins |
 
 Errors wrap internal causes but expose only the stable code and safe message to React. Absolute paths and capability tokens are never included in HTTP or mDNS errors.

@@ -120,7 +120,7 @@ The codes come from the binding contract. `PublicErrorOf` and the malformed/unkn
 | Code | Visible heading | Exact `PublicError.message` | Sole announcement owner | Recovery |
 |---|---|---|---|---|
 | `invalid_selection` | Choose one item | “Choose exactly one file or folder.” | Focused inline Error Panel | Use the drop target or one browse action and choose one item. |
-| `busy` | Transfer already active | “FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.” | Focused current-state heading with the message as description | Wait a moment, or cancel it; do not replace the active session. |
+| `busy` | FairDrop is still busy | “FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.” | Focused current-state heading with the message as description | Wait for it to finish, or restart FairDrop. The clause “or cancel it” was removed on 2026-09-13: cancelling cannot stop an uninterruptible filesystem call, and the outstanding work is not always a transfer (D-111). |
 | `cancelled` | Transfer canceled | “Transfer canceled.” | Polite status during pending; focused Idle cancellation summary when reset wins | Return to Idle; never render as Error. |
 | `path_not_found` | Item not found | “That file or folder is no longer available. Choose it again.” | Focused Error Panel | Choose the item again. |
 | `path_unsupported` | Can’t use that item | “FairDrop can use regular files and folders only. Choose another item.” | Focused Error Panel | Choose a non-link regular file or folder. |
@@ -131,6 +131,10 @@ The codes come from the binding contract. `PublicErrorOf` and the malformed/unkn
 | `setup_failed` | Couldn’t prepare that item | “FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.” | Focused Error Panel | Choose the item again. |
 | `beacon_warning` | Discovery unavailable | `copy.discovery.warning` | One polite status update; focus stays in Staged | Continue with QR/link; this is Warning, not Error. |
 | `transfer_failed` | Transfer stopped | “The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.” | Focused terminal Error Panel | Check network; prepare again after reset. |
+| `cleanup_unconfirmed` | Couldn’t confirm it stopped | “FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again.” | Focused Error Panel | Restart FairDrop; a later attempt may otherwise be refused for a session that is still held (D-103, D-106). |
+| `not_ready` | FairDrop isn’t ready | “FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one.” | Focused Error Panel | Use the FairDrop window that is already open. Reachable since Story 3.10: a second instance the platform lock missed is left uncomposed on purpose (D-048, D-104). |
+| `clipboard_failed` | Couldn’t copy the link | “FairDrop couldn’t copy the link. Select the link and copy it yourself.” | Focused Error Panel beside Staged | Copy the link from the field, which is still on screen; the transfer is unaffected (D-104). |
+| `name_unsupported` | A name can’t be sent | “One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again.” | Focused Error Panel | Rename the entry and choose the folder again. The offending name is never echoed: AD-9 forbids a path, and whether one segment may be shown is undecided (D-112). |
 | `shutting_down` | FairDrop is closing | “FairDrop is closing. Reopen it to start a transfer.” | Focused inline message if the window remains | Reopen FairDrop. |
 
 ## Component Patterns

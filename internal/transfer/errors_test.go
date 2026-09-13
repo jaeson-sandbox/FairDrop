@@ -20,7 +20,7 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		message string
 	}{
 		{ErrInvalidSelection, "Choose exactly one file or folder."},
-		{ErrBusy, "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item."},
+		{ErrBusy, "FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it."},
 		{ErrCancelled, "Transfer canceled."},
 		{ErrPathNotFound, "That file or folder is no longer available. Choose it again."},
 		{ErrPathUnsupported, "FairDrop can use regular files and folders only. Choose another item."},
@@ -31,6 +31,10 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		{ErrSetupFailed, "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again."},
 		{ErrBeaconWarning, "Device discovery isn’t available. The QR code and download link still work."},
 		{ErrTransferFailed, "The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link."},
+		{ErrCleanupUnconfirmed, "FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again."},
+		{ErrNotReady, "FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one."},
+		{ErrClipboardFailed, "FairDrop couldn’t copy the link. Select the link and copy it yourself."},
+		{ErrNameUnsupported, "One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again."},
 		{ErrShuttingDown, "FairDrop is closing. Reopen it to start a transfer."},
 	}
 
@@ -99,7 +103,7 @@ func TestIndependentCodedErrorSurvivesWrapping(t *testing.T) {
 	}
 	want := PublicError{
 		Code:    ErrBusy,
-		Message: "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.",
+		Message: "FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.",
 	}
 	if got := PublicErrorOf(err); got != want {
 		t.Fatalf("PublicErrorOf() = %#v, want %#v", got, want)
@@ -235,14 +239,20 @@ func TestTheCodeRegistryIsExactlyTheseThirteenCodes(t *testing.T) {
 		ErrSetupFailed:        true,
 		ErrBeaconWarning:      true,
 		ErrTransferFailed:     true,
+		ErrCleanupUnconfirmed: true,
+		ErrNotReady:           true,
+		ErrClipboardFailed:    true,
+		ErrNameUnsupported:    true,
 		ErrShuttingDown:       true,
 	}
 
 	for code := range publicMessages {
 		if !want[code] {
 			t.Errorf("publicMessages gained %q. Add it to this test, to the copy test above, "+
-				"to main_test.go's cross-language list, and to frontend/src/transfer/errors.ts "+
-				"-- otherwise it reaches the UI as an unrecognized code.", code)
+				"to main_test.go's cross-language list, to frontend/src/transfer/errors.ts and its "+
+				"own backendCodes list, to docs/fairdrop-contracts.md in both the prose table and the "+
+				"Go constant block, and to EXPERIENCE.md -- otherwise it reaches the UI as an "+
+				"unrecognized code.", code)
 		}
 	}
 	for code := range want {

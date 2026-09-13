@@ -94,7 +94,12 @@ registry's voice and quoted here so the implementation cannot drift from what wa
 - `clipboard_failed` — "Couldn't copy the link" — "FairDrop couldn't copy the link. Select the link
   and copy it yourself."
 - `name_unsupported` — "A name can't be sent" — "One name inside that folder can't be saved on the
-  receiving device. Names can't contain : < > \" | ? * or end with a dot or space."
+  receiving device. Rename anything containing : < > ? * or ending with a dot or space."
+  **Amended during implementation:** the approved draft enumerated `"` and `|` as well. A pipe
+  cannot sit in a markdown table cell, and escaping it in `EXPERIENCE.md` would have left the
+  cross-language pin comparing an escaped string against the unescaped one the code carries — the
+  exact drift that pin exists to catch. Two characters were dropped rather than the rule: the
+  sentence still tells a user what to look for, and the refusal itself is unchanged.
 - `busy` revised — "FairDrop is still finishing the last item. If it doesn't finish, close FairDrop
   and reopen it." The clause dropped is "or cancel it", which is false when the outstanding work is
   an uninterruptible filesystem call (D-111).

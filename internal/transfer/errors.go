@@ -21,6 +21,10 @@ const (
 	ErrSetupFailed        ErrorCode = "setup_failed"
 	ErrBeaconWarning      ErrorCode = "beacon_warning"
 	ErrTransferFailed     ErrorCode = "transfer_failed"
+	ErrCleanupUnconfirmed ErrorCode = "cleanup_unconfirmed"
+	ErrNotReady           ErrorCode = "not_ready"
+	ErrClipboardFailed    ErrorCode = "clipboard_failed"
+	ErrNameUnsupported    ErrorCode = "name_unsupported"
 	ErrShuttingDown       ErrorCode = "shutting_down"
 )
 
@@ -139,7 +143,7 @@ func nilInterface(value any) bool {
 
 var publicMessages = map[ErrorCode]string{
 	ErrInvalidSelection:   "Choose exactly one file or folder.",
-	ErrBusy:               "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.",
+	ErrBusy:               "FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.",
 	ErrCancelled:          "Transfer canceled.",
 	ErrPathNotFound:       "That file or folder is no longer available. Choose it again.",
 	ErrPathUnsupported:    "FairDrop can use regular files and folders only. Choose another item.",
@@ -150,6 +154,10 @@ var publicMessages = map[ErrorCode]string{
 	ErrSetupFailed:        "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.",
 	ErrBeaconWarning:      "Device discovery isn’t available. The QR code and download link still work.",
 	ErrTransferFailed:     "The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.",
+	ErrCleanupUnconfirmed: "FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again.",
+	ErrNotReady:           "FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one.",
+	ErrClipboardFailed:    "FairDrop couldn’t copy the link. Select the link and copy it yourself.",
+	ErrNameUnsupported:    "One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again.",
 	ErrShuttingDown:       "FairDrop is closing. Reopen it to start a transfer.",
 }
 

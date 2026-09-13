@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -253,7 +254,7 @@ func TestAppOptionsRegistersTheErrorFormatter(t *testing.T) {
 		t.Fatalf("ErrorFormatter returned %T, want a JSON string", opts.ErrorFormatter(coded))
 	}
 
-	const want = `{"code":"busy","message":"FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item."}`
+	const want = `{"code":"busy","message":"FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it."}`
 	if got != want {
 		t.Errorf("ErrorFormatter produced\n %s\nwant\n %s", got, want)
 	}
@@ -291,7 +292,7 @@ var registryEntries = []struct {
 	message string
 }{
 	{"invalid_selection", "Choose exactly one file or folder."},
-	{"busy", "FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item."},
+	{"busy", "FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it."},
 	{"cancelled", "Transfer canceled."},
 	{"path_not_found", "That file or folder is no longer available. Choose it again."},
 	{"path_unsupported", "FairDrop can use regular files and folders only. Choose another item."},
@@ -302,6 +303,10 @@ var registryEntries = []struct {
 	{"setup_failed", "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again."},
 	{"beacon_warning", "Device discovery isn’t available. The QR code and download link still work."},
 	{"transfer_failed", "The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link."},
+	{"cleanup_unconfirmed", "FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again."},
+	{"not_ready", "FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one."},
+	{"clipboard_failed", "FairDrop couldn’t copy the link. Select the link and copy it yourself."},
+	{"name_unsupported", "One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again."},
 	{"shutting_down", "FairDrop is closing. Reopen it to start a transfer."},
 }
 
@@ -392,7 +397,21 @@ func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 			if !ok {
 				t.Fatalf("formatCommandError returned a non-string for %q", entry.code)
 			}
-			wantJSON := `{"code":"` + entry.code + `","message":"` + entry.message + `"}`
+			// Marshalled, not concatenated. encoding/json HTML-escapes <, > and
+			// & by default, so a hand-built string compares unequal to a
+			// correct message that happens to contain one -- which cost this
+			// story a false failure on copy that was right. The registry
+			// literal above is still the source of truth; only the encoding
+			// of the expectation is borrowed, and never from the table under
+			// test.
+			want, err := json.Marshal(struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			}{Code: entry.code, Message: entry.message})
+			if err != nil {
+				t.Fatalf("marshal the expected payload for %q: %v", entry.code, err)
+			}
+			wantJSON := string(want)
 			if formatted != wantJSON {
 				t.Errorf("errors.go produced\n %s\nwant\n %s", formatted, wantJSON)
 			}

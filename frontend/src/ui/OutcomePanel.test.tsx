@@ -76,7 +76,7 @@ describe('the Error panel', () => {
         [
             'busy',
             'Transfer already active',
-            'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
+            'FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.',
         ],
         ['path_not_found', 'Item not found', 'That file or folder is no longer available. Choose it again.'],
         ['setup_failed', 'Couldn’t prepare that item', 'FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.'],
