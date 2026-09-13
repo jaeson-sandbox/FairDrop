@@ -1006,7 +1006,7 @@ So that a release candidate is a real build of the real code, correctly named, w
 
 **Scope:** what a workflow can build and verify without a person. Story 3.9 consolidates automated evidence and optional browser, screen-reader and firewall observations under the owner's 2026-09-11 personal-release policy; this story produces the artifacts it records.
 
-**Narrowed 2026-09-09:** the four platform and contract decisions this story used to carry -- the HTTP header set (D-018), the window theme flash (D-055), the macOS non-secure-context limit (D-064), and the Windows single-instance fallthrough (D-088) -- moved to Story 3.10. Each is independently reviewable, three change product behaviour, and none is needed to build and identify an artifact. They remain release-blocking: **Story 3.10 must close before Story 3.9 can record release evidence**, whatever the numbering suggests.
+**Narrowed 2026-09-09:** the four platform and contract decisions this story used to carry -- the HTTP header set (D-018), the window theme flash (D-055), the macOS non-secure-context limit (D-064), and the Windows single-instance fallthrough (D-088) -- moved to Story 3.10. Each is independently reviewable, three change product behaviour, and none is needed to build and identify an artifact. They remain release-blocking: **Story 3.10 must close before a release**, whatever the numbering suggests. It does not block Story 3.9, which records each undecided item as an open limitation (owner decision, 2026-09-12).
 
 **Closes:** nothing directly; the four ids it used to carry moved to Story 3.10.
 
@@ -1261,7 +1261,7 @@ So that a release candidate is not blocked by open questions nobody has answered
 
 **Why a separate story:** these were bundled into Story 3.3, whose goal is producing and identifying an artifact. Each of the four is independently reviewable and mergeable, three change product behaviour, and none is needed to build an artifact -- so carrying them made 3.3 a spec no single session could hold. Split out on 2026-09-09.
 
-**Ordering:** numbered last, required before Story 3.9. Release evidence cannot record a pass against a header set, a first-paint behaviour, or a single-instance guarantee that has not been decided.
+**Ordering:** numbered last, required before a release. Release evidence cannot record a pass against a header set, a first-paint behaviour, or a single-instance guarantee that has not been decided -- but it can, and does, record each as an open limitation, which is why Story 3.9 no longer waits on this story (owner decision, 2026-09-12).
 
 **Closes:** D-018, D-055, D-064, D-088, D-107.
 
@@ -1298,7 +1298,7 @@ So that the contract describes what the code does and the copy describes what ha
 
 **Why a separate story:** these seven were left on Story 3.6 when it was narrowed. They are real and they are small, and they share no mechanism with each other or with 3.6's observability work -- two are progress-shape contract rows, two are contexts fabricated or never cancellable, three are error copy that survived Story 3.5. Grouping them by size rather than by theme is deliberate: each is a short, self-contained correction, and carrying them on a story about something else is how they went unfixed twice already.
 
-**Ordering:** numbered last, required before Story 3.9. Three of the seven change what a user reads, so release evidence cannot record a pass against copy that is still wrong.
+**Ordering:** numbered last, required before a release. Three of the seven change what a user reads, so release evidence cannot record a pass against copy that is still wrong -- it records the gap instead, which is why Story 3.9 no longer waits on this story (owner decision, 2026-09-12).
 
 **Closes:** D-035, D-039, D-048, D-097, D-103, D-104, D-106, D-111, D-112.
 
@@ -1335,7 +1335,7 @@ So that the human evidence rows are the ones that genuinely need a person.
 
 **Why a separate story:** these two were left on Story 3.7 when it was narrowed. Every other id there is a Go test that needs a particular operating system; these two need a real browser engine performing layout and evaluating media queries, which jsdom does not do. That is a new CI dependency and a new harness, not another test run, and pairing it with the platform matrix would have made one story's success depend on two unrelated pieces of infrastructure.
 
-**Ordering:** numbered last, required before Story 3.9. What this story cannot capture becomes a row in the human release evidence, so 3.9 needs to know which rows are left.
+**Ordering:** numbered last, required before a release. What this story cannot capture becomes a row in the release evidence; until it runs, those rows read optional and unverified, which is why Story 3.9 no longer waits on this story (owner decision, 2026-09-12).
 
 **Closes:** D-065, D-068, D-109.
 
