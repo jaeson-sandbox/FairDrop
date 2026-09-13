@@ -248,6 +248,15 @@ func writeStatus(writer http.ResponseWriter, status int) {
 	header := writer.Header()
 	header.Set("Content-Type", "text/plain; charset=utf-8")
 	header.Set("Cache-Control", "no-store")
+	// The same origin policy as the success response, for the same reason: the
+	// capability is the token, not the origin. Without it a receiver page
+	// fetched from anywhere reads every rejection as one opaque network error
+	// and can only say "something went wrong", when the server has already
+	// distinguished a wrong token from a consumed one from a busy sender.
+	// Nothing new is disclosed -- the body stays empty and identical for every
+	// rejection above, and a status is only ever about a token the caller
+	// already holds (D-018).
+	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("X-Content-Type-Options", "nosniff")
 	writer.WriteHeader(status)
 }
@@ -264,6 +273,16 @@ func writeDownloadHeaders(writer http.ResponseWriter, name string, total int64, 
 	// The capability is the token, not the origin, so a receiver page fetched
 	// from anywhere may download it.
 	header.Set("Access-Control-Allow-Origin", "*")
+	// A cross-origin reader sees only the CORS-safelisted response headers
+	// unless the server names the rest, so without this the filename this
+	// response was built to carry is unreadable by the one page most likely to
+	// want it (D-018).
+	header.Set("Access-Control-Expose-Headers", "Content-Disposition")
+	// What the architecture already says in prose -- no range or resume
+	// behaviour in v1 -- stated on the wire. A download manager that assumes
+	// ranges are available would retry against a capability the first request
+	// consumed, and get a 410 it reports as a failed download.
+	header.Set("Accept-Ranges", "none")
 	header.Set("X-Content-Type-Options", "nosniff")
 	if totalKnown {
 		header.Set("Content-Length", strconv.FormatInt(total, 10))

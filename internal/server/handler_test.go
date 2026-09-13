@@ -1015,6 +1015,7 @@ func renderResponse(t *testing.T, response *http.Response) string {
 	for _, name := range []string{
 		"Content-Type", "Content-Length", "Cache-Control", "X-Content-Type-Options",
 		"Content-Disposition", "Location", "Allow", "Access-Control-Allow-Origin",
+		"Access-Control-Expose-Headers", "Accept-Ranges",
 	} {
 		rendered.WriteString("|" + name + "=" + response.Header.Get(name))
 	}
