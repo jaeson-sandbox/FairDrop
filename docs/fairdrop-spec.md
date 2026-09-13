@@ -105,6 +105,7 @@ Use `runtime.EventsEmit(a.ctx, eventName, payload)` to drive the React UI reacti
     *   `Content-Disposition: attachment; filename="<name>"`
     *   `Content-Length: <size>` (If single file. Omit if streaming a directory).
     *   `Cache-Control: no-store`
+    *   `Access-Control-Expose-Headers: Content-Disposition` and `Accept-Ranges: none` (added 2026-09-12, D-018; see the architecture's response rules)
 
 ### Module C: On-the-Fly Directory Archiving
 *   Use `io.Pipe()`.
@@ -123,7 +124,7 @@ Use `runtime.EventsEmit(a.ctx, eventName, payload)` to drive the React UI reacti
 *   **Animations:** Use CSS transitions or `framer-motion` to smoothly transition between IDLE -> STAGED -> TRANSFERRING.
 
 ## 7. Security & Edge Cases
-*   **CORS:** The HTTP server must explicitly set CORS headers `Access-Control-Allow-Origin: *` to allow mobile browsers to initiate downloads without preflight blocking.
+*   **CORS:** The HTTP server must explicitly set CORS headers `Access-Control-Allow-Origin: *` to allow mobile browsers to initiate downloads without preflight blocking. As of 2026-09-12 this is set on rejections as well, so a cross-origin receiver page reads the coded status rather than an opaque failure (D-018); rejection bodies remain empty and identical.
 *   **Concurrent Requests:** The server must reject requests if a transfer is already actively in progress (return `423 Locked`).
 *   **Cancellation:** If the user clicks "Cancel" in the UI, the Go backend must trigger a `context.CancelFunc` tied to the HTTP server to forcefully drop the connection and close the listener.
 *   **Firewall:** Advise the user/agent that running this will trigger the macOS/Windows local firewall prompt the first time the binary runs. Bind to `0.0.0.0` to allow local LAN access.

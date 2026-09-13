@@ -126,6 +126,14 @@ func appOptions(app *App) *options.App {
 }
 
 func appOptionsWithLockProbe(app *App, usable func() bool) *options.App {
+	return appOptionsWith(app, usable, nativeOSPrefersDarkTheme)
+}
+
+// appOptionsWith adds the theme probe to the lock probe above. Two seams
+// rather than one signature change: appOptionsWithLockProbe is named in a
+// source-text pin and in every existing options assertion, and there is no
+// reason a theme test should rewrite those.
+func appOptionsWith(app *App, usable func() bool, prefersDark func() bool) *options.App {
 	return &options.App{
 		Title:     "FairDrop",
 		Width:     1024,
@@ -150,10 +158,10 @@ func appOptionsWithLockProbe(app *App, usable func() bool) *options.App {
 		// The shade the native window paints before the webview renders. It
 		// must track --color-canvas in frontend/src/style.css, or the window
 		// flashes one theme and repaints in another; main_test.go pins the two
-		// together. Wails takes a single value, so this is the light canvas and
-		// a dark-mode OS still gets one light frame -- deferred-work.md carries
-		// the theme-aware version.
-		BackgroundColour: &options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1},
+		// together. Wails takes a single value and offers no per-theme one, so
+		// the OS preference is read here, before the options exist, and the
+		// matching canvas chosen (D-055).
+		BackgroundColour: canvasFor(prefersDark()),
 
 		// Without this, a rejected command carries err.Error() -- raw adapter
 		// text -- and the frontend has no stable code to switch on.
@@ -182,6 +190,20 @@ func singleInstanceOption(app *App, usable func() bool) *options.SingleInstanceL
 		return nil
 	}
 	return &options.SingleInstanceLock{UniqueId: singleInstanceLockUniqueID, OnSecondInstanceLaunch: app.restoreWindow}
+}
+
+// canvasFor is the native window's pre-paint colour for each OS theme, and the
+// only place either token is written in Go.
+//
+// Both must equal --color-canvas in frontend/src/style.css for their mode. A
+// value that disagrees is a visible flash on every launch of that theme, and
+// nothing in the frontend suite can see a Go constant -- which is how the light
+// one once tracked a Tailwind class Story 1.9 had deleted.
+func canvasFor(dark bool) *options.RGBA {
+	if dark {
+		return &options.RGBA{R: 0x1C, G: 0x19, B: 0x16, A: 1}
+	}
+	return &options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1}
 }
 
 // newBoundApp builds the App exactly as main does: wired to the real Wails

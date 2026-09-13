@@ -64,23 +64,73 @@ func TestAppOptionsWindowContract(t *testing.T) {
 // deleted, leaving every light-mode start painting slate-900 and repainting
 // cream.
 func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
-	const token = "--color-canvas: #F7F0E7;"
-
 	stylesheet, err := os.ReadFile(filepath.Join("frontend", "src", "style.css"))
 	if err != nil {
 		t.Fatalf("read stylesheet: %v", err)
 	}
-	if !strings.Contains(string(stylesheet), token) {
-		t.Fatalf("style.css no longer declares %q -- update this test and the option together", token)
+	declared := string(stylesheet)
+
+	// Both modes, because Wails paints one colour and the OS decides which one
+	// it should be. Before D-055 only the light token was pinned and a
+	// dark-mode machine got a light frame at every launch -- a defect no test
+	// could see, since the dark token was never read on the Go side at all.
+	for _, theme := range []struct {
+		name  string
+		dark  bool
+		token string
+		want  options.RGBA
+	}{
+		{"light", false, "--color-canvas: #F7F0E7;", options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1}},
+		{"dark", true, "--color-canvas: #1C1916;", options.RGBA{R: 0x1C, G: 0x19, B: 0x16, A: 1}},
+	} {
+		t.Run(theme.name, func(t *testing.T) {
+			if !strings.Contains(declared, theme.token) {
+				t.Fatalf("style.css no longer declares %q -- update this test and canvasFor together", theme.token)
+			}
+
+			got := appOptionsWith(NewApp(), func() bool { return true }, func() bool { return theme.dark }).BackgroundColour
+			if got == nil {
+				t.Fatal("BackgroundColour is nil: the window would paint the platform default, not the canvas")
+			}
+			if *got != theme.want {
+				t.Errorf("BackgroundColour = %+v, want %+v (the %s --color-canvas)", *got, theme.want, theme.name)
+			}
+		})
 	}
 
-	got := appOptionsWithLockProbe(NewApp(), func() bool { return true }).BackgroundColour
-	if got == nil {
-		t.Fatal("BackgroundColour is nil: the window would paint the platform default, not the canvas")
+	// The dark token lives inside the prefers-color-scheme block, so a
+	// stylesheet that declared it at :root would satisfy the loop above while
+	// meaning something else entirely.
+	_, darkBlock, found := strings.Cut(declared, "@media (prefers-color-scheme: dark)")
+	if !found {
+		t.Fatal("style.css has no dark-scheme block, so the dark token above is not the dark theme's")
 	}
-	want := options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1}
-	if *got != want {
-		t.Errorf("BackgroundColour = %+v, want %+v (the light --color-canvas)", *got, want)
+	if !strings.Contains(darkBlock, "--color-canvas: #1C1916;") {
+		t.Error("the dark canvas token is not declared inside the prefers-color-scheme block")
+	}
+}
+
+// TestTheNativeThemeProbeIsWiredToTheOptions pins the half a fake cannot: that
+// the composed options ask the operating system at all.
+//
+// appOptionsWith takes the probe, so every test above can drive both themes
+// without either OS -- and that is exactly what would let the production path
+// keep a hardcoded light canvas while the suite stayed green, the same shape as
+// Story 3.3's workflow_call and Story 3.6's diagnostic seam.
+func TestTheNativeThemeProbeIsWiredToTheOptions(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatalf("read main.go: %v", err)
+	}
+	found := false
+	for _, line := range splitLines(source) {
+		if strings.Contains(line, "return appOptionsWith(app, usable, nativeOSPrefersDarkTheme)") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("appOptionsWithLockProbe does not pass nativeOSPrefersDarkTheme, so a shipped FairDrop " +
+			"never reads the OS theme however well the seam is tested")
 	}
 }
 
