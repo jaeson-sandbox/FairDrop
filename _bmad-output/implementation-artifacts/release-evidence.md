@@ -24,19 +24,23 @@ from a shell. Receiver-side facts can only come from the person holding the rece
 
 ## What machines verified
 
-Against `c3a80064640db97c94188dce25e39a9211dbccf2` (`main`, 2026-09-12).
+Against `7b59c373164c8bacdd4ae7c367ad3a231385a474` (`main`, 2026-09-13), through the Release
+workflow's own gate. The Release run reuses `verify.yml` by `workflow_call` rather than restating
+it, so the gate below is the same gate every pull request runs.
 
 | Check | Where it ran | Identity | Result |
 | --- | --- | --- | --- |
-| Full gate, native Windows | `verify (windows-latest)` | [Verify 34726508196](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34726508196) at `c3a8006` | **success** |
-| Full gate, native macOS | `verify (macos-latest)` | the same run | **success** |
-| Go adapter suite, Linux | `Linux adapter verification (not release proof)` | the same run | **success** — executes the `O_PATH` branch of `handle_linux.go`, which neither desktop runner compiles, let alone runs; explicitly not release proof |
+| Full gate, native Windows | `gate / verify (windows-latest)` | [Release 34734499181](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34734499181) at `7b59c37` | **success** |
+| Full gate, native macOS | `gate / verify (macos-latest)` | the same run | **success** |
+| Go adapter suite, Linux | `gate / Linux adapter verification (not release proof)` | the same run | **success** — executes the `O_PATH` branch of `handle_linux.go`, which neither desktop runner compiles, let alone runs; explicitly not release proof |
 | Go tests | every runner in the same run | 502 test functions across 8 packages | **pass** |
 | Go tests under `-race` with cgo | every runner in the same run | the same, with a compiled cgo probe first so a cgo-less runner fails loudly instead of reporting a clean race run | **pass** |
 | Frontend suite | every runner in the same run | 498 tests in 17 files | **pass** |
 | `wails build` | both desktop runners in the same run | the real production build, plus a bindings-drift check | **pass** |
 | gofmt, `go vet`, pinned staticcheck, line endings | every runner in the same run | — | **pass** |
 | Mutation proof | the desktop runners in the same run | 68 mutations, each required to fail a **named** assertion: 57 on every runner, 3 on Linux and macOS, 8 macOS-only (`scripts/verify-native-mutations.sh`) | **pass** |
+| Native artifact build | `build (windows-latest)` and `build (macos-latest)` in the same run | each runner builds its own through Wails after the gate, never cross-compiled | **success** |
+| Checksum re-verified after transit | the `release` job in the same run | `sha256sum --check` runs on the downloaded artifacts before `gh release create`, so the published checksum describes the published file | **success** |
 
 What this does not say: that the product works. It says the code compiles, builds, and behaves as
 its tests describe on both supported operating systems, and that breaking any guarded behaviour
@@ -44,18 +48,36 @@ makes a named test fail. Everything a machine cannot observe is below.
 
 ## Artifact identity
 
+**v0.2.0 — drafted 2026-09-13, not yet published.** Built by Release
+[34734499181](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34734499181) from
+`7b59c373164c8bacdd4ae7c367ad3a231385a474`, each artifact on its own native runner after the full
+gate passed on both.
+
+| Artifact | Size | SHA-256 |
+| --- | ---: | --- |
+| `fairdrop.exe` | 13,704,704 | `7480b1dc6ae19a0df646a600a2d4ac8f5dc655de95195b61b190cd8d56b620f6` |
+| `fairdrop-macos.zip` | 4,578,680 | `fe6fff303e77fbf2a44735818667ed18dad526ad57c74dad977f4269f03c2853` |
+
+The workflow stops at a draft on purpose: this repository is public, so making a release visible
+stays a person's act. Until someone publishes it, **v0.1.0 is still the only release anybody can
+download.**
+
+**v0.1.0 — published 2026-09-10,** built from `cc9ce580aa63281b5bd8cc4c6de685b0ac79068f`.
+
 | Artifact | Size | SHA-256 |
 | --- | ---: | --- |
 | `fairdrop.exe` | 13,617,152 | `9785404b3b6373b9763756366c04edb71679bff94f7e58ad3b8c7d199c143fa5` |
 | `fairdrop-macos.zip` | 4,548,773 | `9f1039bfd75083cda3d26619d507d6efd2da442e73c39494195b7a678a897689` |
 
-Release `v0.1.0`, published 2026-09-10, built from `cc9ce580aa63281b5bd8cc4c6de685b0ac79068f`.
+It is **52 commits behind `main`** and predates Stories 3.4 through 3.10 entirely: no bounded
+lifecycle waits, no visible-failure work, no reconciled error copy, no native platform matrix, no
+directory-stream hardening, and none of the platform decisions. Any observation recorded against
+`v0.1.0` describes that build and not the current tree.
 
-**The published artifact is 36 commits behind `main`** and predates Stories 3.4 through 3.8
-entirely. It therefore does not contain bounded lifecycle waits, the visible-failure work, the
-reconciled error copy, the native platform matrix, or the directory-stream hardening. Any
-observation recorded against `v0.1.0` describes that build and not the current tree. A release
-cut from `main` needs its own row here.
+Neither checksum is a signature. Both are produced by the same pipeline as the binary, so they
+prove a download arrived intact and say nothing about whether that pipeline was tampered with.
+Neither artifact is signed beyond the macOS build's ad-hoc signature, which exists only so the app
+will launch; there is no notarization and no auto-update.
 
 ## Recorded rather than verified
 
@@ -64,12 +86,15 @@ owns, listed so that reading this file is enough to know what a release would sh
 
 | Limitation | Owner | What is unsettled |
 | --- | --- | --- |
-| HTTP header set for the download response (D-018) | Story 3.10 | CORS, `Accept-Ranges` and `Access-Control-Expose-Headers` are undecided; an error response reachable cross-origin may read as opaque to a receiver page rather than as a coded failure |
-| Window theme flash at first paint (D-055) | Story 3.10 | The native window background is not yet read from the OS in Go ahead of the webview's first paint, so a one-frame flash of the opposite theme is possible |
-| macOS non-secure-context limit (D-064) | Story 3.10 | WKWebView serves from `wails://`, so browser APIs requiring a secure context are absent; the clipboard already routes through Go, but the limit is not written into the UX contract |
-| Windows single-instance fallthrough (D-088) | Story 3.10 | An elevated owner, a tight double launch, or a second logged-in user can leave a first instance undetected |
-| Residual error copy (D-035, D-039, D-048, D-097, D-103, D-104, D-106, D-111, D-112) | Story 3.11 | Nine states whose wording does not yet describe what happened — including an ordinary macOS or Linux filename containing `:` failing a whole folder transfer under copy that says FairDrop can use regular files and folders only |
+| Residual error copy (D-035, D-039, D-048, D-097, D-103, D-104, D-106, D-111, D-112) | Story 3.11 | Nine states whose wording does not yet describe what happened — including an ordinary macOS or Linux filename containing `:` failing a whole folder transfer under copy that says FairDrop can use regular files and folders only, and busy-recovery copy that suggests cancelling and retrying when the only real options are waiting or restarting |
 | Rendered accessibility capture (D-065, D-068, D-109) | Story 3.12 | 320 CSS pixel reflow, 200% text, the 44px target floor and forced-colors QR rendering are proved against stylesheet text and the DOM, never against a rendered layout |
+
+Story 3.10 closed the four platform decisions this table used to carry (D-018, D-055, D-064,
+D-088) on 2026-09-12, and they are in `v0.2.0`. None of them was observed running on the machine
+it targets: the runners compile and link the theme read, the instance lock and the wiring dialog,
+but never launch a window, read a preference or show a dialog. Each is proved through a seam a
+test drives and reasoned from the documented platform API. That distinction is the reason those
+rows moved out of this table rather than becoming a claim.
 
 **Windows restoration on a second launch (D-086), decided 2026-09-12.** Restoration means the
 existing window is unminimised with its session, transfer and keyboard focus intact, and that the
@@ -84,8 +109,12 @@ behaviour above is what Story 3.1 proved against fake runtime seams.
 ## Optional manual checks
 
 Optional under the release policy. Each row says what would have to be observed, so that anyone
-who does run one can fill it in. `v0.1.0` is the only artifact that exists; see the warning above
-about what it predates.
+who does run one can fill it in, and against which build -- `v0.2.0` is drafted and carries every
+story through 3.10, while `v0.1.0` is what is currently downloadable and predates most of them.
+
+Three rows are worth more now than they were: rows 2, 4 and 12 exercise the theme read, the
+instance lock and the wiring dialog Story 3.10 added, and those are precisely the three things no
+runner has ever executed on the machine they target.
 
 | # | Scenario | Sender | Receiver | Artifact | Date | Reviewer | Result | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -100,7 +129,8 @@ about what it predates.
 | 9 | Browser combinations | — | — | — | — | — | optional / unverified | The four sender-to-receiver combinations `EXPERIENCE.md` names. Until each is observed, "supported modern browser" is not a claim this project has evidence for. |
 | 10 | Windows assistive technology | — | — | — | — | — | optional / unverified | One keyboard-only transfer with NVDA running: each transition announced exactly once, no duplicate or lost announcement. The routing table and throttle are unit-proved; what a screen reader actually says is not. |
 | 11 | macOS assistive technology | — | — | — | — | — | optional / unverified | The same, with VoiceOver. |
-| 12 | Rendered layout limits | — | — | — | — | — | optional / unverified | Staged at 320 CSS pixels, at 200% text, and with forced colors on. Story 3.12 intends to capture what a headless browser can; a real window at those settings is the rest. |
+| 12 | Native window theme at launch (new in v0.2.0) | — | — | — | — | — | optional / unverified | Launch on a machine set to dark mode and watch the first frame. The window should paint the dark canvas `#1C1916` before the webview renders; a one-frame flash of cream means the OS read returned light. Repeat in light mode. This is the only way to see D-055 working: the runners compile the registry read and the `defaults` call but never launch a window. |
+| 13 | Rendered layout limits | — | — | — | — | — | optional / unverified | Staged at 320 CSS pixels, at 200% text, and with forced colors on. Story 3.12 intends to capture what a headless browser can; a real window at those settings is the rest. |
 
 ## Attempts that did not pass, kept for the record
 
