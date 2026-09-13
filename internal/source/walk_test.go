@@ -398,7 +398,7 @@ func TestWalkRejectsAnEntryNameThatIsNotASingleComponent(t *testing.T) {
 			factory := newFakeFactory(pathPlan{anchor: "root", rootLabel: "root"}, root)
 
 			seen, err := recordWalk(t, &Inspector{handles: factory, sameFile: sameFakeFile}, "original")
-			assertCode(t, err, transfer.ErrPathUnsupported)
+			assertCode(t, err, transfer.ErrNameUnsupported)
 			if len(seen) != 0 {
 				t.Fatalf("walk emitted %+v for entry name %q", seen, entryName)
 			}
@@ -410,11 +410,11 @@ func TestWalkRejectsAnEntryNameThatIsNotASingleComponent(t *testing.T) {
 func TestChildRelativeNameAccumulatesSlashSeparatedNames(t *testing.T) {
 	t.Parallel()
 
-	got, err := childRelativeName("", "top.txt")
+	got, _, err := childRelativeName("", "top.txt")
 	if err != nil || got != "top.txt" {
 		t.Fatalf("childRelativeName(root) = %q, %v", got, err)
 	}
-	got, err = childRelativeName("nested/deeper", "leaf.txt")
+	got, _, err = childRelativeName("nested/deeper", "leaf.txt")
 	if err != nil || got != "nested/deeper/leaf.txt" {
 		t.Fatalf("childRelativeName(nested) = %q, %v", got, err)
 	}

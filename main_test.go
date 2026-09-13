@@ -306,7 +306,8 @@ var registryEntries = []struct {
 	{"cleanup_unconfirmed", "FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again."},
 	{"not_ready", "FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one."},
 	{"clipboard_failed", "FairDrop couldn’t copy the link. Select the link and copy it yourself."},
-	{"name_unsupported", "One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again."},
+	{"name_unsupported", "One name inside that folder can’t be sent safely. Rename it, then choose the folder again."},
+	{"name_warning", "Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items."},
 	{"shutting_down", "FairDrop is closing. Reopen it to start a transfer."},
 }
 
@@ -470,7 +471,7 @@ func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 // reported as missing, so adding one is two edits, not one -- but it is one
 // deliberate edit in a small, visible list, not a silent compile-time gap.
 func TestEveryWarningCodeIsAcceptedByTheFrontendParser(t *testing.T) {
-	everyWarningCode := []transfer.WarningCode{transfer.WarnBeaconUnavailable}
+	everyWarningCode := []transfer.WarningCode{transfer.WarnBeaconUnavailable, transfer.WarnUnportableNames}
 
 	mirror, err := os.ReadFile(filepath.Join("frontend", "src", "transfer", "validation.ts"))
 	if err != nil {

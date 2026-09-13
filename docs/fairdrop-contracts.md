@@ -59,6 +59,7 @@ const (
     ErrNotReady           ErrorCode = "not_ready"
     ErrClipboardFailed    ErrorCode = "clipboard_failed"
     ErrNameUnsupported    ErrorCode = "name_unsupported"
+    ErrNameWarning        ErrorCode = "name_warning"
     ErrShuttingDown       ErrorCode = "shutting_down"
 )
 
@@ -128,7 +129,8 @@ Stable domain error codes are:
 | `cleanup_unconfirmed` | a teardown bound elapsed with nothing sent: a Cancel of a staged-but-never-claimed session, or a malformed Stage acknowledgement whose best-effort cleanup also failed. The session may still be held, so the next attempt may be refused `busy` |
 | `not_ready` | a command reached the App before a window exists, or with no coordinator composed -- the state Story 3.10's single-instance backstop leaves a second process in deliberately |
 | `clipboard_failed` | the Wails runtime clipboard write failed; the staged session is unaffected and the link is still on screen |
-| `name_unsupported` | an entry name inside a selected folder cannot be saved by a receiving device; the selection itself is a supported regular folder |
+| `name_unsupported` | an entry name inside a selected folder is unsafe to archive: traversal, a drive prefix, a control or format character, or invalid UTF-8. Names a Windows receiver merely cannot save are warned about, not refused (2026-09-13) |
+| `name_warning` | non-terminal. A selected folder holds entries a Windows receiver cannot save; they are sent unchanged and the sender is told at Staged |
 | `shutting_down` | command rejected after application shutdown begins |
 
 Errors wrap internal causes but expose only the stable code and safe message to React. Absolute paths and capability tokens are never included in HTTP or mDNS errors.

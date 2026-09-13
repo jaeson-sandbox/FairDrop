@@ -59,10 +59,16 @@ export function parseWarning(value: unknown): Warning | null {
     try {
         const record = asRecord(value)
         if (record === null || !ownsEvery(record, ['code', 'message'])) return null
-        if (record.code !== 'beacon_warning') return null
+        // The codes a warning may carry, which is deliberately not every error
+        // code: a Warning is non-terminal, and a code that describes a failure
+        // has no business arriving as one. Go's WarningCode type is the other
+        // half of this, and main_test.go fails if the two lists disagree.
+        if (record.code !== 'beacon_warning' && record.code !== 'name_warning') return null
         if (!isNonEmptyString(record.message)) return null
 
-        return {code: 'beacon_warning', message: fixedErrorMessages.beacon_warning}
+        // The registry's copy, never the sender's: an incoming message is
+        // discarded exactly as a PublicError's is.
+        return {code: record.code, message: fixedErrorMessages[record.code]}
     } catch {
         return null
     }

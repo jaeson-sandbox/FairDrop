@@ -34,7 +34,8 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		{ErrCleanupUnconfirmed, "FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again."},
 		{ErrNotReady, "FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one."},
 		{ErrClipboardFailed, "FairDrop couldn’t copy the link. Select the link and copy it yourself."},
-		{ErrNameUnsupported, "One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again."},
+		{ErrNameUnsupported, "One name inside that folder can’t be sent safely. Rename it, then choose the folder again."},
+		{ErrNameWarning, "Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items."},
 		{ErrShuttingDown, "FairDrop is closing. Reopen it to start a transfer."},
 	}
 
@@ -223,7 +224,7 @@ func (e independentCodedError) Code() ErrorCode { return e.code }
 // removed code and misses an added one entirely -- and an added code reaches
 // the Wails boundary as unrecognized, degrading to transfer_failed with the
 // wrong copy and no test failing anywhere. This pins the registry as a set.
-func TestTheCodeRegistryIsExactlyTheseThirteenCodes(t *testing.T) {
+func TestTheCodeRegistryIsExactlyThisSet(t *testing.T) {
 	t.Parallel()
 
 	want := map[ErrorCode]bool{
@@ -243,6 +244,7 @@ func TestTheCodeRegistryIsExactlyTheseThirteenCodes(t *testing.T) {
 		ErrNotReady:           true,
 		ErrClipboardFailed:    true,
 		ErrNameUnsupported:    true,
+		ErrNameWarning:        true,
 		ErrShuttingDown:       true,
 	}
 

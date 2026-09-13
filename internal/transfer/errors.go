@@ -25,6 +25,7 @@ const (
 	ErrNotReady           ErrorCode = "not_ready"
 	ErrClipboardFailed    ErrorCode = "clipboard_failed"
 	ErrNameUnsupported    ErrorCode = "name_unsupported"
+	ErrNameWarning        ErrorCode = "name_warning"
 	ErrShuttingDown       ErrorCode = "shutting_down"
 )
 
@@ -157,7 +158,8 @@ var publicMessages = map[ErrorCode]string{
 	ErrCleanupUnconfirmed: "FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again.",
 	ErrNotReady:           "FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one.",
 	ErrClipboardFailed:    "FairDrop couldn’t copy the link. Select the link and copy it yourself.",
-	ErrNameUnsupported:    "One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again.",
+	ErrNameUnsupported:    "One name inside that folder can’t be sent safely. Rename it, then choose the folder again.",
+	ErrNameWarning:        "Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items.",
 	ErrShuttingDown:       "FairDrop is closing. Reopen it to start a transfer.",
 }
 

@@ -72,7 +72,7 @@ func (p *preparedDirectory) Walk(ctx context.Context, visit transfer.SourceVisit
 		if _, err := p.inspector.verifyOpened(ctx, selected.info, p.pin, true); err != nil {
 			return err
 		}
-		_, err := p.inspector.walkDirectory(ctx, selected.handle, selected.info, visit, selected.retained)
+		_, _, err := p.inspector.walkDirectory(ctx, selected.handle, selected.info, visit, selected.retained)
 		return err
 	})
 }

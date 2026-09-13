@@ -29,6 +29,7 @@ export const transferErrorCodes = [
     'not_ready',
     'clipboard_failed',
     'name_unsupported',
+    'name_warning',
     'shutting_down',
 ] as const
 
@@ -55,7 +56,9 @@ export const fixedErrorMessages: Readonly<Record<TransferErrorCode, string>> = {
     not_ready: 'FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one.',
     clipboard_failed: 'FairDrop couldn’t copy the link. Select the link and copy it yourself.',
     name_unsupported:
-        'One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again.',
+        'One name inside that folder can’t be sent safely. Rename it, then choose the folder again.',
+    name_warning:
+        'Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items.',
     shutting_down: 'FairDrop is closing. Reopen it to start a transfer.',
 }
 

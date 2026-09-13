@@ -29,6 +29,17 @@ type StagedItem struct {
 	Kind        ItemKind
 	LogicalSize int64
 	ModTime     time.Time
+
+	// UnportableNames counts entries whose names a Windows receiver cannot
+	// save. It is a count, never the names themselves: AD-9 forbids a path,
+	// and one segment of a user's filesystem is close enough to one that
+	// echoing it is a decision nobody has taken.
+	//
+	// Zero for a file, and for a directory whose every entry travels. The
+	// coordinator turns a non-zero count into the Staged warning; nothing
+	// here refuses, because a name Windows dislikes is still an ordinary name
+	// on the sender and on the phone that is this product's usual receiver.
+	UnportableNames int
 }
 
 // ProgressSnapshot is one wire-accurate view of a transfer in flight.
@@ -64,6 +75,12 @@ type WarningCode string
 // which is the whole point: assigning any other ErrorCode to a Warning is a
 // compile error.
 const WarnBeaconUnavailable WarningCode = WarningCode(ErrBeaconWarning)
+
+// WarnUnportableNames is raised at Stage when a selected folder holds entries
+// a Windows receiver cannot save. Non-terminal by construction: the transfer
+// proceeds and the names are sent unchanged, because the sender may well be
+// sending to a phone, where they are perfectly ordinary.
+const WarnUnportableNames WarningCode = WarningCode(ErrNameWarning)
 
 // Warning is one non-fatal condition attached to an otherwise successful
 // command result. A warning never carries adapter text: its code selects fixed

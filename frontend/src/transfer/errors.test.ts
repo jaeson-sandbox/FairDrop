@@ -34,6 +34,7 @@ const backendCodes = [
     'not_ready',
     'clipboard_failed',
     'name_unsupported',
+    'name_warning',
     'shutting_down',
 ]
 
@@ -56,7 +57,8 @@ const expectedFixedCopies = [
     {code: 'cleanup_unconfirmed', message: 'FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again.'},
     {code: 'not_ready', message: 'FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one.'},
     {code: 'clipboard_failed', message: 'FairDrop couldn’t copy the link. Select the link and copy it yourself.'},
-    {code: 'name_unsupported', message: 'One name inside that folder can’t be saved on the receiving device — usually a colon, an asterisk, or a trailing dot or space. Rename it, then choose the folder again.'},
+    {code: 'name_unsupported', message: 'One name inside that folder can’t be sent safely. Rename it, then choose the folder again.'},
+    {code: 'name_warning', message: 'Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items.'},
     {code: 'shutting_down', message: 'FairDrop is closing. Reopen it to start a transfer.'},
 ] as const
 
