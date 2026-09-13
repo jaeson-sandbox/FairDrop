@@ -957,3 +957,122 @@ func columnIndex(header []string, name string) int {
 	}
 	return -1
 }
+
+// TestTheInstanceLockIsExclusiveWithinThisUser drives the backstop against
+// itself: the second acquisition of the same file must fail while the first
+// still holds it, and succeed once it is released.
+//
+// This is the whole of D-088's guarantee that a test can reach. Wails' two
+// Windows fallthroughs need an elevated process or a scheduling race to
+// produce, and neither is something a unit test should try to stage; what it
+// can prove is that when a second process does get past Wails, this lock
+// refuses it.
+func TestTheInstanceLockIsExclusiveWithinThisUser(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, instanceLockName)
+
+	first, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatalf("open the lock file: %v", err)
+	}
+	if !lockFileExclusive(first) {
+		t.Fatal("the first holder could not take an uncontended lock")
+	}
+
+	second, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatalf("reopen the lock file: %v", err)
+	}
+	if lockFileExclusive(second) {
+		t.Error("a second holder took the lock while the first still held it: a competing coordinator would start")
+	}
+	if err := second.Close(); err != nil {
+		t.Errorf("close the second descriptor: %v", err)
+	}
+
+	// Released by closing the descriptor, which is also what a crashed process
+	// gets from the operating system for free -- the reason this is an advisory
+	// lock rather than a file whose existence means "running".
+	if err := first.Close(); err != nil {
+		t.Fatalf("close the first descriptor: %v", err)
+	}
+
+	third, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatalf("reopen the lock file after release: %v", err)
+	}
+	t.Cleanup(func() { _ = third.Close() })
+	if !lockFileExclusive(third) {
+		t.Error("the lock was not released when its holder closed: every later launch would be refused")
+	}
+}
+
+// TestAnUnheldInstanceLockLeavesTheAppUncomposed pins what the backstop is for.
+// An App without a coordinator refuses every command, which is exactly the
+// outcome D-088 wants for a process Wails failed to stop: no listener, no
+// beacon, nothing competing for a port.
+func TestAnUnheldInstanceLockLeavesTheAppUncomposed(t *testing.T) {
+	app := buildApp(false)
+
+	app.mu.RLock()
+	installed := app.transfers
+	app.mu.RUnlock()
+
+	if installed != nil {
+		t.Error("a process that lost the instance lock still composed a coordinator, so it would start a " +
+			"second listener and a second beacon")
+	}
+
+	if got := buildApp(true); got == nil {
+		t.Fatal("holding the lock produced no App at all")
+	}
+}
+
+// TestAWiringPanicReachesTheUserBeforeItKillsTheProcess is D-107.
+//
+// The dialog is a seam so this can drive it; the panic continuing is asserted
+// because swallowing it would leave a half-composed process running, and the
+// runtime's stack trace is what a developer needs even though a release build
+// has no console to print it to.
+func TestAWiringPanicReachesTheUserBeforeItKillsTheProcess(t *testing.T) {
+	var shown []string
+	continued := false
+
+	func() {
+		defer func() {
+			if recover() != nil {
+				continued = true
+			}
+		}()
+		defer reportWiringPanic(func(message string) { shown = append(shown, message) })
+		panic("transfer: dependencies are incomplete: " + testPath)
+	}()
+
+	if !continued {
+		t.Error("the panic was swallowed: a half-composed FairDrop would keep running")
+	}
+	if len(shown) != 1 {
+		t.Fatalf("showed %v, want exactly one message", shown)
+	}
+	if shown[0] != fatalWiringMessage {
+		t.Errorf("showed %q, want the fixed message", shown[0])
+	}
+	// AD-9: the panic carried a path, and nothing the user sees may.
+	if strings.Contains(shown[0], testPath) {
+		t.Errorf("the dialog disclosed what the panic carried: %q", shown[0])
+	}
+}
+
+// TestNoWiringPanicShowsNothing is the other half: the deferred reporter runs
+// on every composition, and a healthy one must be silent.
+func TestNoWiringPanicShowsNothing(t *testing.T) {
+	shown := 0
+
+	func() {
+		defer reportWiringPanic(func(string) { shown++ })
+	}()
+
+	if shown != 0 {
+		t.Errorf("showed %d dialogs with nothing wrong", shown)
+	}
+}

@@ -220,11 +220,67 @@ func newBoundApp() *App {
 }
 
 func main() {
-	app := newBoundApp()
+	release, held := acquireInstanceLock()
+	if held {
+		defer release()
+	}
+
+	app := buildApp(held)
 
 	if err := wails.Run(appOptions(app)); err != nil {
 		// log.Fatal, not println: a bare print would fall off the end of main
 		// and exit 0, reporting success to CI after a failed launch.
 		log.Fatalf("fairdrop: %v", err)
 	}
+}
+
+// buildApp returns the App main runs: composed when this process holds the
+// user's instance lock, inert when it does not.
+//
+// Inert rather than absent, because Wails' own single-instance handoff has not
+// run yet and it is the thing that restores the existing window. On the
+// ordinary path Wails sees the first instance and exits this process before the
+// window appears, so nothing uncomposed is ever shown. Only when Wails misses
+// the first instance -- the two Windows fallthroughs D-088 describes -- does
+// this window reach a user, and then every command answers that FairDrop is not
+// ready, which is the point: a second listener and a second beacon are what
+// must not happen (D-088).
+func buildApp(held bool) *App {
+	if !held {
+		app := NewApp()
+		// Fixed diagnostic: a lock path is a filesystem path (AD-9).
+		app.logf("fairdrop: another FairDrop already holds this user's instance lock; this window starts no transfer")
+		return app
+	}
+
+	defer reportWiringPanic(showFatalDialog)
+	return newBoundApp()
+}
+
+// fatalWiringMessage is the whole of what a user is told when composition
+// fails. It names no port, no path and nothing the panic carried: a wiring
+// defect is not a situation a user can act on, and AD-9 does not relax because
+// the process is dying.
+const fatalWiringMessage = "FairDrop could not start because of an internal defect in this build. " +
+	"Nothing was sent, and no transfer was started."
+
+// reportWiringPanic shows a panic to the user before letting it continue.
+//
+// NewCoordinator panics when a port is nil, which is the right answer for a
+// wiring defect and is what makes ready()'s nil-port branch unreachable. What
+// had no answer was the shape of that failure in a release build: compose runs
+// before wails.Run, no recover covered it, and a release build has no console,
+// so the process would vanish with no window, no dialog and no message (D-107).
+//
+// The panic continues rather than being swallowed. A recovered wiring defect
+// would leave a half-composed process running, and the stack trace the runtime
+// prints is what a developer needs -- the dialog is for the person who
+// double-clicked, not instead of the diagnosis.
+func reportWiringPanic(show func(string)) {
+	recovered := recover()
+	if recovered == nil {
+		return
+	}
+	show(fatalWiringMessage)
+	panic(recovered)
 }

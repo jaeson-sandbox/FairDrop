@@ -2,7 +2,7 @@
 title: 'Story 3.10: Settle the Release-Blocking Platform Decisions'
 type: 'feature'
 created: '2026-09-12'
-status: 'ready-for-dev'
+status: 'done'
 baseline_commit: '572fc9aea4b96785ea27034bce1426290f4618d7'
 review_loop_iteration: 0
 context:
@@ -60,13 +60,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/server/handler.go` — the decided header changes, with `renderResponse` widened so each is visible to every existing response assertion.
-- [ ] `docs/fairdrop-architecture.md`, `docs/fairdrop-spec.md` — the same set, moved together, with the reasoning recorded.
-- [ ] `main.go` plus build-tagged siblings — read the OS theme before the options are built and paint the matching canvas; a seam a test drives on any host, and the existing pin extended to both tokens.
-- [ ] `main.go` plus a Windows sibling — the decided answer to Wails' fallthrough, keeping the existing single-instance pins green.
-- [ ] `main.go` — the decided answer for a panic before any window exists.
-- [ ] `EXPERIENCE.md` — the macOS secure-context limit and what it costs a user.
-- [ ] `evidence-3-10-settle-the-release-blocking-platform-decisions.md`, the five ids discharged, `epics.md` kept in step.
+- [x] `internal/server/handler.go` — the decided header changes, with `renderResponse` widened so each is visible to every existing response assertion.
+- [x] `docs/fairdrop-architecture.md`, `docs/fairdrop-spec.md` — the same set, moved together, with the reasoning recorded.
+- [x] `main.go` plus build-tagged siblings — read the OS theme before the options are built and paint the matching canvas; a seam a test drives on any host, and the existing pin extended to both tokens.
+- [x] `main.go` plus a Windows sibling — the decided answer to Wails' fallthrough, keeping the existing single-instance pins green.
+- [x] `main.go` — the decided answer for a panic before any window exists.
+- [x] `EXPERIENCE.md` — the macOS secure-context limit and what it costs a user.
+- [x] `evidence-3-10-settle-the-release-blocking-platform-decisions.md`, the five ids discharged, `epics.md` kept in step.
 
 **Acceptance Criteria:**
 - Given a cross-origin receiver page, when it fetches a consumed capability, then it can read the coded status rather than an opaque failure, and a test renders that header on the error path.
