@@ -127,7 +127,25 @@ Terracotta Linen is an authored light/dark semantic pair, not a tint-generation 
 | Focus and outcomes | Focus, success, warning, and error pairs | Always pair color with outline, pattern, glyph, or literal text. |
 | QR | `{colors.qr-surface}` / `{colors.qr-ink}` in both modes | Fixed high-contrast substrate; never recolor, invert, texture, rotate, round modules, or overlay a logo. |
 
-WCAG 2.2 targets are ≥4.5:1 for normal text, ≥3:1 for large text, and >3:1 without rounding for load-bearing non-text boundaries, focus indicators, and value distinctions. Automated sRGB checks for the exact tokens produce:
+WCAG 2.2 targets are ≥4.5:1 for normal text, ≥3:1 for large text, and >3:1 without rounding for load-bearing non-text boundaries, focus indicators, and value distinctions. Every figure in the two tables below is **derived, not maintained**: `frontend/src/ui/styles.test.ts` recomputes each ratio from the tokens `style.css` actually declares and asserts this document publishes it unrounded, so a palette edit that quietly breaks a pair fails at that assertion, and a figure hand-edited here is rejected by the same test. When a token changes, run the frontend suite and copy the figure it reports; do not recompute one by hand.
+
+**Text pairs**, at the 4.5:1 floor — every authored pair the views actually place together.
+
+| Text pair | Light ratio | Dark ratio |
+|---|---:|---:|
+| Text / canvas | 13.064952890:1 | 15.360550226:1 |
+| Text / surface | 14.232535399:1 | 14.028615842:1 |
+| Text / elevated | 11.606433168:1 | 12.393886362:1 |
+| Muted / canvas | 5.070532556:1 | 8.142330404:1 |
+| Muted / surface | 5.523673504:1 | 7.436297764:1 |
+| Muted / elevated | 4.504478335:1 | 6.569759304:1 |
+| Error / elevated | 4.906303647:1 | 6.234835752:1 |
+| Primary ink / primary | 5.811100200:1 | 8.304735473:1 |
+| QR ink / QR surface, fixed in both modes | 16.396272390:1 | 16.396272390:1 |
+
+Status text on its own panel is published as a floor rather than a row each: warning, success and error against surface all exceed 5.14:1 light and 7.05:1 dark.
+
+**Load-bearing non-text pairs**, at the unrounded 3:1 floor.
 
 | Load-bearing pair | Light ratio | Dark ratio |
 |---|---:|---:|
@@ -140,8 +158,6 @@ WCAG 2.2 targets are ≥4.5:1 for normal text, ≥3:1 for large text, and >3:1 w
 | Status rule / canvas, weakest of the three | 4.723097692:1 | 7.727237843:1 |
 | Trusted-LAN marker / elevated | 4.195829726:1 | 8.223782537:1 |
 | Focus / weakest adjacent authored surface | 4.986787078:1 | 6.328871109:1 |
-
-Text checks remain, for every authored pair the views actually place together: text/canvas 13.064952890:1 light and 15.360550226:1 dark; text/surface 14.232535399:1 and 14.028615842:1; text/elevated 11.606433168:1 and 12.393886362:1; muted/canvas 5.070532556:1 and 8.142330404:1; muted/surface 5.523673504:1 and 7.436297764:1; muted/elevated 4.504478335:1 and 6.569759304:1; error/elevated 4.906303647:1 and 6.234835752:1; primary/primary-ink 5.811100200:1 and 8.304735473:1; QR ink/surface 16.396272390:1. Status rules against their surface also exceed 5.14:1 light and 7.05:1 dark. Re-run unrounded automated checks if opacity, blending, color-mix, or adjacent surfaces change.
 
 When `forced-colors: active`, use system colors for text, surfaces, controls, borders, status rules, progress, and focus; retain text, glyph, length, and pattern distinctions. `forced-color-adjust: none` is forbidden except on the production QR bitmap and white quiet-zone substrate, and only after native scan evidence confirms it remains readable. Give the DropZone a visible system-color boundary.
 

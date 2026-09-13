@@ -2,7 +2,7 @@
 title: 'Story 3.9: Record Release Evidence and Optional Manual Checks'
 type: 'chore'
 created: '2026-09-12'
-status: 'ready-for-dev'
+status: 'done'
 baseline_commit: 'c3a80064640db97c94188dce25e39a9211dbccf2'
 review_loop_iteration: 0
 context:
@@ -57,11 +57,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `release-evidence.md` — rewrite the rules to match `docs/release-policy.md`; add the machine-verified rows with run identity; convert row 2 and every unrun manual check to optional/unverified with what would have to be observed; keep row 1 and the failed-attempts section as written.
-- [ ] `release-evidence.md` — record the D-086 decision: what counts as restoration on Windows when the foreground rules leave the window behind, and that no native second launch has been observed.
-- [ ] `DESIGN.md` — move the nine pairs from prose into the contrast table; replace the stale re-run instruction with a note that `styles.test.ts` derives and pins these figures, so a hand-edit fails the suite.
-- [ ] `main_test.go` — one test over `release-evidence.md`: no row says "pending", and any row whose result claims a pass carries either a Verify run id or a named observer.
-- [ ] `evidence-3-9-record-human-release-evidence.md`, with D-073 and D-086 closed and `epics.md` kept in step.
+- [x] `release-evidence.md` — rewrite the rules to match `docs/release-policy.md`; add the machine-verified rows with run identity; convert row 2 and every unrun manual check to optional/unverified with what would have to be observed; keep row 1 and the failed-attempts section as written.
+- [x] `release-evidence.md` — record the D-086 decision: what counts as restoration on Windows when the foreground rules leave the window behind, and that no native second launch has been observed.
+- [x] `DESIGN.md` — move the nine pairs from prose into the contrast table; replace the stale re-run instruction with a note that `styles.test.ts` derives and pins these figures, so a hand-edit fails the suite.
+- [x] `main_test.go` — one test over `release-evidence.md`: no row says "pending", and any row whose result claims a pass carries either a Verify run id or a named observer.
+- [x] `evidence-3-9-record-human-release-evidence.md`, with D-073 and D-086 closed and `epics.md` kept in step.
 
 **Acceptance Criteria:**
 - Given the contrast figures moved into the table, when the frontend suite runs, then `styles.test.ts` still finds every published figure, the floor sentence and the weakest-of-three claim.

@@ -62,7 +62,7 @@ development_status:
   3-6-make-lost-and-malformed-events-visible: done
   3-7-execute-the-native-platform-test-matrix: done
   3-8-harden-the-directory-stream: done
-  3-9-record-human-release-evidence: in-progress
+  3-9-record-human-release-evidence: review
   3-10-settle-the-release-blocking-platform-decisions: backlog
   3-11-close-the-residual-contract-and-copy-gaps: backlog
   3-12-capture-the-accessibility-evidence-a-runner-can-produce: backlog
