@@ -379,6 +379,24 @@ func sanitizeProgress(snapshot ProgressSnapshot) ProgressSnapshot {
 		snapshot.TotalBytes = 0
 		snapshot.Percent = 0
 	}
+	// The known-total half of the same invariant (D-039). The unknown case
+	// above was already enforced; this one was documented and trusted, which
+	// is the arrangement the function's own comment says it cannot afford.
+	//
+	// Enforced rather than merely refused because the frontend validator
+	// rejects an incoherent snapshot by dropping the whole event, and a
+	// dropped progress event is a meter that stops moving with nothing on
+	// screen to explain it. Clamping here means a coherent snapshot always
+	// crosses, and an adapter that miscounts costs a figure rather than the
+	// event carrying it.
+	if snapshot.TotalKnown {
+		if snapshot.TotalBytes == 0 {
+			snapshot.BytesSent = 0
+			snapshot.Percent = 0
+		} else if snapshot.BytesSent > snapshot.TotalBytes {
+			snapshot.BytesSent = snapshot.TotalBytes
+		}
+	}
 	snapshot.Percent = clamp(snapshot.Percent, 0, 100)
 	snapshot.SpeedBytesPerSec = clamp(snapshot.SpeedBytesPerSec, 0, math.MaxFloat64)
 	return snapshot

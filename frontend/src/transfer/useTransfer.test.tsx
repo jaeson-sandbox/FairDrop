@@ -332,6 +332,38 @@ describe('Stage generations and malformed acknowledgements', () => {
         })
     })
 
+    /*
+      D-106: the same malformed acknowledgement, with the cleanup failing.
+
+      "Nothing was sent. Choose it again." stays true about the bytes and
+      becomes misleading about everything else: the backend had already
+      committed a staged session with a listener and a capability URL, the
+      cleanup that would have released it failed, and the next Stage is refused
+      busy for a session the user was just told did not exist.
+
+      The rejection's own text is still discarded -- it is adapter text -- but
+      the fact of it is not, because it changes which sentence is true.
+    */
+    it('reports an unconfirmed cleanup when quiescing a malformed acknowledgement fails', async () => {
+        mocks.stageTransfer.mockResolvedValue(metadata({sessionId: ''}))
+        mocks.cancelTransfer.mockRejectedValue(new Error(String.raw`C:\privateeport.pdf?token=secret`))
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.stage('C:\report.pdf') })
+
+        expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1)
+        expect(hook.result.current.state).toEqual({
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: {
+                code: 'cleanup_unconfirmed',
+                message: 'FairDrop couldn’t confirm it released the connection. Nothing was sent. ' +
+                    'Close FairDrop and reopen it before sending again.',
+            },
+        })
+        expect(JSON.stringify(hook.result.current.state)).not.toContain('token=secret')
+    })
+
     it('uses fixed command copy and keeps cancelled out of Error state', async () => {
         const hook = renderHook(() => useTransfer())
         mocks.stageTransfer.mockRejectedValueOnce(new Error(JSON.stringify({
