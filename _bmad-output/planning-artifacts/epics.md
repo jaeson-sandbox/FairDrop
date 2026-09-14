@@ -1388,6 +1388,8 @@ So that I am not asked to classify my thing before I have chosen it.
 
 **Owner decision, 2026-09-13 (hierarchy):** the drop zone keeps the top of the page and its `h1`, visually calmed but not demoted. FR23 stays as written -- firewall guidance ahead of the selection controls -- so the browse control stays below it, which is why it must not be the loudest thing on the screen. Rejected: promoting browse above the firewall guidance, which would have meant renegotiating a frozen requirement; and quieting both, which leaves Idle with no confident affordance on the one screen where the user has not acted yet.
 
+**Closes:** D-113.
+
 **Acceptance Criteria:**
 
 **Given** the Idle screen

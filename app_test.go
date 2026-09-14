@@ -477,8 +477,10 @@ func TestCopyToClipboardRefusesBeforeStartup(t *testing.T) {
 	if got := len(h.clipboardWrites()); got != 0 {
 		t.Errorf("clipboard was written %d times before startup, want 0", got)
 	}
-	if code := transfer.PublicErrorOf(err).Code; code != transfer.ErrTransferFailed {
-		t.Errorf("code = %q, want %q", code, transfer.ErrTransferFailed)
+	// not_ready since 2026-09-13: nothing stopped midway, and a user who
+	// reaches this state has a real recovery to be offered.
+	if code := transfer.PublicErrorOf(err).Code; code != transfer.ErrNotReady {
+		t.Errorf("code = %q, want %q", code, transfer.ErrNotReady)
 	}
 }
 
@@ -493,8 +495,10 @@ func TestCopyToClipboardKeepsThePlatformDiagnosticBehindTheCode(t *testing.T) {
 		t.Fatal("CopyToClipboard returned no error for a failing clipboard")
 	}
 	public := transfer.PublicErrorOf(err)
-	if public.Code != transfer.ErrTransferFailed {
-		t.Errorf("code = %q, want %q", public.Code, transfer.ErrTransferFailed)
+	// A failed copy is not a transfer that stopped (D-104). The staged session
+	// is untouched and the link is still on screen to copy by hand.
+	if public.Code != transfer.ErrClipboardFailed {
+		t.Errorf("code = %q, want %q", public.Code, transfer.ErrClipboardFailed)
 	}
 	if strings.Contains(public.Message, "NSPasteboard") {
 		t.Errorf("public message leaked the platform diagnostic: %q", public.Message)
@@ -915,8 +919,11 @@ func TestDialogBeforeStartupIsRefusedRatherThanFatal(t *testing.T) {
 	if got != "" || err == nil {
 		t.Fatalf("SelectFile before startup returned (%q, %v), want a coded refusal", got, err)
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "setup_failed" {
-		t.Errorf("the refusal crossed as %q, want %q", code, "setup_failed")
+	// not_ready, like every command that arrives before a window exists or
+	// before compose ran (D-048, D-104): setup_failed is a claim about the
+	// item the user chose, and at this point there is none.
+	if code := string(transfer.ErrorCodeOf(err)); code != "not_ready" {
+		t.Errorf("the refusal crossed as %q, want %q", code, "not_ready")
 	}
 	if titles := h.dialogs(); len(titles) != 0 {
 		t.Errorf("a dialog was opened without a window context: %v", titles)
@@ -1045,11 +1052,16 @@ func TestPublishBeforeStartupDropsTheEventWithoutEmitting(t *testing.T) {
 		lines[0] != "fairdrop: undelivered (no window yet) transfer-started seq=1 session="+string(testSessionID) {
 		t.Errorf("logged %v, want one line naming the pre-window drop", lines)
 	}
-	// The coordinator holds its operation lease across this call, so the only
-	// thing that matters is that it got control back -- which reaching this
-	// line proves.
-	if err := h.app.CancelTransfer(); err != nil {
-		t.Errorf("the next command returned %v after a dropped event", err)
+	// The coordinator holds its operation lease across this call, so what
+	// matters is that control came back -- which reaching this line proves.
+	//
+	// The command itself is now refused rather than run: before D-048 a nil
+	// context was defaulted to context.Background(), so a command arriving
+	// before the window existed would bind a listener and start a beacon whose
+	// every event this very test watches being dropped. Refusing is the point,
+	// and the code says which kind of not-yet this is.
+	if code := transfer.ErrorCodeOf(h.app.CancelTransfer()); code != transfer.ErrNotReady {
+		t.Errorf("the next command returned %q after a dropped event, want %q", code, transfer.ErrNotReady)
 	}
 }
 
@@ -1407,8 +1419,11 @@ func TestCommandsRefuseBeforeCompositionRatherThanPanicking(t *testing.T) {
 	if metadata != nil || err == nil {
 		t.Fatalf("StageTransfer returned (%v, %v) with no coordinator", metadata, err)
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "setup_failed" {
-		t.Errorf("the refusal crossed as %q, want %q", code, "setup_failed")
+	// not_ready, like every command that arrives before a window exists or
+	// before compose ran (D-048, D-104): setup_failed is a claim about the
+	// item the user chose, and at this point there is none.
+	if code := string(transfer.ErrorCodeOf(err)); code != "not_ready" {
+		t.Errorf("the refusal crossed as %q, want %q", code, "not_ready")
 	}
 
 	if err := app.CancelTransfer(); err == nil {
