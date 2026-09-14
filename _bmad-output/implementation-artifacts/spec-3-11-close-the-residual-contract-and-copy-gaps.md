@@ -2,7 +2,7 @@
 title: 'Story 3.11: Close the Residual Contract and Copy Gaps'
 type: 'bugfix'
 created: '2026-09-13'
-status: 'ready-for-dev'
+status: 'done'
 baseline_commit: 'bf925a6'
 review_loop_iteration: 0
 context:
@@ -61,14 +61,14 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `EXPERIENCE.md` — four new rows and the revised `busy` message, by stable key, before any code changes.
-- [ ] `docs/fairdrop-contracts.md`, `internal/transfer/errors.go`, `frontend/src/transfer/errors.ts` — the same four codes and the revision, moved together under the pin.
-- [ ] `internal/transfer/lifecycle.go` — a staged-session Cancel whose unwind hit a bound reports `cleanup_unconfirmed`; the nil receiver reports `not_ready`.
-- [ ] `app.go` — `delegate()` refuses before the window exists rather than fabricating a context; clipboard failures report `clipboard_failed`; a cancellable context is derived at startup and cancelled at shutdown.
-- [ ] `frontend/src/transfer/useTransfer.ts` — a failed cleanup after a malformed acknowledgement reports `cleanup_unconfirmed` instead of being swallowed.
-- [ ] `internal/source`, `internal/transfer/archive_name.go` — an unsendable entry name reports `name_unsupported`.
-- [ ] `internal/transfer/outcomes.go` — `sanitizeProgress` enforces the unknown-total invariant it sits beside; the contract gains the snapshot-less `Complete` row.
-- [ ] `evidence-3-11-close-the-residual-contract-and-copy-gaps.md`, the nine ids discharged, `epics.md` kept in step.
+- [x] `EXPERIENCE.md` — four new rows and the revised `busy` message, by stable key, before any code changes.
+- [x] `docs/fairdrop-contracts.md`, `internal/transfer/errors.go`, `frontend/src/transfer/errors.ts` — the same four codes and the revision, moved together under the pin.
+- [x] `internal/transfer/lifecycle.go` — a staged-session Cancel whose unwind hit a bound reports `cleanup_unconfirmed`; the nil receiver reports `not_ready`.
+- [x] `app.go` — `delegate()` refuses before the window exists rather than fabricating a context; clipboard failures report `clipboard_failed`; a cancellable context is derived at startup and cancelled at shutdown.
+- [x] `frontend/src/transfer/useTransfer.ts` — a failed cleanup after a malformed acknowledgement reports `cleanup_unconfirmed` instead of being swallowed.
+- [x] `internal/source`, `internal/transfer/archive_name.go` — an unsendable entry name reports `name_unsupported`.
+- [x] `internal/transfer/outcomes.go` — `sanitizeProgress` enforces the unknown-total invariant it sits beside; the contract gains the snapshot-less `Complete` row.
+- [x] `evidence-3-11-close-the-residual-contract-and-copy-gaps.md`, the nine ids discharged, `epics.md` kept in step.
 
 **Acceptance Criteria:**
 - Given each of the five states, when it is reached, then the message describes that state and no other, and a test drives the state rather than asserting the string alone.
@@ -106,6 +106,14 @@ registry's voice and quoted here so the implementation cannot drift from what wa
 
 Rejected: collapsing these into two broader codes. A message vague enough to cover three causes is
 the thing Story 3.5 spent a story removing.
+
+**2026-09-13 (mid-implementation).** The owner questioned the refusal behind `name_unsupported`
+rather than its wording, and that changed the design: `SafeArchiveSegment` split into a security
+predicate that refuses and a portability predicate that warns, so a folder holding one
+Windows-awkward entry name now transfers with a Staged warning instead of being refused. The
+approved `name_unsupported` copy was rewritten for what it now covers, and `name_warning` was added
+as a fifth string with the owner's approval. D-112's fix is therefore the removal of a refusal
+rather than the rewording of one.
 
 ## Design Notes
 

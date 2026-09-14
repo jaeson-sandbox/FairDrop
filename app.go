@@ -66,6 +66,24 @@ type App struct {
 	ctx       context.Context
 	transfers transferCoordinator
 
+	// commands is the context bound transfer commands receive, derived from
+	// ctx at startup and cancelled when shutdown begins.
+	//
+	// It exists because ctx cannot be cancelled (D-097). Wails builds its
+	// application context once from context.Background() plus WithValue and
+	// never wraps it in WithCancel or WithTimeout, so Cancel and Shutdown
+	// honouring a caller's context -- which is what Story 3.4 built and what
+	// its tests exercise -- was unreachable in a shipped binary: both were
+	// bounded only by the internal leaseBound. Deriving one here makes the
+	// feature real, and gives shutdown a way to release a Cancel that is
+	// waiting on the lease rather than waiting out its bound behind it.
+	//
+	// ctx stays the lifetime context and keeps its own job: it is what events
+	// are emitted through, and emitting through a cancelled context would lose
+	// the very events shutdown wants delivered.
+	commands     context.Context
+	stopCommands context.CancelFunc
+
 	// undelivered counts lifecycle events the window could not be told about,
 	// plus a second-instance restoration that arrived before startup had
 	// installed a window to restore. The recovered panic value is deliberately
@@ -430,6 +448,7 @@ func (a *App) startup(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.ctx = ctx
+	a.commands, a.stopCommands = context.WithCancel(ctx)
 }
 
 // shutdown is called when the app terminates. It blocks until every resource
@@ -449,6 +468,20 @@ func (a *App) startup(ctx context.Context) {
 // process explains why. This is the one place that window can be diagnosed.
 func (a *App) shutdown(ctx context.Context) {
 	a.logf("fairdrop: shutdown begin")
+
+	// Released before the teardown, not after. A Cancel already waiting on the
+	// operation lease would otherwise hold this hook behind it for the whole
+	// lease bound, and it has nothing left to accomplish: Shutdown is about to
+	// tear down the very session it was cancelling. This is the one production
+	// caller that ever cancels a command context, which is what makes D-097's
+	// feature reachable rather than merely tested.
+	a.mu.RLock()
+	stop := a.stopCommands
+	a.mu.RUnlock()
+	if stop != nil {
+		stop()
+	}
+
 	_, coordinator := a.delegate()
 	if coordinator == nil {
 		return
@@ -526,7 +559,7 @@ func (a *App) delegate() (context.Context, transferCoordinator) {
 	//
 	// A nil coordinator answers the same way, which is what the window of a
 	// second instance the platform lock missed now does for every command.
-	return a.ctx, a.transfers
+	return a.commands, a.transfers
 }
 
 // runtimeContext returns the stored Wails context, or nil before startup. The

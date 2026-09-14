@@ -77,8 +77,10 @@ type fakeCoordinator struct {
 	stagePath     string
 	stageCtx      context.Context
 
-	cancelErr error
-	cancelCtx context.Context
+	cancelErr             error
+	cancelCtx             context.Context
+	cancelEntered         chan struct{}
+	cancelWaitsForContext bool
 
 	// shutdownGate, when non-nil, holds Shutdown until it is closed. It is how
 	// the blocking hook is proven to block.
@@ -99,7 +101,18 @@ func (f *fakeCoordinator) Cancel(ctx context.Context) error {
 	f.record("Cancel")
 	f.mu.Lock()
 	f.cancelCtx = ctx
+	entered, waits := f.cancelEntered, f.cancelWaitsForContext
 	f.mu.Unlock()
+	// The one seam that lets a test prove cancelling the command context ends
+	// a wait rather than merely reaching one (D-097). A real coordinator waits
+	// on the operation lease here; this waits on the same signal.
+	if waits {
+		if entered != nil {
+			close(entered)
+		}
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	return f.cancelErr
 }
 
@@ -695,12 +708,24 @@ func TestCancelTransferDelegatesAndReturnsQuietly(t *testing.T) {
 	if got := h.emitted(); len(got) != 0 {
 		t.Errorf("CancelTransfer emitted %+v itself", got)
 	}
-	// D-036: Cancel now takes a context, and CancelTransfer hands it the
-	// stored application-lifetime one -- the same context every other
-	// delegated command uses -- rather than a fabricated one the coordinator
-	// would have nothing real to honour.
-	if h.coordinator.cancelCtx != h.ctx {
-		t.Error("CancelTransfer did not hand Cancel the application-lifetime context")
+	// D-036: Cancel takes a context, and CancelTransfer hands it a real one
+	// rather than a fabricated one the coordinator has nothing to honour.
+	//
+	// D-097 made it a derivation of the lifetime context rather than the
+	// lifetime context itself. Wails never wraps its own in WithCancel, so
+	// honouring it was unreachable in a shipped binary; the derived one is
+	// cancelled when shutdown begins, which is what gives the parameter
+	// something to mean. It must still carry the lifetime context's values --
+	// the coordinator revalidates against them -- so identity is checked
+	// through the value rather than by comparing the contexts.
+	if h.coordinator.cancelCtx == nil {
+		t.Fatal("CancelTransfer handed Cancel no context at all")
+	}
+	if h.coordinator.cancelCtx.Value(runtimeContextKey{}) != h.ctx.Value(runtimeContextKey{}) {
+		t.Error("CancelTransfer's context is not derived from the application-lifetime one")
+	}
+	if h.coordinator.cancelCtx.Err() != nil {
+		t.Errorf("CancelTransfer handed Cancel an already-cancelled context: %v", h.coordinator.cancelCtx.Err())
 	}
 }
 
@@ -1673,3 +1698,66 @@ func TestLogDiagnosticWritesOneSafeLine(t *testing.T) {
 // package wrote, never an adapter's text -- and that is checkable exactly
 // where it holds, so internal/transfer's
 // TestEveryDiagnosticMessageIsAFixedLiteral pins it at the call sites.
+
+// TestShutdownEndsACancelThatIsWaitingOnItsContext is D-097's behavioural half.
+//
+// Story 3.4 gave Cancel and Shutdown a context to honour and tested that they
+// do. What no test could reach was whether a shipped FairDrop ever cancels one:
+// Wails builds its application context from context.Background() plus
+// WithValue and never wraps it, so ctx.Done() never fired and both commands
+// were bounded in production only by the internal lease bound.
+//
+// This drives the production path. A Cancel is left waiting on its context, the
+// real shutdown hook runs, and the wait must end -- which is a different claim
+// from "the parameter was passed", and the only one worth making.
+func TestShutdownEndsACancelThatIsWaitingOnItsContext(t *testing.T) {
+	h := newHarness(t)
+	entered := make(chan struct{})
+	h.coordinator.mu.Lock()
+	h.coordinator.cancelWaitsForContext = true
+	h.coordinator.cancelEntered = entered
+	h.coordinator.mu.Unlock()
+
+	cancelled := make(chan error, 1)
+	go func() { cancelled <- h.app.CancelTransfer() }()
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("CancelTransfer never reached the coordinator")
+	}
+
+	select {
+	case err := <-cancelled:
+		t.Fatalf("Cancel returned %v before anything cancelled its context", err)
+	default:
+	}
+
+	h.app.shutdown(h.ctx)
+
+	select {
+	case err := <-cancelled:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Cancel returned %v, want the context cancellation that ended its wait", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("shutdown did not end a Cancel waiting on its context: in production it would wait out the lease bound instead")
+	}
+}
+
+// The lifetime context is not the one that gets cancelled. Events are emitted
+// through it, and cancelling it would lose the events shutdown exists to let
+// finish.
+func TestShutdownLeavesTheEmitContextUsable(t *testing.T) {
+	h := newHarness(t)
+
+	h.app.shutdown(h.ctx)
+
+	if err := h.app.runtimeContext().Err(); err != nil {
+		t.Errorf("the application-lifetime context was cancelled by shutdown: %v", err)
+	}
+	h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 9, Kind: transfer.TransferReset})
+	if events := h.emitted(); len(events) != 1 {
+		t.Errorf("an event published during shutdown was dropped: %+v", events)
+	}
+}
