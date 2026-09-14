@@ -229,7 +229,7 @@ describe('fixed error surface', () => {
     it('pairs every stable code with its exact visible heading', () => {
         expect(errorHeadings).toEqual({
             invalid_selection: 'Choose one item',
-            busy: 'Transfer already active',
+            busy: 'FairDrop is still busy',
             cancelled: 'Transfer canceled',
             path_not_found: 'Item not found',
             path_unsupported: 'Can’t use that item',
@@ -240,6 +240,11 @@ describe('fixed error surface', () => {
             setup_failed: 'Couldn’t prepare that item',
             beacon_warning: 'Discovery unavailable',
             transfer_failed: 'Transfer stopped',
+            cleanup_unconfirmed: 'Couldn’t confirm it stopped',
+            not_ready: 'FairDrop isn’t ready',
+            clipboard_failed: 'Couldn’t copy the link',
+            name_unsupported: 'A name can’t be sent',
+            name_warning: 'Some names may not save',
             shutting_down: 'FairDrop is closing',
         })
     })
@@ -362,7 +367,7 @@ describe('registry immutability', () => {
         expect(() => {
             mutable.busy = 'Busy'
         }).toThrow()
-        expect(errorHeadings.busy).toBe('Transfer already active')
+        expect(errorHeadings.busy).toBe('FairDrop is still busy')
     })
 })
 

@@ -9,7 +9,7 @@ export interface PublicError {
 }
 
 export interface Warning {
-    readonly code: 'beacon_warning'
+    readonly code: 'beacon_warning' | 'name_warning'
     readonly message: string
 }
 

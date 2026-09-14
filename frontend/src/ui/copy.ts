@@ -139,7 +139,7 @@ export const copy = {
 /** The visible heading for each stable failure code. */
 export const errorHeadings: Readonly<Record<TransferErrorCode, string>> = {
     invalid_selection: 'Choose one item',
-    busy: 'Transfer already active',
+    busy: 'FairDrop is still busy',
     cancelled: 'Transfer canceled',
     path_not_found: 'Item not found',
     path_unsupported: 'Can’t use that item',
@@ -150,6 +150,11 @@ export const errorHeadings: Readonly<Record<TransferErrorCode, string>> = {
     setup_failed: 'Couldn’t prepare that item',
     beacon_warning: 'Discovery unavailable',
     transfer_failed: 'Transfer stopped',
+    cleanup_unconfirmed: 'Couldn’t confirm it stopped',
+    not_ready: 'FairDrop isn’t ready',
+    clipboard_failed: 'Couldn’t copy the link',
+    name_unsupported: 'A name can’t be sent',
+    name_warning: 'Some names may not save',
     shutting_down: 'FairDrop is closing',
 }
 

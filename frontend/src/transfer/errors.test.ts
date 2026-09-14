@@ -30,6 +30,11 @@ const backendCodes = [
     'setup_failed',
     'beacon_warning',
     'transfer_failed',
+    'cleanup_unconfirmed',
+    'not_ready',
+    'clipboard_failed',
+    'name_unsupported',
+    'name_warning',
     'shutting_down',
 ]
 
@@ -38,7 +43,7 @@ const backendCodes = [
 // failing test's name instead of hiding it inside one loop.
 const expectedFixedCopies = [
     {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
-    {code: 'busy', message: 'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.'},
+    {code: 'busy', message: 'FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.'},
     {code: 'cancelled', message: 'Transfer canceled.'},
     {code: 'path_not_found', message: 'That file or folder is no longer available. Choose it again.'},
     {code: 'path_unsupported', message: 'FairDrop can use regular files and folders only. Choose another item.'},
@@ -49,6 +54,11 @@ const expectedFixedCopies = [
     {code: 'setup_failed', message: 'FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.'},
     {code: 'beacon_warning', message: 'Device discovery isn’t available. The QR code and download link still work.'},
     {code: 'transfer_failed', message: 'The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.'},
+    {code: 'cleanup_unconfirmed', message: 'FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again.'},
+    {code: 'not_ready', message: 'FairDrop isn’t ready to send. Another copy may already be running. Close this window and use that one.'},
+    {code: 'clipboard_failed', message: 'FairDrop couldn’t copy the link. Select the link and copy it yourself.'},
+    {code: 'name_unsupported', message: 'One name inside that folder can’t be sent safely. Rename it, then choose the folder again.'},
+    {code: 'name_warning', message: 'Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items.'},
     {code: 'shutting_down', message: 'FairDrop is closing. Reopen it to start a transfer.'},
 ] as const
 
@@ -73,7 +83,7 @@ describe('parseCommandError', () => {
         })
 
         expect(parseCommandError(rejectionCarrying(formatted)).message).toBe(
-            'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
+            'FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.',
         )
     })
 

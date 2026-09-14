@@ -47,31 +47,81 @@ func TestPreparedArchiveNativeRootReplacementIsRefused(t *testing.T) {
 	}
 }
 
-func TestArchivePortableNamesAreRejectedAtBothBoundaries(t *testing.T) {
-	for _, name := range []string{"con.txt", "NUL .txt", "COM¹", "lpt².log", "bad\u202ename", "bad\u0001name", "name?", "name*", "name<", "name>", "name|", `name"`, "name:", "tail.", "tail "} {
+// TestArchiveNamesAreRejectedOnlyWhenUnsafe splits what Story 3.8 refused into
+// what endangers a receiver and what merely inconveniences one (owner
+// decision, 2026-09-13).
+//
+// The first list stays refused because each is a primitive: traversal, a drive
+// prefix a receiver would join onto its destination, a NUL that truncates the
+// name an extractor writes, and U+202E, which makes an executable display as a
+// text file.
+//
+// The second list is the change. Every one is an ordinary filename on the
+// sending machine and on the phone this product usually sends to, and each now
+// travels unchanged -- the sender is warned at Staged instead, which is also
+// what every other archiver does.
+func TestArchiveNamesAreRejectedOnlyWhenUnsafe(t *testing.T) {
+	for _, name := range []string{"bad\u202ename", "bad\x01name", "C:evil.txt", "..", ".", ""} {
 		if got, err := archiveEntryName("root", "folder/"+name); got != "" || transfer.ErrorCodeOf(err) != transfer.ErrPathUnsupported {
 			t.Errorf("unsafe nested ZIP name accepted: %q %v", got, err)
+		}
+		if name == "" {
+			continue
 		}
 		if _, err := archiveEntryName(name, "file"); transfer.ErrorCodeOf(err) != transfer.ErrPathUnsupported {
 			t.Errorf("unsafe ZIP root accepted: %q", name)
 		}
 	}
-	for _, name := range []string{"résumé with spaces.txt", "a'b;c", "照片"} {
+	for _, name := range []string{
+		"con.txt", "NUL .txt", "COM¹", "lpt².log",
+		"name?", "name*", "name<", "name>", "name|", `name"`, "name:", "tail.", "tail ",
+		"résumé with spaces.txt", "a'b;c", "照片",
+	} {
 		if got, err := archiveEntryName("root", "folder/"+name); err != nil || got != "root/folder/"+name {
-			t.Fatalf("ordinary ZIP segment changed: %q %v", got, err)
+			t.Fatalf("a name a receiver may dislike was refused rather than warned about: %q %v", got, err)
 		}
 	}
 }
 
-func TestPrepareValidatesSanitizedArchiveRootAndReleasesPin(t *testing.T) {
-	closed := 0
-	s := &scriptedSource{prepare: func(context.Context, string) (transfer.PreparedDirectory, error) {
-		return testPreparedDirectory{close: func() error { closed++; return nil }}, nil
-	}}
-	p, err := New(s).Prepare(context.Background(), transfer.StagedItem{Kind: transfer.ItemDirectory, Name: "CON.txt"})
-	assertNoPayload(t, p, err, transfer.ErrPathUnsupported)
-	if closed != 1 {
-		t.Fatalf("unsafe archive root leaked its prepared pin: closes=%d", closed)
+// TestPrepareSanitizesEveryArchiveRootItAccepts replaces a test that could no
+// longer reach what it asserted.
+//
+// It used to hand Prepare a Windows device name and check the refusal released
+// the prepared pin. Since 2026-09-13 a device name is warned about rather than
+// refused, and every other input that would fail SafeArchiveSegment is already
+// removed by sanitizeDownloadName before the check sees it: separators are cut
+// to the last component, control and format characters and colons are stripped,
+// trailing dots and spaces are trimmed, and a name reduced to nothing falls back
+// to a fixed one. The refusal is therefore unreachable through Prepare.
+//
+// The check stays -- it costs a string scan and guards a future caller that
+// skips the sanitizer -- but a test that pretended to drive it would be
+// asserting a branch no input reaches. What is worth proving is the guarantee
+// that makes it unreachable, and that the pin is released either way.
+func TestPrepareSanitizesEveryArchiveRootItAccepts(t *testing.T) {
+	for _, hostile := range []string{
+		"C:evil", "..", "", "nested/root", `back\slash`, "bad\u202ename", "trailing. ",
+	} {
+		closed := 0
+		s := &scriptedSource{prepare: func(context.Context, string) (transfer.PreparedDirectory, error) {
+			return testPreparedDirectory{close: func() error { closed++; return nil }}, nil
+		}}
+
+		p, err := New(s).Prepare(context.Background(), transfer.StagedItem{
+			Kind: transfer.ItemDirectory, Name: hostile, Path: "/tmp/root",
+		})
+		if err != nil {
+			t.Fatalf("Prepare(%q) = %v, want a payload built on a sanitized root", hostile, err)
+		}
+		if got := p.(*archive).root; !transfer.SafeArchiveSegment(got) {
+			t.Errorf("Prepare(%q) produced the unsafe archive root %q", hostile, got)
+		}
+		if err := p.Close(); err != nil {
+			t.Fatalf("Close() = %v", err)
+		}
+		if closed != 1 {
+			t.Errorf("Prepare(%q) released its prepared pin %d times, want once", hostile, closed)
+		}
 	}
 }
 

@@ -56,11 +56,12 @@ baseline TestPreparedCloseJoinsActiveWalk ./internal/source
 baseline TestBorrowedReaderRevocationJoinsAnInFlightRead ./internal/source
 baseline TestWalkRevokesBorrowBeforeOwnedClose ./internal/source
 baseline TestSourceArithmeticAndBatchFaultsArePhaseCorrect ./internal/source
-baseline TestSourceRejectsPortableNamesDuringInspectionAndWalk ./internal/source
-baseline TestPortableArchiveSegmentsRejectAmbiguousReceiverNames ./internal/transfer
+baseline TestSourceRefusesUnsafeNamesAndCountsUnportableOnes ./internal/source
+baseline TestSafeArchiveSegmentRefusesOnlyDangerousNames ./internal/transfer
+baseline TestPortableArchiveSegmentNamesWhatWindowsCannotSave ./internal/transfer
 baseline TestPreparedArchiveNativeRootReplacementIsRefused ./internal/stream
-baseline TestArchivePortableNamesAreRejectedAtBothBoundaries ./internal/stream
-baseline TestPrepareValidatesSanitizedArchiveRootAndReleasesPin ./internal/stream
+baseline TestArchiveNamesAreRejectedOnlyWhenUnsafe ./internal/stream
+baseline TestPrepareSanitizesEveryArchiveRootItAccepts ./internal/stream
 baseline TestArchiveEmitsExplicitPortableModes ./internal/stream
 baseline TestEmptyReadGuardsFailOnRead101AndResetOnProgress ./internal/stream
 # Story 3.8 checkpoint 2: cleanup ownership, retry fencing and nested bounds.
@@ -79,7 +80,7 @@ baseline TestCoordinatorCleanupOutlastsServerTeardown .
 baseline TestArchiveCloseDelegatesOnceAndPreservesThePreparedCause ./internal/stream
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
   baseline TestPOSIXContentOpenRefusesFIFOAfterMetadataWithoutBlocking ./internal/source
-  baseline TestNativeChildNameRefusesReceiverVolumePrefixes ./internal/source
+  baseline TestNativeChildNameRefusesOnlyUnsafeNames ./internal/source
 fi
 if [[ "$platform" == darwin ]]; then
   baseline TestDarwinMetadataNoFollowAndSpecialFileClassification ./internal/source
@@ -110,7 +111,7 @@ if [[ "$platform" == linux || "$platform" == darwin ]]; then
 
   # This regression is only observable on a POSIX sender.
   perl -0pi -e 's/!transfer\.SafeArchiveSegment\(name\)/filepath.IsAbs(name) || filepath.VolumeName(name) != ""/ or die "volume mutation did not match\n"' internal/source/source.go
-  expect_named_failure 'host-dependent source volume predicate' TestNativeChildNameRefusesReceiverVolumePrefixes ./internal/source 'unsafe fixture name accepted'
+  expect_named_failure 'host-dependent source volume predicate' TestNativeChildNameRefusesOnlyUnsafeNames ./internal/source 'unsafe fixture name accepted'
 fi
 
 if [[ "$platform" == darwin ]]; then
@@ -220,16 +221,23 @@ perl -0pi -e 's/code := transfer\.ErrSetupFailed/code := transfer.ErrTransferFai
 expect_named_failure 'misclassify inspection arithmetic and batch faults' TestSourceArithmeticAndBatchFaultsArePhaseCorrect ./internal/source 'want "setup_failed"'
 
 perl -0pi -e 's/stem = strings\.TrimRight\(stem, " "\)/stem = stem/ or die "device stem mutation did not match\n"' internal/transfer/archive_name.go
-expect_named_failure 'accept spaced device stem before extension' TestPortableArchiveSegmentsRejectAmbiguousReceiverNames ./internal/transfer 'unsafe archive segment accepted: "NUL .txt"'
+expect_named_failure 'accept spaced device stem before extension' TestPortableArchiveSegmentNamesWhatWindowsCannotSave ./internal/transfer 'called "NUL .txt" portable'
 
 perl -0pi -e 's/if !transfer\.SafeArchiveSegment\(name\)/if false \&\& !transfer.SafeArchiveSegment(name)/ or die "source name boundary mutation did not match\n"' internal/source/source.go
-expect_named_failure 'bypass source portable-name refusal' TestSourceRejectsPortableNamesDuringInspectionAndWalk ./internal/source 'want "path_unsupported"'
+expect_named_failure 'bypass source unsafe-name refusal' TestSourceRefusesUnsafeNamesAndCountsUnportableOnes ./internal/source 'want "name_unsupported"'
 
 perl -0pi -e 's/if !transfer\.SafeArchiveSegment\(segment\)/if false \&\& !transfer.SafeArchiveSegment(segment)/ or die "ZIP segment boundary mutation did not match\n"' internal/stream/archive.go
-expect_named_failure 'bypass ZIP segment refusal' TestArchivePortableNamesAreRejectedAtBothBoundaries ./internal/stream 'unsafe nested ZIP name accepted'
+expect_named_failure 'bypass ZIP segment refusal' TestArchiveNamesAreRejectedOnlyWhenUnsafe ./internal/stream 'unsafe nested ZIP name accepted'
 
-perl -0pi -e 's/if !transfer\.SafeArchiveSegment\(root\)/if false \&\& !transfer.SafeArchiveSegment(root)/ or die "prepared root name mutation did not match\n"' internal/stream/payload.go
-expect_named_failure 'accept unsafe sanitized ZIP root' TestPrepareValidatesSanitizedArchiveRootAndReleasesPin ./internal/stream 'want code "path_unsupported"'
+# The archive root's own SafeArchiveSegment check is defence in depth on a
+# value sanitizeDownloadName has already cleaned, so disabling it changes
+# nothing any input can observe -- that mutation is unkillable by
+# construction, and it was failing the gate as 'no tests to run' after the
+# 2026-09-13 split renamed its test. What is worth proving is the guarantee
+# that makes the check unreachable, so the sanitizer is what gets broken:
+# stop stripping the colon and a drive-qualified name reaches the root.
+perl -0pi -e 's/case r == .:.:/case false:/ or die "download-name colon mutation did not match\n"' internal/stream/payload.go
+expect_named_failure 'let a drive prefix through the download-name sanitizer' TestPrepareSanitizesEveryArchiveRootItAccepts ./internal/stream 'want a payload built on a sanitized root'
 
 perl -0pi -e 's/header\.SetMode\(0o644\)/header.SetMode(0o600)/ or die "ZIP file mode mutation did not match\n"' internal/stream/archive.go
 expect_named_failure 'change portable file mode' TestArchiveEmitsExplicitPortableModes ./internal/stream 'ZIP mode for'

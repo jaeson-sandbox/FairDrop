@@ -463,6 +463,18 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 		return c.failStage(live, NewError(ErrSetupFailed, "selection kind is unsupported"))
 	}
 	live.item = item
+	if item.UnportableNames > 0 {
+		// Raised here rather than at the archive boundary because this is the
+		// only moment the sender is looking: the walk that counted them is
+		// Inspect's own size walk, and Staged is the screen where a warning
+		// can still change what they do. Nothing is refused and nothing is
+		// renamed -- a name Windows dislikes is ordinary on the sender and on
+		// the phone this is usually going to (owner decision, 2026-09-13).
+		//
+		// The count never reaches the message. It is a count of the user's own
+		// filenames, and AD-9 does not care that the number is small.
+		live.warnings = append(live.warnings, unportableNamesWarning())
+	}
 
 	// 2. Resolve the address the receiver will dial.
 	address, err := c.network.GetLocalIP(setupCtx)
@@ -1149,6 +1161,14 @@ func capabilityURL(address netip.Addr, port int, token CapabilityToken) string {
 // copy comes from the public registry rather than from the adapter, so no
 // adapter text can reach the UI through it, and its code is the one
 // WarningCode this build produces (Epic 1 retrospective item 3).
+// unportableNamesWarning is the Staged warning for a folder holding entries a
+// Windows receiver cannot save. Fixed registry copy, like every warning: the
+// number of offending entries and their names stay inside the process.
+func unportableNamesWarning() Warning {
+	public := PublicErrorOf(NewError(ErrNameWarning, "selection holds names a Windows receiver cannot save"))
+	return Warning{Code: WarnUnportableNames, Message: public.Message}
+}
+
 func beaconWarning() Warning {
 	public := PublicErrorOf(NewError(ErrBeaconWarning, "device discovery is unavailable"))
 	return Warning{Code: WarnBeaconUnavailable, Message: public.Message}

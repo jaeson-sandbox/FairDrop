@@ -38,7 +38,13 @@ func (c *Coordinator) Cancel(ctx context.Context) error {
 	if c == nil {
 		// Stage and AuthorizeClaim answer a missing coordinator with a coded
 		// error rather than a panic; a command may not be the odd one out.
-		return NewError(ErrTransferFailed, "FairDrop is not ready to cancel a transfer")
+		//
+		// not_ready rather than transfer_failed (D-104): nothing stopped
+		// midway, and since Story 3.10 this is a state a user can actually
+		// reach -- a second instance the platform lock missed is left
+		// uncomposed deliberately, and its window answers every command from
+		// here.
+		return NewError(ErrNotReady, "FairDrop is not ready to cancel a transfer")
 	}
 	c.mu.Lock()
 	if c.closing {
@@ -163,7 +169,43 @@ func (c *Coordinator) retire(live *session, announce bool) error {
 		c.publish(*reset)
 	}
 	c.releaseLease()
-	return unwindErr
+	return c.retireFailure(live, unwindErr)
+}
+
+// retireFailure re-codes a teardown failure for a session that never began a
+// transfer (D-103).
+//
+// unwind's bound failures are transfer_failed, which is right when bytes were
+// moving and wrong when they never were: cancelling a staged link whose
+// teardown then hit its bound told the user "the transfer stopped before
+// FairDrop finished sending" about a transfer that had not started. startedAt
+// is stamped at the claim commit and nowhere else, so a zero value is exactly
+// "no transfer began".
+//
+// The cause is wrapped rather than discarded, so the diagnostic trail still
+// carries which resource was actually outstanding.
+func (c *Coordinator) retireFailure(live *session, unwindErr error) error {
+	if unwindErr == nil {
+		return nil
+	}
+	c.mu.Lock()
+	began := !live.startedAt.IsZero()
+	c.mu.Unlock()
+	if began {
+		return unwindErr
+	}
+	// The joined text is carried forward rather than replaced. DomainError's
+	// Error() deliberately omits its cause (AD-9: a cause can be adapter text),
+	// so wrapping with a message of this function's own would have silently
+	// undone D-100 -- a teardown that loses two resources must still name both,
+	// and the Story 3.10 test that proves it caught exactly that here.
+	//
+	// Safe to carry because every message unwind can join is a fixed literal
+	// this package wrote: stopBeaconBounded, stopServerBounded and
+	// joinDrainerBounded return their own bound errors and turn adapter errors
+	// into diagnostics instead. And it never reaches a user either way --
+	// PublicErrorOf answers from the registry, never from safeMessage.
+	return WrapError(ErrCleanupUnconfirmed, unwindErr.Error(), unwindErr)
 }
 
 // fireReset is the armed reset timer's callback: it ends the terminal UI lease

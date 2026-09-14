@@ -77,8 +77,10 @@ type fakeCoordinator struct {
 	stagePath     string
 	stageCtx      context.Context
 
-	cancelErr error
-	cancelCtx context.Context
+	cancelErr             error
+	cancelCtx             context.Context
+	cancelEntered         chan struct{}
+	cancelWaitsForContext bool
 
 	// shutdownGate, when non-nil, holds Shutdown until it is closed. It is how
 	// the blocking hook is proven to block.
@@ -99,7 +101,18 @@ func (f *fakeCoordinator) Cancel(ctx context.Context) error {
 	f.record("Cancel")
 	f.mu.Lock()
 	f.cancelCtx = ctx
+	entered, waits := f.cancelEntered, f.cancelWaitsForContext
 	f.mu.Unlock()
+	// The one seam that lets a test prove cancelling the command context ends
+	// a wait rather than merely reaching one (D-097). A real coordinator waits
+	// on the operation lease here; this waits on the same signal.
+	if waits {
+		if entered != nil {
+			close(entered)
+		}
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	return f.cancelErr
 }
 
@@ -477,8 +490,10 @@ func TestCopyToClipboardRefusesBeforeStartup(t *testing.T) {
 	if got := len(h.clipboardWrites()); got != 0 {
 		t.Errorf("clipboard was written %d times before startup, want 0", got)
 	}
-	if code := transfer.PublicErrorOf(err).Code; code != transfer.ErrTransferFailed {
-		t.Errorf("code = %q, want %q", code, transfer.ErrTransferFailed)
+	// not_ready since 2026-09-13: nothing stopped midway, and a user who
+	// reaches this state has a real recovery to be offered.
+	if code := transfer.PublicErrorOf(err).Code; code != transfer.ErrNotReady {
+		t.Errorf("code = %q, want %q", code, transfer.ErrNotReady)
 	}
 }
 
@@ -493,8 +508,10 @@ func TestCopyToClipboardKeepsThePlatformDiagnosticBehindTheCode(t *testing.T) {
 		t.Fatal("CopyToClipboard returned no error for a failing clipboard")
 	}
 	public := transfer.PublicErrorOf(err)
-	if public.Code != transfer.ErrTransferFailed {
-		t.Errorf("code = %q, want %q", public.Code, transfer.ErrTransferFailed)
+	// A failed copy is not a transfer that stopped (D-104). The staged session
+	// is untouched and the link is still on screen to copy by hand.
+	if public.Code != transfer.ErrClipboardFailed {
+		t.Errorf("code = %q, want %q", public.Code, transfer.ErrClipboardFailed)
 	}
 	if strings.Contains(public.Message, "NSPasteboard") {
 		t.Errorf("public message leaked the platform diagnostic: %q", public.Message)
@@ -691,12 +708,24 @@ func TestCancelTransferDelegatesAndReturnsQuietly(t *testing.T) {
 	if got := h.emitted(); len(got) != 0 {
 		t.Errorf("CancelTransfer emitted %+v itself", got)
 	}
-	// D-036: Cancel now takes a context, and CancelTransfer hands it the
-	// stored application-lifetime one -- the same context every other
-	// delegated command uses -- rather than a fabricated one the coordinator
-	// would have nothing real to honour.
-	if h.coordinator.cancelCtx != h.ctx {
-		t.Error("CancelTransfer did not hand Cancel the application-lifetime context")
+	// D-036: Cancel takes a context, and CancelTransfer hands it a real one
+	// rather than a fabricated one the coordinator has nothing to honour.
+	//
+	// D-097 made it a derivation of the lifetime context rather than the
+	// lifetime context itself. Wails never wraps its own in WithCancel, so
+	// honouring it was unreachable in a shipped binary; the derived one is
+	// cancelled when shutdown begins, which is what gives the parameter
+	// something to mean. It must still carry the lifetime context's values --
+	// the coordinator revalidates against them -- so identity is checked
+	// through the value rather than by comparing the contexts.
+	if h.coordinator.cancelCtx == nil {
+		t.Fatal("CancelTransfer handed Cancel no context at all")
+	}
+	if h.coordinator.cancelCtx.Value(runtimeContextKey{}) != h.ctx.Value(runtimeContextKey{}) {
+		t.Error("CancelTransfer's context is not derived from the application-lifetime one")
+	}
+	if h.coordinator.cancelCtx.Err() != nil {
+		t.Errorf("CancelTransfer handed Cancel an already-cancelled context: %v", h.coordinator.cancelCtx.Err())
 	}
 }
 
@@ -915,8 +944,11 @@ func TestDialogBeforeStartupIsRefusedRatherThanFatal(t *testing.T) {
 	if got != "" || err == nil {
 		t.Fatalf("SelectFile before startup returned (%q, %v), want a coded refusal", got, err)
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "setup_failed" {
-		t.Errorf("the refusal crossed as %q, want %q", code, "setup_failed")
+	// not_ready, like every command that arrives before a window exists or
+	// before compose ran (D-048, D-104): setup_failed is a claim about the
+	// item the user chose, and at this point there is none.
+	if code := string(transfer.ErrorCodeOf(err)); code != "not_ready" {
+		t.Errorf("the refusal crossed as %q, want %q", code, "not_ready")
 	}
 	if titles := h.dialogs(); len(titles) != 0 {
 		t.Errorf("a dialog was opened without a window context: %v", titles)
@@ -1045,11 +1077,16 @@ func TestPublishBeforeStartupDropsTheEventWithoutEmitting(t *testing.T) {
 		lines[0] != "fairdrop: undelivered (no window yet) transfer-started seq=1 session="+string(testSessionID) {
 		t.Errorf("logged %v, want one line naming the pre-window drop", lines)
 	}
-	// The coordinator holds its operation lease across this call, so the only
-	// thing that matters is that it got control back -- which reaching this
-	// line proves.
-	if err := h.app.CancelTransfer(); err != nil {
-		t.Errorf("the next command returned %v after a dropped event", err)
+	// The coordinator holds its operation lease across this call, so what
+	// matters is that control came back -- which reaching this line proves.
+	//
+	// The command itself is now refused rather than run: before D-048 a nil
+	// context was defaulted to context.Background(), so a command arriving
+	// before the window existed would bind a listener and start a beacon whose
+	// every event this very test watches being dropped. Refusing is the point,
+	// and the code says which kind of not-yet this is.
+	if code := transfer.ErrorCodeOf(h.app.CancelTransfer()); code != transfer.ErrNotReady {
+		t.Errorf("the next command returned %q after a dropped event, want %q", code, transfer.ErrNotReady)
 	}
 }
 
@@ -1407,8 +1444,11 @@ func TestCommandsRefuseBeforeCompositionRatherThanPanicking(t *testing.T) {
 	if metadata != nil || err == nil {
 		t.Fatalf("StageTransfer returned (%v, %v) with no coordinator", metadata, err)
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "setup_failed" {
-		t.Errorf("the refusal crossed as %q, want %q", code, "setup_failed")
+	// not_ready, like every command that arrives before a window exists or
+	// before compose ran (D-048, D-104): setup_failed is a claim about the
+	// item the user chose, and at this point there is none.
+	if code := string(transfer.ErrorCodeOf(err)); code != "not_ready" {
+		t.Errorf("the refusal crossed as %q, want %q", code, "not_ready")
 	}
 
 	if err := app.CancelTransfer(); err == nil {
@@ -1658,3 +1698,66 @@ func TestLogDiagnosticWritesOneSafeLine(t *testing.T) {
 // package wrote, never an adapter's text -- and that is checkable exactly
 // where it holds, so internal/transfer's
 // TestEveryDiagnosticMessageIsAFixedLiteral pins it at the call sites.
+
+// TestShutdownEndsACancelThatIsWaitingOnItsContext is D-097's behavioural half.
+//
+// Story 3.4 gave Cancel and Shutdown a context to honour and tested that they
+// do. What no test could reach was whether a shipped FairDrop ever cancels one:
+// Wails builds its application context from context.Background() plus
+// WithValue and never wraps it, so ctx.Done() never fired and both commands
+// were bounded in production only by the internal lease bound.
+//
+// This drives the production path. A Cancel is left waiting on its context, the
+// real shutdown hook runs, and the wait must end -- which is a different claim
+// from "the parameter was passed", and the only one worth making.
+func TestShutdownEndsACancelThatIsWaitingOnItsContext(t *testing.T) {
+	h := newHarness(t)
+	entered := make(chan struct{})
+	h.coordinator.mu.Lock()
+	h.coordinator.cancelWaitsForContext = true
+	h.coordinator.cancelEntered = entered
+	h.coordinator.mu.Unlock()
+
+	cancelled := make(chan error, 1)
+	go func() { cancelled <- h.app.CancelTransfer() }()
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("CancelTransfer never reached the coordinator")
+	}
+
+	select {
+	case err := <-cancelled:
+		t.Fatalf("Cancel returned %v before anything cancelled its context", err)
+	default:
+	}
+
+	h.app.shutdown(h.ctx)
+
+	select {
+	case err := <-cancelled:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Cancel returned %v, want the context cancellation that ended its wait", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("shutdown did not end a Cancel waiting on its context: in production it would wait out the lease bound instead")
+	}
+}
+
+// The lifetime context is not the one that gets cancelled. Events are emitted
+// through it, and cancelling it would lose the events shutdown exists to let
+// finish.
+func TestShutdownLeavesTheEmitContextUsable(t *testing.T) {
+	h := newHarness(t)
+
+	h.app.shutdown(h.ctx)
+
+	if err := h.app.runtimeContext().Err(); err != nil {
+		t.Errorf("the application-lifetime context was cancelled by shutdown: %v", err)
+	}
+	h.app.publish(transfer.Event{SessionID: testSessionID, Seq: 9, Kind: transfer.TransferReset})
+	if events := h.emitted(); len(events) != 1 {
+		t.Errorf("an event published during shutdown was dropped: %+v", events)
+	}
+}

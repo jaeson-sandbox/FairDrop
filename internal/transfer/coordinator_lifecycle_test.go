@@ -1078,10 +1078,15 @@ func TestCancelSucceedsThroughACleanupDiagnostic(t *testing.T) {
 }
 
 // Neither command may panic where Stage and AuthorizeClaim answer with a code.
+//
+// not_ready since 2026-09-13, not transfer_failed: nothing stopped midway, and
+// this stopped being a theoretical state when Story 3.10 began leaving a second
+// instance uncomposed on purpose rather than letting it start a competing
+// listener (D-104).
 func TestLifecycleCommandsSurviveAMissingCoordinator(t *testing.T) {
 	var absent *Coordinator
-	if got := ErrorCodeOf(absent.Cancel(context.Background())); got != ErrTransferFailed {
-		t.Errorf("Cancel on a nil coordinator returned %q, want %q", got, ErrTransferFailed)
+	if got := ErrorCodeOf(absent.Cancel(context.Background())); got != ErrNotReady {
+		t.Errorf("Cancel on a nil coordinator returned %q, want %q", got, ErrNotReady)
 	}
 	if err := absent.Shutdown(context.Background()); err != nil {
 		t.Errorf("Shutdown on a nil coordinator returned %v, want nil -- nothing is running", err)
@@ -1607,8 +1612,16 @@ func TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes(t *t
 	for {
 		select {
 		case err := <-cancelDone:
-			if ErrorCodeOf(err) != ErrTransferFailed {
-				t.Fatalf("Cancel() = %v, want the forced server stop bound", err)
+			// cleanup_unconfirmed, not transfer_failed: this session was staged
+			// and never claimed, so no transfer began and the old code told the
+			// user one had stopped partway (D-103). The bound that actually
+			// elapsed is still named in the error text, which is what keeps
+			// D-100's two-resource report intact.
+			if ErrorCodeOf(err) != ErrCleanupUnconfirmed {
+				t.Fatalf("Cancel() = %v, want the forced server stop bound re-coded for a session that never began", err)
+			}
+			if !strings.Contains(err.Error(), "the transfer server did not confirm it stopped") {
+				t.Errorf("Cancel() = %v, which no longer names the bound that elapsed", err)
 			}
 			goto cancelled
 		default:

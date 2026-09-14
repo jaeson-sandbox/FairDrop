@@ -55,13 +55,17 @@ func (i *Inspector) Inspect(ctx context.Context, absolutePath string) (transfer.
 			}
 			return nil
 		}
-		logicalSize, err := i.walkDirectory(ctx, selected.handle, selected.info, nil, selected.retained)
+		logicalSize, unportable, err := i.walkDirectory(ctx, selected.handle, selected.info, nil, selected.retained)
 		if err != nil {
 			return err
 		}
 		item = transfer.StagedItem{
 			Path: absolutePath, Name: selected.name, Kind: transfer.ItemDirectory,
 			LogicalSize: logicalSize, ModTime: selected.info.ModTime(),
+			// Counted on the one walk Inspect already performs for the size,
+			// so the warning is known before the QR is shown rather than
+			// during the stream, when nobody is looking at the sender.
+			UnportableNames: unportable,
 		}
 		return nil
 	})
@@ -84,7 +88,7 @@ func (i *Inspector) Walk(ctx context.Context, absolutePath string, visit transfe
 		if selected.isFile {
 			return transfer.NewError(transfer.ErrPathUnsupported, "selection walk requires a directory")
 		}
-		_, err := i.walkDirectory(ctx, selected.handle, selected.info, visit, selected.retained)
+		_, _, err := i.walkDirectory(ctx, selected.handle, selected.info, visit, selected.retained)
 		return err
 	})
 }
@@ -266,23 +270,23 @@ func (i *Inspector) withSelectionRetained(ctx context.Context, absolutePath stri
 // an entry name is accumulated as the walk descends rather than reconstructed
 // from a path afterwards. State is one enumeration handle per active depth plus
 // the single entry being visited: nothing per-entry survives the iteration.
-func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, inspected fs.FileInfo, visit transfer.SourceVisitor, retained int) (size int64, returnedErr error) {
+func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, inspected fs.FileInfo, visit transfer.SourceVisitor, retained int) (size int64, unportable int, returnedErr error) {
 	if retained >= maxRetainedDirectoryHandles {
-		return 0, directoryDepthError()
+		return 0, unportable, directoryDepthError()
 	}
 	opened, err := root.OpenEnumeration()
 	if ctxErr := ctx.Err(); ctxErr != nil {
-		return 0, closeMetadataHandles(ctx, []metadataHandle{opened}, cancelledError(ctxErr))
+		return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{opened}, cancelledError(ctxErr))
 	}
 	if err != nil {
-		return 0, closeMetadataHandles(ctx, []metadataHandle{opened}, i.classifyMetadataError(err))
+		return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{opened}, i.classifyMetadataError(err))
 	}
 	if opened == nil {
-		return 0, transfer.NewError(transfer.ErrPathUnsupported, "selection directory could not be opened")
+		return 0, unportable, transfer.NewError(transfer.ErrPathUnsupported, "selection directory could not be opened")
 	}
 	openedInfo, err := i.verifyOpened(ctx, inspected, opened, true)
 	if err != nil {
-		return 0, closeMetadataHandles(ctx, []metadataHandle{opened}, err)
+		return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{opened}, err)
 	}
 
 	type frame struct {
@@ -299,93 +303,96 @@ func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, insp
 
 	for len(stack) > 0 {
 		if err := ctx.Err(); err != nil {
-			return 0, cancelledError(err)
+			return 0, unportable, cancelledError(err)
 		}
 		current := &stack[len(stack)-1]
 		entries, readErr := current.handle.ReadDir(directoryReadBatchSize)
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return 0, cancelledError(ctxErr)
+			return 0, unportable, cancelledError(ctxErr)
 		}
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
-			return 0, i.classifyMetadataError(readErr)
+			return 0, unportable, i.classifyMetadataError(readErr)
 		}
 		if len(entries) == 0 {
 			finished := current.handle
 			stack = stack[:len(stack)-1]
 			if err := closeChecked(ctx, finished); err != nil {
-				return 0, err
+				return 0, unportable, err
 			}
 			continue
 		}
 		if len(entries) != 1 {
-			return 0, sourceFault(visit, "selection enumeration exceeded its fixed batch")
+			return 0, unportable, sourceFault(visit, "selection enumeration exceeded its fixed batch")
 		}
 
 		// Read out of the frame before anything can append to the stack: growing
 		// it may move the element this pointer refers to.
 		parent := current.handle
 		entryName := entries[0].Name()
-		relative, relativeErr := childRelativeName(current.relative, entryName)
+		relative, portable, relativeErr := childRelativeName(current.relative, entryName)
+		if !portable {
+			unportable++
+		}
 		if relativeErr != nil {
-			return 0, relativeErr
+			return 0, unportable, relativeErr
 		}
 
 		metadata, openErr := parent.OpenChildMetadata(entryName)
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, cancelledError(ctxErr))
+			return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata}, cancelledError(ctxErr))
 		}
 		if openErr != nil {
-			return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, i.classifyMetadataError(openErr))
+			return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata}, i.classifyMetadataError(openErr))
 		}
 		if metadata == nil {
-			return 0, transfer.NewError(transfer.ErrPathUnsupported, "selection entry metadata is unavailable")
+			return 0, unportable, transfer.NewError(transfer.ErrPathUnsupported, "selection entry metadata is unavailable")
 		}
 		info, statErr := statChecked(ctx, metadata)
 		if statErr != nil {
-			return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, i.classifyOperationError(statErr))
+			return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata}, i.classifyOperationError(statErr))
 		}
 		if unsupportedErr := rejectUnsupportedInfo(info); unsupportedErr != nil {
-			return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, unsupportedErr)
+			return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata}, unsupportedErr)
 		}
 
 		switch {
 		case info.Mode().IsRegular():
 			entrySize := info.Size()
 			if entrySize < 0 || size > math.MaxInt64-entrySize {
-				return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, sourceFault(visit, "selection logical size is invalid"))
+				return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata}, sourceFault(visit, "selection logical size is invalid"))
 			}
 			if visit != nil {
 				if emitErr := i.emitFile(ctx, parent, entryName, relative, info, visit); emitErr != nil {
-					return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, emitErr)
+					return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata}, emitErr)
 				}
 			}
 			closeErr := closeChecked(ctx, metadata)
 			if closeErr != nil {
-				return 0, closeErr
+				return 0, unportable, closeErr
 			}
 			size += entrySize
 		case info.IsDir():
 			if retained+len(stack) >= maxRetainedDirectoryHandles {
-				return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, directoryDepthError())
+				return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata}, directoryDepthError())
 			}
 			child, childErr := metadata.OpenEnumeration()
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return 0, closeMetadataHandles(ctx, []metadataHandle{metadata, child}, cancelledError(ctxErr))
+				return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata, child}, cancelledError(ctxErr))
 			}
 			if childErr != nil {
-				return 0, closeMetadataHandles(ctx, []metadataHandle{metadata, child}, i.classifyMetadataError(childErr))
+				return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata, child}, i.classifyMetadataError(childErr))
 			}
 			childInfo, verifyErr := i.verifyOpened(ctx, info, child, true)
 			if verifyErr != nil {
-				return 0, closeMetadataHandles(ctx, []metadataHandle{metadata, child}, verifyErr)
+				return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata, child}, verifyErr)
 			}
 			if closeErr := closeChecked(ctx, metadata); closeErr != nil {
-				return 0, closeMetadataHandles(ctx, []metadataHandle{child}, closeErr)
+				return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{child}, closeErr)
 			}
 			for _, ancestor := range stack {
 				if i.sameFileInfo(ancestor.info, childInfo) {
 					primary := transfer.NewError(transfer.ErrPathUnsupported, "selection contains a directory cycle")
-					return 0, closeMetadataHandles(ctx, []metadataHandle{child}, primary)
+					return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{child}, primary)
 				}
 			}
 			stack = append(stack, frame{handle: child, info: childInfo, relative: relative})
@@ -397,15 +404,15 @@ func (i *Inspector) walkDirectory(ctx context.Context, root metadataHandle, insp
 					RelativePath: relative, Kind: transfer.ItemDirectory, ModTime: childInfo.ModTime(),
 				}
 				if visitErr := visit(entry, nil); visitErr != nil {
-					return 0, visitErr
+					return 0, unportable, visitErr
 				}
 			}
 		default:
 			primary := transfer.NewError(transfer.ErrPathUnsupported, "selection contains an unsupported entry")
-			return 0, closeMetadataHandles(ctx, []metadataHandle{metadata}, primary)
+			return 0, unportable, closeMetadataHandles(ctx, []metadataHandle{metadata}, primary)
 		}
 	}
-	return size, nil
+	return size, unportable, nil
 }
 
 // emitFile opens one entry's bytes, proves the descriptor is still the object
@@ -493,19 +500,28 @@ func (b *borrowedContent) release() {
 }
 
 // childRelativeName accumulates one entry's root-relative, slash-separated
-// name. Directory entry names come from the filesystem, so they are checked
-// rather than trusted: a name that is empty, a dot element, separator-bearing,
-// volume-qualified, or NUL-bearing would become a traversal primitive once it
-// reached an archive a receiver extracts.
-func childRelativeName(parent, name string) (string, error) {
+// name, and reports whether that name will survive a Windows receiver.
+//
+// Directory entry names come from the filesystem, so they are checked rather
+// than trusted: a name that is empty, a dot element, separator-bearing, or
+// carrying a control or format character would become a traversal or spoofing
+// primitive once it reached an archive a receiver extracts. Those are refused.
+//
+// A name that is merely awkward on Windows is not refused (owner decision,
+// 2026-09-13). It is counted, and the count becomes a Staged warning, because
+// "Q1 report:final.txt" is an ordinary filename on the sender and on the phone
+// this product is usually sending to -- refusing the whole folder over it was
+// the most restrictive answer available and the only one no other archiver
+// gives.
+func childRelativeName(parent, name string) (relative string, portable bool, err error) {
 	if !transfer.SafeArchiveSegment(name) {
-		return "", transfer.NewError(transfer.ErrPathUnsupported, "selection contains an unsupported entry name")
+		return "", false, transfer.NewError(transfer.ErrNameUnsupported, "selection contains an unsendable entry name")
 	}
 	slashed := filepath.ToSlash(name)
-	if parent == "" {
-		return slashed, nil
+	if parent != "" {
+		slashed = parent + "/" + slashed
 	}
-	return parent + "/" + slashed, nil
+	return slashed, transfer.PortableArchiveSegment(name), nil
 }
 
 func closeContentHandle(ctx context.Context, handle contentHandle, primary error) error {

@@ -114,16 +114,33 @@ export function useTransfer(): TransferController {
                 operation.cancelRequested = true
                 // A malformed acknowledgement may still represent a live
                 // backend session. Quiesce it once before showing the fallback.
+                let quiesced = true
                 try {
                     await CancelTransfer()
                 } catch {
-                    // Best effort: no rejection text from cleanup is trusted.
+                    // Best effort on the call, but not on the report (D-106).
+                    // No rejection text from cleanup is trusted -- it is adapter
+                    // text -- yet whether the cleanup worked changes what is
+                    // true for the user, so the outcome is kept even though the
+                    // reason is discarded.
+                    quiesced = false
                 }
                 if (mountedRef.current && stageOperationRef.current === operation) {
                     // The command itself resolved -- no lifecycle event was ever
                     // received -- so nothing was sent; the selection was refused,
                     // not interrupted (D-053).
-                    dispatch({type: 'stage-failed', generation, error: publicError('setup_failed')})
+                    //
+                    // But "nothing was sent" is only half the story when the
+                    // cleanup above failed: the backend had already committed a
+                    // staged session with a listener and a capability URL, and
+                    // the next Stage would be refused busy for a session the
+                    // user was just told did not exist. That is a different
+                    // sentence, and cleanup_unconfirmed is the one that says it.
+                    dispatch({
+                        type: 'stage-failed',
+                        generation,
+                        error: publicError(quiesced ? 'setup_failed' : 'cleanup_unconfirmed'),
+                    })
                 }
                 if (stageOperationRef.current === operation) stageOperationRef.current = null
                 return

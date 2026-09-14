@@ -293,20 +293,60 @@ func TestWalkRevokesBorrowBeforeOwnedClose(t *testing.T) {
 	assertFakeClosed(t, factory)
 }
 
-func TestSourceRejectsPortableNamesDuringInspectionAndWalk(t *testing.T) {
-	for _, name := range []string{"NUL .txt", "COM¹.txt", "LPT³", "bad\u202e.txt", "bad\x01.txt", "bad<", "bad>", "bad|", "bad?", "bad*", "bad:", `bad"`, "tail.", "tail "} {
+// TestSourceRefusesUnsafeNamesAndCountsUnportableOnes covers both halves of
+// the 2026-09-13 split at the source boundary.
+//
+// Refusing was the old answer to every name in either list, and it meant one
+// oddly-named entry refused an entire folder. Now only the dangerous list is
+// refused; the rest are counted so Stage can warn, and they reach the archive
+// with the name the user gave them.
+func TestSourceRefusesUnsafeNamesAndCountsUnportableOnes(t *testing.T) {
+	for _, name := range []string{"bad\u202e.txt", "bad\x01.txt", "C:evil.txt"} {
 		t.Run(name, func(t *testing.T) {
 			root := fakeDirectory("root")
 			root.add(name, fakeFile(name, "data"))
 			factory := newFakeFactory(pathPlan{rootLabel: "root"}, root)
 			i := &Inspector{handles: factory, sameFile: sameFakeFile}
 			_, err := i.Inspect(context.Background(), "original")
-			assertCode(t, err, transfer.ErrPathUnsupported)
+			assertCode(t, err, transfer.ErrNameUnsupported)
 			seen := 0
 			err = i.Walk(context.Background(), "original", func(transfer.SourceEntry, io.Reader) error { seen++; return nil })
-			assertCode(t, err, transfer.ErrPathUnsupported)
+			assertCode(t, err, transfer.ErrNameUnsupported)
 			if seen != 0 {
 				t.Fatal("unsafe source entry reached a visitor")
+			}
+			assertFakeClosed(t, factory)
+		})
+	}
+
+	for _, name := range []string{"NUL .txt", "COM¹.txt", "LPT³", "bad<", "bad>", "bad|", "bad?", "bad*", "ab:cd", `bad"`, "tail.", "tail "} {
+		t.Run(name, func(t *testing.T) {
+			root := fakeDirectory("root")
+			root.add(name, fakeFile(name, "data"))
+			factory := newFakeFactory(pathPlan{rootLabel: "root"}, root)
+			i := &Inspector{handles: factory, sameFile: sameFakeFile}
+
+			item, err := i.Inspect(context.Background(), "original")
+			if err != nil {
+				t.Fatalf("Inspect refused %q rather than counting it: %v", name, err)
+			}
+			if item.UnportableNames != 1 {
+				t.Errorf("UnportableNames = %d, want 1: Stage has nothing to warn about", item.UnportableNames)
+			}
+
+			seen := 0
+			err = i.Walk(context.Background(), "original", func(entry transfer.SourceEntry, _ io.Reader) error {
+				seen++
+				if entry.RelativePath != name {
+					t.Errorf("the walk renamed the entry to %q; names travel unchanged", entry.RelativePath)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatalf("Walk refused %q: %v", name, err)
+			}
+			if seen != 1 {
+				t.Errorf("the visitor saw %d entries, want the one that was counted", seen)
 			}
 			assertFakeClosed(t, factory)
 		})

@@ -217,6 +217,12 @@ Maintainers can verify and ship a single-instance FairDrop application through r
 
 **FRs covered:** FR22, plus CAP-7 and release/verification NFRs
 
+### Epic 4: Refine the Selection Experience
+
+A sender chooses what to send through one control rather than answering a file-or-folder question before they have done anything. Created 2026-09-13 from an owner observation about the Idle screen; scoped to one story so far.
+
+**FRs covered:** none new; refines FR23-FR24's surface within the existing UX contract.
+
 > **Cross-cutting rule.** FR coverage identifies primary epic ownership, not the full acceptance surface. Every story also inherits the relevant NFRs, architecture requirements, binding contracts, and UX requirements. Unit, integration, race, and accessibility verification lands with the behavior it proves; Epic 3 owns native packaging, release automation, platform smoke tests, and single-instance release behavior rather than deferred testing debt.
 
 ## Epic 1: Share One File with a Nearby Device
@@ -1327,6 +1333,11 @@ So that the contract describes what the code does and the copy describes what ha
 **Then** the public copy explains applicable recovery (wait for the lookup, or restart FairDrop), rather than suggesting another Cancel will stop the OS call (D-111)
 **And** any new code/string moves through the UX registry, contract, Go and TypeScript mirrors together; the one-outstanding-call bound and successful retry after return remain tested.
 
+**Given** a folder holding one entry whose name a receiving device cannot save
+**When** the sender chooses that folder
+**Then** the refusal says a name is the problem rather than claiming FairDrop can use regular files and folders only -- which the folder plainly is -- and says what makes a name unsendable (D-112)
+**And** the refusal discloses no path; whether a single offending segment may be echoed is decided explicitly rather than assumed.
+
 ### Story 3.12: Capture the Accessibility Evidence a Runner Can Produce
 
 As a maintainer,
@@ -1357,3 +1368,47 @@ So that the human evidence rows are the ones that genuinely need a person.
 **Given** Story 1.10's missing Blind Hunter and verification-gap reviews
 **When** the accessibility evidence is completed
 **Then** both independent layers run against that story's change and their findings are revalidated against current code, fixed or explicitly routed, with evidence recorded (D-109). The 2026-09-11 project audit recovered this id-less entry from the already-done Story 3.2; its later review covered Story 1.6, not 1.10.
+
+## Epic 4: Refine the Selection Experience
+
+### Story 4.1: Replace the Two Browse Controls with One
+
+As a sender,
+I want one control that takes whatever I am sending,
+So that I am not asked to classify my thing before I have chosen it.
+
+**Owner observation, 2026-09-13:** "I don't like how we have two buttons -- one for a folder and one for a file." The complaint is the two-buttons-ness specifically, not the drag-versus-browse split.
+
+**What the investigation found, so the next session does not redo it:**
+
+- The two buttons are not a design choice. Wails exposes `OpenFileDialog` and `OpenDirectoryDialog` as separate calls, and underneath, macOS's `NSOpenPanel` *can* accept both at once (`canChooseFiles` + `canChooseDirectories`) while Windows' `IFileOpenDialog` cannot -- `FOS_PICKFOLDERS` is a mode switch, not an addition. Any one-button design must answer what Windows does.
+- `PendingItemKind` already has `'unknown'`, used by native drop, with `copy.stage.pending.item` already written for it and a comment in `selectors.ts` explaining why it must not be resolved early. A control that does not yet know the kind costs nothing downstream.
+- `IdleView.tsx` carries a scar worth not reopening: the drop zone used to open the file chooser on click, which contradicted the "file or folder" instruction above it, and a live run went straight into it. Whatever replaces the buttons must not re-create that lie.
+- `EXPERIENCE.md` says "Modal depth is limited to OS dialogs", so a dropdown menu would be the product's first floating surface. Permitted -- a menu is not a modal -- but against the grain, and it carries real work: `role="menu"` semantics, keyboard operation, Escape and focus return, the 44px target floor, and the one-announcement-owner rule.
+
+**Owner decision, 2026-09-13 (hierarchy):** the drop zone keeps the top of the page and its `h1`, visually calmed but not demoted. FR23 stays as written -- firewall guidance ahead of the selection controls -- so the browse control stays below it, which is why it must not be the loudest thing on the screen. Rejected: promoting browse above the firewall guidance, which would have meant renegotiating a frozen requirement; and quieting both, which leaves Idle with no confident affordance on the one screen where the user has not acted yet.
+
+**Closes:** D-113.
+
+**Acceptance Criteria:**
+
+**Given** the Idle screen
+**When** a sender looks for how to send something
+**Then** exactly one browse control is present where two were, labelled for both kinds -- a thing Gmail's attach cannot say, since it makes a folder into a zip first
+**And** the drop zone still leads the region, still holds the `idle-instruction` focus target the routing table names, and still accepts either kind in one gesture.
+
+**Given** that control is activated by pointer or keyboard
+**When** the sender picks a destination
+**Then** both a file and a folder are reachable, the choice is announced by one owner, and the control is operable by keyboard alone with focus returning where it started.
+
+**Given** the native choosers underneath
+**When** the platform cannot offer both in one dialog
+**Then** the difference is absorbed by the control rather than shown to the user, and no path opens a chooser that contradicts what its label offered.
+
+**Given** macOS, where one panel can accept either kind
+**When** a later phase routes it through `NSOpenPanel` directly
+**Then** the same control simply takes one step instead of two, with no second label and no visible divergence -- explicitly a second phase, because it means reaching around Wails' dialog API on the path that chooses the file.
+
+**Given** any label this story introduces
+**When** it is written
+**Then** it enters `EXPERIENCE.md` by stable key first and moves the registry, the contract, the Go table and the TypeScript mirror together, as Story 3.5 established.

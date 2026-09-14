@@ -66,6 +66,24 @@ type App struct {
 	ctx       context.Context
 	transfers transferCoordinator
 
+	// commands is the context bound transfer commands receive, derived from
+	// ctx at startup and cancelled when shutdown begins.
+	//
+	// It exists because ctx cannot be cancelled (D-097). Wails builds its
+	// application context once from context.Background() plus WithValue and
+	// never wraps it in WithCancel or WithTimeout, so Cancel and Shutdown
+	// honouring a caller's context -- which is what Story 3.4 built and what
+	// its tests exercise -- was unreachable in a shipped binary: both were
+	// bounded only by the internal leaseBound. Deriving one here makes the
+	// feature real, and gives shutdown a way to release a Cancel that is
+	// waiting on the lease rather than waiting out its bound behind it.
+	//
+	// ctx stays the lifetime context and keeps its own job: it is what events
+	// are emitted through, and emitting through a cancelled context would lose
+	// the very events shutdown wants delivered.
+	commands     context.Context
+	stopCommands context.CancelFunc
+
 	// undelivered counts lifecycle events the window could not be told about,
 	// plus a second-instance restoration that arrived before startup had
 	// installed a window to restore. The recovered panic value is deliberately
@@ -173,7 +191,7 @@ func (a *App) useCoordinator(coordinator transferCoordinator) {
 // definition of the same shape, and the two would drift.
 func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error) {
 	ctx, coordinator := a.delegate()
-	if coordinator == nil {
+	if ctx == nil || coordinator == nil {
 		return nil, errNotComposed()
 	}
 
@@ -199,7 +217,7 @@ func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
 // there is nothing to translate on the success path.
 func (a *App) CancelTransfer() error {
 	ctx, coordinator := a.delegate()
-	if coordinator == nil {
+	if ctx == nil || coordinator == nil {
 		return errNotComposed()
 	}
 	return coordinator.Cancel(ctx)
@@ -239,7 +257,7 @@ const maxClipboardText = 2048
 func (a *App) CopyToClipboard(text string) error {
 	if len(text) > maxClipboardText {
 		return transfer.NewError(
-			transfer.ErrTransferFailed,
+			transfer.ErrClipboardFailed,
 			"the text to copy is larger than the clipboard command accepts",
 		)
 	}
@@ -249,7 +267,7 @@ func (a *App) CopyToClipboard(text string) error {
 		// Same reasoning as the dialogs: the real runtime answers a context
 		// that never came from a window by taking the process down.
 		return transfer.NewError(
-			transfer.ErrTransferFailed,
+			transfer.ErrNotReady,
 			"FairDrop is not ready to use the clipboard",
 		)
 	}
@@ -258,7 +276,7 @@ func (a *App) CopyToClipboard(text string) error {
 		// The platform's own clipboard diagnostic is adapter text; only the
 		// code and its fixed copy cross the boundary.
 		return transfer.WrapError(
-			transfer.ErrTransferFailed,
+			transfer.ErrClipboardFailed,
 			"the clipboard could not be written",
 			err,
 		)
@@ -276,7 +294,7 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 		// binary (Wails runs OnStartup before the webview can call a
 		// command), and no transfer has begun either way (D-047).
 		return "", transfer.NewError(
-			transfer.ErrSetupFailed,
+			transfer.ErrNotReady,
 			"FairDrop is not ready to open a chooser",
 		)
 	}
@@ -288,6 +306,12 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 	if err != nil {
 		// A dialog's own diagnostic text names directories, so it stays behind
 		// Unwrap: what crosses the boundary is the code and the fixed copy.
+		// Left as transfer_failed deliberately. A chooser that fails to open
+		// is a platform failure, not a FairDrop that is not ready, and
+		// not_ready's copy blames a second instance -- which this is not.
+		// Story 3.11 was scoped to the states its ids name; inventing a code
+		// for this one would be exactly the unreviewed copy its Ask First
+		// boundary refuses. Recorded as D-113 instead.
 		return "", transfer.WrapError(
 			transfer.ErrTransferFailed,
 			"the chooser could not be opened",
@@ -424,6 +448,7 @@ func (a *App) startup(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.ctx = ctx
+	a.commands, a.stopCommands = context.WithCancel(ctx)
 }
 
 // shutdown is called when the app terminates. It blocks until every resource
@@ -443,6 +468,20 @@ func (a *App) startup(ctx context.Context) {
 // process explains why. This is the one place that window can be diagnosed.
 func (a *App) shutdown(ctx context.Context) {
 	a.logf("fairdrop: shutdown begin")
+
+	// Released before the teardown, not after. A Cancel already waiting on the
+	// operation lease would otherwise hold this hook behind it for the whole
+	// lease bound, and it has nothing left to accomplish: Shutdown is about to
+	// tear down the very session it was cancelling. This is the one production
+	// caller that ever cancels a command context, which is what makes D-097's
+	// feature reachable rather than merely tested.
+	a.mu.RLock()
+	stop := a.stopCommands
+	a.mu.RUnlock()
+	if stop != nil {
+		stop()
+	}
+
 	_, coordinator := a.delegate()
 	if coordinator == nil {
 		return
@@ -511,11 +550,16 @@ func (a *App) delegate() (context.Context, transferCoordinator) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return ctx, a.transfers
+	// No fabricated context (D-048). Defaulting a nil a.ctx to
+	// context.Background() let a command that arrived before the window
+	// existed run to completion -- binding a listener and starting a beacon
+	// whose every lifecycle event publish then dropped, handing the UI a
+	// session it could never hear from. The dialogs already refused this case;
+	// the commands were the half that did not.
+	//
+	// A nil coordinator answers the same way, which is what the window of a
+	// second instance the platform lock missed now does for every command.
+	return a.commands, a.transfers
 }
 
 // runtimeContext returns the stored Wails context, or nil before startup. The
@@ -532,9 +576,17 @@ func (a *App) runtimeContext() context.Context {
 // nil dereference if composition is ever reordered. No transfer has begun
 // either way, so it uses the pre-transfer setup code rather than the
 // interrupted-transfer one (D-047).
+// errNotComposed answers a command that arrived before this App can serve one:
+// no coordinator was composed, or no window exists yet.
+//
+// not_ready rather than setup_failed (D-048, D-104). setup_failed says FairDrop
+// could not prepare the item the user chose, which is a claim about their
+// selection; this is a claim about FairDrop, and since Story 3.10 it has a real
+// recovery to offer -- a second instance the platform lock missed is left
+// uncomposed on purpose, and the window that is already open is the one to use.
 func errNotComposed() error {
 	return transfer.NewError(
-		transfer.ErrSetupFailed,
+		transfer.ErrNotReady,
 		"FairDrop is not ready to run a transfer command",
 	)
 }

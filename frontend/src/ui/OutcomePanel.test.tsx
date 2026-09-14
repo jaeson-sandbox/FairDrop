@@ -75,8 +75,8 @@ describe('the Error panel', () => {
         ['invalid_selection', 'Choose one item', 'Choose exactly one file or folder.'],
         [
             'busy',
-            'Transfer already active',
-            'FairDrop is still finishing the last transfer. Wait a moment, or cancel it, then choose another item.',
+            'FairDrop is still busy',
+            'FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.',
         ],
         ['path_not_found', 'Item not found', 'That file or folder is no longer available. Choose it again.'],
         ['setup_failed', 'Couldn’t prepare that item', 'FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.'],
@@ -132,7 +132,7 @@ describe('heading rank and phase ownership', () => {
         const error: PublicError = {code: 'busy', message: 'ignored'}
         render(<OutcomePanel outcome={{kind: 'error', retained: false, error}} focusTarget="command-error"/>)
 
-        expect(screen.getByRole('heading', {level: 2}).textContent).toBe('Transfer already active')
+        expect(screen.getByRole('heading', {level: 2}).textContent).toBe('FairDrop is still busy')
         expect(panel().hasAttribute('data-phase-view')).toBe(false)
         expect(panel().getAttribute('data-focus-target')).toBe('command-error')
     })

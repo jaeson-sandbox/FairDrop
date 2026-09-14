@@ -1031,3 +1031,55 @@ func TestATerminalFailureRecordsItsCauseBeforeRewritingIt(t *testing.T) {
 			ErrNetworkUnavailable, h.diagnosed.snapshot())
 	}
 }
+
+// TestSanitizeProgressEnforcesEveryInvariantItDocuments is D-039.
+//
+// The function's own comment calls itself "the boundary that cannot afford to
+// trust" the producing adapter, and it clamped NaN accordingly while taking the
+// contract's coherence rules on faith. The frontend validator refuses an
+// incoherent snapshot by dropping the whole event, so the cost of trusting was
+// never a wrong figure -- it was a progress meter that stops moving with
+// nothing on screen to explain it.
+func TestSanitizeProgressEnforcesEveryInvariantItDocuments(t *testing.T) {
+	for name, test := range map[string]struct {
+		given ProgressSnapshot
+		want  ProgressSnapshot
+	}{
+		"unknown total carries no figures": {
+			given: ProgressSnapshot{BytesSent: 40, TotalBytes: 100, TotalKnown: false, Percent: 40},
+			want:  ProgressSnapshot{BytesSent: 40, TotalBytes: 0, TotalKnown: false, Percent: 0},
+		},
+		"known empty payload has nothing sent": {
+			given: ProgressSnapshot{BytesSent: 7, TotalBytes: 0, TotalKnown: true, Percent: 100},
+			want:  ProgressSnapshot{BytesSent: 0, TotalBytes: 0, TotalKnown: true, Percent: 0},
+		},
+		"sent never exceeds the total": {
+			given: ProgressSnapshot{BytesSent: 150, TotalBytes: 100, TotalKnown: true, Percent: 150},
+			want:  ProgressSnapshot{BytesSent: 100, TotalBytes: 100, TotalKnown: true, Percent: 100},
+		},
+		"negative counts become zero": {
+			given: ProgressSnapshot{BytesSent: -5, TotalBytes: -1, TotalKnown: true, Percent: -1},
+			want:  ProgressSnapshot{BytesSent: 0, TotalBytes: 0, TotalKnown: true, Percent: 0},
+		},
+		"a coherent snapshot is untouched": {
+			given: ProgressSnapshot{BytesSent: 25, TotalBytes: 100, TotalKnown: true, Percent: 25, SpeedBytesPerSec: 10},
+			want:  ProgressSnapshot{BytesSent: 25, TotalBytes: 100, TotalKnown: true, Percent: 25, SpeedBytesPerSec: 10},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := sanitizeProgress(test.given); got != test.want {
+				t.Errorf("sanitizeProgress(%+v) = %+v, want %+v", test.given, got, test.want)
+			}
+		})
+	}
+
+	// NaN is tested separately because it compares false against itself, so
+	// the struct equality above would pass whatever came back.
+	nan := sanitizeProgress(ProgressSnapshot{
+		BytesSent: 1, TotalBytes: 100, TotalKnown: true,
+		Percent: math.NaN(), SpeedBytesPerSec: math.Inf(1),
+	})
+	if math.IsNaN(nan.Percent) || math.IsInf(nan.SpeedBytesPerSec, 0) {
+		t.Errorf("sanitizeProgress left %+v unmarshalable: a NaN fails JSON encoding and costs the UI the event", nan)
+	}
+}
