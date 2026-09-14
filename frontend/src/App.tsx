@@ -140,6 +140,11 @@ function App() {
         // round trip returns to the same phase under a different session, and
         // an in-flight command belongs to the session that started it.
         if (current.phase !== 'staged' || current.session.sessionId !== sessionId) return
+        // A retiring session has already been announced. `cancel-requested` is a
+        // spoken row -- "Canceling…" -- and a copy that resolves a moment later
+        // would replace the one confirmation the user is waiting on with an
+        // answer to a question they stopped asking.
+        if (current.cancelPending) return
         announce(text)
     }
 
@@ -218,7 +223,14 @@ function phaseBody(
             return <StagePendingCard state={state} onCancel={() => void transfer.cancel()}/>
 
         case 'staged':
-            return <StagedView state={state} onCancel={() => void transfer.cancel()} onAnnounce={announce}/>
+            return (
+                <StagedView
+                    state={state}
+                    onCancel={() => void transfer.cancel()}
+                    onAnnounce={announce}
+                    onCopyFailed={transfer.reportCopyFailure}
+                />
+            )
 
         case 'transferring':
             return <TransferringView state={state} onCancel={() => void transfer.cancel()}/>

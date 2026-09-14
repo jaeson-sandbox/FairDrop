@@ -78,6 +78,7 @@ export type TransferAction =
         readonly eventName: LifecycleEventName
         readonly args: readonly unknown[]
     }
+    | {readonly type: 'clipboard-failed'; readonly sessionId: string}
     | {readonly type: 'dismiss-retained'}
 
 export function createInitialTransferState(): IdleTransferState {
@@ -156,6 +157,27 @@ export function transferReducer(state: TransferState, action: TransferAction): T
             const event = parseLifecycleEvent(action.eventName, action.args)
             return event === null ? state : reduceLifecycle(state, event)
         }
+
+        /*
+          The one command a view issues on its own behalf.
+
+          Story 3.11 gave the clipboard write a registry code and a heading and
+          nothing that could reach them: the view discarded the rejection, so a
+          copy that never happened looked exactly like one that did. This is the
+          `invalid-selection` shape, scoped to a session rather than to a phase:
+          the copy control exists only in Staged, and a rejection that arrives
+          after its own session has been replaced belongs to nobody.
+
+          `cancelPending` refuses it for the same reason `active-cancel-failed`
+          requires it. A session being retired has already told the user what is
+          happening, and a failed copy is not a reason to talk over that.
+        */
+        case 'clipboard-failed':
+            if (state.phase !== 'staged' || state.session.sessionId !== action.sessionId ||
+                state.cancelPending) {
+                return state
+            }
+            return {...state, commandError: publicError('clipboard_failed')}
 
         case 'dismiss-retained':
             if (state.phase !== 'idle' || state.retainedOutcome === null) return state

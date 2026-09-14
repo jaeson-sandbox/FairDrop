@@ -134,7 +134,12 @@ func TestVerifyWorkflowLinuxJobIsAdapterVerificationOnly(t *testing.T) {
 			t.Errorf("Linux job is missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"wails", "frontend", "npm", "setup-node"} {
+	// "playwright" and "browser" are not redundant with "npm": a bare
+	// `npx playwright install` step carries neither "npm" nor "frontend",
+	// and the rendered accessibility suite is desktop-only by design --
+	// this job executes the O_PATH branch and is explicitly not release
+	// proof, which a browser here would blur.
+	for _, forbidden := range []string{"wails", "frontend", "npm", "setup-node", "playwright", "browser"} {
 		if strings.Contains(strings.ToLower(linux), forbidden) {
 			t.Errorf("Linux adapter job contains forbidden desktop/frontend step %q", forbidden)
 		}
@@ -530,6 +535,7 @@ func TestVerifyWorkflowRunsEveryStepInTheRequiredOrder(t *testing.T) {
 		"- name: Confirm cgo is enabled",
 		"- name: go test -race",
 		"- name: Frontend suite",
+		"- name: Accessibility browser suite",
 		"- name: Line-ending check",
 	}
 
@@ -544,7 +550,8 @@ func TestVerifyWorkflowRunsEveryStepInTheRequiredOrder(t *testing.T) {
 		if idx <= last {
 			t.Errorf("step %q appears at or before %q: the required order is wails build, "+
 				"bindings-drift/.gitkeep, gofmt, go vet, staticcheck, go test, cgo check, "+
-				"go test -race, frontend suite, line-ending check", step, lastName)
+				"go test -race, frontend suite, accessibility browser suite, line-ending check",
+				step, lastName)
 		}
 		last = idx
 		lastName = step
@@ -648,6 +655,66 @@ func TestVerifyWorkflowRunsTheFrontendSuite(t *testing.T) {
 	}
 	if !strings.Contains(block, "npm test") {
 		t.Error("the frontend suite step does not run `npm test`")
+	}
+}
+
+/*
+The rendered accessibility suite (D-065, D-068) and the browser it drives.
+
+Three things the spec requires in words, pinned here because none of them is
+visible from the suite's own green run: the browser is installed and driven on
+the desktop runners only, its build is pinned and cached the way the Wails CLI
+is, and the step runs well clear of `wails build` rather than beside it. The
+Linux job's own test forbids it from the other direction.
+*/
+func TestVerifyWorkflowRunsTheAccessibilityBrowserSuiteOnDesktopRunnersOnly(t *testing.T) {
+	full := readVerifyWorkflow(t)
+	wf := verifyJob(full, "verify")
+
+	idx := strings.Index(wf, "- name: Accessibility browser suite")
+	if idx < 0 {
+		t.Fatal("the rendered accessibility suite step is missing from the verify job")
+	}
+	block := wf[idx:]
+	if end := strings.Index(block[1:], "- name:"); end >= 0 {
+		block = block[:end+1]
+	}
+	if !strings.Contains(block, "working-directory: frontend") {
+		t.Error("the accessibility browser suite does not run inside frontend/")
+	}
+	if !strings.Contains(block, "npm run test:browser") {
+		t.Error("the accessibility browser suite step does not run `npm run test:browser`")
+	}
+
+	// Pinned like WAILS_VERSION, and for the same reason: a cache restore
+	// must never be able to serve a different Chromium build than the one
+	// the pinned playwright npm package expects.
+	if !strings.Contains(full, "PLAYWRIGHT_VERSION: '1.63.0'") {
+		t.Error("the workflow does not pin PLAYWRIGHT_VERSION to '1.63.0'")
+	}
+	if !strings.Contains(full, "key: playwright-${{ env.PLAYWRIGHT_VERSION }}-chromium-") {
+		t.Error("the Playwright cache key does not carry the pinned version: a stale cache would be restored across upgrades")
+	}
+	if !strings.Contains(full, "path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}") {
+		t.Error("the Playwright cache does not cache PLAYWRIGHT_BROWSERS_PATH, so the download repeats every run")
+	}
+	if !strings.Contains(full, "npx playwright install chromium") {
+		t.Error("the workflow never installs the Chromium build the rendered suite needs")
+	}
+
+	/*
+	  Never beside `wails build`. wails build runs its own frontend:install
+	  and a full Vite build; a browser suite sharing the runner with it
+	  competes for the same node_modules and the same CPU, and the spec's
+	  Never list says so in as many words. Step order is how a single-job
+	  runner expresses "not concurrently".
+	*/
+	buildIdx := strings.Index(wf, "\n      - name: wails build\n")
+	if buildIdx < 0 || buildIdx > idx {
+		t.Error("the accessibility browser suite does not run after `wails build` finished")
+	}
+	if suiteIdx := strings.Index(wf, "- name: Frontend suite"); suiteIdx < 0 || suiteIdx > idx {
+		t.Error("the rendered suite runs before the jsdom suite: the fast universal check must fail first")
 	}
 }
 

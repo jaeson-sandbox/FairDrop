@@ -375,3 +375,52 @@ describe('terminal scrubbing and retained outcome', () => {
         })
     })
 })
+
+/*
+  The clipboard command's rejection, which used to have nowhere to go.
+
+  `clipboard_failed` has carried a registry message since Story 3.11 and could
+  not reach a user: the staged view discarded the rejection. This is the action
+  that carries it, and it is scoped to a session rather than to a phase, because
+  the command outlives the render that issued it.
+*/
+describe('clipboard-failed', () => {
+    const failed = {type: 'clipboard-failed', sessionId} as const
+
+    it('shows the registry message for the session that issued the command', () => {
+        const next = transferReducer(staged(), failed)
+
+        expect(next.phase).toBe('staged')
+        expect(next.phase === 'staged' ? next.commandError : null).toEqual({
+            code: 'clipboard_failed',
+            message: 'FairDrop couldn’t copy the link. Select the link and copy it yourself.',
+        })
+    })
+
+    it('ignores a rejection naming a session that is no longer the staged one', () => {
+        const before = staged()
+        const other = 'ffffffffffffffffffffffffffffffff'
+
+        expect(transferReducer(before, {type: 'clipboard-failed', sessionId: other})).toBe(before)
+    })
+
+    /*
+      A session being retired has already said so. `cancel-requested` is a
+      spoken row, and a failed copy is not a reason to replace the one answer
+      the user is waiting on -- the same rule `active-cancel-failed` follows
+      from the other direction.
+    */
+    it('ignores a rejection that lands while the session is being cancelled', () => {
+        const cancelling = transferReducer(staged(), {type: 'cancel-requested'})
+
+        expect(transferReducer(cancelling, failed)).toBe(cancelling)
+    })
+
+    it('ignores a rejection in a phase that has no copy control', () => {
+        const idle = createInitialTransferState()
+        const transferring = event(staged(), 'transfer-started', {sessionId, seq: 1})
+
+        expect(transferReducer(idle, failed)).toBe(idle)
+        expect(transferReducer(transferring, failed)).toBe(transferring)
+    })
+})

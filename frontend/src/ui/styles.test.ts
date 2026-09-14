@@ -656,6 +656,32 @@ describe('rules the components can only reference by name', () => {
     it('shows an aria-disabled control as inert rather than merely saying so', () => {
         expect(componentRules).toMatch(/\.fd-button\[aria-disabled='true'\] \{[^}]*cursor: default;/)
     })
+
+    /*
+      An opacity is a contrast figure nobody published.
+
+      DESIGN.md's text table is "every authored pair the views actually place
+      together", and it is checked against the tokens this file declares. A
+      fractional opacity composites one of those pairs against whatever is
+      behind it at render time, so the pair the user reads is not the pair the
+      table publishes and no assertion here can see the difference.
+
+      It was not hypothetical: `.fd-button[aria-disabled='true']` carried
+      `opacity: 0.7`, and the quiet Cancel button underneath it is muted on
+      elevated -- published at 4.504478335:1 and composited to 2.64:1 light,
+      4.01:1 dark. The light pair has four thousandths of headroom at full
+      strength, so no fraction could have cleared the floor. Found by the Blind
+      Hunter layer re-run (D-109); DESIGN.md had already said it in the palette
+      table: "Muted is readable copy, never disabled text."
+
+      A future design that genuinely needs to dim something has to delete this
+      test and publish the composited pair, which is the point.
+    */
+    it('dims nothing with opacity, because a composited pair publishes no figure', () => {
+        const opacities = [...stylesheet.matchAll(/^\s*opacity:\s*([^;]+);/gm)].map((match) => match[1].trim())
+
+        expect(opacities.filter((value) => value !== '1'), 'fractional opacity declarations').toEqual([])
+    })
 })
 
 describe('a cancellation is a status, and never an error', () => {

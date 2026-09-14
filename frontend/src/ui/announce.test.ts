@@ -252,13 +252,34 @@ describe('a cancellation that lands beside a command failure', () => {
 
 describe('the warning the beacon row speaks', () => {
     // announce.ts fires this row on "a warning appeared" and then speaks the
-    // fixed discovery text. That is only correct because parseWarning admits
-    // exactly one code, which is asserted in another module and was relied on
-    // here in prose.
-    it('is the only warning code the validator can produce', () => {
+    // fixed discovery text. That was safe while parseWarning admitted exactly
+    // one code; Story 3.11 added name_warning, so it is not safe any more and
+    // the row's own unreachability is now the only thing holding it up --
+    // metadata.warnings is written once by stage-succeeded and never replaced,
+    // so no warning can arrive at an already-staged session.
+    //
+    // The assertion is kept and widened rather than deleted: if a later story
+    // makes a warning arrive after the initial Stage, this row would announce
+    // the beacon sentence whichever warning fired, and the count below is what
+    // says the premise moved.
+    it('admits only warning codes, and the announcer row assumes which one', () => {
         expect(parseWarning({code: 'beacon_warning', message: 'x'})).not.toBeNull()
+        expect(parseWarning({code: 'name_warning', message: 'x'})).not.toBeNull()
         expect(parseWarning({code: 'some_other_warning', message: 'x'})).toBeNull()
+        expect(parseWarning({code: 'transfer_failed', message: 'x'})).toBeNull()
         expect(parseWarning({code: '', message: 'x'})).toBeNull()
+
+        // The beacon-warning row hardcodes copy.discovery.warning. With more
+        // than one warning code admitted, that is only correct while the row
+        // stays unreachable -- which toStaged's own condition guarantees.
+        const staged = {
+            phase: 'staged' as const,
+            session: {sessionId, lastSeq: 0},
+            metadata: metadata({warnings: [discovery]}),
+            cancelPending: false,
+            commandError: null,
+        }
+        expect(routeTransition(staged, staged)).toBeNull()
     })
 })
 

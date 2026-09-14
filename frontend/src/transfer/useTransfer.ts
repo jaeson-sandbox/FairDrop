@@ -28,6 +28,8 @@ export interface TransferController {
     readonly selectDirectory: () => Promise<void>
     readonly cancel: () => Promise<void>
     readonly rejectSelection: () => void
+    /** Reported by the staged view, which is the only thing that issues the command. */
+    readonly reportCopyFailure: (sessionId: string) => void
     readonly dismissRetained: () => void
 }
 
@@ -230,6 +232,43 @@ export function useTransfer(): TransferController {
             return
         }
 
+        // A live Done or Error is cancellable too, and this is the only way out
+        // of one when the backend's three-second reset never arrives (D-059).
+        // App wires that outcome's control to this function precisely for that
+        // case, and until 2026-09-14 the guard below sent it straight back: the
+        // control rendered, did nothing, and left the window exactly as
+        // stranded as having no control at all.
+        //
+        // No cancel-requested dispatch, because a terminal state carries no
+        // cancelPending to show and the reducer ignores it there anyway. The
+        // transition comes from the backend's own transfer-reset, which is what
+        // retires the session and returns the UI to Idle with the outcome
+        // retained.
+        if (current.phase === 'done' || current.phase === 'error') {
+            const outstanding = activeCancelRef.current
+            if (outstanding !== null && outstanding.sessionId === current.session.sessionId) return
+
+            const terminalGeneration = cancelGenerationRef.current + 1
+            cancelGenerationRef.current = terminalGeneration
+            const terminal: ActiveCancelOperation = {
+                generation: terminalGeneration,
+                sessionId: current.session.sessionId,
+            }
+            activeCancelRef.current = terminal
+            try {
+                await CancelTransfer()
+            } catch {
+                // Nowhere to put it: a terminal state has no commandError field,
+                // and the reset this was trying to force is what would have
+                // produced the Idle that could show one. The rejection text is
+                // adapter text either way, and the outcome panel the user is
+                // looking at is still correct about what happened.
+            } finally {
+                if (activeCancelRef.current === terminal) activeCancelRef.current = null
+            }
+            return
+        }
+
         if (current.phase !== 'staged' && current.phase !== 'transferring') return
         if (current.cancelPending) return
         const outstandingCancel = activeCancelRef.current
@@ -258,8 +297,13 @@ export function useTransfer(): TransferController {
 
     const rejectSelection = useCallback(() => dispatch({type: 'invalid-selection'}), [])
     const dismissRetained = useCallback(() => dispatch({type: 'dismiss-retained'}), [])
+    const reportCopyFailure = useCallback((sessionId: string) => {
+        dispatch({type: 'clipboard-failed', sessionId})
+    }, [])
 
-    return {state, stage, selectFile, selectDirectory, cancel, rejectSelection, dismissRetained}
+    return {
+        state, stage, selectFile, selectDirectory, cancel, rejectSelection, reportCopyFailure, dismissRetained,
+    }
 
     function browseMayCommit(operation: BrowseOperation): boolean {
         return mountedRef.current && browseOperationRef.current === operation
