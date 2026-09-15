@@ -1096,3 +1096,51 @@ func TestNoWiringPanicShowsNothing(t *testing.T) {
 		t.Errorf("showed %d dialogs with nothing wrong", shown)
 	}
 }
+
+/*
+TestEveryPreWindowSubprocessIsBounded reads the source on every platform,
+because the defect it pins is reachable on one and fixable on none of the
+others' CI.
+
+nativeOSPrefersDarkTheme is per-platform and build-tagged: the darwin
+implementation shells out, the windows one reads a registry key, and only the
+first can hang. So the behavioural test for it compiles on macOS alone, and a
+Windows or Linux runner that reintroduced a bare exec.Command there would
+report green. This does not: it parses the file as text, which every runner
+can do for every platform's implementation.
+
+What it refuses is the shape, not a particular call. Anything before wails.Run
+that waits on a process without a deadline puts FairDrop back where the Epic 3
+retrospective found it (B8) -- no window, no fatal dialog, no log line, and
+nothing D-107 built able to reach it, because none of that machinery is
+running yet.
+*/
+func TestEveryPreWindowSubprocessIsBounded(t *testing.T) {
+	// Every file that runs before wails.Run and may reach outside the process.
+	// A new one belongs here; that is the point of naming them rather than
+	// globbing, so adding an unbounded reader is a deliberate act.
+	for _, name := range []string{"theme_darwin.go", "theme_windows.go", "theme_other.go"} {
+		source, err := os.ReadFile(name)
+		if err != nil {
+			t.Errorf("read %s: %v -- a pre-window reader this test cannot see is one it cannot pin", name, err)
+			continue
+		}
+		text := string(source)
+
+		if !strings.Contains(text, "exec.") {
+			continue // no subprocess at all: nothing here can hang on one.
+		}
+		if strings.Contains(text, "exec.Command(") {
+			t.Errorf("%s calls exec.Command without a context: a subprocess that never returns blocks "+
+				"main() before wails.Run, so FairDrop shows no window, no fatal dialog and no log line",
+				name)
+		}
+		if !strings.Contains(text, "exec.CommandContext(") {
+			t.Errorf("%s reaches exec without CommandContext, so nothing bounds the call", name)
+		}
+		if !strings.Contains(text, "context.WithTimeout(") {
+			t.Errorf("%s passes a context to its subprocess but never gives one a deadline, which bounds "+
+				"nothing: cancellation has to come from somewhere", name)
+		}
+	}
+}
