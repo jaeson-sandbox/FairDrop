@@ -2,7 +2,7 @@
 title: 'Story 4.2: Close What the Epic 3 Retrospective Found'
 type: 'chore'
 created: '2026-09-14'
-status: 'ready-for-dev'
+status: 'done'
 baseline_commit: 'fa6ee8a'
 review_loop_iteration: 0
 context:
@@ -94,17 +94,17 @@ entry states which.
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Retro item 12 — the WCAG 1.4.12 text-spacing case in the rendered suite, failing on a measured value.
-- [ ] Retro item 13 — literal-value assertions for all three D-018 response headers.
-- [ ] Retro item 14 — a test that drives `acquireInstanceLock` itself.
-- [ ] Retro item 15 — CLAIMING driven through `drain`, so narrowing the production call site fails by name.
-- [ ] Retro item 16 — the selection gate proved re-acquirable after the unselected `StartBeacon` branch.
-- [ ] Retro item 17 — `resolveAncestorsWith` driven with a failing eval stub.
-- [ ] Retro item 18 — a deadline on `theme_darwin.go`'s `defaults read`.
-- [ ] Retro item 19 — one fixed, path-free line when the instance lock's setup fails.
-- [ ] Retro item 20 — the four falsified comments corrected and `beaconWarning`'s doc comment reattached.
-- [ ] Retro item 21 — `writeStatus`'s D-018 rationale and `Stop()`'s docstring corrected.
-- [ ] `evidence-4-2-close-what-the-epic-3-retrospective-found.md`, the ten items marked `done`, `epics.md` kept in step.
+- [x] Retro item 12 — the WCAG 1.4.12 text-spacing case in the rendered suite, failing on a measured value.
+- [x] Retro item 13 — literal-value assertions for all three D-018 response headers.
+- [x] Retro item 14 — a test that drives `acquireInstanceLock` itself.
+- [x] Retro item 15 — CLAIMING driven through `drain`, so narrowing the production call site fails by name.
+- [x] Retro item 16 — the selection gate proved re-acquirable after the unselected `StartBeacon` branch.
+- [x] Retro item 17 — `resolveAncestorsWith` driven with a failing eval stub.
+- [x] Retro item 18 — a deadline on `theme_darwin.go`'s `defaults read`.
+- [x] Retro item 19 — one fixed, path-free line when the instance lock's setup fails.
+- [x] Retro item 20 — the four falsified comments corrected and `beaconWarning`'s doc comment reattached.
+- [x] Retro item 21 — `writeStatus`'s D-018 rationale and `Stop()`'s docstring corrected.
+- [x] `evidence-4-2-close-what-the-epic-3-retrospective-found.md`, the ten items marked `done`, `epics.md` kept in step.
 
 **Acceptance Criteria:**
 - Given each mutation the retrospective ran to confirm a gap, when it is re-applied, then a named test fails.
