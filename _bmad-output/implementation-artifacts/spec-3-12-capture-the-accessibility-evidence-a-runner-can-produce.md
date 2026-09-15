@@ -2,7 +2,7 @@
 title: 'Story 3.12: Capture the Accessibility Evidence a Runner Can Produce'
 type: 'chore'
 created: '2026-09-14'
-status: 'ready-for-dev'
+status: 'done'
 baseline_commit: 'cb4c9e9'
 review_loop_iteration: 0
 context:
@@ -56,13 +56,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `frontend/` — a browser-run test project alongside the jsdom one, pinned and cached, running only the checks that need layout.
-- [ ] Rendered checks for 320-pixel reflow, 200% text, the 44-pixel target floor, and forced colors, each failing on a measurement that names the element.
-- [ ] The forced-colors QR capture, retained as an artefact, with what it does and does not prove stated beside it.
-- [ ] `.github/workflows/verify.yml` — the browser step on the desktop runners, never on the Linux adapter job, and never beside `wails build`.
-- [ ] `release-evidence.md` — the rows this story automates move to machine-verified with their run identity; the camera scan and the screen-reader pass stay optional and unverified.
-- [ ] D-109: run the two missing review layers against Story 1.10's change, revalidate every finding against current code, and fix or route each with a reason.
-- [ ] `evidence-3-12-capture-the-accessibility-evidence-a-runner-can-produce.md`, the three ids discharged, `epics.md` kept in step.
+- [x] `frontend/` — a browser-run test project alongside the jsdom one, pinned and cached, running only the checks that need layout.
+- [x] Rendered checks for 320-pixel reflow, 200% text, the 44-pixel target floor, and forced colors, each failing on a measurement that names the element.
+- [x] The forced-colors QR capture, retained as an artefact, with what it does and does not prove stated beside it.
+- [x] `.github/workflows/verify.yml` — the browser step on the desktop runners, never on the Linux adapter job, and never beside `wails build`.
+- [x] `release-evidence.md` — the rows this story automates move to machine-verified with their run identity; the camera scan and the screen-reader pass stay optional and unverified.
+- [x] D-109: run the two missing review layers against Story 1.10's change, revalidate every finding against current code, and fix or route each with a reason.
+- [x] `evidence-3-12-capture-the-accessibility-evidence-a-runner-can-produce.md`, the three ids discharged, `epics.md` kept in step.
 
 **Acceptance Criteria:**
 - Given the built frontend at 320 CSS pixels and at 200% text, when the rendered suite runs, then a clipped control or a horizontal page scroll fails by name rather than by substring.

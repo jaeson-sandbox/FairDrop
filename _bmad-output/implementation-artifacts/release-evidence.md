@@ -39,8 +39,15 @@ it, so the gate below is the same gate every pull request runs.
 | `wails build` | both desktop runners in the same run | the real production build, plus a bindings-drift check | **pass** |
 | gofmt, `go vet`, pinned staticcheck, line endings | every runner in the same run | — | **pass** |
 | Mutation proof | the desktop runners in the same run | 68 mutations, each required to fail a **named** assertion: 57 on every runner, 3 on Linux and macOS, 8 macOS-only (`scripts/verify-native-mutations.sh`) | **pass** |
+| Rendered accessibility floor | `verify (windows-latest)` and `verify (macos-latest)` | [run 34796962306](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34796962306) at `b8fb09a`, on `epic-3-run-reliably-on-supported-desktops` | **pass** — 8 checks in real Chromium: 320 CSS pixel reflow and 200% text on Staged and Transferring, the 44×44 activation floor on every control, the forced-colors exemption confined to the QR substrate, and the forced-colors capture. New in Story 3.12 and not in `v0.2.0` |
 | Native artifact build | `build (windows-latest)` and `build (macos-latest)` in the same run | each runner builds its own through Wails after the gate, never cross-compiled | **success** |
 | Checksum re-verified after transit | the `release` job in the same run | `sha256sum --check` runs on the downloaded artifacts before `gh release create`, so the published checksum describes the published file | **success** |
+
+The rendered row is the one line in this table produced by a branch's `verify.yml` run rather than
+by the Release workflow's gate, because it postdates `v0.2.0`. It needs no separate arrangement to
+become release proof: Release calls `verify.yml` by `workflow_call`, so the next release runs these
+same eight checks on both desktop runners as part of its own gate, and this row is replaced by that
+run's identity when it does.
 
 What this does not say: that the product works. It says the code compiles, builds, and behaves as
 its tests describe on both supported operating systems, and that breaking any guarded behaviour
@@ -86,13 +93,17 @@ will launch; there is no notarization and no auto-update.
 
 ## Recorded rather than verified
 
-These are known and open. None is a defect discovered here; each is work an identified story
-owns, listed so that reading this file is enough to know what a release would ship with.
+These are known and open, listed so that reading this file is enough to know what a release would
+ship with. None is a defect discovered here. Most are work an identified story owns; one is owned
+by nobody, because it needs a person with a phone rather than a story, and that row says so and
+points at the optional check below where it belongs.
 
 | Limitation | Owner | What is unsettled |
 | --- | --- | --- |
-| Residual error copy (D-035, D-039, D-048, D-097, D-103, D-104, D-106, D-111, D-112) | Story 3.11 | Nine states whose wording does not yet describe what happened — including an ordinary macOS or Linux filename containing `:` failing a whole folder transfer under copy that says FairDrop can use regular files and folders only, and busy-recovery copy that suggests cancelling and retrying when the only real options are waiting or restarting |
-| Rendered accessibility capture (D-065, D-068, D-109) | Story 3.12 | 320 CSS pixel reflow, 200% text, the 44px target floor and forced-colors QR rendering are proved against stylesheet text and the DOM, never against a rendered layout |
+| Residual error copy (D-035, D-039, D-048, D-097, D-103, D-104, D-106, D-111, D-112) | Story 3.11, **closed 2026-09-13** | Nine states whose wording did not describe what happened. All nine are fixed on `epic-3-run-reliably-on-supported-desktops` and none of them is in `v0.2.0`, which predates the story: a copy of that build still refuses a whole folder transfer over an ordinary macOS or Linux filename containing `:`, and still offers to cancel work that cannot be cancelled. The row stays until a release carries the fix |
+| QR forced-colors exemption, unscanned (D-065) | nobody — row 14 below | `DESIGN.md` gates the exemption on native scan evidence. Story 3.12 produced the rendered capture and the confinement proof; a camera reading that bitmap is an observation a person makes, not a check a runner owes |
+| Copy button loses its name after a copy (D-114) | Story 4.1 | A successful copy renames the only control that reaches the capability URL to “Copied” for the rest of the session. Every fix is a design decision — see the id |
+| Chooser failure reports the wrong state (D-113) | Story 4.1 | A native chooser that fails to open reports that a transfer stopped partway, for a transfer that never existed |
 
 Story 3.10 closed the four platform decisions this table used to carry (D-018, D-055, D-064,
 D-088) on 2026-09-12, and they are in `v0.2.0`. None of them was observed running on the machine
@@ -136,7 +147,8 @@ runner has ever executed on the machine they target.
 | 10 | Windows assistive technology | — | — | — | — | — | optional / unverified | One keyboard-only transfer with NVDA running: each transition announced exactly once, no duplicate or lost announcement. The routing table and throttle are unit-proved; what a screen reader actually says is not. |
 | 11 | macOS assistive technology | — | — | — | — | — | optional / unverified | The same, with VoiceOver. |
 | 12 | Native window theme at launch (new in v0.2.0) | — | — | — | — | — | optional / unverified | Launch on a machine set to dark mode and watch the first frame. The window should paint the dark canvas `#1C1916` before the webview renders; a one-frame flash of cream means the OS read returned light. Repeat in light mode. This is the only way to see D-055 working: the runners compile the registry read and the `defaults` call but never launch a window. |
-| 13 | Rendered layout limits | — | — | — | — | — | optional / unverified | Staged at 320 CSS pixels, at 200% text, and with forced colors on. Story 3.12 intends to capture what a headless browser can; a real window at those settings is the rest. |
+| 13 | Rendered layout limits, in a real window | — | — | — | — | — | optional / unverified | What a runner can measure is now measured on every run — see the rendered row in the machine table above. This row is what is left over: the same three settings driven through the OS rather than emulated, in the real WebView2 and WKWebView rather than in Chromium standalone. Set the display to 320 CSS pixels wide, then to 200% text through Windows Settings or macOS Displays, then turn on Windows high contrast; observe that nothing clips, that no control falls below a comfortable touch size, and that the window repaints in the system palette. A headless browser evaluates `forced-colors: active` because it was told to; a high-contrast Windows session also changes what the webview host paints behind the page, which no runner here has ever exercised. |
+| 14 | A camera reading the QR under forced colors | — | — | — | — | — | optional / unverified | The half of D-065 that no runner can produce. `DESIGN.md` permits `forced-color-adjust: none` on the QR substrate “only after native scan evidence confirms it remains readable”, and that gate is still unmet: Story 3.12 retained `frontend/browser/captures/qr-panel-forced-colors.capture.png`, which shows the substrate still painting light-on-dark with its quiet zone intact under forced colors, and proves nothing at all about a camera. Scan a real staged QR with a phone in a high-contrast Windows session and record whether it decoded. Until then the exemption is applied on the strength of an argument, which is recorded here rather than implied. |
 
 ## Attempts that did not pass, kept for the record
 
