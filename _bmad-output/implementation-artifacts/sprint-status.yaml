@@ -53,7 +53,7 @@ development_status:
   2-2-stream-a-safe-directory-zip: done
   epic-2-retrospective: done
 
-  epic-3: in-progress
+  epic-3: done
   3-1-enforce-one-running-fairdrop-instance: done
   3-2-automate-reproducible-cross-platform-verification: done
   3-3-produce-and-smoke-test-native-release-artifacts: done
