@@ -240,11 +240,24 @@ func main() {
 // Inert rather than absent, because Wails' own single-instance handoff has not
 // run yet and it is the thing that restores the existing window. On the
 // ordinary path Wails sees the first instance and exits this process before the
-// window appears, so nothing uncomposed is ever shown. Only when Wails misses
-// the first instance -- the two Windows fallthroughs D-088 describes -- does
-// this window reach a user, and then every command answers that FairDrop is not
-// ready, which is the point: a second listener and a second beacon are what
-// must not happen (D-088).
+// window appears, so nothing uncomposed is ever shown.
+//
+// This window reaches a user only when Wails' own lock misses the first
+// instance, and there are three such paths, not the two this comment named
+// until the Epic 3 retrospective (B12). Two are the Windows fallthroughs D-088
+// describes: SetupSingleInstance reads any CreateMutex error other than
+// ERROR_ALREADY_EXISTS as "nobody is running", which an elevated first instance
+// produces, and it falls through when FindWindowW has not yet found the first
+// instance's event window, which a tight double launch produces. The third is
+// macOS, added later: singleInstanceOption passes Wails no lock at all when
+// nativeSingleInstanceLockUsable fails its probe, which disables the handoff
+// the same way.
+//
+// On every one of them each command answers that FairDrop is not ready, which
+// is the point: a second listener and a second beacon are what must not happen
+// (D-088). Whether an inert window is the right answer on macOS specifically is
+// an open question the retrospective routed rather than settled -- D-088 chose
+// it for Windows deliberately, and nobody has decided it applies here.
 func buildApp(held bool) *App {
 	if !held {
 		app := NewApp()

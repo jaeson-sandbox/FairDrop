@@ -252,10 +252,22 @@ func writeStatus(writer http.ResponseWriter, status int) {
 	// capability is the token, not the origin. Without it a receiver page
 	// fetched from anywhere reads every rejection as one opaque network error
 	// and can only say "something went wrong", when the server has already
-	// distinguished a wrong token from a consumed one from a busy sender.
-	// Nothing new is disclosed -- the body stays empty and identical for every
-	// rejection above, and a status is only ever about a token the caller
-	// already holds (D-018).
+	// distinguished a wrong token from a consumed one from a busy sender
+	// (D-018).
+	//
+	// What this discloses, stated accurately. The body stays empty and
+	// identical for every rejection above, so the status is the whole of it,
+	// and it is readable by anyone who can make the request -- which means
+	// anyone holding the URL. For a caller who has it, the status describes
+	// their own capability. For a caller who does not, it answers a guess
+	// against a 128-bit token with "wrong", which is what they already knew.
+	// An earlier version of this comment said a status is only ever about a
+	// token the caller already holds; that is false for the 404 branch above,
+	// which is reached precisely when nobody holds the token (Epic 3
+	// retrospective, B11). The conclusion survives the correction: this
+	// product's threat model already concedes a plain-HTTP transfer on a
+	// trusted LAN, so anyone positioned to read a status is positioned to read
+	// the token itself off the wire.
 	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("X-Content-Type-Options", "nosniff")
 	writer.WriteHeader(status)

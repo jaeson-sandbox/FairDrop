@@ -466,12 +466,19 @@ func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 // warning fails to parse, cancelling a perfectly good session over a
 // warning nobody needed to see.
 //
-// The list below is a literal, in the same spirit as registryEntries above:
-// a WarningCode added to types.go without also being added here is not
-// reported as missing, so adding one is two edits, not one -- but it is one
-// deliberate edit in a small, visible list, not a silent compile-time gap.
+// The list is read from the package rather than restated here. It used to be
+// a literal, and this comment used to admit what that cost: "a WarningCode
+// added to types.go without also being added here is not reported as missing."
+// That is the self-referential shape this project keeps rediscovering -- the
+// expectation and the value under test maintained separately, so the test
+// stays green while the contract drifts. transfer.WarningCodes() is now the
+// one list, so a code that reaches the wire without reaching validation.ts
+// fails here (Epic 3 retrospective, A7).
 func TestEveryWarningCodeIsAcceptedByTheFrontendParser(t *testing.T) {
-	everyWarningCode := []transfer.WarningCode{transfer.WarnBeaconUnavailable, transfer.WarnUnportableNames}
+	everyWarningCode := transfer.WarningCodes()
+	if len(everyWarningCode) == 0 {
+		t.Fatal("the package reports no warning codes at all, so this pin would pass having checked nothing")
+	}
 
 	mirror, err := os.ReadFile(filepath.Join("frontend", "src", "transfer", "validation.ts"))
 	if err != nil {

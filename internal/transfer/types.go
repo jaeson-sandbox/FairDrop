@@ -2,7 +2,10 @@
 // consumed by the transfer coordinator.
 package transfer
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // SessionID correlates one transfer session internally and with the UI. It
 // carries at least 128 random bits from a CSPRNG, is independent of the
@@ -69,11 +72,15 @@ type ProgressSnapshot struct {
 // know (Epic 1 retrospective item 3).
 type WarningCode string
 
-// WarnBeaconUnavailable is the one WarningCode this build produces. It
-// shares ErrBeaconWarning's wire value deliberately -- the two describe the
-// same condition from two different boundaries -- without sharing its type,
-// which is the whole point: assigning any other ErrorCode to a Warning is a
-// compile error.
+// WarnBeaconUnavailable shares ErrBeaconWarning's wire value deliberately --
+// the two describe the same condition from two different boundaries -- without
+// sharing its type, which is the whole point: assigning any other ErrorCode to
+// a Warning is a compile error.
+//
+// It was described here as "the one WarningCode this build produces" until
+// Story 3.11 added a second fourteen lines below and left the claim standing
+// (Epic 3 retrospective, A7). The count lives in warningCodes below now, where
+// a test can read it, rather than in a sentence nothing checks.
 const WarnBeaconUnavailable WarningCode = WarningCode(ErrBeaconWarning)
 
 // WarnUnportableNames is raised at Stage when a selected folder holds entries
@@ -81,6 +88,29 @@ const WarnBeaconUnavailable WarningCode = WarningCode(ErrBeaconWarning)
 // proceeds and the names are sent unchanged, because the sender may well be
 // sending to a phone, where they are perfectly ordinary.
 const WarnUnportableNames WarningCode = WarningCode(ErrNameWarning)
+
+// warningCodes is every WarningCode this build produces.
+//
+// Here rather than in prose because a comment claiming a count is a pin with
+// no test: two such comments went stale the moment a second code was added,
+// and nothing failed (Epic 3 retrospective, A7). This is the one list, and the
+// tests that care read it through WarningCodes rather than restating it.
+var warningCodes = []WarningCode{WarnBeaconUnavailable, WarnUnportableNames}
+
+// WarningCodes returns every WarningCode this build produces.
+//
+// Exported for the cross-language pin in main_test.go, which until now
+// declared its own copy of this list and said so: "a WarningCode added to
+// types.go without also being added here is not reported as missing." That is
+// the self-referential shape this project keeps finding -- the test's
+// expectation and the value under test written separately, so the test passes
+// while the contract drifts. It reads this now.
+//
+// A copy, because a caller that appended to the package's own slice would
+// change what every later test believes the contract is.
+func WarningCodes() []WarningCode {
+	return slices.Clone(warningCodes)
+}
 
 // Warning is one non-fatal condition attached to an otherwise successful
 // command result. A warning never carries adapter text: its code selects fixed

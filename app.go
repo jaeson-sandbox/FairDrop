@@ -440,10 +440,24 @@ func (a *App) logEvent(what string, event transfer.Event) {
 	a.logf("fairdrop: %s %s seq=%d session=%s%s", what, event.Kind, event.Seq, event.SessionID, detail)
 }
 
-// startup is called when the app starts. The context is saved so the Wails
-// runtime methods -- EventsEmit, the two dialogs, the clipboard write, and
-// window restoration -- can be called later. This is the application-lifetime
-// context and the only one the App stores.
+// startup is called when the app starts and stores two contexts, which are not
+// interchangeable.
+//
+// a.ctx is the application-lifetime one Wails hands over. Every runtime method
+// goes through it -- EventsEmit, the two dialogs, the clipboard write, window
+// restoration -- and it is deliberately never cancelled here: it is what events
+// are emitted through, so cancelling it would lose the events shutdown exists
+// to let finish.
+//
+// a.commands is a cancellable derivation of it, and the one transfer commands
+// delegate through. Wails builds its context from context.Background() plus
+// WithValue and never wraps it, so ctx.Done() never fires and a Cancel waiting
+// on the operation lease would hold shutdown behind it for the whole bound
+// (D-097). shutdown cancels this one before teardown begins.
+//
+// This comment claimed a.ctx was "the only one the App stores" from Story 1.7
+// until the Epic 3 retrospective, two lines above the line that stored the
+// second (A7).
 func (a *App) startup(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
