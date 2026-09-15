@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 2026-09-12
+last_updated: 09-14-2026 21:16
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -69,7 +69,7 @@ development_status:
 
   epic-4: backlog
   4-1-replace-the-two-browse-controls-with-one: backlog
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
     epic: 1
@@ -150,3 +150,105 @@ action_items:
     owner: "3-8-harden-the-directory-stream"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-04.md"
+  - id: "epic-3-retro-item-12-add-the-wcag-1-4-12-text-spacing-case-to"
+    epic: 3
+    action: "Add the WCAG 1.4.12 text-spacing case to the rendered accessibility suite
+      (1.5x line height, 2x paragraph spacing, 0.12em letter spacing, 0.16em word
+      spacing), closing the half of the epic's declared '200% text with text-spacing
+      overrides' requirement that no test reaches."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-13-pin-all-three-d-018-response-headers-wit"
+    epic: 3
+    action: "Pin all three D-018 response headers with literal-value assertions. Each
+      can currently be deleted with the whole repo green, and TestRejectionsAreIndistinguishable
+      compares rejections only to each other, so all-missing is as indistinguishable
+      as all-present."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-14-test-acquireinstancelock-itself-rather-t"
+    epic: 3
+    action: "Test acquireInstanceLock itself rather than only lockFileExclusive: its
+      body can be replaced with 'return func() {}, true' against a green repo, so
+      D-088's backstop could stop working silently."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-15-drive-the-claiming-state-through-drain-s"
+    epic: 3
+    action: "Drive the CLAIMING state through drain so narrowing the production call
+      site fails by name. The existing test hands drainerMayActLocked its own literal
+      list and proves only that the guard honours it."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-16-re-acquire-the-selection-gate-after-the"
+    epic: 3
+    action: "Re-acquire the selection gate after the unselected StartBeacon branch,
+      as the sibling test already does for 'already active'. A leaked token blocks
+      discovery for the life of the process."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-17-call-resolveancestorswith-directly-with"
+    epic: 3
+    action: "Call resolveAncestorsWith directly with a failing eval stub: the branch
+      preserving the source's coded refusal is unexercised and mutable against a green
+      repo."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-18-give-theme_darwin-go-s-defaults-read-a-d"
+    epic: 3
+    action: "Give theme_darwin.go's 'defaults read' a deadline via exec.CommandContext.
+      A wedged cfprefsd blocks main() before wails.Run, outside every recovery path
+      D-107 built."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-19-log-one-fixed-path-free-line-when-acquir"
+    epic: 3
+    action: "Log one fixed, path-free line when acquireInstanceLock's setup fails,
+      matching singleInstanceOption and buildApp. The backstop currently disables
+      itself with no forensic trail."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-20-correct-four-comments-the-code-outgrew-b"
+    epic: 3
+    action: "Correct four comments the code outgrew: both 'the one WarningCode this
+      build produces' claims, app.go's 'the only one the App stores', and buildApp's
+      'two Windows fallthroughs' which macOS now also reaches. Move beaconWarning's
+      orphaned doc comment back onto beaconWarning, which go doc currently prints
+      under the wrong function."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-21-correct-writestatus-s-d-018-rationale-a"
+    epic: 3
+    action: "Correct writeStatus's D-018 rationale ('a status is only ever about a
+      token the caller already holds' is false for the 404 branch) and Stop()'s docstring
+      (a repeated Stop after a mundane cleanup error replays the cached diagnostic
+      rather than no-opping). Both behaviours are sound; the sentences are not."
+    owner: "4-1-replace-the-two-browse-controls-with-one"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-22-decide-and-record-whether-the-three-stre"
+    epic: 3
+    action: "Decide and record whether the three stream copy loops stay independent.
+      Epic 2 asked this; Story 3.8 answered it in practice by making all three identical,
+      and nobody wrote the decision down."
+    owner: "Epic 4"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-3-retro-item-23-split-internal-transfer-coordinator-go-b"
+    epic: 3
+    action: "Split internal/transfer/coordinator.go before it grows again: 1,175 lines,
+      eight responsibilities, a 213-line Stage, and a cohesive 148-line bounded-call
+      subsystem that lifts out beside a 314-line lifecycle.go. Epic 4 does not touch
+      this file, so the cost is lowest now."
+    owner: "Epic 4"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
