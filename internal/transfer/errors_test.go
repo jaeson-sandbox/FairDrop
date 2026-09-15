@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -331,6 +332,104 @@ func TestEveryDiagnosticMessageIsAFixedLiteral(t *testing.T) {
 	}
 	if calls == 0 {
 		t.Fatal("no recordDiagnostic calls parsed, so this test would pass vacuously")
+	}
+}
+
+/*
+TestDrainAcceptsTerminalAtTheStatesEachCallSiteIsFor closes the half of
+D-042/D-091 that had no guard, and pins the distinction the two call sites
+exist to make.
+
+drain accepts a terminal outcome in two places and they are deliberately not
+the same. The in-loop arm forwards a real report from the server, which only
+ever describes a claimed, in-flight transfer, so it stays gated to
+TRANSFERRING: widening it would let a stray event end a session nobody claimed.
+The post-loop synthesis is the opposite case -- the server left without
+reporting anything -- so it must reach STAGED and CLAIMING too, or a session
+keeps showing a QR code for a listener that no longer exists.
+
+Three tests appear to cover this and none pins CLAIMING.
+TestALaneThatClosesWhileStagedStillEndsTheSession drives only STAGED,
+TestLaneClosureWithoutAnOutcomeSynthesizesAFailure only TRANSFERRING, and
+TestTheDrainerMayEndASessionFromEveryStateOneCanBeIn declares its own
+three-state list and hands it to the guard -- which proves the guard honours
+what it is given, a different claim. The Epic 3 retrospective narrowed the
+production call site to stateStaged, stateTransferring and the package stayed
+green (B2).
+
+CLAIMING cannot be driven deterministically, and that is not an oversight: it
+exists only inside AuthorizeClaim, which holds the operation lease the
+synthesis itself needs, so a behavioural test would race for it and usually
+prove nothing. The claim here is structural -- *this call site names this
+state* -- so it is checked structurally, the way
+TestEveryBoundedCallArmsItsBoundBeforeLaunching below checks an ordering a
+comment could not hold.
+*/
+func TestDrainAcceptsTerminalAtTheStatesEachCallSiteIsFor(t *testing.T) {
+	fileSet := token.NewFileSet()
+	parsed, err := parser.ParseFile(fileSet, "outcomes.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse outcomes.go: %v", err)
+	}
+
+	// The two call sites are told apart by what they pass as the event: the
+	// in-loop arm forwards the one it received, the synthesis builds its own.
+	// Nothing else distinguishes them, and a test that matched on order would
+	// break the first time someone moved a line.
+	var forwarded, synthesised []string
+	sites := 0
+	for _, declaration := range parsed.Decls {
+		function, isFunction := declaration.(*ast.FuncDecl)
+		if !isFunction || function.Name.Name != "drain" || function.Body == nil {
+			continue
+		}
+		ast.Inspect(function.Body, func(node ast.Node) bool {
+			call, isCall := node.(*ast.CallExpr)
+			if !isCall {
+				return true
+			}
+			selector, isSelector := call.Fun.(*ast.SelectorExpr)
+			if !isSelector || selector.Sel.Name != "acceptTerminal" || len(call.Args) < 2 {
+				return true
+			}
+			sites++
+
+			states := make([]string, 0, len(call.Args))
+			for _, argument := range call.Args[2:] {
+				if identifier, isIdentifier := argument.(*ast.Ident); isIdentifier {
+					states = append(states, identifier.Name)
+				}
+			}
+			if _, builtHere := call.Args[1].(*ast.CompositeLit); builtHere {
+				synthesised = states
+			} else {
+				forwarded = states
+			}
+			return true
+		})
+	}
+
+	// Vacuity: a renamed function, a moved call site or a changed signature
+	// would otherwise satisfy every assertion below by finding nothing.
+	if sites != 2 {
+		t.Fatalf("found %d acceptTerminal call sites in drain, want 2 (the forwarded report and the "+
+			"synthesised one) -- this test can only pin call sites it can find", sites)
+	}
+
+	// A real server report describes a transfer that was claimed and started.
+	if !slices.Equal(forwarded, []string{"stateTransferring"}) {
+		t.Errorf("drain forwards a real server report at %v, want exactly [stateTransferring]: a report "+
+			"accepted at STAGED or CLAIMING would let a stray event end a session nobody claimed",
+			forwarded)
+	}
+
+	// The synthesis is for a server that left without reporting anything.
+	for _, state := range []string{"stateStaged", "stateClaiming", "stateTransferring"} {
+		if !slices.Contains(synthesised, state) {
+			t.Errorf("drain's synthesis does not name %s, so a session whose server dies in that state "+
+				"gets no outcome at all: the window keeps a QR code for a listener that is gone "+
+				"(D-042, D-091). Named: %v", state, synthesised)
+		}
 	}
 }
 

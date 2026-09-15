@@ -1371,6 +1371,20 @@ So that the human evidence rows are the ones that genuinely need a person.
 
 ## Epic 4: Refine the Selection Experience
 
+### Story 4.2: Close What the Epic 3 Retrospective Found
+
+As a maintainer,
+I want the ten things the retrospective found and verified to be closed,
+So that the guarantees Epic 3 shipped are ones a broken build actually fails on.
+
+**Why a separate story:** the Epic 3 retrospective produced twelve action items, ten of which carry a verified source and a named fix. They share no mechanism with Story 4.1's selection controls, and three of them are gaps in what the suite proves rather than gaps in what the code does -- including one half of a requirement the epic declared and nobody checked.
+
+**Ordering:** numbered second, sequenced first. Two of its ten close things that are mutable against a green suite today (D-088's backstop function, and the drainer state that closed D-042/D-091), and one closes the WCAG 1.4.12 text-spacing half of the epic's accessibility requirement.
+
+**Excluded, and still open as action items:** whether the three stream copy loops stay independent (needs an owner decision) and splitting `internal/transfer/coordinator.go` (a refactor that deserves a story not also fixing ten unrelated things).
+
+**Closes:** Epic 3 retrospective items 12 through 21.
+
 ### Story 4.1: Replace the Two Browse Controls with One
 
 As a sender,

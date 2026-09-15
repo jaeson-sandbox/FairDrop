@@ -352,6 +352,56 @@ func TestStartBeaconRequiresSelectionAndLiveContext(t *testing.T) {
 	}
 }
 
+/*
+TestAnUnselectedStartBeaconGivesTheSelectionGateBack pins the release, not the
+error code.
+
+StartBeacon's unselected branch does two things: it returns the warning, and it
+hands back the selection gate it took on the way in. Only the first was tested.
+The Epic 3 retrospective dropped m.releaseSelectionGate() from that branch alone
+and the package stayed green (B4), because the sibling assertion above checks
+the returned code and never asks for the gate again.
+
+A leaked token is not a degraded path. The gate is a one-token semaphore, so
+every later GetLocalIP and StartBeacon on this Manager blocks until its caller's
+context is cancelled -- for the life of the process. This is the shape
+TestStartBeaconRejectsInvalidAndDuplicateRequestsWithoutReplacement already uses
+for the "already active" branch: make a call that cannot proceed without the
+gate, and let a hang be the failure.
+
+Reached with a bounded context rather than context.Background() so a regression
+fails this test in a second instead of hanging the package until Go's timeout,
+which reports the whole binary rather than the branch.
+*/
+func TestAnUnselectedStartBeaconGivesTheSelectionGateBack(t *testing.T) {
+	t.Parallel()
+
+	manager := unselectedBeaconTestManager(bytes.NewReader(make([]byte, processSuffixBytes)), nil)
+
+	if err := manager.StartBeacon(context.Background(), validBeaconRequest()); transfer.ErrorCodeOf(err) != transfer.ErrBeaconWarning {
+		t.Fatalf("unselected StartBeacon() code = %q, want %q", transfer.ErrorCodeOf(err), transfer.ErrBeaconWarning)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Any gate-taking call proves the point; GetLocalIP is the one the
+	// coordinator makes first on every later Stage, so it is the one whose
+	// loss the user would actually meet.
+	done := make(chan error, 1)
+	go func() { _, err := manager.GetLocalIP(ctx); done <- err }()
+
+	select {
+	case err := <-done:
+		if errors.Is(err, context.DeadlineExceeded) {
+			t.Fatal("the selection gate was never released by the unselected StartBeacon branch: " +
+				"every later GetLocalIP and StartBeacon on this Manager blocks for the life of the process")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("GetLocalIP did not return at all after an unselected StartBeacon: the selection gate leaked")
+	}
+}
+
 func TestStartBeaconCleansPartialHandleOnFactoryFailure(t *testing.T) {
 	t.Parallel()
 

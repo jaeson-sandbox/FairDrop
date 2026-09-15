@@ -373,8 +373,15 @@ func (s *Server) Start(
 // the way; an error naming a wait that hit its bound means teardown did NOT
 // finish and quiescence is unproven -- the accept loop, a handler, or a
 // connection may still be running. Neither ever means Stop is unsafe to call
-// again: repeating it after either kind of error is still a no-op, because
-// s.active is already cleared below.
+// again: repeating it after either kind is safe, because s.active is already
+// cleared below.
+//
+// Safe to repeat is not the same as silent, and this said "a no-op" until the
+// Epic 3 retrospective (B14). s.unresolved is cleared only when teardown
+// returned nil, so after a mundane cleanup diagnostic a second Stop finds the
+// finished run still recorded and replays that same cached diagnostic. Nothing
+// runs twice -- sync.Once sees to that -- but the caller is handed a repeat of
+// a failure that happened once, so anything logging it records two.
 //
 // s.mu is held only long enough to take ownership of s.active and clear it --
 // never across the wait itself. A teardown that hits its bound therefore

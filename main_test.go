@@ -466,12 +466,19 @@ func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 // warning fails to parse, cancelling a perfectly good session over a
 // warning nobody needed to see.
 //
-// The list below is a literal, in the same spirit as registryEntries above:
-// a WarningCode added to types.go without also being added here is not
-// reported as missing, so adding one is two edits, not one -- but it is one
-// deliberate edit in a small, visible list, not a silent compile-time gap.
+// The list is read from the package rather than restated here. It used to be
+// a literal, and this comment used to admit what that cost: "a WarningCode
+// added to types.go without also being added here is not reported as missing."
+// That is the self-referential shape this project keeps rediscovering -- the
+// expectation and the value under test maintained separately, so the test
+// stays green while the contract drifts. transfer.WarningCodes() is now the
+// one list, so a code that reaches the wire without reaching validation.ts
+// fails here (Epic 3 retrospective, A7).
 func TestEveryWarningCodeIsAcceptedByTheFrontendParser(t *testing.T) {
-	everyWarningCode := []transfer.WarningCode{transfer.WarnBeaconUnavailable, transfer.WarnUnportableNames}
+	everyWarningCode := transfer.WarningCodes()
+	if len(everyWarningCode) == 0 {
+		t.Fatal("the package reports no warning codes at all, so this pin would pass having checked nothing")
+	}
 
 	mirror, err := os.ReadFile(filepath.Join("frontend", "src", "transfer", "validation.ts"))
 	if err != nil {
@@ -1094,5 +1101,53 @@ func TestNoWiringPanicShowsNothing(t *testing.T) {
 
 	if shown != 0 {
 		t.Errorf("showed %d dialogs with nothing wrong", shown)
+	}
+}
+
+/*
+TestEveryPreWindowSubprocessIsBounded reads the source on every platform,
+because the defect it pins is reachable on one and fixable on none of the
+others' CI.
+
+nativeOSPrefersDarkTheme is per-platform and build-tagged: the darwin
+implementation shells out, the windows one reads a registry key, and only the
+first can hang. So the behavioural test for it compiles on macOS alone, and a
+Windows or Linux runner that reintroduced a bare exec.Command there would
+report green. This does not: it parses the file as text, which every runner
+can do for every platform's implementation.
+
+What it refuses is the shape, not a particular call. Anything before wails.Run
+that waits on a process without a deadline puts FairDrop back where the Epic 3
+retrospective found it (B8) -- no window, no fatal dialog, no log line, and
+nothing D-107 built able to reach it, because none of that machinery is
+running yet.
+*/
+func TestEveryPreWindowSubprocessIsBounded(t *testing.T) {
+	// Every file that runs before wails.Run and may reach outside the process.
+	// A new one belongs here; that is the point of naming them rather than
+	// globbing, so adding an unbounded reader is a deliberate act.
+	for _, name := range []string{"theme_darwin.go", "theme_windows.go", "theme_other.go"} {
+		source, err := os.ReadFile(name)
+		if err != nil {
+			t.Errorf("read %s: %v -- a pre-window reader this test cannot see is one it cannot pin", name, err)
+			continue
+		}
+		text := string(source)
+
+		if !strings.Contains(text, "exec.") {
+			continue // no subprocess at all: nothing here can hang on one.
+		}
+		if strings.Contains(text, "exec.Command(") {
+			t.Errorf("%s calls exec.Command without a context: a subprocess that never returns blocks "+
+				"main() before wails.Run, so FairDrop shows no window, no fatal dialog and no log line",
+				name)
+		}
+		if !strings.Contains(text, "exec.CommandContext(") {
+			t.Errorf("%s reaches exec without CommandContext, so nothing bounds the call", name)
+		}
+		if !strings.Contains(text, "context.WithTimeout(") {
+			t.Errorf("%s passes a context to its subprocess but never gives one a deadline, which bounds "+
+				"nothing: cancellation has to come from somewhere", name)
+		}
 	}
 }

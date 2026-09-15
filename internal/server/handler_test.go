@@ -102,6 +102,43 @@ func TestRejectedRequestsNeverReachClaimLogic(t *testing.T) {
 	readBody(t, response)
 }
 
+// TestEveryRejectionCarriesTheCrossOriginHeader pins the value, which the
+// indistinguishability test below structurally cannot.
+//
+// That test renders each rejection and compares them to each other, taking the
+// first as its reference -- so every rejection missing this header is exactly
+// as indistinguishable as every rejection carrying it, and deleting the header
+// left the whole package green (Epic 3 retrospective, B3). Indistinguishable
+// from each other and correct are two different claims, and only one of them
+// was being made.
+//
+// D-018: without it a receiver page fetched from anywhere reads every
+// rejection as one opaque network error, when the server has already
+// distinguished a wrong token from a consumed one from a busy sender.
+func TestEveryRejectionCarriesTheCrossOriginHeader(t *testing.T) {
+	t.Parallel()
+
+	server := newTestServer(t, &stubPayloads{})
+	handle := startTestServer(t, server, &stubAuthorizer{})
+
+	shapes := map[string]struct {
+		method string
+		url    string
+	}{
+		"wrong token":               {http.MethodGet, downloadURL(handle.Port, strings.Repeat("b", len(testToken)))},
+		"wrong path":                {http.MethodGet, baseURL(handle.Port) + "/nope"},
+		"right token, wrong method": {http.MethodPost, downloadURL(handle.Port, string(testToken))},
+	}
+
+	for name, shape := range shapes {
+		response := do(t, shape.method, shape.url)
+		if got := response.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+			t.Errorf("%s: Access-Control-Allow-Origin = %q, want %q -- a cross-origin receiver "+
+				"reads this rejection as an opaque network error", name, got, "*")
+		}
+	}
+}
+
 // TestRejectionsAreIndistinguishable pins the disclosure rule: a caller with a
 // wrong token learns nothing a caller with a wrong path does not.
 func TestRejectionsAreIndistinguishable(t *testing.T) {
@@ -422,6 +459,15 @@ func TestSuccessfulDownloadServesHeadersBodyAndOneCompleteEvent(t *testing.T) {
 		"X-Content-Type-Options":      "nosniff",
 		"Content-Type":                "application/octet-stream",
 		"Content-Length":              strconv.Itoa(len(body)),
+		// D-018, and literal on purpose. A cross-origin receiver page sees
+		// only the CORS-safelisted response headers unless the server names
+		// the rest, so without Expose-Headers it cannot read the filename off
+		// Content-Disposition; and Accept-Ranges states on the wire that a
+		// capability the first request consumed must not be range-retried.
+		// Both shipped unpinned until the Epic 3 retrospective deleted each
+		// one against a green repository (B3).
+		"Access-Control-Expose-Headers": "Content-Disposition",
+		"Accept-Ranges":                 "none",
 	}
 	for name, want := range headers {
 		if got := response.Header.Get(name); got != want {
