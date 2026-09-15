@@ -771,3 +771,38 @@ describe('a live terminal outcome is cancellable', () => {
         expect(JSON.stringify(hook.result.current.state)).not.toContain('token=secret')
     })
 })
+
+/*
+  The one command a view issues on its own behalf, wired end to end.
+
+  The staged view proves it calls this, and the reducer proves what the action
+  does; without a test here the middle was a seam nobody drove -- a
+  reportCopyFailure that dispatched nothing passed all 519 other tests.
+*/
+describe('a failed clipboard write reaches the reducer', () => {
+    async function driveToStaged(hook: {result: {current: ReturnType<typeof useTransfer>}}) {
+        mocks.stageTransfer.mockResolvedValue(metadata())
+        await act(async () => { await hook.result.current.stage('C:\\report.pdf') })
+    }
+
+    it('shows the registry message for the staged session', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToStaged(hook)
+
+        act(() => { hook.result.current.reportCopyFailure(sessionId) })
+
+        const state = hook.result.current.state
+        expect(state.phase).toBe('staged')
+        expect(state.phase === 'staged' ? state.commandError?.code : null).toBe('clipboard_failed')
+    })
+
+    it('ignores a rejection carrying a session that is not the staged one', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToStaged(hook)
+        const before = hook.result.current.state
+
+        act(() => { hook.result.current.reportCopyFailure('ffffffffffffffffffffffffffffffff') })
+
+        expect(hook.result.current.state).toBe(before)
+    })
+})

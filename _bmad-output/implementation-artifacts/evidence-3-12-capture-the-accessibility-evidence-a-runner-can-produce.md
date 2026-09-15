@@ -87,6 +87,12 @@ render time against whatever is behind it, so the pair the user reads is not the
 publishes and no token-level assertion can see the difference. The state is carried instead by the
 label change, the cursor, and the hover rule that pins the control to its resting appearance.
 
+**A seam of my own, found the same way.** With the view proving it calls
+`reportCopyFailure` and the reducer proving what the action does, the controller between them was
+untested: a `reportCopyFailure` that dispatched nothing passed all 519 other tests. Both ends of a
+chain can be pinned while the middle is decorative -- which is the fourth vacuous-test pattern this
+project keeps rediscovering. M18 and M19 close it.
+
 **Two findings needed no change, which is also a result.** The transition effect's missing
 dependency array is deliberate — it observes commits rather than state, and returns early when the
 state is unchanged, which is what makes it a transition observer at all. D-059's dead terminal
@@ -135,6 +141,8 @@ Findings and pins (jsdom, Go):
 | M15 | the browser suite moves onto the Linux adapter job | KILLED — `Linux adapter job contains forbidden desktop/frontend step "playwright"` |
 | M16 | the Playwright cache key loses its pinned version | KILLED — `a stale cache would be restored across upgrades` |
 | M17 | the browser suite moves above `wails build` | KILLED — the step-order pin, and `does not run after wails build finished` |
+| M18 | `reportCopyFailure` dispatches nothing | KILLED — `shows the registry message for the staged session` |
+| M19 | it dispatches the live session instead of the caller's | KILLED — `ignores a rejection carrying a session that is not the staged one` |
 
 ## What the subagent produced, and what it left
 
@@ -156,7 +164,7 @@ Read stage by stage:
 - `gofmt -l .`; `go vet ./...`; `go tool staticcheck ./...` — clean
 - `go test -count=1 ./...` — 8 packages ok
 - `cd frontend && npx tsc --noEmit -p tsconfig.json` — clean, the browser project included
-- `npx vitest run` (jsdom) — 519 passing in 17 files
+- `npx vitest run` (jsdom) — 521 passing in 17 files
 - `npm run test:browser` (Chromium) — 8 passing
 - Native gate: run 34796962306 at `b8fb09a`, three jobs, all success
 
