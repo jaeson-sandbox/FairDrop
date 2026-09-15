@@ -374,6 +374,10 @@ func (p *payload) WriteTo(ctx context.Context, dst io.Writer) error {
 	// io.Reader permits (0, nil) indefinitely. payloadFile is an injectable
 	// seam, so a source that never progresses must end the stream rather than
 	// spin a core until the context happens to be cancelled.
+	//
+	// One of three read/stall/context/write copy loops shared across this
+	// package -- see archive.drain's comment in archive.go for why this one,
+	// drain, and writeArchiveFile stay independent instead of sharing a helper.
 	stalls := 0
 	for remaining > 0 {
 		if err := contextError(ctx); err != nil {

@@ -669,11 +669,18 @@ func TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic(t *testing.T) {
 	}
 	close(release)
 	first, second := <-results, <-results
-	if first == nil || second == nil || first != second {
-		t.Fatalf("owner and joined StopBeacon results = (%v, %v), want the same non-nil wrapped error", first, second)
+	// The owner performed the Shutdown directly; the joiner joined that same
+	// pending outcome through joinedStopOutcome, which now allocates its own
+	// wrapper rather than handing back the owner's pointer. Compare text, not
+	// identity: both must still read as the same stop-appropriate description.
+	if first == nil || second == nil || first.Error() != second.Error() {
+		t.Fatalf("owner and joined StopBeacon results = (%v, %v), want the same stop-appropriate description", first, second)
 	}
 	if !errors.Is(first, cleanupFailure) || transfer.ErrorCodeOf(first) != transfer.ErrBeaconWarning {
 		t.Fatalf("joined result = %v, want wrapped cleanup cause and beacon_warning", first)
+	}
+	if !errors.Is(second, cleanupFailure) || transfer.ErrorCodeOf(second) != transfer.ErrBeaconWarning {
+		t.Fatalf("joiner result = %v, want wrapped cleanup cause and beacon_warning", second)
 	}
 }
 
@@ -710,11 +717,26 @@ func TestStopBeaconJoinsFailedStartCleanupAndRecovery(t *testing.T) {
 	}
 	close(release)
 	ownerErr, joinerErr := <-owner, <-joiner
-	if ownerErr == nil || joinerErr == nil || ownerErr != joinerErr {
-		t.Fatalf("failed-start owner and StopBeacon joiner = (%v, %v), want the same non-nil wrapped error", ownerErr, joinerErr)
+	if ownerErr == nil || joinerErr == nil {
+		t.Fatalf("failed-start owner and StopBeacon joiner = (%v, %v), want two non-nil results", ownerErr, joinerErr)
+	}
+	if transfer.ErrorCodeOf(ownerErr) != transfer.ErrBeaconWarning || transfer.ErrorCodeOf(joinerErr) != transfer.ErrBeaconWarning {
+		t.Fatalf("failed-start owner and joiner codes = (%s, %s), want beacon_warning for both -- the joiner's code is registry-governed and must pass through unchanged", transfer.ErrorCodeOf(ownerErr), transfer.ErrorCodeOf(joinerErr))
 	}
 	if !errors.Is(ownerErr, startFailure) || !errors.Is(ownerErr, cleanupFailure) {
 		t.Fatalf("failed-start result = %v, want both start and cleanup causes", ownerErr)
+	}
+	if !errors.Is(joinerErr, startFailure) || !errors.Is(joinerErr, cleanupFailure) {
+		t.Fatalf("joined failed-start result = %v, want both start and cleanup causes preserved through the join rewrap", joinerErr)
+	}
+	// The owner asked StartBeacon to start and is told the truth: it did not.
+	// The joiner asked StopBeacon to stop and must never be told that instead
+	// -- this is exactly the defect the join rewrap exists to fix.
+	if !strings.Contains(ownerErr.Error(), "did not start") {
+		t.Fatalf("owner result = %v, want it to still describe the start that failed", ownerErr)
+	}
+	if strings.Contains(joinerErr.Error(), "did not start") {
+		t.Fatalf("joiner result = %v, a StopBeacon caller must never be told discovery did not start", joinerErr)
 	}
 	if got := firstHandle.calls(); got != 1 {
 		t.Fatalf("partial-handle Shutdown calls = %d, want one", got)
