@@ -1388,7 +1388,9 @@ So that I am not asked to classify my thing before I have chosen it.
 
 **Owner decision, 2026-09-13 (hierarchy):** the drop zone keeps the top of the page and its `h1`, visually calmed but not demoted. FR23 stays as written -- firewall guidance ahead of the selection controls -- so the browse control stays below it, which is why it must not be the loudest thing on the screen. Rejected: promoting browse above the firewall guidance, which would have meant renegotiating a frozen requirement; and quieting both, which leaves Idle with no confident affordance on the one screen where the user has not acted yet.
 
-**Closes:** D-113.
+**Closes:** D-113, D-114.
+
+**Added 2026-09-14 by Story 3.12:** D-114 -- a successful copy renames the Copy download link button to "Copied" for the rest of the staged session, so the one control that reaches the capability URL loses the name that says what it does. It arrives here rather than in 3.12 because every available fix is a design decision: swapping the label back needs a trigger `EXPERIENCE.md` does not sanction, keeping the accessible name while showing "Copied" breaks label-in-name, and moving the confirmation beside the button changes a control `DESIGN.md` lays out. This story already has the owner's attention on the staged surface and on what a control's label promises.
 
 **Acceptance Criteria:**
 

@@ -18,6 +18,14 @@ interface StagedViewProps {
      * Optional so the view still renders standalone.
      */
     readonly onAnnounce?: (sessionId: string, text: string) => void
+    /**
+     * Reports a clipboard write that failed.
+     *
+     * The command's rejection has nowhere else to go: `commandError` is reducer
+     * state, and this is the only thing that issues the command. Optional for
+     * the same reason `onAnnounce` is -- the view still renders standalone.
+     */
+    readonly onCopyFailed?: (sessionId: string) => void
 }
 
 /**
@@ -31,7 +39,7 @@ interface StagedViewProps {
  * `data:image/png;base64,` is prepended here, at render, and nowhere else. The
  * reducer holds the bare base64 payload the backend produced.
  */
-export function StagedView({state, onCancel, onAnnounce}: StagedViewProps) {
+export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedViewProps) {
     const {metadata} = state
     const warnings = selectWarnings(state)
     const commandError = selectCommandError(state)
@@ -68,15 +76,23 @@ export function StagedView({state, onCancel, onAnnounce}: StagedViewProps) {
      * on Windows only. The Wails runtime clipboard works on both.
      *
      * A write that never happened is still never reported as one: the label
-     * changes, and the announcer speaks, only after the command resolves.
+     * changes, and the announcer speaks, only after the command resolves -- and
+     * the confirmation is cleared before each attempt, so a failure can never be
+     * read beside a `Copied` left standing by an earlier success.
+     *
+     * The rejection is reported rather than discarded. `clipboard_failed` has
+     * had a registry message and a heading since Story 3.11 and no way to reach
+     * a user, which made a clipboard the OS refused indistinguishable from one
+     * it accepted.
      */
     const handleCopy = () => {
+        setCopied(false)
         void Promise.resolve()
             .then(() => CopyToClipboard(metadata.url))
             .then(() => {
                 setCopied(true)
                 onAnnounce?.(state.session.sessionId, copy.copy.confirmation)
-            }, () => undefined)
+            }, () => onCopyFailed?.(state.session.sessionId))
     }
 
     return (

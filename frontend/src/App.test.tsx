@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     selectDirectory: vi.fn(),
     rejectSelection: vi.fn(),
     cancel: vi.fn(),
+    reportCopyFailure: vi.fn(),
     dismissRetained: vi.fn(),
 }))
 
@@ -186,6 +187,7 @@ const commands: ControllerCommands = {
     selectDirectory: mocks.selectDirectory,
     cancel: mocks.cancel,
     rejectSelection: mocks.rejectSelection,
+    reportCopyFailure: mocks.reportCopyFailure,
     dismissRetained: mocks.dismissRetained,
 }
 
@@ -619,6 +621,40 @@ describe('announcer-owned transitions', () => {
         expect(screen.getByRole('main').getAttribute('data-transfer-phase')).toBe('staged')
     })
 
+    /*
+      Two owners for one moment, arriving in the wrong order.
+
+      `cancel-requested` is a spoken row: the announcer says "Canceling…" and
+      that is the only acknowledgement the user gets that the request was
+      heard. A clipboard command already in flight resolved a moment later and
+      replaced it with "Copied" -- an answer to a question they had stopped
+      asking, and the cancellation then had no acknowledgement at all. Found by
+      the Blind Hunter layer re-run (D-109).
+    */
+    it('keeps the cancellation acknowledgement when a copy resolves behind it', async () => {
+        const view = mountWith(stagedState)
+        const copy = screen.getByRole('button', {name: 'Copy download link'})
+        transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
+        expect(announcer().textContent).toBe('Canceling…')
+
+        await act(async () => { fireEvent.click(copy) })
+
+        expect(mocks.copyToClipboard).toHaveBeenCalledWith(metadata.url)
+        expect(announcer().textContent).toBe('Canceling…')
+    })
+
+    it('hands the staged view the reporter a failed clipboard write needs', async () => {
+        mocks.copyToClipboard.mockRejectedValue(new Error('denied'))
+        mountWith(stagedState)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        })
+
+        expect(mocks.reportCopyFailure).toHaveBeenCalledWith(sessionId)
+        expect(announcer().textContent).toBe('')
+    })
+
     it('empties the announcer again on the next focus-owned transition', () => {
         const view = mountWith(stagedState)
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
@@ -834,6 +870,14 @@ describe('a live terminal outcome is never a dead end', () => {
     // message, and nothing to press. Cancel is what clears the terminal lease
     // on the backend, which is why that is what the control does here rather
     // than a local dismissal that would only hide a session still held.
+    //
+    // This mounts App against a mocked controller, so what it proves is the
+    // wiring: the control exists, it is Cancel rather than a local dismissal,
+    // and the retained path is untouched. It proves nothing about whether the
+    // real hook acts on it -- and for six days it did not, because cancel()
+    // returned immediately from a terminal phase. useTransfer.test.tsx's
+    // "a live terminal outcome is cancellable" drives the real hook and is the
+    // half that would have caught it.
     it('offers a control on a live Done that cancels the held session', () => {
         mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done'}} as TransferState)
 

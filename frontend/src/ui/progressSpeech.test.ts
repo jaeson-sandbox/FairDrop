@@ -1,3 +1,5 @@
+import {readFileSync, readdirSync} from 'node:fs'
+import {resolve} from 'node:path'
 import {describe, expect, it} from 'vitest'
 import {selectProgressSnapshot, type ProgressSelection} from '../transfer/selectors'
 import {
@@ -36,13 +38,36 @@ const empty: ProgressSelection = selectProgressSnapshot({
 
 const mib = 1024 * 1024
 
+// The one design folder, located the way styles.test.ts locates DESIGN.md:
+// by discovery rather than by a hardcoded dated path, so a re-dated folder
+// fails loudly here instead of silently skipping the assertions below.
+function experienceSpinePath(): string {
+    // Vitest roots at frontend/, the same anchor styles.test.ts uses to find DESIGN.md.
+    const designs = resolve(process.cwd(), '..', '_bmad-output', 'planning-artifacts', 'ux-designs')
+    const folders = readdirSync(designs).filter((entry) => entry.startsWith('ux-'))
+
+    expect(folders, 'a ux-* design folder').toHaveLength(1)
+    return resolve(designs, folders[0], 'EXPERIENCE.md')
+}
+
+
 describe('the assistive progress throttle', () => {
     /*
-      EXPERIENCE.md reads per-mode -- "10 percentage points for known totals or
-      10 MiB of new wire bytes for unknown totals" -- while the spec's frozen
-      Always clause reads cross-mode, and the implementation follows the spec.
-      Neither reading was pinned, so rewriting this to one threshold per mode
-      passed the whole suite. This case is the difference between them.
+      The case where the two readings of the threshold differ.
+
+      EXPERIENCE.md used to read per-mode -- "10 percentage points for known
+      totals or 10 MiB of new wire bytes for unknown totals" -- while the
+      implementation applied both thresholds in both modes. Nothing pinned
+      either reading, so the UX contract and the shipped behaviour disagreed
+      for two epics and a rewrite to one threshold per mode would have passed
+      the whole suite. Found by the Blind Hunter layer re-run that Story 1.10
+      never got (D-109).
+
+      Settled on 2026-09-14 by keeping the code and correcting the spine: a
+      known total that is large and slow gains bytes without gaining percentage
+      points, so the per-mode reading meant minutes of silence, and the
+      five-second floor already caps how often the extra threshold can speak.
+      The test below is the behaviour; the test after it is the spine.
     */
     it('speaks a known total that gained bytes without gaining percentage points', () => {
         const memory = {spokenAtMs: 0, percent: 0, bytesSent: 0}
@@ -156,5 +181,38 @@ describe('what a progress update says', () => {
         expect(progressSpeechIntervalMs).toBe(5_000)
         expect(progressSpeechPercentPoints).toBe(10)
         expect(progressSpeechBytes).toBe(10 * mib)
+    })
+})
+
+/*
+  The UX contract has to keep saying what the throttle does.
+
+  Nothing connected EXPERIENCE.md's sentence to progressSpeech.ts, which is how
+  they came to disagree unnoticed. This reads the spine the same way
+  styles.test.ts reads DESIGN.md's contrast figures: the document is the
+  artefact under test, and a silent edit to either side fails here.
+*/
+describe('the spine describes the throttle it documents', () => {
+    it('states the thresholds as cross-mode, matching isMeaningfulChange', () => {
+        const spine = readFileSync(experienceSpinePath(), 'utf8')
+
+        const sentence = spine.split(/\r?\n/).find((line) => line.includes('Assistive progress speech is separate'))
+        expect(sentence, 'the assistive-speech sentence').toBeTruthy()
+        expect(sentence).toContain('in either mode')
+        expect(sentence).not.toContain('for known totals or 10 MiB of new wire bytes for unknown totals')
+    })
+
+    it('names the same two numbers the code enforces', () => {
+        const spine = readFileSync(experienceSpinePath(), 'utf8')
+
+        expect(spine).toContain(`${progressSpeechPercentPoints} percentage points`)
+        expect(spine).toContain(`${progressSpeechBytes / mib} MiB`)
+        // The spine spells the interval and writes the other two as numerals.
+        // Keyed lookup rather than a numeral: an interval with no spelling here
+        // fails on the missing key instead of quietly matching nothing.
+        const spelled: Record<number, string> = {5: 'five'}
+        const seconds = progressSpeechIntervalMs / 1000
+        expect(spelled[seconds], `a spelling for ${seconds} seconds`).toBeTruthy()
+        expect(spine).toContain(`every ${spelled[seconds]} seconds`)
     })
 })

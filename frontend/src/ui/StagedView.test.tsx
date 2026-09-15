@@ -247,6 +247,66 @@ describe('copy feedback', () => {
         expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe(capabilityURL)
         expect(document.querySelector('[role="alert"]')).toBeNull()
     })
+
+    /*
+      A rejection the user can act on, rather than one only the console sees.
+
+      Story 3.11 gave the clipboard write its own registry code, message and
+      heading. Nothing consumed them: this view discarded the rejection, so an
+      OS that refused the clipboard produced exactly the same screen as one
+      that accepted it -- the shipped path for `clipboard_failed` ended in a
+      `() => undefined`. Found by the Blind Hunter layer re-run (D-109).
+    */
+    it('reports a rejected clipboard write with the session that issued it', async () => {
+        const onCopyFailed = vi.fn()
+        writeText.mockRejectedValue(new Error('denied'))
+        render(<StagedView state={staged()} onCancel={vi.fn()} onCopyFailed={onCopyFailed}/>)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        })
+
+        expect(onCopyFailed).toHaveBeenCalledTimes(1)
+        expect(onCopyFailed).toHaveBeenCalledWith(sessionId)
+    })
+
+    it('does not report a clipboard write that resolved', async () => {
+        const onCopyFailed = vi.fn()
+        render(<StagedView state={staged()} onCancel={vi.fn()} onCopyFailed={onCopyFailed}/>)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        })
+
+        expect(onCopyFailed).not.toHaveBeenCalled()
+    })
+
+    /*
+      The confirmation describes the last attempt, not the best one.
+
+      `Copied` was set on success and never cleared, so a second copy that the
+      OS refused left a success label standing over a failure notice -- the one
+      thing this control's own contract ("a write that never happened is still
+      never reported as one") promises it will not do.
+    */
+    it('clears an earlier confirmation when a later write rejects', async () => {
+        const onCopyFailed = vi.fn()
+        render(<StagedView state={staged()} onCancel={vi.fn()} onCopyFailed={onCopyFailed}/>)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        })
+        expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
+
+        writeText.mockRejectedValue(new Error('denied'))
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copied'}))
+        })
+
+        expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+        expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
+        expect(onCopyFailed).toHaveBeenCalledWith(sessionId)
+    })
 })
 
 describe('trust disclosures', () => {

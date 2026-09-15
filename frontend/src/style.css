@@ -355,9 +355,25 @@ body {
   aria-disabled is a promise to everyone, not only to assistive technology: the
   control still takes focus and still answers a second activation with nothing,
   so it has to look like it.
+
+  It looks like it without dimming. This rule carried `opacity: 0.7`, which
+  multiplied whichever text pair the control was already using and published no
+  figure for the result: the quiet Cancel button is muted on elevated, a pair
+  the contrast table above publishes at 4.504478335:1 light, and at 0.7 that
+  composites to 2.6447:1 light and 4.0133:1 dark -- both under the 4.5:1 floor,
+  on the one label that says a cancellation is in progress. No opacity below 1
+  could have cleared it either: the light pair has four thousandths of headroom
+  at full strength. DESIGN.md's palette table settles it in one line -- "Muted
+  is readable copy, never disabled text."
+
+  What carries the state instead is already there and costs no contrast: the
+  label itself changes (Cancel -> Canceling…, Cancel preparation -> Canceling
+  preparation…), the pointer stops being a pointer, and the rule below pins the
+  control to its resting appearance so it visibly does not answer a hover.
+  styles.test.ts refuses a fractional opacity on a text-bearing rule now, so a
+  future dim has to publish its pair rather than quietly halve one.
 */
 .fd-button[aria-disabled='true'] {
-    opacity: 0.7;
     cursor: default;
 }
 
@@ -620,25 +636,36 @@ body {
 }
 
 /*
-  A readonly <input>, not a div wearing a textbox role. Its activation floor
-  comes from the shared .fd-target rule rather than a duplicated size here, and
-  it fills its grid column so the field can never set the row's width.
+  A readonly <textarea>, not a div wearing a textbox role: assistive technology
+  reads the value of a real form control reliably and disagrees about the other.
+  A textarea rather than an input because the value has to wrap -- at 320px
+  under 200% text a single-line field shows a fraction of the capability URL,
+  and that URL is the fallback when the QR cannot be scanned.
+
+  Its activation floor comes from the shared .fd-target rule rather than a
+  duplicated size here, and it fills its grid column so the field can never set
+  the row's width.
 */
 .fd-url {
     inline-size: 100%;
-    /*
-      A textarea, not an input, because the value has to wrap: at 320px under
-      200% text a single-line field shows a fraction of the capability URL, and
-      that URL is the fallback when the QR cannot be scanned.
-    */
     resize: none;
-    overflow-wrap: anywhere;
     /*
-      Required, not decorative: an input has an intrinsic minimum size, so as a
-      grid item it refuses to shrink below roughly twenty characters and forces
-      a page-level horizontal scrollbar at the 320px reflow floor. The div this
-      replaced carried the same declaration.
+      This is what actually holds the 320px reflow floor, measured in Chromium
+      (D-068's rendered suite): `anywhere` lets the field's min-content width
+      fall to a single character, so the capability URL -- one unbroken token --
+      cannot widen the grid track.
+
+      `min-inline-size: 0` below and `minmax(0, 1fr)` on .fd-direct-row are the
+      two standard floors for a grid item that would otherwise refuse to shrink.
+      Removing either one, or both, changes no measurement today, because this
+      declaration already got there first. They stay as depth: an edit that
+      narrows the wrapping -- to `break-word`, say, which leaves an unbreakable
+      token intrinsically wide -- lands on them rather than on a horizontal
+      scrollbar. An earlier comment here claimed min-inline-size was itself
+      load-bearing and named a scrollbar it would prevent; the rendered suite
+      disagreed, and the rule stays while the claim does not.
     */
+    overflow-wrap: anywhere;
     min-inline-size: 0;
     padding: var(--spacing-3);
     border: 1px solid var(--color-control-border);

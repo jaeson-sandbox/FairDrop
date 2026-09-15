@@ -39,6 +39,12 @@ env:
   # so its version is pinned here rather than left to whatever `@latest`
   # resolves to on a given day.
   WAILS_VERSION: 'v2.15.0'
+  # Same reasoning for the browser the accessibility rendered suite drives:
+  # frontend/package.json pins the exact npm versions of playwright and its
+  # Vitest provider, and this pins the Chromium build `playwright install`
+  # fetches, so a cache restore can never silently serve a different build.
+  PLAYWRIGHT_VERSION: '1.63.0'
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
 
 jobs:
   verify:
@@ -198,6 +204,33 @@ jobs:
       - name: Frontend suite
         working-directory: frontend
         run: npm test
+
+      - name: Cache the Playwright Chromium download
+        id: cache-playwright
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: playwright-${{ env.PLAYWRIGHT_VERSION }}-chromium-${{ runner.os }}-${{ runner.arch }}
+
+      # The rendered accessibility suite's browser only -- desktop-only like the
+      # suite itself, and never wails build's frontend:install (that installs
+      # npm packages, this fetches the Chromium binary frontend/package.json's
+      # pinned playwright and @vitest/browser-playwright versions already
+      # resolved). A cache hit skips this entirely.
+      - name: Install the Playwright Chromium browser
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        working-directory: frontend
+        run: npx playwright install chromium
+
+      # A real Chromium, not jsdom: 320px reflow, 200% text, the 44px target
+      # floor and forced-colors all need actual layout and media-query
+      # evaluation, which the Frontend suite step above (jsdom) cannot give
+      # them. Its own step, after wails build already finished and well clear
+      # of it in the step list, per the spec's "never run the browser suite
+      # concurrently with wails build".
+      - name: Accessibility browser suite
+        working-directory: frontend
+        run: npm run test:browser
 
       - name: Line-ending check
         run: |

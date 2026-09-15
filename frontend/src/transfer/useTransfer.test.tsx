@@ -702,3 +702,107 @@ describe('native browse commands', () => {
         expect(mocks.cancelTransfer).not.toHaveBeenCalled()
     })
 })
+
+/*
+  D-059's control, driven through the real hook.
+
+  Story 3.6 made a live Done or Error always carry a control, because a lost
+  transfer-reset would otherwise strand the window with no way out. App wires
+  that control to cancel(). What nothing checked was whether cancel() does
+  anything from a terminal phase -- and until 2026-09-14 it did not: the guard
+  for staged/transferring sent it straight back, so the control rendered and
+  was inert, which is the same stranded window with a button on it.
+
+  The test that was supposed to cover this mocks useTransfer entirely and
+  asserts the mock's cancel was called. That proves App's wiring and nothing
+  about the hook, which is exactly how this survived being written and
+  reviewed. This drives the real reducer into `done` with real lifecycle events
+  and requires the backend command to actually be invoked.
+*/
+describe('a live terminal outcome is cancellable', () => {
+    async function driveToDone(hook: {result: {current: ReturnType<typeof useTransfer>}}) {
+        mocks.stageTransfer.mockResolvedValue(metadata())
+        await act(async () => { await hook.result.current.stage('C:\report.pdf') })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        })
+    }
+
+    it('invokes the backend cancel from a live done outcome', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+        expect(hook.result.current.state.phase).toBe('done')
+
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        await act(async () => { await hook.result.current.cancel() })
+
+        expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not issue a second cancel for the same terminal session', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+
+        const pending = deferred<void>()
+        mocks.cancelTransfer.mockReturnValue(pending.promise)
+        let first!: Promise<void>
+        let second!: Promise<void>
+        act(() => {
+            first = hook.result.current.cancel()
+            second = hook.result.current.cancel()
+        })
+        await act(async () => {
+            pending.resolve()
+            await Promise.all([first, second])
+        })
+
+        expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves the outcome on screen when the backend refuses', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+
+        mocks.cancelTransfer.mockRejectedValue(new Error(String.raw`C:PRIVATE?token=secret`))
+        await act(async () => { await hook.result.current.cancel() })
+
+        expect(hook.result.current.state.phase).toBe('done')
+        expect(JSON.stringify(hook.result.current.state)).not.toContain('token=secret')
+    })
+})
+
+/*
+  The one command a view issues on its own behalf, wired end to end.
+
+  The staged view proves it calls this, and the reducer proves what the action
+  does; without a test here the middle was a seam nobody drove -- a
+  reportCopyFailure that dispatched nothing passed all 519 other tests.
+*/
+describe('a failed clipboard write reaches the reducer', () => {
+    async function driveToStaged(hook: {result: {current: ReturnType<typeof useTransfer>}}) {
+        mocks.stageTransfer.mockResolvedValue(metadata())
+        await act(async () => { await hook.result.current.stage('C:\\report.pdf') })
+    }
+
+    it('shows the registry message for the staged session', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToStaged(hook)
+
+        act(() => { hook.result.current.reportCopyFailure(sessionId) })
+
+        const state = hook.result.current.state
+        expect(state.phase).toBe('staged')
+        expect(state.phase === 'staged' ? state.commandError?.code : null).toBe('clipboard_failed')
+    })
+
+    it('ignores a rejection carrying a session that is not the staged one', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToStaged(hook)
+        const before = hook.result.current.state
+
+        act(() => { hook.result.current.reportCopyFailure('ffffffffffffffffffffffffffffffff') })
+
+        expect(hook.result.current.state).toBe(before)
+    })
+})

@@ -57,6 +57,7 @@ const commands: ControllerCommands = {
     selectDirectory: mocks.noop,
     cancel: mocks.noop,
     rejectSelection: mocks.noop,
+    reportCopyFailure: mocks.noop,
     dismissRetained: mocks.noop,
 }
 
