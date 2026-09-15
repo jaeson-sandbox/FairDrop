@@ -198,3 +198,76 @@ func TestSelectionResolutionCancellationAtResolverReturn(t *testing.T) {
 		t.Fatal("cancelled result reached raw Inspect or network instead of cancelled refusal")
 	}
 }
+
+/*
+TestAncestorResolutionKeepsTheSelectionWhenEvalFails pins what an unreadable
+ancestor leaves behind.
+
+resolveAncestorsWith exists to spell a selection's ancestors through their real
+directories -- macOS reaches its temporary directory through /var, a symlink --
+and it must not invent a path when it cannot. On an eval failure it returns the
+selection exactly as the picker gave it, so the source layer below refuses it
+with its own coded error rather than this decorator refusing something the user
+never chose.
+
+Every other test here stubs the outer resolve field or supplies a filesystem
+where eval succeeds, so this branch was never executed: the Epic 3
+retrospective replaced it with a path built from a zero-value parent and the
+whole repository stayed green (B5). The window is real and the function's own
+comment names it -- an ancestor can be removed or become unreadable between the
+picker returning and Stage resolving.
+*/
+func TestAncestorResolutionKeepsTheSelectionWhenEvalFails(t *testing.T) {
+	t.Parallel()
+
+	selected := filepath.Join(absoluteRoot()+"Users", "someone", "Documents", "Travel Notes.pdf")
+
+	calls := 0
+	got := resolveAncestorsWith(selected, func(string) (string, error) {
+		calls++
+		return "", os.ErrNotExist
+	})
+
+	if calls != 1 {
+		t.Fatalf("eval was called %d times, want 1 -- this test can only pin a branch it reaches", calls)
+	}
+	if got != selected {
+		t.Errorf("an unreadable ancestor resolved to %q, want the selection unchanged (%q): a path built "+
+			"from a parent that never resolved is a path the user did not choose", got, selected)
+	}
+}
+
+/*
+TestAncestorResolutionSpellsTheAncestorItResolved is the other half, and the
+reason the test above cannot stand alone: a resolveAncestorsWith that ignored
+eval entirely and always returned its argument would satisfy it.
+*/
+func TestAncestorResolutionSpellsTheAncestorItResolved(t *testing.T) {
+	t.Parallel()
+
+	leaf := "Travel Notes.pdf"
+	parent := filepath.Join(absoluteRoot()+"real", "documents")
+	selected := filepath.Join(parent+"-link", leaf)
+
+	got := resolveAncestorsWith(selected, func(ancestor string) (string, error) {
+		if !strings.HasSuffix(strings.TrimRight(ancestor, string(os.PathSeparator)), "documents-link") {
+			t.Errorf("eval was asked for %q, want the selection's ancestor", ancestor)
+		}
+		return parent, nil
+	})
+
+	if want := filepath.Join(parent, leaf); got != want {
+		t.Errorf("resolved to %q, want %q -- the leaf must be rejoined onto the resolved ancestor", got, want)
+	}
+}
+
+// absoluteRoot is the prefix that makes a joined test path absolute on this
+// platform. filepath.Join("C:", "Users") produces the drive-RELATIVE "C:Users",
+// which resolveAncestorsWith correctly declines to treat as an ancestor -- so
+// a test that used it would silently never reach the branch it names.
+func absoluteRoot() string {
+	if runtime.GOOS == "windows" {
+		return `C:\`
+	}
+	return "/"
+}
