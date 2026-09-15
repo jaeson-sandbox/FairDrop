@@ -69,6 +69,7 @@ development_status:
 
   epic-4: backlog
   4-1-replace-the-two-browse-controls-with-one: backlog
+  4-2-close-what-the-epic-3-retrospective-found: in-progress
   epic-3-retrospective: done
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
