@@ -126,6 +126,7 @@ function renderTransferring(): HTMLElement {
 afterEach(async () => {
     cleanup()
     document.documentElement.style.cssText = ''
+    document.getElementById(textSpacingStyleId)?.remove()
     await page.viewport(1024, 800)
     await setForcedColorsActive(false)
 })
@@ -181,6 +182,69 @@ function doubleTextTokens(): void {
         if (Number.isNaN(px)) throw new Error(`${token} did not resolve to a px value to double`)
         root.style.setProperty(token, `${px * 2}px`)
     }
+}
+
+const textSpacingStyleId = 'wcag-1-4-12-overrides'
+
+/*
+  WCAG 1.4.12 Text Spacing, applied the way the success criterion means it.
+
+  `DESIGN.md` and `EXPERIENCE.md` both require the layout to survive these four
+  overrides, and EXPERIENCE.md names the values: 1.5x line height, 2x paragraph
+  spacing, 0.12em letter spacing, 0.16em word spacing. The epic required it and
+  nothing checked it -- found by the Epic 3 retrospective (A6).
+
+  This is not the type ramp, and it is deliberately not done the way
+  doubleTextTokens does its job. 1.4.12 is about a *reader's* stylesheet
+  defeating the author's spacing, so the overrides are injected as a stylesheet
+  with `!important`, exactly as the WCAG bookmarklet does. They have to be:
+  style.css declares `letter-spacing` on three selectors, and an author-level
+  rule of equal specificity would simply lose to it, which would leave this
+  suite measuring the shipped spacing and calling it a pass.
+*/
+function applyTextSpacingOverrides(): void {
+    const sheet = document.createElement('style')
+    sheet.id = textSpacingStyleId
+    sheet.textContent = `
+        * {
+            line-height: 1.5 !important;
+            letter-spacing: 0.12em !important;
+            word-spacing: 0.16em !important;
+        }
+        p {
+            margin-block-end: 2em !important;
+        }
+    `
+    document.head.append(sheet)
+}
+
+/**
+ * Proves the overrides are in effect before anything concludes from them.
+ *
+ * A stylesheet that failed to apply -- a typo in a property, a rule the engine
+ * dropped, an id the cleanup removed too early -- would leave every assertion
+ * below measuring the shipped layout and reporting a pass. So the spacing is
+ * read back off a real rendered element and checked against its own font size,
+ * which is what `em` resolves against.
+ */
+function assertTextSpacingIsInEffect(container: HTMLElement): void {
+    const sample = container.querySelector<HTMLElement>('.fd-meta') ?? container
+    const style = getComputedStyle(sample)
+    const fontSize = Number.parseFloat(style.fontSize)
+
+    expect(fontSize, 'a resolved font size to measure the em overrides against').toBeGreaterThan(0)
+    expect(
+        Number.parseFloat(style.letterSpacing) / fontSize,
+        `letter-spacing on ${describeElement(sample)} (${style.letterSpacing} at ${style.fontSize})`,
+    ).toBeCloseTo(0.12, 2)
+    expect(
+        Number.parseFloat(style.wordSpacing) / fontSize,
+        `word-spacing on ${describeElement(sample)} (${style.wordSpacing} at ${style.fontSize})`,
+    ).toBeCloseTo(0.16, 2)
+    expect(
+        Number.parseFloat(style.lineHeight) / fontSize,
+        `line-height on ${describeElement(sample)} (${style.lineHeight} at ${style.fontSize})`,
+    ).toBeCloseTo(1.5, 2)
 }
 
 /**
@@ -283,6 +347,63 @@ describe('200% text (D-068)', () => {
         await page.viewport(1024, 900)
         doubleTextTokens()
         const container = renderTransferring()
+        assertNoHorizontalOverflow(container)
+        assertNoFixedHeightClipsGrownText(container)
+    })
+})
+
+/*
+  The half of the epic's declared requirement that shipped unchecked.
+
+  epic-3-context.md requires "200% text with text-spacing overrides"; DESIGN.md
+  says content containers grow under both; EXPERIENCE.md spells the four values
+  out. Story 3.12 delivered the 200% half because its own I/O matrix named 320
+  pixels, 200% text, targets and forced colors and never named text spacing --
+  so no story was wrong and the requirement stayed half met until the Epic 3
+  retrospective counted it (A6).
+
+  320 pixels is included on purpose rather than for symmetry: wider letters,
+  words and lines are hardest to fit in the narrowest column, and DESIGN.md's
+  own sentence pairs the reflow floor with the spacing overrides.
+*/
+describe('WCAG 1.4.12 text-spacing overrides (D-068)', () => {
+    it('keeps Staged unclipped under all four overrides', async () => {
+        await page.viewport(1024, 900)
+        applyTextSpacingOverrides()
+        const container = renderStaged()
+
+        assertTextSpacingIsInEffect(container)
+        assertNoHorizontalOverflow(container)
+        assertNoFixedHeightClipsGrownText(container)
+    })
+
+    it('keeps Transferring unclipped under all four overrides', async () => {
+        await page.viewport(1024, 900)
+        applyTextSpacingOverrides()
+        const container = renderTransferring()
+
+        assertTextSpacingIsInEffect(container)
+        assertNoHorizontalOverflow(container)
+        assertNoFixedHeightClipsGrownText(container)
+    })
+
+    it('keeps Staged unclipped with the overrides at the 320-pixel reflow floor', async () => {
+        await page.viewport(320, 900)
+        applyTextSpacingOverrides()
+        const container = renderStaged()
+
+        assertTextSpacingIsInEffect(container)
+        assertNoHorizontalOverflow(container)
+        assertNoFixedHeightClipsGrownText(container)
+    })
+
+    it('keeps the overrides and 200% text survivable together', async () => {
+        await page.viewport(1024, 900)
+        doubleTextTokens()
+        applyTextSpacingOverrides()
+        const container = renderStaged()
+
+        assertTextSpacingIsInEffect(container)
         assertNoHorizontalOverflow(container)
         assertNoFixedHeightClipsGrownText(container)
     })
