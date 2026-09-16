@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1081,5 +1082,200 @@ func TestSanitizeProgressEnforcesEveryInvariantItDocuments(t *testing.T) {
 	})
 	if math.IsNaN(nan.Percent) || math.IsInf(nan.SpeedBytesPerSec, 0) {
 		t.Errorf("sanitizeProgress left %+v unmarshalable: a NaN fails JSON encoding and costs the UI the event", nan)
+	}
+}
+
+// TestPublishCoalescesOutstandingObserverCalls is B9.
+//
+// forwardProgress calls publish once per accepted snapshot, and before this
+// story publish ran callBounded directly, which spawned a fresh goroutine and
+// armed a fresh timer on every call. An observer that stopped answering left
+// one abandoned goroutine per snapshot for the rest of the transfer --
+// thousands on a large file. publish now holds at most one outstanding
+// observer call in a slot, the way callAdapterBounded already holds at most
+// one outstanding server or beacon cleanup call.
+//
+// It is deliberately not a join, unlike callAdapterBounded's: two
+// callAdapterBounded callers ask the same idempotent question (is the
+// adapter stopped) and can share one answer, but two publish calls carry two
+// different events, and waiting for the first call would still never deliver
+// the second event's content. So a publish that finds the slot occupied
+// drops its own event and records why, and the slot is proven to self-heal
+// once the abandoned call finally returns -- a permanently stuck slot would
+// silently drop every event for the rest of the session even after the
+// observer recovered.
+func TestPublishCoalescesOutstandingObserverCalls(t *testing.T) {
+	h := newHarness(t)
+
+	blocking := make(chan struct{})
+	resume := make(chan struct{})
+	release := sync.OnceFunc(func() { close(resume) })
+	// A failure that bails out early (t.Fatalf) must not leave the blocked
+	// observer goroutine parked past the end of the test -- release runs
+	// once either way, on the success path below or here.
+	defer release()
+	var once sync.Once
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferProgress {
+			once.Do(func() { close(blocking) })
+			<-resume
+		}
+	}
+
+	metadata := h.transferring()
+
+	h.emit(progressEvent(metadata.SessionID, testProgress(1024, 25)))
+	select {
+	case <-blocking:
+	case <-time.After(mutexProbeTimeout):
+		t.Fatal("first progress never reached the observer")
+	}
+	h.awaitBoundsPending()
+	h.bounds.fire()
+	// The first snapshot's observer call is now abandoned: publish returned
+	// when the bound elapsed, but the goroutine that is actually calling
+	// observer.Publish is still parked on <-release.
+
+	h.emit(progressEvent(metadata.SessionID, testProgress(2048, 50)))
+	// forwardProgress for the second snapshot must find the slot still
+	// occupied and drop its event without ever calling the observer, rather
+	// than starting a second goroutine.
+
+	deadline := time.Now().Add(mutexProbeTimeout)
+	var dropped bool
+	for !dropped {
+		for _, entry := range h.diagnosed.snapshot() {
+			if strings.Contains(entry.message, "an earlier one had not finished") {
+				dropped = true
+				break
+			}
+		}
+		if dropped || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+	if !dropped {
+		t.Fatalf("no diagnostic says a second event was dropped while the first was outstanding; seam saw %+v",
+			h.diagnosed.snapshot())
+	}
+
+	for _, event := range h.observer.published() {
+		if event.Kind == TransferProgress && event.Progress != nil && event.Progress.BytesSent == 2048 {
+			t.Fatalf("the second snapshot reached the observer: %+v -- it should have been dropped while "+
+				"the first call was still outstanding", event)
+		}
+	}
+	if got := h.calls.count("observer.Publish"); got != 2 {
+		t.Fatalf("observer.Publish was called %d times, want 2 (started, first progress) -- the dropped "+
+			"snapshot must never reach the observer at all", got)
+	}
+
+	release()
+	h.awaitPublishSlotClear()
+	// The abandoned call finished on its own and cleared the slot without
+	// anyone joining it, which is what proves this is a cap and not a
+	// permanent one-way valve: a slow-but-eventually-healthy observer must
+	// not cost every later event for the rest of the session.
+
+	h.emit(progressEvent(metadata.SessionID, testProgress(3072, 75)))
+	events := h.awaitEvents(3)
+	if len(events) != 3 {
+		t.Fatalf("published %+v, want started, the first snapshot and the third -- the second was dropped by design", events)
+	}
+	wantKinds := []EventKind{TransferStarted, TransferProgress, TransferProgress}
+	for index, kind := range wantKinds {
+		if events[index].Kind != kind {
+			t.Errorf("event %d is %q, want %q", index, events[index].Kind, kind)
+		}
+	}
+	if got := *events[1].Progress; got != testProgress(1024, 25) {
+		t.Errorf("first delivered snapshot is %+v, want the one sent before the bound elapsed %+v", got, testProgress(1024, 25))
+	}
+	if got := *events[2].Progress; got != testProgress(3072, 75) {
+		t.Errorf("second delivered snapshot is %+v, want the one sent after the slot cleared %+v", got, testProgress(3072, 75))
+	}
+}
+
+/*
+TestADroppedTerminalEventStillSettlesTheSession pins the consequence of the
+slot that TestPublishCoalescesOutstandingObserverCalls establishes, on the one
+event where dropping it matters most.
+
+A terminal event is dropped by the same rule as a progress snapshot and is
+deliberately not exempted: delivering it while an earlier call is still
+outstanding is the concurrent entry into Observer.Publish that the port's
+"synchronous FIFO handoff" forbids, and an observer that has not returned in
+five seconds is not one a terminal event was going to reach anyway.
+
+What must not follow is a coordinator stuck mid-transfer. The event is what is
+lost; the session still settles, the lease still comes back, and a diagnostic
+still says an event could not be delivered. Without that, a wedged observer
+would leave the coordinator unable to start anything else -- which is worse
+than the goroutine accumulation B9 set out to fix.
+*/
+func TestADroppedTerminalEventStillSettlesTheSession(t *testing.T) {
+	h := newHarness(t)
+
+	blocking := make(chan struct{})
+	resume := make(chan struct{})
+	release := sync.OnceFunc(func() { close(resume) })
+	defer release()
+	var once sync.Once
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferProgress {
+			once.Do(func() { close(blocking) })
+			<-resume
+		}
+	}
+
+	metadata := h.transferring()
+
+	h.emit(progressEvent(metadata.SessionID, testProgress(1024, 25)))
+	select {
+	case <-blocking:
+	case <-time.After(mutexProbeTimeout):
+		t.Fatal("first progress never reached the observer")
+	}
+	h.awaitBoundsPending()
+	h.bounds.fire()
+
+	// The observer is still parked inside the first call. The transfer now
+	// finishes, so its terminal event meets an occupied slot.
+	h.emit(completeEvent(metadata.SessionID, testProgress(testSize, 100)))
+
+	settled := false
+	for deadline := time.Now().Add(mutexProbeTimeout); time.Now().Before(deadline); {
+		if h.state() == stateDone {
+			settled = true
+			break
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+	if !settled {
+		t.Errorf("state is %q, want %q -- a dropped event must not leave the coordinator mid-transfer, "+
+			"unable to start anything else", h.state(), stateDone)
+	}
+	// No assertion on the lease here, deliberately. A settled session keeps the
+	// operation lease for its terminal window -- that is the three-second
+	// terminal lease a reset or a Cancel clears, not a symptom of the dropped
+	// event -- so asserting it had come back would be an assertion that is only
+	// sometimes true, which is the concurrency shape this project bans.
+	for _, event := range h.observer.published() {
+		if event.Kind == TransferComplete {
+			t.Errorf("the terminal event reached the observer while an earlier call was outstanding: %+v -- "+
+				"that is the concurrent Publish the port's FIFO contract forbids", event)
+		}
+	}
+
+	var diagnosed bool
+	for _, entry := range h.diagnosed.snapshot() {
+		if strings.Contains(entry.message, "an earlier one had not finished") {
+			diagnosed = true
+		}
+	}
+	if !diagnosed {
+		t.Errorf("a terminal event was dropped with no diagnostic saying so; seam saw %+v",
+			h.diagnosed.snapshot())
 	}
 }
