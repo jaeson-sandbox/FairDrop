@@ -172,7 +172,7 @@ expect_named_failure 'remove mutation gates' TestVerifyWorkflowPinsNativeProofGa
 perl -0pi -e 's/return half\.CloseWrite\(\)/_ = half; return nil/ or die "half-close mutation did not match\n"' internal/server/lifecycle.go
 expect_named_failure 'hide TCP half-close' TestHTTPRejectionsPreserveTCPHalfClose ./internal/server 'finalizing connection hid TCP CloseWrite'
 
-perl -0pi -e 's/if !s\.resolving\.CompareAndSwap\(false, true\)/if false \&\& !s.resolving.CompareAndSwap(false, true)/ or die "resolution ownership mutation did not match\n"' selection_source.go
+perl -0pi -e 's/if !s\.resolving\.CompareAndSwap\(0, gen\)/if false \&\& !s.resolving.CompareAndSwap(0, gen)/ or die "resolution ownership mutation did not match\n"' selection_source.go
 expect_named_failure 'admit multiple unresolved calls' TestSelectionResolutionHonoursAdmissionAndCancellation . 'retry admitted additional unresolved filesystem work'
 
 perl -0pi -e 's/if ctx\.Err\(\) != nil/if false \&\& ctx.Err() != nil/ or die "post-result cancellation mutation did not match\n"' selection_source.go
@@ -255,11 +255,11 @@ expect_named_failure 'do not reset archive drain stalls' TestEmptyReadGuardsFail
 perl -0pi -e 's/if m\.stopping != nil/if false \&\& m.stopping != nil/ or die "network overlap mutation did not match\n"' internal/network/beacon.go
 expect_named_failure 'admit responder during outstanding cleanup' TestWedgedStopDetachesAndCoalescesWithoutPoisoningSelection ./internal/network 'want beacon_warning'
 
-perl -0pi -e 's/<-pending\.done\n\t\treturn pending\.err/<-pending.done\n\t\treturn nil/ or die "beacon join result mutation did not match\n"' internal/network/beacon.go
-expect_named_failure 'drop normal beacon joiner result' TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic ./internal/network 'want the same non-nil wrapped error'
+perl -0pi -e 's/<-pending\.done\n\t\treturn joinedStopOutcome\(pending\.err\)/<-pending.done\n\t\treturn nil/ or die "beacon join result mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'drop normal beacon joiner result' TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic ./internal/network 'want the same stop-appropriate description'
 
-perl -0pi -e 's/<-pending\.done\n\t\treturn pending\.err/<-pending.done\n\t\treturn nil/ or die "failed-start join result mutation did not match\n"' internal/network/beacon.go
-expect_named_failure 'drop failed-start beacon joiner result' TestStopBeaconJoinsFailedStartCleanupAndRecovery ./internal/network 'want the same non-nil wrapped error'
+perl -0pi -e 's/<-pending\.done\n\t\treturn joinedStopOutcome\(pending\.err\)/<-pending.done\n\t\treturn nil/ or die "failed-start join result mutation did not match\n"' internal/network/beacon.go
+expect_named_failure 'drop failed-start beacon joiner result' TestStopBeaconJoinsFailedStartCleanupAndRecovery ./internal/network 'want two non-nil results'
 
 perl -0pi -e 's/if m\.stopping != nil \{/if m.stopping != nil { _, _ = m.deps.start(nil);/ or die "overlap factory mutation did not match\n"' internal/network/beacon.go
 expect_named_failure 'invoke beacon factory before cleanup refusal' TestStopBeaconJoinerReceivesTheOwnersCleanupDiagnostic ./internal/network 'want the original one only'
