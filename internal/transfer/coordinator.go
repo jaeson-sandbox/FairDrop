@@ -608,25 +608,6 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 	c.state = stateClaiming
 	c.mu.Unlock()
 
-	// Stop the beacon before committing, without the mutex. The port
-	// guarantees no advertisement remains on every return, so a diagnostic
-	// here is a cleanup note and never evidence that the beacon is still up.
-	// The call is unconditional because it is idempotent and safe before a
-	// start: proving the advertisement is gone matters more than remembering
-	// whether it was ever there. Bounded like every other adapter call this
-	// story covers: an mDNS shutdown that never returns must not hang the
-	// claim (D-024), so this proceeds to commit regardless of whether the
-	// bound was hit -- the diagnostic it leaves behind is the honest record.
-	// Released only when the adapter actually confirmed it stopped. The claim
-	// still commits either way -- that is D-024, and hanging here would be the
-	// worse failure -- but booking the resource as released when the bound
-	// elapsed would be this story's rule broken in the data model rather than
-	// in a return value: a later teardown would then never revisit a beacon
-	// that may still be advertising.
-	if c.stopBeaconBounded() == nil {
-		live.release(resourceBeacon)
-	}
-
 	startedAt := c.now()
 
 	c.mu.Lock()
@@ -647,6 +628,36 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 	// would leave a window where a reset could reach the UI ahead of the
 	// started event for the transfer it terminates.
 	c.publish(event)
+
+	// The beacon stops after the claim commits, not before it (owner decision,
+	// 2026-09-15). This ran ahead of the commit, holding the lease, with the
+	// receiver's HTTP request already open and AdapterCleanupBound set to
+	// fifteen seconds -- so a slow mDNS teardown on a contended interface
+	// delayed the receiver's first byte by up to that long, with no feedback,
+	// and read as a hung link. D-024 had already settled the neighbouring
+	// question: a beacon that never returns must not hang the claim. This is
+	// the same reasoning applied to one that returns slowly, and the beacon's
+	// liveness never had any bearing on whether the claim should proceed.
+	//
+	// Still before releaseLease and still under the lease, so a teardown
+	// cannot race this call for the same adapter. The port guarantees no
+	// advertisement remains on every return, so a diagnostic here is a cleanup
+	// note and never evidence that the beacon is still up. The call is
+	// unconditional because it is idempotent and safe before a start: proving
+	// the advertisement is gone matters more than remembering whether it was
+	// ever there.
+	//
+	// Released only when the adapter actually confirmed it stopped. Booking it
+	// released on an elapsed bound would break the rule in the data model
+	// rather than in a return value: a later teardown would never revisit a
+	// beacon that may still be advertising. That holds on the revalidate
+	// failure path above too, which returns before reaching this line -- the
+	// ledger still says the beacon is held, and the teardown that took the
+	// lease owns stopping it.
+	if c.stopBeaconBounded() == nil {
+		live.release(resourceBeacon)
+	}
+
 	c.releaseLease()
 	return nil
 }

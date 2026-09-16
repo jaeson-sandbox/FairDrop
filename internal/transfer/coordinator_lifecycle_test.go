@@ -76,13 +76,15 @@ func TestCancelFromEveryState(t *testing.T) {
 			run: func(t *testing.T, h *harness) error {
 				metadata := h.stageSuccessfully()
 				cancelled := make(chan error, 1)
-				// StopBeacon is the one unlocked step inside the handshake, so
-				// this lands the cancellation after CLAIMING and before the
-				// TRANSFERRING commit -- the state Story 1.5 could not leave.
-				h.network.stopBeacon = func() error {
+				// The startedAt clock read is the one unlocked step inside the
+				// handshake, so this lands the cancellation after CLAIMING and
+				// before the TRANSFERRING commit -- the state Story 1.5 could
+				// not leave. It was the beacon stop until that call moved after
+				// the commit, so a slow mDNS teardown could no longer delay the
+				// receiver's first byte.
+				h.clock.onNow = func() {
 					go func() { cancelled <- h.coordinator.Cancel(context.Background()) }()
 					h.awaitCancelled()
-					return nil
 				}
 
 				claimErr := h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID)

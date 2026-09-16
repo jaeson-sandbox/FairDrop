@@ -642,10 +642,23 @@ type fakeClock struct {
 	current time.Time
 	step    time.Duration
 	calls   int
+
+	// onNow runs on the caller's goroutine before the clock answers, nil
+	// unless a test sets it. AuthorizeClaim's startedAt read is the one
+	// unlocked step between CLAIMING and the TRANSFERRING commit, so this is
+	// where a test lands a cancellation that must beat the commit. It used to
+	// be network.StopBeacon; that call moved after the commit so a slow mDNS
+	// teardown could not delay the receiver's first byte.
+	onNow func()
 }
 
 func (f *fakeClock) Now() time.Time {
 	f.h.enter("clock.Now")
+	// Before the mutex: a hook that reaches back into the coordinator must not
+	// be holding this clock's lock when it does.
+	if f.onNow != nil {
+		f.onNow()
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
