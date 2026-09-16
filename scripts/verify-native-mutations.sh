@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 scratch="$(mktemp -d)"
 platform="$(go env GOOS)"
-files=(internal/source/source.go internal/source/prepared.go internal/transfer/archive_name.go internal/transfer/coordinator.go internal/transfer/errors.go internal/network/beacon.go internal/network/network.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go selection_source.go single_instance_darwin.go .github/workflows/verify.yml)
+files=(internal/source/source.go internal/source/prepared.go internal/transfer/archive_name.go internal/transfer/coordinator.go internal/transfer/bounded.go internal/transfer/errors.go internal/network/beacon.go internal/network/network.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go selection_source.go single_instance_darwin.go .github/workflows/verify.yml)
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
   files+=("internal/source/handle_${platform}.go" internal/source/handle_posix.go)
 fi
@@ -73,6 +73,7 @@ baseline TestStageRechecksOutstandingCleanupAtAdmission ./internal/transfer
 baseline TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown ./internal/transfer
 baseline TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes ./internal/transfer
 baseline TestCoordinatorPropagatesAnInnerUnquiescentServerFailure ./internal/transfer
+baseline TestPublishCoalescesOutstandingObserverCalls ./internal/transfer
 baseline TestStopReleasesItsMutexBeforeWaitingAndFencesAConcurrentStart ./internal/server
 baseline TestEachServerTeardownWaitIsNamedInIsolation ./internal/server
 baseline TestInitQuiescenceTracksRealHandlerAndConnectionWaitState ./internal/server
@@ -281,20 +282,32 @@ expect_named_failure 'retain selection gate across failed-start cleanup' TestFai
 perl -0pi -e 's/if c\.cleanupPending\(\)/if false \&\& c.cleanupPending()/ or die "stage cleanup admission mutation did not match\n"' internal/transfer/coordinator.go
 expect_named_failure 'admit Stage across outstanding cleanup' TestStageRechecksOutstandingCleanupAtAdmission ./internal/transfer 'Stage across cleanup-admission race'
 
-perl -0pi -e 's/pending := \*slot/pending := (*boundedCall)(nil)/ or die "cleanup coalescing mutation did not match\n"' internal/transfer/coordinator.go
+perl -0pi -e 's/pending := \*slot/pending := (*boundedCall)(nil)/ or die "cleanup coalescing mutation did not match\n"' internal/transfer/bounded.go
 expect_named_failure 'launch repeated adapter cleanup workers' TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown ./internal/transfer 'teardown launched another StopBeacon'
 
-perl -0pi -e 's/c\.callAdapterBounded\(&c\.serverCleanup,/c.callAdapterBounded(new(*boundedCall),/ or die "server cleanup slot mutation did not match\n"' internal/transfer/coordinator.go
+perl -0pi -e 's/c\.callAdapterBounded\(&c\.serverCleanup,/c.callAdapterBounded(new(*boundedCall),/ or die "server cleanup slot mutation did not match\n"' internal/transfer/bounded.go
 expect_named_failure 'detach production server cleanup slot' TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes ./internal/transfer 'want busy'
 
-perl -0pi -e 's/pending := \*slot/pending := (*boundedCall)(nil)/ or die "server cleanup coalescing mutation did not match\n"' internal/transfer/coordinator.go
+perl -0pi -e 's/pending := \*slot/pending := (*boundedCall)(nil)/ or die "server cleanup coalescing mutation did not match\n"' internal/transfer/bounded.go
 expect_named_failure 'duplicate production server cleanup calls' TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes ./internal/transfer 'want one coalesced call'
 
 perl -0pi -e 's/AdapterCleanupBound = 15 \* time\.Second/AdapterCleanupBound = 10 * time.Second/ or die "outer bound mutation did not match\n"' internal/transfer/coordinator.go
 expect_named_failure 'equalize nested cleanup bounds' TestCoordinatorCleanupOutlastsServerTeardown . 'want 15s'
 
-perl -0pi -e 's/if IsUnquiescent\(err\)/if false \&\& IsUnquiescent(err)/ or die "inner timeout propagation mutation did not match\n"' internal/transfer/coordinator.go
+perl -0pi -e 's/if IsUnquiescent\(err\)/if false \&\& IsUnquiescent(err)/ or die "inner timeout propagation mutation did not match\n"' internal/transfer/bounded.go
 expect_named_failure 'absorb inner unquiescent failure as diagnostic' TestCoordinatorPropagatesAnInnerUnquiescentServerFailure ./internal/transfer 'want the inner unquiescent marker preserved'
+
+# B9: publish coalesces observer calls through publishCleanup instead of
+# spawning one goroutine and timer per event. These two mutations prove both
+# halves: the cap itself (a second event must not reach the observer while an
+# earlier call is outstanding) and the self-heal (the slot must clear on its
+# own once the abandoned call returns, or every later event in the session is
+# silently dropped even after the observer recovers).
+perl -0pi -e 's/if c\.publishCleanup != nil \{/if false \&\& c.publishCleanup != nil {/ or die "publish cap mutation did not match\n"' internal/transfer/coordinator.go
+expect_named_failure 'let a second publish call reach the observer while one is outstanding' TestPublishCoalescesOutstandingObserverCalls ./internal/transfer 'second event was dropped while the first was outstanding'
+
+perl -0pi -e 's/if c\.publishCleanup == pending \{/if false \&\& c.publishCleanup == pending {/ or die "publish slot clear mutation did not match\n"' internal/transfer/coordinator.go
+expect_named_failure 'never clear the publish coalescing slot' TestPublishCoalescesOutstandingObserverCalls ./internal/transfer 'first progress never reached the observer'
 
 perl -0pi -e 's/return transfer\.MarkUnquiescent\(teardownTimeoutError\(([^\n]+)\)\)/return teardownTimeoutError($1)/ or die "unquiescent marker mutation did not match\n"' internal/server/lifecycle.go
 expect_named_failure 'erase server unquiescent marker' TestEachServerTeardownWaitIsNamedInIsolation ./internal/server 'want structurally unquiescent failure'
