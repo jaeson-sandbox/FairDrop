@@ -81,7 +81,7 @@ func TestSelectionResolutionHonoursAdmissionAndCancellation(t *testing.T) {
 			}
 			unblock()
 			deadline := time.After(5 * time.Second)
-			for inspector.selection.resolving.Load() {
+			for inspector.selection.resolving.Load() != 0 {
 				select {
 				case <-deadline:
 					t.Fatal("returned resolver retained busy ownership")
@@ -143,7 +143,7 @@ func TestSelectionResolutionRetryAfterFilesystemReturns(t *testing.T) {
 	}
 	unblock()
 	deadline := time.After(5 * time.Second)
-	for inspector.selection.resolving.Load() {
+	for inspector.selection.resolving.Load() != 0 {
 		select {
 		case <-deadline:
 			t.Fatal("returned resolver retained ownership")
@@ -168,6 +168,167 @@ func TestSelectionResolutionRetryAfterFilesystemReturns(t *testing.T) {
 	}
 }
 
+// stubSource lets TestSelectionResolutionBoundRecoversTheFlagWithoutCorruptingALaterCall
+// complete a real Inspect call past the decorator without touching the
+// filesystem; PrepareDirectory and Walk are never reached from that test.
+type stubSource struct{}
+
+func (stubSource) Inspect(context.Context, string) (transfer.StagedItem, error) {
+	return transfer.StagedItem{}, nil
+}
+func (stubSource) PrepareDirectory(context.Context, string) (transfer.PreparedDirectory, error) {
+	panic("stubSource.PrepareDirectory is not used by this test")
+}
+func (stubSource) Walk(context.Context, string, transfer.SourceVisitor) error {
+	panic("stubSource.Walk is not used by this test")
+}
+
+// stubBoundTimer lets a test fire a selectionSource's bound deterministically
+// instead of sleeping past the real one. It captures whatever run was armed
+// most recently; a test calls fire to invoke it on demand.
+type stubBoundTimer struct {
+	mu      sync.Mutex
+	run     func()
+	stopped bool
+}
+
+func (b *stubBoundTimer) after(_ time.Duration, run func()) transfer.StopTimer {
+	b.mu.Lock()
+	b.run = run
+	b.stopped = false
+	b.mu.Unlock()
+	return func() bool {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		if b.stopped {
+			return false
+		}
+		b.stopped = true
+		return true
+	}
+}
+
+// fire honours stop, because a real timer does. A stub that ran its callback
+// after the code under test had cancelled it would report a flag recovered by
+// a timer that, in production, was never going to fire -- which is exactly the
+// case this file has to be able to tell apart.
+func (b *stubBoundTimer) fire() {
+	b.mu.Lock()
+	run, stopped := b.run, b.stopped
+	b.mu.Unlock()
+	if stopped {
+		return
+	}
+	run()
+}
+
+// TestSelectionResolutionBoundRecoversTheFlagWithoutCorruptingALaterCall
+// drives the D-024-shaped fix directly: a resolver that never returns must
+// not make every later Stage busy forever, and the worker abandoned by the
+// bound must not corrupt a call that has since taken the flag when it
+// eventually, harmlessly, finishes.
+func TestSelectionResolutionBoundRecoversTheFlagWithoutCorruptingALaterCall(t *testing.T) {
+	source := newSelectionSource(stubSource{})
+	bound := &stubBoundTimer{}
+	source.boundTimer = bound.after
+
+	staleEntered, staleRelease := make(chan struct{}), make(chan struct{})
+	staleEnteredOnce := sync.OnceFunc(func() { close(staleEntered) })
+	source.resolve = func(path string) string {
+		staleEnteredOnce()
+		<-staleRelease
+		return path
+	}
+
+	staleErr := make(chan error, 1)
+	go func() {
+		_, err := source.Inspect(context.Background(), "private stale selection")
+		staleErr <- err
+	}()
+	select {
+	case <-staleEntered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stale resolver was not entered")
+	}
+
+	// Firing the bound must recover the flag immediately and report that the
+	// call did not come back in time -- never success, never busy forever.
+	bound.fire()
+	select {
+	case err := <-staleErr:
+		if transfer.ErrorCodeOf(err) != transfer.ErrSetupFailed {
+			t.Fatalf("bound-elapsed resolution returned code=%s, want setup_failed", transfer.ErrorCodeOf(err))
+		}
+		if strings.Contains(err.Error(), "stale selection") {
+			t.Fatal("bound-elapsed diagnostic named the selection it was resolving (AD-9)")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("bound-elapsed call did not return")
+	}
+	if got := source.resolving.Load(); got != 0 {
+		t.Fatalf("flag stayed held (gen=%d) after its bound elapsed", got)
+	}
+
+	// A fresh call must be admitted right away -- proving the flag was really
+	// cleared, not merely that the stale worker happened to finish already:
+	// the stale worker is still blocked on staleRelease at this point.
+	freshEntered, freshRelease := make(chan struct{}), make(chan struct{})
+	freshEnteredOnce := sync.OnceFunc(func() { close(freshEntered) })
+	source.resolve = func(path string) string {
+		freshEnteredOnce()
+		<-freshRelease
+		return path
+	}
+	freshErr := make(chan error, 1)
+	go func() {
+		_, err := source.Inspect(context.Background(), "fresh selection")
+		freshErr <- err
+	}()
+	select {
+	case <-freshEntered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("later Stage did not recover from the wedged ancestor resolution")
+	}
+	freshGen := source.resolving.Load()
+	if freshGen == 0 {
+		t.Fatal("fresh call did not record itself as the flag's new owner")
+	}
+
+	// Now let the abandoned stale worker finish late. Its release call must
+	// be a no-op: the flag belongs to the fresh call now, and this hook fires
+	// deterministically right after that worker's own release attempt.
+	staleCleared := make(chan struct{})
+	source.afterResolverCleared = sync.OnceFunc(func() { close(staleCleared) })
+	close(staleRelease)
+	select {
+	case <-staleCleared:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stale worker never reached its release attempt")
+	}
+	if got := source.resolving.Load(); got != freshGen {
+		t.Fatalf("stale worker's late release corrupted the fresh call's ownership: gen=%d, want %d", got, freshGen)
+	}
+
+	// A third call while the fresh one is still outstanding must still be
+	// refused busy -- the stale worker's late release did not free it.
+	if _, err := source.Inspect(context.Background(), "third selection"); transfer.ErrorCodeOf(err) != transfer.ErrBusy {
+		t.Fatal("stale worker's late release let a third call in while the fresh one was still outstanding")
+	}
+
+	close(freshRelease)
+	select {
+	case err := <-freshErr:
+		if err != nil {
+			t.Fatalf("fresh call failed: code=%s", transfer.ErrorCodeOf(err))
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("fresh call did not complete after release")
+	}
+	if got := source.resolving.Load(); got != 0 {
+		t.Fatalf("flag stayed held (gen=%d) after the fresh call completed", got)
+	}
+}
+
 func TestSelectionResolutionCancellationImmediatelyBeforeResult(t *testing.T) {
 	_, inspector := nativeMatrixApp(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -183,7 +344,7 @@ func TestSelectionResolutionCancellationImmediatelyBeforeResult(t *testing.T) {
 	if err != nil {
 		t.Fatal("selection result wiring source unavailable")
 	}
-	if !strings.Contains(strings.ReplaceAll(string(data), "\r\n", "\n"), "case canonical := <-result:\n\t\treturn s.inspectResolved(ctx, canonical)") {
+	if !strings.Contains(strings.ReplaceAll(string(data), "\r\n", "\n"), "case canonical := <-result:\n\t\tstop()\n\t\treturn s.inspectResolved(ctx, canonical)") {
 		t.Fatal("production result arm bypasses cancellation acceptance gate")
 	}
 }
@@ -270,4 +431,80 @@ func absoluteRoot() string {
 		return `C:\`
 	}
 	return "/"
+}
+
+/*
+TestACancelledResolutionStillRecoversAWedgedFlag closes the second route to the
+defect the bound exists to remove.
+
+The bound recovers the flag when it elapses. The cancellation arm returns
+before that, while the worker is still wedged -- so if stopping the timer were
+part of leaving on a cancel, nothing would ever take the flag back and every
+later Stage would be busy for the life of the process. That is the same
+permanent busy, reached by a user pressing Cancel rather than by waiting.
+
+The fix is that the timer releases the flag itself rather than the timedOut
+arm doing it, and the cancellation arm deliberately leaves the timer armed.
+Found reviewing the bound, and not by the test above: that one never cancels.
+*/
+func TestACancelledResolutionStillRecoversAWedgedFlag(t *testing.T) {
+	source := newSelectionSource(stubSource{})
+	bound := &stubBoundTimer{}
+	source.boundTimer = bound.after
+
+	entered, wedged := make(chan struct{}), make(chan struct{})
+	defer close(wedged)
+	enteredOnce := sync.OnceFunc(func() { close(entered) })
+	source.resolve = func(path string) string {
+		enteredOnce()
+		<-wedged // never returns while this test runs
+		return path
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancelled := make(chan error, 1)
+	go func() {
+		_, err := source.Inspect(ctx, "private wedged selection")
+		cancelled <- err
+	}()
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the resolver was never entered")
+	}
+	cancel()
+
+	select {
+	case err := <-cancelled:
+		if transfer.ErrorCodeOf(err) != transfer.ErrCancelled {
+			t.Fatalf("cancelled Inspect = %q, want %q", transfer.ErrorCodeOf(err), transfer.ErrCancelled)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("a cancelled Inspect did not return")
+	}
+
+	// The worker is still wedged and still holds the flag, which is correct:
+	// the decorator allows one outstanding resolution and there is one.
+	if source.resolving.Load() == 0 {
+		t.Fatal("the flag was released while the resolver was still running")
+	}
+
+	// The bound is what must still be able to take it back. If leaving on a
+	// cancel had stopped the timer, firing it here would do nothing.
+	bound.fire()
+
+	if got := source.resolving.Load(); got != 0 {
+		t.Fatalf("the flag is still held (gen=%d) after the bound fired on a cancelled resolution: "+
+			"every later Stage returns busy for the life of the process", got)
+	}
+	// The observable consequence, not just the field. The resolver is swapped
+	// first: the wedged one is still parked on <-wedged and would hang this
+	// call forever, which proves nothing about the flag and hangs the package
+	// instead of failing it. The abandoned worker keeps its stale generation
+	// either way, so it cannot disturb what this call takes.
+	source.resolve = func(path string) string { return path }
+	if _, err := source.Inspect(context.Background(), "private later selection"); transfer.ErrorCodeOf(err) == transfer.ErrBusy {
+		t.Error("a later Stage was refused busy by a resolution its caller had already abandoned")
+	}
 }

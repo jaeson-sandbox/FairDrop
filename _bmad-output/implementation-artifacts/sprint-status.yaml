@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-14-2026 21:30
+last_updated: 09-16-2026 19:41
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -242,7 +242,7 @@ action_items:
       Epic 2 asked this; Story 3.8 answered it in practice by making all three identical,
       and nobody wrote the decision down."
     owner: "Epic 4"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
   - id: "epic-3-retro-item-23-split-internal-transfer-coordinator-go-b"
     epic: 3
@@ -251,5 +251,5 @@ action_items:
       subsystem that lifts out beside a 314-line lifecycle.go. Epic 4 does not touch
       this file, so the cost is lowest now."
     owner: "Epic 4"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"

@@ -154,6 +154,26 @@ func (a *archive) produce(ctx context.Context, writer *io.PipeWriter) error {
 // A read failure from the pipe is the worker's own error arriving backwards, so
 // it is reported separately from a destination failure and yields to the
 // authoritative copy the join collects.
+//
+// This is one of three read/stall/context/write copy loops in this package --
+// the other two are writeArchiveFile below and payload.WriteTo in payload.go.
+// The Epic 2 retrospective asked whether the three should share one helper.
+// Story 3.8 closed the divergence between them by giving this loop the same
+// stall guard (maxEmptyReads) its two siblings already had, so all three now
+// carry identical read/stall/context/write logic -- but left the duplication
+// itself unrecorded, and the Epic 3 retrospective flagged that omission again.
+//
+// The owner's decision (2026-09-15): keep the three independent. Their shapes
+// genuinely differ -- this loop reports two errors separately (destination and
+// pipe, because the pipe's failure is the worker's own error arriving
+// backwards rather than a destination fault); payload.WriteTo's loop is
+// bounded by a known size ("for remaining > 0"); writeArchiveFile's is
+// neither, since one archive entry's length is never known up front. A shared
+// helper would need a callback plus a two-error return to serve all three,
+// which costs more clarity than the duplicated lines buy back. The identical
+// guard logic across all three is Story 3.8's deliberate convergence, not
+// copy-paste nobody noticed -- only that convergence is meant to be shared,
+// never the code that carries it.
 func (a *archive) drain(ctx context.Context, dst io.Writer, src io.Reader) (destinationErr, pipeErr error) {
 	buffer := make([]byte, a.bufferSize)
 	stalls := 0
@@ -323,6 +343,9 @@ func writeArchiveFile(
 	// io.Reader permits (0, nil) indefinitely, and the reader is borrowed from
 	// an injectable port, so a source that never progresses must end the stream
 	// rather than spin a core until the context happens to be cancelled.
+	//
+	// One of this package's three copy loops -- see drain's comment above for
+	// why it stays independent of the other two instead of sharing a helper.
 	stalls := 0
 	for {
 		if err := contextError(ctx); err != nil {

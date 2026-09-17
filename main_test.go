@@ -1151,3 +1151,88 @@ func TestEveryPreWindowSubprocessIsBounded(t *testing.T) {
 		}
 	}
 }
+
+/*
+TestEveryMutationTheScriptNamesPointsAtATestThatExists closes a failure this
+repository keeps repeating.
+
+scripts/verify-native-mutations.sh drives its proof by name: `baseline` runs a
+test to establish it passes unmutated, and `expect_named_failure` requires a
+specific test to fail once a mutation is applied. Both take a test name and a
+package, and neither is checked by the compiler. Rename or delete a test and
+the script does not fail where you can see it -- it fails on a runner, with
+`no tests to run`, after the change has already been pushed.
+
+It has landed three times now: once when five tests were renamed, once when a
+test the script named was deleted with the feature it covered, and once when a
+reverted change took its test with it and left the baseline line behind. The
+script also dies at the first problem, so a second stale name stays invisible
+until a later run trips on it -- which is why this checks every reference
+rather than stopping at one.
+
+Names only. Whether each mutation's regex still matches its target is the other
+half and is genuinely harder to check portably; this covers the half that has
+actually broken, and it runs in milliseconds where CI takes minutes.
+*/
+func TestEveryMutationTheScriptNamesPointsAtATestThatExists(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("scripts", "verify-native-mutations.sh"))
+	if err != nil {
+		t.Fatalf("read the mutation script: %v", err)
+	}
+
+	baseline := regexp.MustCompile(`(?m)^baseline\s+(\S+)\s+(\S+)`)
+	expect := regexp.MustCompile(`(?m)^expect_named_failure\s+'[^']*'\s+(\S+)\s+(\S+)`)
+
+	type reference struct{ test, pkg string }
+	var refs []reference
+	for _, match := range baseline.FindAllStringSubmatch(string(source), -1) {
+		refs = append(refs, reference{match[1], match[2]})
+	}
+	for _, match := range expect.FindAllStringSubmatch(string(source), -1) {
+		refs = append(refs, reference{match[1], match[2]})
+	}
+
+	// Vacuity: a script whose shape changed would otherwise satisfy this test
+	// by parsing to nothing at all.
+	if len(refs) < 50 {
+		t.Fatalf("parsed %d test references, want the script's own count: the parser or the script "+
+			"shape changed, and this test can only pin references it can find", len(refs))
+	}
+
+	declared := regexp.MustCompile(`(?m)^func (Test\w+)\(`)
+	tests := map[string]map[string]bool{}
+	for _, pkg := range []string{".", "./internal/transfer", "./internal/server", "./internal/source",
+		"./internal/stream", "./internal/network", "./internal/qr"} {
+		names := map[string]bool{}
+		entries, err := os.ReadDir(filepath.Clean(pkg))
+		if err != nil {
+			t.Fatalf("read %s: %v", pkg, err)
+		}
+		for _, entry := range entries {
+			if !strings.HasSuffix(entry.Name(), "_test.go") {
+				continue
+			}
+			body, err := os.ReadFile(filepath.Join(filepath.Clean(pkg), entry.Name()))
+			if err != nil {
+				t.Fatalf("read %s: %v", entry.Name(), err)
+			}
+			for _, match := range declared.FindAllStringSubmatch(string(body), -1) {
+				names[match[1]] = true
+			}
+		}
+		tests[pkg] = names
+	}
+
+	for _, ref := range refs {
+		names, known := tests[ref.pkg]
+		if !known {
+			t.Errorf("the mutation script names package %q, which this test does not scan: a reference "+
+				"it cannot check is one it cannot pin", ref.pkg)
+			continue
+		}
+		if !names[ref.test] {
+			t.Errorf("the mutation script names %s in %s and no such test exists: the native proof would "+
+				"fail on a runner with \"no tests to run\" rather than here", ref.test, ref.pkg)
+		}
+	}
+}

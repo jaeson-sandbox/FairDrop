@@ -128,7 +128,7 @@ func (m *Manager) StopBeacon() error {
 			m.deps.stopJoined()
 		}
 		<-pending.done
-		return pending.err
+		return joinedStopOutcome(pending.err)
 	}
 	if !beaconHandlePresent(m.beacon) {
 		m.beacon = nil
@@ -301,6 +301,27 @@ func beaconCleanupError(err error) error {
 		return nil
 	}
 	return transfer.WrapError(transfer.ErrBeaconWarning, "device discovery cleanup reported a problem", err)
+}
+
+// joinedStopOutcome describes a joined pending struct the way a caller who
+// asked to stop is owed, independent of whether that pending struct came from
+// a directly-owned StopBeacon or from StartBeacon's own cleanupFailedStartLocked
+// recovery from a failed start. Without this, a StopBeacon that joins a failed
+// start's in-flight cleanup returns failedStartError's "device discovery did
+// not start" -- the truth for the start it never asked about, not for the
+// stop it did. The code carried through is registry-governed and untouched
+// here; only this internal description changes, in the same words a
+// directly-owned stop's own cleanup failure already uses.
+func joinedStopOutcome(pending error) error {
+	if pending == nil {
+		return nil
+	}
+	code := transfer.ErrBeaconWarning
+	var coded transfer.CodedError
+	if errors.As(pending, &coded) {
+		code = coded.Code()
+	}
+	return transfer.WrapError(code, "device discovery cleanup reported a problem", pending)
 }
 
 func beaconHandlePresent(handle beaconHandle) bool {

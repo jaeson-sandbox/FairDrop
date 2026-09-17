@@ -449,11 +449,15 @@ func TestDrainAcceptsTerminalAtTheStatesEachCallSiteIsFor(t *testing.T) {
 // It is a structural claim, so it is checked structurally -- the behavioural
 // alternative is a test that fails only on the scheduler's bad days, which is
 // how this defect reached main in the first place.
+//
+// Both functions moved to bounded.go with the rest of the bounded-call
+// subsystem (Epic 3 retrospective item 23), so this parses bounded.go rather
+// than coordinator.go -- the file, not the ordering claim, is what moved.
 func TestEveryBoundedCallArmsItsBoundBeforeLaunching(t *testing.T) {
 	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, "coordinator.go", nil, 0)
+	parsed, err := parser.ParseFile(fileSet, "bounded.go", nil, 0)
 	if err != nil {
-		t.Fatalf("parse coordinator.go: %v", err)
+		t.Fatalf("parse bounded.go: %v", err)
 	}
 
 	checked := map[string]bool{"callBounded": false, "callAdapterBounded": false}
@@ -500,7 +504,7 @@ func TestEveryBoundedCallArmsItsBoundBeforeLaunching(t *testing.T) {
 
 	for name, found := range checked {
 		if !found {
-			t.Errorf("%s was not found in coordinator.go, so this test silently stopped covering it", name)
+			t.Errorf("%s was not found in bounded.go, so this test silently stopped covering it", name)
 		}
 	}
 }

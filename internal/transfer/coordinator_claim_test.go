@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestAuthorizeClaimCommitsAndPublishesStarted(t *testing.T) {
@@ -40,14 +41,20 @@ func TestAuthorizeClaimCommitsAndPublishesStarted(t *testing.T) {
 		t.Error("started was published after the operation lease was released")
 	}
 
-	// The beacon stops before the commit, and both happen without the mutex.
-	// The first timer.AfterFunc arms the bound this story wraps every
-	// StopBeacon call in (D-024); the second arms observerPublishBound
-	// around the publication itself (D-034), added by Story 3.6 so a
-	// blocking observer cannot hold the operation lease. Both are stopped
-	// again the instant the call they bound returns, but each is armed
-	// first, deterministically, so it always precedes the call it bounds.
-	want0 := []string{"timer.AfterFunc", "network.StopBeacon", "clock.Now", "timer.AfterFunc", "observer.Publish"}
+	// The commit happens first and the beacon stops after it, both without the
+	// mutex and both still under the operation lease. That order is the point:
+	// the beacon stop used to run ahead of the commit, holding the receiver's
+	// open request behind a mDNS teardown bounded at fifteen seconds, and the
+	// beacon's liveness never had any bearing on whether the claim proceeds
+	// (owner decision, 2026-09-15; D-024 had already settled the same question
+	// for a teardown that never returns at all).
+	//
+	// Each timer.AfterFunc arms a bound before the call it bounds: the first
+	// arms observerPublishBound around the publication (D-034, so a blocking
+	// observer cannot hold the lease), the second arms the StopBeacon bound
+	// (D-024). Both are stopped the instant their call returns, but each is
+	// armed first, deterministically, so it always precedes the call it bounds.
+	want0 := []string{"clock.Now", "timer.AfterFunc", "observer.Publish", "timer.AfterFunc", "network.StopBeacon"}
 	if got := h.calls.snapshot()[before:]; !slices.Equal(got, want0) {
 		t.Errorf("the claim handshake ran %v, want %v", got, want0)
 	}
@@ -86,12 +93,14 @@ func TestAuthorizeClaimPublishesStartedBeforeACancellationCanFollow(t *testing.T
 func TestAuthorizeClaimLosesToACancellationBeforeTheCommit(t *testing.T) {
 	h := newHarness(t)
 	metadata := h.stageSuccessfully()
-	// The beacon stop is the one unlocked step inside the handshake, so it is
-	// where a cancellation can land after CLAIMING and before TRANSFERRING.
-	h.network.stopBeacon = func() error {
-		h.coordinator.cancelSession()
-		return nil
-	}
+	// The startedAt clock read is the one unlocked step inside the handshake,
+	// so it is where a cancellation can land after CLAIMING and before
+	// TRANSFERRING. It used to be the beacon stop; that call moved after the
+	// commit, because holding the receiver's open request behind a slow mDNS
+	// teardown for up to AdapterCleanupBound was the defect. The guarantee
+	// under test is unchanged -- a cancellation that lands before the commit
+	// wins, and no started event is published -- only the step it lands in.
+	h.clock.onNow = func() { h.coordinator.cancelSession() }
 
 	err := h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID)
 
@@ -368,5 +377,66 @@ func TestClaimRaceResolvesOneWayOrTheOther(t *testing.T) {
 	if won+lost != iterations {
 		t.Fatalf("counted %d outcomes over %d iterations: an iteration resolved as neither",
 			won+lost, iterations)
+	}
+}
+
+/*
+TestASlowBeaconStopDoesNotDelayTheClaimCommit states the guarantee the call
+order above only implies.
+
+The receiver's HTTP request is already open when AuthorizeClaim runs. Stopping
+the beacon ahead of the commit put an unrelated adapter in front of that
+request, bounded at AdapterCleanupBound -- fifteen seconds of no response and
+no feedback on a contended interface, which a receiver reads as a hung link.
+D-024 had already decided a beacon that never returns must not hang the claim;
+this is the same reasoning for one that returns slowly.
+
+The beacon here never returns during the test. The started event must be
+published anyway, which is what a receiver waiting on the first byte actually
+needs.
+*/
+func TestASlowBeaconStopDoesNotDelayTheClaimCommit(t *testing.T) {
+	h := newHarness(t)
+	metadata := h.stageSuccessfully()
+
+	stopping := make(chan struct{})
+	release := sync.OnceFunc(func() { close(stopping) })
+	defer release()
+
+	published := make(chan struct{})
+	var once sync.Once
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferStarted {
+			once.Do(func() { close(published) })
+		}
+	}
+	h.network.stopBeacon = func() error {
+		<-stopping // never returns while the claim is in flight
+		return nil
+	}
+
+	claimed := make(chan error, 1)
+	go func() { claimed <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
+
+	select {
+	case <-published:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the started event waited on a beacon stop that never returned: the receiver's request " +
+			"is held open behind an adapter whose liveness has nothing to do with the claim")
+	}
+
+	// Only now let the beacon finish, so the claim can return.
+	release()
+	select {
+	case err := <-claimed:
+		if err != nil {
+			t.Fatalf("AuthorizeClaim returned %v, want the claim to commit", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("AuthorizeClaim did not return after its beacon stop completed")
+	}
+
+	if got := h.state(); got != stateTransferring {
+		t.Errorf("state is %q, want %q", got, stateTransferring)
 	}
 }
