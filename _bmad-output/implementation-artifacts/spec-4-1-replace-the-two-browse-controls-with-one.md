@@ -2,7 +2,8 @@
 title: 'Story 4.1: Replace the Two Browse Controls with One'
 type: 'feature'
 created: '2026-09-17'
-status: 'ready-for-dev'
+status: 'in-progress'
+baseline_commit: '84b0594c63f83b49ac1ece84cd5477de3fb9ea43'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-4-context.md'
