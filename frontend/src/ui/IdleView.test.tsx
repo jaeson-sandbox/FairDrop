@@ -63,8 +63,9 @@ describe('where the cancellation summary sits', () => {
 describe('the drop target is only a drop target', () => {
     // Reported from a live run: the zone said "file or folder" and clicking it
     // opened the file chooser, so a folder sender was handed a single-file
-    // picker. A native chooser is one kind or the other; the labelled buttons
-    // are the only honest click targets, so the zone opens nothing.
+    // picker. The labelled control below is the only honest click target --
+    // it offers both kinds and opens whichever the sender picks -- so the zone
+    // opens nothing.
     it('opens no chooser when the drop target is clicked', () => {
         const {onSelectFile, onSelectDirectory} = show()
 
@@ -74,7 +75,7 @@ describe('the drop target is only a drop target', () => {
         expect(onSelectDirectory).not.toHaveBeenCalled()
     })
 
-    it('keeps the zone out of the tab order, because the buttons are the keyboard path', () => {
+    it('keeps the zone out of the tab order, because the browse control is the keyboard path', () => {
         show()
         const zone = document.querySelector('.fd-drop-zone')!
 
@@ -146,20 +147,13 @@ describe('Idle at rest', () => {
         expect(view.container.querySelector('[style*="--wails-drop-target"]')).toBe(zone)
     })
 
-    it('offers two equal browse controls that each reach the full activation target', () => {
-        const {onSelectFile, onSelectDirectory} = show()
+    it('offers one control, labelled for both kinds, that reaches the full activation target', () => {
+        const {view} = show()
 
-        const file = screen.getByRole('button', {name: 'Select File'})
-        const directory = screen.getByRole('button', {name: 'Select Directory'})
-        for (const control of [file, directory]) {
-            expect(control.className).toContain('fd-target')
-            expect(control.className).not.toContain('fd-button--primary')
-        }
-
-        fireEvent.click(file)
-        fireEvent.click(directory)
-        expect(onSelectFile).toHaveBeenCalledTimes(1)
-        expect(onSelectDirectory).toHaveBeenCalledTimes(1)
+        const control = screen.getByRole('button', {name: 'Choose a file or folder'})
+        expect(control.className).toContain('fd-target')
+        expect(control.className).not.toContain('fd-button--primary')
+        expect(view.container.querySelectorAll('.fd-selection button')).toHaveLength(1)
     })
 
     it('shows no session surface, no history and no QR while idle', () => {
@@ -173,6 +167,113 @@ describe('Idle at rest', () => {
     })
 })
 
+describe('the browse menu', () => {
+    it('stays closed until the control is activated', () => {
+        show()
+
+        expect(screen.queryByRole('menu')).toBeNull()
+        const control = screen.getByRole('button', {name: 'Choose a file or folder'})
+        expect(control.getAttribute('aria-expanded')).toBe('false')
+        expect(control.getAttribute('aria-haspopup')).toBe('menu')
+    })
+
+    it('opens on activation, offers both kinds, and lands focus in it', () => {
+        show()
+
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+
+        const menu = screen.getByRole('menu')
+        expect(menu).toBeTruthy()
+        const items = screen.getAllByRole('menuitem')
+        expect(items.map((item) => item.textContent)).toEqual(['File', 'Folder'])
+        expect(document.activeElement).toBe(items[0])
+        expect(screen.getByRole('button', {name: 'Choose a file or folder'}).getAttribute('aria-expanded'))
+            .toBe('true')
+    })
+
+    it('reaches the full activation target on every item', () => {
+        show()
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+
+        for (const item of screen.getAllByRole('menuitem')) {
+            expect(item.className).toContain('fd-target')
+        }
+    })
+
+    it('runs the matching command and closes when a kind is chosen', () => {
+        const {onSelectFile, onSelectDirectory} = show()
+
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
+
+        expect(onSelectFile).toHaveBeenCalledTimes(1)
+        expect(onSelectDirectory).not.toHaveBeenCalled()
+        expect(screen.queryByRole('menu')).toBeNull()
+
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        fireEvent.click(screen.getByRole('menuitem', {name: 'Folder'}))
+
+        expect(onSelectDirectory).toHaveBeenCalledTimes(1)
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('returns focus to the control once a kind is chosen', () => {
+        show()
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+
+        fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
+
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Choose a file or folder'}))
+    })
+
+    it('closes on Escape, returns focus to the control, and announces nothing', () => {
+        show()
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'Escape'})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        // Not asserted here: that nothing was announced. IdleView renders no
+        // live region in any state, so querying for one passes whatever the
+        // menu does -- the announcer belongs to App, and the one-owner rule is
+        // pinned there against the routing table. What this can honestly say
+        // is that the menu raised no error surface of its own.
+        expect(document.querySelector('[role="alert"]')).toBeNull()
+    })
+
+    it('closes quietly when focus leaves the menu on its own, without recapturing it', () => {
+        const {view} = show()
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const menu = screen.getByRole('menu')
+        const outside = document.createElement('button')
+        view.container.append(outside)
+
+        fireEvent.blur(screen.getByRole('menuitem', {name: 'File'}), {relatedTarget: outside})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+        // No focus trap outside an OS dialog: focus is left where the sender
+        // sent it, not stolen back to the control.
+        expect(document.activeElement).not.toBe(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        expect(menu.isConnected).toBe(false)
+    })
+
+    it('moves focus between items with the arrow keys', () => {
+        show()
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const [file, folder] = screen.getAllByRole('menuitem')
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'ArrowDown'})
+        expect(document.activeElement).toBe(folder)
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'ArrowDown'})
+        expect(document.activeElement).toBe(file)
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'ArrowUp'})
+        expect(document.activeElement).toBe(folder)
+    })
+})
+
 describe('Idle with a command failure', () => {
     it('renders the fixed invalid-selection panel and stages nothing', () => {
         const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
@@ -181,7 +282,7 @@ describe('Idle with a command failure', () => {
         expect(screen.getByRole('heading', {name: 'Choose one item'})).toBeTruthy()
         expect(screen.getByText('Choose exactly one file or folder.')).toBeTruthy()
         // The failure sits beside Idle, which stays fully usable.
-        expect(screen.getByRole('button', {name: 'Select File'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Choose a file or folder'})).toBeTruthy()
     })
 
     it('never dresses a cancellation up as an Error', () => {
@@ -250,5 +351,109 @@ describe('Idle after a cancellation won its race', () => {
         const targets = [...document.querySelectorAll('[data-focus-target]')]
             .map((element) => element.getAttribute('data-focus-target'))
         expect(targets).toEqual(['idle-instruction', 'command-error'])
+    })
+})
+
+/*
+  A second press on the control closes the menu it opened.
+
+  The review reproduced the opposite in Chromium: mousedown focuses the
+  trigger, which fires focusout from the menu subtree, which closed the menu --
+  and the click that followed then read `open === false` and reopened it, so
+  the control could never dismiss its own menu. Neither suite could see it,
+  because fireEvent.click moves no focus and even browser mode dispatches a
+  synthetic event with no default focus action.
+
+  So the focus move is staged explicitly here: blur the menu with relatedTarget
+  set to the trigger, which is exactly what a real mousedown does, and only
+  then click.
+*/
+describe('the browse control dismisses its own menu', () => {
+    it('closes on a second activation, after the focus move a real press performs', () => {
+        show()
+        const control = screen.getByRole('button', {name: 'Choose a file or folder'})
+
+        fireEvent.click(control)
+        expect(screen.getByRole('menu')).toBeTruthy()
+        expect(control.getAttribute('aria-expanded')).toBe('true')
+
+        // What a pointer press on the trigger does before its click lands.
+        fireEvent.blur(screen.getByRole('menu'), {relatedTarget: control})
+        fireEvent.click(control)
+
+        expect(screen.queryByRole('menu')).toBeNull()
+        expect(control.getAttribute('aria-expanded')).toBe('false')
+    })
+})
+
+/*
+  The rest of the menu-button pattern, which the first pass claimed and did not
+  have.
+
+  The review found a menu that was a menu in role only: every item its own tab
+  stop rather than the pattern's single one, no Home or End, the arrow keys
+  that conventionally open a menu button doing nothing on the trigger, Escape
+  dead whenever focus sat on the trigger -- which is exactly where a pointer
+  press leaves it -- and aria-controls naming an element that does not exist
+  while the menu is closed.
+*/
+describe('the browse menu follows the menu-button pattern', () => {
+    function control(): HTMLElement {
+        return screen.getByRole('button', {name: 'Choose a file or folder'})
+    }
+
+    it('opens on ArrowDown and on ArrowUp, not only on activation', () => {
+        for (const key of ['ArrowDown', 'ArrowUp']) {
+            cleanup()
+            show()
+            fireEvent.keyDown(control(), {key})
+
+            expect(screen.getByRole('menu')).toBeTruthy()
+            expect(control().getAttribute('aria-expanded')).toBe('true')
+        }
+    })
+
+    it('closes on Escape while focus is still on the control', () => {
+        show()
+        fireEvent.click(control())
+        // What a pointer press leaves behind: the menu open, focus on the
+        // trigger rather than inside the menu.
+        fireEvent.blur(screen.getByRole('menu'), {relatedTarget: control()})
+
+        fireEvent.keyDown(control(), {key: 'Escape'})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+        expect(control().getAttribute('aria-expanded')).toBe('false')
+    })
+
+    it('is one tab stop, with the items reachable by arrow rather than by Tab', () => {
+        show()
+        fireEvent.click(control())
+
+        for (const item of screen.getAllByRole('menuitem')) {
+            expect(item.getAttribute('tabindex')).toBe('-1')
+        }
+    })
+
+    it('moves to the first and last item on Home and End', () => {
+        show()
+        fireEvent.click(control())
+        const items = screen.getAllByRole('menuitem')
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'End'})
+        expect(document.activeElement).toBe(items[items.length - 1])
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'Home'})
+        expect(document.activeElement).toBe(items[0])
+    })
+
+    it('names no menu in aria-controls while there is no menu', () => {
+        show()
+        expect(control().getAttribute('aria-controls')).toBeNull()
+
+        fireEvent.click(control())
+        const named = control().getAttribute('aria-controls')
+        expect(named).toBeTruthy()
+        expect(document.getElementById(named as string)).toBe(screen.getByRole('menu'))
     })
 })

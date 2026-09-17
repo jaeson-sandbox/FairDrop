@@ -197,13 +197,13 @@ The production-reference index in **Layout & Spacing** covers every visual compo
 |---|---|---|---|
 | **App Shell** | App-shell background/foreground | Dark pair | Standard OS chrome; one centered lifecycle region plus an optional retained outcome in Idle. |
 | **DropZone** | Surface + functional boundary; active drop fill + primary boundary | Dark pair | Dashed rest boundary; solid boundary during native drag-active state. Fill is never the only state cue. |
-| **Selection Controls** | Surface/text/functional boundary | Dark pair | Equal-weight File and Directory controls; no false primary choice. |
+| **Selection Controls** | Surface/text/functional boundary | Dark pair | One selection control, quieter than the drop zone. |
 | **Stage Pending Card** | Elevated/text | Dark pair | Quiet flexible-height paper block; no authoritative-state badge. |
 | **StagedView** | Elevated + decorative offset edge | Dark pair | Folder-tab silhouette once; QR and primary instruction remain dominant. |
 | **Item Summary** | Text/muted | Dark pair | Serif name with robust full-name access; folder says it downloads as ZIP. |
 | **QR Panel** | Fixed QR pair + functional frame | Same fixed QR pair | Square, crisp, generous quiet zone, no rotation or overlay. |
 | **Direct URL Row** | Surface/text/functional frame | Dark pair | Readonly monospace URL beside the terracotta action named by `EXPERIENCE.md` key `copy.direct_link.action`; never a sender-side activation link. |
-| **Copy Feedback** | Success text | Dark success text | Label changes to `EXPERIENCE.md` key `copy.copy.confirmation`; no toast, badge, or layout shift. |
+| **Copy Feedback** | Success text | Dark success text | Label changes to `EXPERIENCE.md` key `copy.copy.confirmation`; no toast, badge, or layout shift. Reverts on blur (D-114), so the control's own box and position never move. |
 | **Trusted-LAN Note** | Muted with warning marker | Dark pair | Literal plain-HTTP and local-network disclosure; never green or lock-shaped. |
 | **Warning Banner** | Surface with warning rule/text | Dark pair | Inline, non-modal, no full yellow fill. |
 | **TransferView** | Elevated/text | Dark pair | Packet identity remains while QR/link yield to progress. |

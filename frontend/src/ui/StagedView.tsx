@@ -1,4 +1,4 @@
-import {useState} from 'react'
+import {useRef, useState} from 'react'
 import {CopyToClipboard} from '../../wailsjs/go/main/App'
 import {selectCommandError, selectWarnings} from '../transfer/selectors'
 import type {StagedTransferState} from '../transfer/state'
@@ -44,6 +44,10 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
     const warnings = selectWarnings(state)
     const commandError = selectCommandError(state)
     const [copied, setCopied] = useState(false)
+    // Whether the copy control holds focus right now. A ref rather than state
+    // because the asynchronous clipboard callback below reads it after the
+    // render that set it, and re-rendering on focus would buy nothing.
+    const focusedRef = useRef(false)
     const [showFullName, setShowFullName] = useState(false)
 
     const size = metadata.isDir
@@ -90,9 +94,42 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
         void Promise.resolve()
             .then(() => CopyToClipboard(metadata.url))
             .then(() => {
-                setCopied(true)
+                // Only claim the confirmation while the control still holds
+                // focus. The command is asynchronous, so a sender who clicks
+                // and tabs straight on can have it resolve after focus has
+                // already gone -- and then no blur is ever coming to revert
+                // the label, which is D-114 returning by the back door
+                // (reproduced in Chromium). The announcement still happens:
+                // the copy did succeed, and that is what the sender needs to
+                // hear regardless of where focus went.
+                if (focusedRef.current) setCopied(true)
                 onAnnounce?.(state.session.sessionId, copy.copy.confirmation)
             }, () => onCopyFailed?.(state.session.sessionId))
+    }
+
+    /**
+     * Reverts the label the moment the sender's own focus leaves the control
+     * (D-114).
+     *
+     * A successful copy used to rename this button to `copy.copy.confirmation`
+     * for the rest of the session with no way back: `EXPERIENCE.md` bans
+     * frontend lifecycle timers, so nothing ever swapped it back, and the one
+     * control that reaches the capability URL lost the name that says what it
+     * does (WCAG 4.1.2) the moment it succeeded once.
+     *
+     * Blur is the trigger EXPERIENCE.md now sanctions for this control
+     * specifically: it fires only from the sender's own action -- tabbing on,
+     * clicking elsewhere -- never from a timer this product forbids, and by
+     * the time focus "returns to the control" later (the acceptance
+     * criterion's own words), the label has already reverted. It does not
+     * fire while a fresh click on the still-focused "Copied" button retries
+     * the copy (see the test beside this one): that click's own result --
+     * success or failure -- is what decides the label next, exactly as
+     * before.
+     */
+    const handleCopyBlur = () => {
+        focusedRef.current = false
+        setCopied(false)
     }
 
     return (
@@ -187,6 +224,8 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                         type="button"
                                         className={`fd-button fd-target ${copied ? 'fd-button--copied' : 'fd-button--primary'}`}
                                         onClick={handleCopy}
+                                        onFocus={() => { focusedRef.current = true }}
+                                        onBlur={handleCopyBlur}
                                     >
                                         {copied ? copy.copy.confirmation : copy.directLink.action}
                                     </button>

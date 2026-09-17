@@ -350,11 +350,17 @@ describe('reflow to 320 CSS pixels', () => {
         expect(narrow).toContain('.fd-direct-row')
     })
 
-    it('collapses the remaining pairs into one column below 640px', () => {
+    it('collapses the remaining pair into one column below 640px', () => {
         const narrowest = block('@media (max-width: 639px) {')
-        expect(narrowest).toContain('.fd-selection')
         expect(narrowest).toContain('.fd-metrics')
         expect(narrowest).toContain('grid-template-columns: minmax(0, 1fr);')
+    })
+
+    it('drops the single browse control out of the pair-collapse media query', () => {
+        // fd-selection held two equal-weight buttons and needed the collapse;
+        // one control with an absolutely positioned menu (spec-4-1) does not.
+        const narrowest = block('@media (max-width: 639px) {')
+        expect(narrowest).not.toContain('.fd-selection')
     })
 
     it('declares no width that could force a page-level horizontal scrollbar', () => {
@@ -711,7 +717,7 @@ describe('the decorative edge stays decorative', () => {
     // them would put an invisible boundary on something that needs a visible
     // one -- and it would still pass the contrast proof, which does not look
     // at that token at all.
-    it.each(['.fd-button', '.fd-drop-zone', '.fd-qr-panel', '.fd-url', '.fd-meter'])(
+    it.each(['.fd-button', '.fd-drop-zone', '.fd-qr-panel', '.fd-url', '.fd-meter', '.fd-browse-menu'])(
         '%s draws its boundary with the functional token', (selector) => {
             const rule = block(`${selector} {`)
 

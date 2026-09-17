@@ -927,8 +927,10 @@ func TestDialogFailureIsCodedAndDisclosesNoDialogText(t *testing.T) {
 	if err == nil {
 		t.Fatal("a failed dialog returned no error")
 	}
-	if code := string(transfer.ErrorCodeOf(err)); code != "transfer_failed" {
-		t.Errorf("a failed dialog crossed as %q, want %q", code, "transfer_failed")
+	// chooser_failed, not transfer_failed (D-113): the dialog never opened, so
+	// no transfer ever began to stop partway.
+	if code := string(transfer.ErrorCodeOf(err)); code != "chooser_failed" {
+		t.Errorf("a failed dialog crossed as %q, want %q", code, "chooser_failed")
 	}
 	if strings.Contains(err.Error(), testPath) {
 		t.Errorf("the dialog's own text reached the command error: %q", err.Error())

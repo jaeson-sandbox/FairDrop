@@ -61,6 +61,7 @@ const (
     ErrNameUnsupported    ErrorCode = "name_unsupported"
     ErrNameWarning        ErrorCode = "name_warning"
     ErrShuttingDown       ErrorCode = "shutting_down"
+    ErrChooserFailed      ErrorCode = "chooser_failed"
 )
 
 type Warning struct {
@@ -132,6 +133,7 @@ Stable domain error codes are:
 | `name_unsupported` | an entry name inside a selected folder is unsafe to archive: traversal, a drive prefix, a control or format character, or invalid UTF-8. Names a Windows receiver merely cannot save are warned about, not refused (2026-09-13) |
 | `name_warning` | non-terminal. A selected folder holds entries a Windows receiver cannot save; they are sent unchanged and the sender is told at Staged |
 | `shutting_down` | command rejected after application shutdown begins |
+| `chooser_failed` | the native file/directory chooser itself failed to open; no item was ever chosen and no transfer ever began |
 
 Errors wrap internal causes but expose only the stable code and safe message to React. Absolute paths and capability tokens are never included in HTTP or mDNS errors.
 
@@ -295,7 +297,7 @@ func (a *App) SelectDirectory() (string, error)
 func (a *App) CopyToClipboard(text string) error
 ```
 
-`SelectFile` and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. A cancelled native dialog returns an empty selection without emitting a transfer error. The frontend validates that native drop arrays contain exactly one path before calling `StageTransfer`.
+`SelectFile` and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. A cancelled native dialog returns an empty selection without emitting a transfer error. A dialog that fails to open (the platform chooser itself refuses) returns `chooser_failed` rather than a coded selection failure, since no item was ever chosen. The frontend validates that native drop arrays contain exactly one path before calling `StageTransfer`.
 
 `CopyToClipboard` writes through the Wails Go runtime. The frontend never relies on `navigator.clipboard`, because the macOS Wails webview is not a secure context.
 

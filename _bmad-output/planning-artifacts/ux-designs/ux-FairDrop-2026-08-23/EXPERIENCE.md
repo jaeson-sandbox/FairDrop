@@ -36,7 +36,7 @@ One process owns one live session and receiver. V1 has no receiver app or brande
 
 | Surface | Reached from | Purpose and boundary |
 |---|---|---|
-| **FairDrop desktop window — Idle** | App open; accepted `transfer-reset` | Native drop target, Select File, Select Directory, firewall preflight, optional retained Done/Error, and staged troubleshooting. |
+| **FairDrop desktop window — Idle** | App open; accepted `transfer-reset` | Native drop target, one browse control (`copy.label.chooseFileOrFolder`) opening a menu for file or folder, firewall preflight, optional retained Done/Error, and staged troubleshooting. |
 | **Native file/directory dialogs** | Selection Controls | OS-owned selection; empty result is a quiet cancel. Dialog does not stage itself. |
 | **Local staging-pending presentation** | One valid drop or non-empty dialog result | Shows local preparation and **Cancel preparation** while `StageTransfer` is pending; never claims backend STAGED. |
 | **FairDrop desktop window — Staged** | Successful `FileMetadata` | Item, QR-primary handoff, readonly URL, exact trust/link guidance, warnings, troubleshooting, and Cancel. |
@@ -89,6 +89,9 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.qr.alt` | QR accessible-name template | “Download QR code for [item name]” |
 | `copy.folder.note` | Folder note | “This folder downloads as a ZIP.” |
 | `copy.direct_link.action` | Direct-link action | “Copy download link” |
+| `copy.label.choose_file_or_folder` | Browse control | “Choose a file or folder” |
+| `copy.label.file` | Item kind, file | “File” |
+| `copy.label.folder` | Item kind, folder | “Folder” |
 | `copy.direct_link.helper` | Direct-link helper | “Open this link directly in the receiving device’s browser.” |
 | `copy.first_opener.warning` | First-opener warning | “One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.” |
 | `copy.network.disclosure` | Network disclosure | “Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.” |
@@ -137,6 +140,7 @@ The codes come from the binding contract. `PublicErrorOf` and the malformed/unkn
 | `name_unsupported` | A name can’t be sent | “One name inside that folder can’t be sent safely. Rename it, then choose the folder again.” | Focused Error Panel | Rename the entry and choose the folder again. Refused only when a name is unsafe to archive at all — traversal, a drive prefix, a control or format character, invalid UTF-8. The name is never echoed: AD-9 forbids a path, and whether one segment may be shown is undecided (D-112). |
 | `name_warning` | Some names may not save | “Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items.” | One polite status update at Staged; focus stays where Stage success put it | Continue — this is a Warning, not an Error. Rename the entries only if the receiver runs Windows. Sent unchanged because the same names are ordinary on macOS, Linux and a phone (owner decision, 2026-09-13). |
 | `shutting_down` | FairDrop is closing | “FairDrop is closing. Reopen it to start a transfer.” | Focused inline message if the window remains | Reopen FairDrop. |
+| `chooser_failed` | Couldn’t open the chooser | “FairDrop couldn’t open the chooser. Try again, or drop the item on the zone above.” | Focused Error Panel | Try again, or use the drop zone instead. No path in the message (AD-9); reachable only when the OS itself refuses to open a dialog (D-113). |
 
 ## Component Patterns
 
@@ -146,13 +150,13 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 |---|---|---|
 | **App Shell** | Every desktop state | Renders one authoritative lifecycle presentation plus an optional retained terminal outcome in Idle; subscribes once to `transfer-*`; a second launch preserves the session and retained status. |
 | **DropZone** | Idle | Uses `OnFileDrop(callback, true)` and inherited `--wails-drop-target: drop`; no DOM drop handler. Rejects zero/multiple paths and stages exactly one. |
-| **Selection Controls** | Idle | Semantic `SelectFile()` / `SelectDirectory()`; non-empty result stages immediately; empty result stays quiet. Starting Stage dismisses a retained outcome. |
+| **Selection Controls** | Idle | One control labelled `copy.label.chooseFileOrFolder`, opening a `role="menu"` offering both kinds (spec-4-1) because Windows' `IFileOpenDialog` cannot; the item chosen runs the matching semantic `SelectFile()` / `SelectDirectory()`. Keyboard-operable, Escape closes the menu, and focus returns to the control on Escape or on a kind chosen; focus leaving the menu on its own (e.g. Tab) closes it without recapturing focus, since no focus trap is permitted outside an OS dialog. Non-empty result stages immediately; empty result stays quiet. Starting Stage dismisses a retained outcome. |
 | **Stage Pending Card** | Local command pending | Identifies item kind and preparation; includes semantic `copy.cancel.preparation`. No QR/session controls or authoritative-state badge. Obsolete promises cannot commit state. |
 | **StagedView** | Staged | Built only from successful metadata. QR is primary; URL is fallback. Exposes exact link/trust guidance, warning, recovery help, and Cancel without implying receiver identity or claim. |
 | **Item Summary** | Staged, Transferring | Shows sanitized bidi-isolated full name and logical size; folders distinguish logical size from unknown ZIP wire total. Persistent full-name access follows `DESIGN.md`. |
 | **QR Panel** | Staged | Prepends `data:image/png;base64,` only at render. The noninteractive image uses `copy.qr.alt`; it never exposes or spells the token. |
 | **Direct URL Row** | Staged | Readonly selectable text, not a sender-side activation link. The button uses `copy.direct_link.action`; the helper uses `copy.direct_link.helper` and `copy.first_opener.warning`. |
-| **Copy Feedback** | Staged | Label becomes `copy.copy.confirmation`; one polite update, no toast, focus move, lifecycle change, or clipboard clearing. |
+| **Copy Feedback** | Staged | Label becomes `copy.copy.confirmation`; one polite update, no toast, focus move, lifecycle change, or clipboard clearing. Reverts to `copy.direct_link.action` the moment focus leaves the control (D-114) -- an event the sender's own action triggers, not a timer, so the one control that reaches the capability URL still names what it does whenever the sender returns to it. |
 | **Trusted-LAN Note** | Staged | Displays the approved not-encrypted and no-extra-copy/receiver-retains-download disclosures beside handoff controls. |
 | **Warning Banner** | Staged or Idle recovery | Renders safe `Warning` or firewall/recovery copy. `beacon_warning` remains non-terminal. |
 | **TransferView** | Transferring | Appears only after accepted `transfer-started`; never from scan animation, browser navigation, or frontend inference. |

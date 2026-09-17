@@ -1,9 +1,11 @@
 import type {} from '@vitest/browser-playwright' // pulls in the CDPSession#send() augmentation for the playwright provider
-import {cleanup, render} from '@testing-library/react'
+import type {CSSProperties} from 'react'
+import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {cdp, page} from 'vitest/browser'
 import {afterEach, describe, expect, it, vi} from 'vitest'
-import type {StagedTransferState, TransferringTransferState} from '../src/transfer/state'
+import type {IdleTransferState, StagedTransferState, TransferringTransferState} from '../src/transfer/state'
 import type {FileMetadata, ProgressSnapshot} from '../src/transfer/types'
+import {IdleView} from '../src/ui/IdleView'
 import {StagedView} from '../src/ui/StagedView'
 import {TransferringView} from '../src/ui/TransferringView'
 import '../src/style.css'
@@ -18,8 +20,11 @@ import '../src/style.css'
   Chromium and measuring them. A rule that disagrees between the two suites is
   a finding to report, never a reason to loosen either one (spec Never list).
 
-  Only Staged and Transferring are rendered: they are the two views the
-  spec's Intent and I/O matrix name for every rendered check below.
+  Staged and Transferring are the two views the spec's Intent and I/O matrix
+  named for every rendered check below. Idle's browse menu joined them for
+  spec-4-1 (Story 4.1): it is the product's first floating surface, so the
+  same rendered proof -- targets, reflow, forced colors -- applies to it
+  measured open, not merely to its text in the stylesheet.
 */
 
 vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn().mockResolvedValue(undefined)}))
@@ -118,6 +123,27 @@ function renderStaged(): HTMLElement {
 
 function renderTransferring(): HTMLElement {
     return render(<TransferringView state={transferring()} onCancel={() => undefined}/>).container
+}
+
+const dropTargetStyle = {'--wails-drop-target': 'drop'} as CSSProperties
+
+function idle(): IdleTransferState {
+    return {phase: 'idle', retainedOutcome: null, commandError: null}
+}
+
+/** Idle with the browse menu already open -- the surface these checks measure. */
+function renderIdleMenuOpen(): HTMLElement {
+    const {container} = render(
+        <IdleView
+            state={idle()}
+            dropTargetStyle={dropTargetStyle}
+            cancelWon={false}
+            onSelectFile={() => undefined}
+            onSelectDirectory={() => undefined}
+        />,
+    )
+    fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+    return container
 }
 
 // Every rendered token or media-feature override below is applied to the
@@ -332,6 +358,15 @@ describe('reflow at 320 CSS pixels (D-068)', () => {
         await page.viewport(320, 900)
         assertNoHorizontalOverflow(renderTransferring())
     })
+
+    it('keeps the open browse menu scrolling only vertically, with nothing clipped', async () => {
+        await page.viewport(320, 900)
+        const container = renderIdleMenuOpen()
+        assertNoHorizontalOverflow(container)
+        // The name promised "nothing clipped" and only the overflow half was
+        // measured. Both halves now are.
+        assertNoFixedHeightClipsGrownText(container)
+    })
 })
 
 describe('200% text (D-068)', () => {
@@ -409,6 +444,75 @@ describe('WCAG 1.4.12 text-spacing overrides (D-068)', () => {
     })
 })
 
+/*
+  The first floating surface, at the sizes the product actually runs at.
+
+  The menu was measured at 320x900 and 1024x900 and nowhere else, which left
+  two gaps the review named. It is a fixed-width panel of full-width rows, so
+  doubling every text token is exactly what should overflow it if anything
+  does. And it opens downward only -- `inset-block-start: 100%`, no flip, no
+  max-height, no scroll -- while sitting low in Idle, below the drop zone, the
+  firewall preflight and any retained outcome. Idle is already taller than the
+  640x480 minimum main.go sets, so at that size the window scrolls and "past
+  the bottom edge" is not the failure to look for; a menu that detaches from
+  its control, or that grows taller than the window it opens in, is.
+*/
+describe('the browse menu at the sizes the app really runs at (D-068)', () => {
+    it('survives 200% text without overflowing or clipping', async () => {
+        await page.viewport(1024, 900)
+        doubleTextTokens()
+        const container = renderIdleMenuOpen()
+
+        assertNoHorizontalOverflow(container)
+        assertNoFixedHeightClipsGrownText(container)
+    })
+
+    /*
+      Both measurements here are differences, and that is deliberate.
+
+      Opening the menu moves focus into its first item, and Chromium scrolls a
+      newly focused element into view. `getBoundingClientRect()` is
+      viewport-relative, so after that scroll the menu's `bottom` sits flush
+      against the viewport edge wherever it was actually laid out -- this case
+      first asserted `bottom <= window.innerHeight` and a mutation pushing the
+      menu 600px down the page still passed, at `scrollY = 723`. Any assertion
+      comparing one viewport-relative coordinate against the viewport is
+      measuring the browser's scroll-into-view, not this menu's layout.
+
+      A gap between two rects taken after the same scroll, and a height, are
+      both scroll-invariant, and between them they are the claim: the menu
+      hangs directly off the control that opened it, and the whole of it is
+      small enough to be read at once in the smallest window main.go allows.
+    */
+    it('hangs off its control and fits the 640x480 minimum main.go sets', async () => {
+        await page.viewport(640, 480)
+        const container = renderIdleMenuOpen()
+
+        assertNoHorizontalOverflow(container)
+
+        const menu = container.querySelector<HTMLElement>('.fd-browse-menu')
+        if (menu === null) throw new Error('.fd-browse-menu did not render')
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+        const gap = menu.getBoundingClientRect().top - trigger.getBoundingClientRect().bottom
+
+        expect(
+            gap,
+            `the open menu starts ${gap.toFixed(1)}px below the control it hangs from: it opens ` +
+                'downward only, with no flip, so a menu detached from its control is one the sender ' +
+                'has to go looking for',
+        ).toBeGreaterThanOrEqual(-0.5)
+        expect(gap, 'the same, in the other direction').toBeLessThanOrEqual(24)
+
+        const height = menu.getBoundingClientRect().height
+        expect(
+            height,
+            `the open menu is ${height.toFixed(1)}px tall in a ${window.innerHeight}px window: it ` +
+                'carries no max-height and no scroll of its own, so a menu taller than the window ' +
+                'could not be read in one piece',
+        ).toBeLessThanOrEqual(window.innerHeight)
+    })
+})
+
 describe('the 44px activation floor (D-068)', () => {
     it('measures every Staged control at or above 44x44 CSS pixels', async () => {
         await page.viewport(1024, 900)
@@ -418,6 +522,11 @@ describe('the 44px activation floor (D-068)', () => {
     it('measures every Transferring control at or above 44x44 CSS pixels', async () => {
         await page.viewport(1024, 900)
         assertEveryTargetMeetsTheFloor(renderTransferring())
+    })
+
+    it('measures the browse control and every open menu item at or above 44x44 CSS pixels', async () => {
+        await page.viewport(1024, 900)
+        assertEveryTargetMeetsTheFloor(renderIdleMenuOpen())
     })
 })
 
@@ -440,6 +549,21 @@ describe('forced colors (D-065)', () => {
                 ).not.toBe('none')
             }
         }
+    })
+
+    it('keeps the open browse menu inside the system palette, with no exemption of its own', async () => {
+        await page.viewport(1024, 900)
+        await setForcedColorsActive(true)
+        const container = renderIdleMenuOpen()
+
+        for (const element of container.querySelectorAll<HTMLElement>('*')) {
+            const adjust = getComputedStyle(element).getPropertyValue('forced-color-adjust')
+            expect(
+                adjust,
+                `${describeElement(element)} computes forced-color-adjust: none -- the menu carries no exemption`,
+            ).not.toBe('none')
+        }
+        assertNoHorizontalOverflow(container)
     })
 
     it('captures the QR panel under forced colors -- a rendered capture, not a scan', async () => {

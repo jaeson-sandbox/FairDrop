@@ -194,7 +194,7 @@ describe('copy feedback', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
 
         expect(writeText).toHaveBeenCalledWith(capabilityURL)
@@ -207,7 +207,7 @@ describe('copy feedback', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
 
         expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
@@ -228,7 +228,7 @@ describe('copy feedback', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
 
         expect(writeText).toHaveBeenCalledTimes(1)
@@ -239,7 +239,7 @@ describe('copy feedback', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
 
         expect(writeText).toHaveBeenCalledTimes(1)
@@ -263,7 +263,7 @@ describe('copy feedback', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()} onCopyFailed={onCopyFailed}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
 
         expect(onCopyFailed).toHaveBeenCalledTimes(1)
@@ -275,7 +275,7 @@ describe('copy feedback', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()} onCopyFailed={onCopyFailed}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
 
         expect(onCopyFailed).not.toHaveBeenCalled()
@@ -294,7 +294,7 @@ describe('copy feedback', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()} onCopyFailed={onCopyFailed}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
         expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
 
@@ -306,6 +306,66 @@ describe('copy feedback', () => {
         expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
         expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
         expect(onCopyFailed).toHaveBeenCalledWith(sessionId)
+    })
+
+    /*
+      D-114: a successful copy used to rename this control to "Copied" for the
+      rest of the session, with no way back -- the one control that reaches
+      the capability URL lost the name that says what it does. Blur is the
+      sanctioned trigger: it fires only from the sender's own focus move, never
+      a timer EXPERIENCE.md forbids, so by the time the sender "returns to the
+      control" (the acceptance criterion's words) it already names the action
+      again.
+    */
+    it('reverts to the action label once focus leaves the control (D-114)', async () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        await act(async () => {
+            pressCopy()
+        })
+        const button = screen.getByRole('button', {name: 'Copied'})
+
+        fireEvent.blur(button)
+
+        expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+        expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
+    })
+
+    it('still names the action when the sender returns to the control later', async () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        const button = () => screen.getByRole('button', {name: /^(Copy download link|Copied)$/})
+        await act(async () => {
+            // Focus first: a real press focuses before it clicks, and the
+            // confirmation is only claimed while the control holds focus.
+            button().focus()
+            fireEvent.click(button())
+        })
+        expect(button().textContent).toBe('Copied')
+
+        // The sender moves on -- Tab reaches Cancel, say -- and later returns.
+        fireEvent.blur(button(), {relatedTarget: screen.getByRole('button', {name: 'Cancel'})})
+        fireEvent.focus(button())
+
+        expect(button().textContent).toBe('Copy download link')
+        expect(screen.getByRole('button', {name: 'Copy download link'})).toBe(button())
+    })
+
+    it('does not revert while the same activation is still retrying (a click on "Copied")', async () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        await act(async () => {
+            pressCopy()
+        })
+        expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
+
+        // A second click while still focused re-copies rather than losing the
+        // confirmation to a spurious revert -- no blur happened.
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copied'}))
+        })
+
+        expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
     })
 })
 
@@ -520,7 +580,7 @@ describe('the announcer rows this view owns', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()} onAnnounce={onAnnounce}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
 
         expect(onAnnounce).toHaveBeenCalledTimes(1)
@@ -533,7 +593,7 @@ describe('the announcer rows this view owns', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()} onAnnounce={onAnnounce}/>)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            pressCopy()
         })
 
         expect(onAnnounce).not.toHaveBeenCalled()
@@ -547,4 +607,64 @@ describe('the announcer rows this view owns', () => {
         expect(heading.textContent).toBe('Ready to pass along')
         expect(heading.getAttribute('tabindex')).toBe('-1')
     })
+})
+
+/*
+ * What a real pointer press does, which fireEvent.click alone does not.
+ *
+ * jsdom's click moves no focus, so a test that only clicks leaves the control
+ * unfocused -- and the copy confirmation is deliberately only claimed while
+ * the control holds focus, since otherwise no blur is ever coming to revert it
+ * (D-114, reached by ordering). Clicking through this helper states the
+ * precondition the behaviour depends on instead of quietly not having it.
+ */
+function pressCopy(): HTMLElement {
+    const button = screen.getByRole('button', {name: 'Copy download link'})
+    button.focus()
+    fireEvent.click(button)
+    return button
+}
+
+// A promise this test resolves on demand, so the clipboard command can be made
+// to come back after focus has already moved on.
+function deferred<T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void
+    const promise = new Promise<T>((settle) => { resolve = settle })
+    return {promise, resolve}
+}
+
+/*
+  D-114 returning by the back door.
+
+  The clipboard command is asynchronous. A sender who clicks Copy and tabs
+  straight on can have it resolve after focus has already left -- and then no
+  blur is ever coming to revert the label, so the control keeps the name
+  "Copied" for the rest of the session. That is the original defect, reached by
+  ordering rather than by the missing revert, and the review reproduced it in
+  Chromium.
+
+  The three tests above cannot see it: each dispatches focusout directly on a
+  button that never held focus, so they pin the handler body rather than the
+  event meant to deliver it. This one states the precondition instead --
+  focus, then move it away before the command resolves.
+*/
+it('does not strand the confirmation when the copy resolves after focus has left', async () => {
+    const pending = deferred<void>()
+    writeText.mockReturnValue(pending.promise)
+    render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+    const button = screen.getByRole('button', {name: 'Copy download link'})
+    button.focus()
+    expect(document.activeElement).toBe(button)
+
+    fireEvent.click(button)
+    // The sender moves on before the command comes back.
+    fireEvent.blur(button, {relatedTarget: document.body})
+    await act(async () => {
+        pending.resolve()
+        await pending.promise
+    })
+
+    expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+    expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
 })

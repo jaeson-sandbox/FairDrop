@@ -306,14 +306,18 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 	if err != nil {
 		// A dialog's own diagnostic text names directories, so it stays behind
 		// Unwrap: what crosses the boundary is the code and the fixed copy.
-		// Left as transfer_failed deliberately. A chooser that fails to open
-		// is a platform failure, not a FairDrop that is not ready, and
-		// not_ready's copy blames a second instance -- which this is not.
-		// Story 3.11 was scoped to the states its ids name; inventing a code
-		// for this one would be exactly the unreviewed copy its Ask First
-		// boundary refuses. Recorded as D-113 instead.
+		//
+		// chooser_failed, not transfer_failed: a chooser that never opened is
+		// not a transfer that stopped partway -- nothing was ever chosen, so
+		// nothing was ever sent, and transfer_failed's "check the local
+		// network and create a fresh link" answers a question this failure
+		// never asked. It is not not_ready either, which blames a second
+		// running instance. Story 3.11 left this one uncoded on purpose (its
+		// Ask First boundary forbade inventing unreviewed copy) and routed it
+		// here as D-113; Story 4.1 is the one that decided the fifth code and
+		// discharged it.
 		return "", transfer.WrapError(
-			transfer.ErrTransferFailed,
+			transfer.ErrChooserFailed,
 			"the chooser could not be opened",
 			err,
 		)

@@ -36,6 +36,7 @@ const backendCodes = [
     'name_unsupported',
     'name_warning',
     'shutting_down',
+    'chooser_failed',
 ]
 
 // Written independently of fixedErrorMessages so every literal is pinned at
@@ -60,6 +61,7 @@ const expectedFixedCopies = [
     {code: 'name_unsupported', message: 'One name inside that folder can’t be sent safely. Rename it, then choose the folder again.'},
     {code: 'name_warning', message: 'Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items.'},
     {code: 'shutting_down', message: 'FairDrop is closing. Reopen it to start a transfer.'},
+    {code: 'chooser_failed', message: 'FairDrop couldn’t open the chooser. Try again, or drop the item on the zone above.'},
 ] as const
 
 const fixedTransferFailedCopy =
