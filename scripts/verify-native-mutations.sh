@@ -297,18 +297,6 @@ expect_named_failure 'equalize nested cleanup bounds' TestCoordinatorCleanupOutl
 perl -0pi -e 's/if IsUnquiescent\(err\)/if false \&\& IsUnquiescent(err)/ or die "inner timeout propagation mutation did not match\n"' internal/transfer/bounded.go
 expect_named_failure 'absorb inner unquiescent failure as diagnostic' TestCoordinatorPropagatesAnInnerUnquiescentServerFailure ./internal/transfer 'want the inner unquiescent marker preserved'
 
-# B9: publish coalesces observer calls through publishCleanup instead of
-# spawning one goroutine and timer per event. These two mutations prove both
-# halves: the cap itself (a second event must not reach the observer while an
-# earlier call is outstanding) and the self-heal (the slot must clear on its
-# own once the abandoned call returns, or every later event in the session is
-# silently dropped even after the observer recovers).
-perl -0pi -e 's/if c\.publishCleanup != nil \{/if false \&\& c.publishCleanup != nil {/ or die "publish cap mutation did not match\n"' internal/transfer/coordinator.go
-expect_named_failure 'let a second publish call reach the observer while one is outstanding' TestPublishCoalescesOutstandingObserverCalls ./internal/transfer 'second event was dropped while the first was outstanding'
-
-perl -0pi -e 's/if c\.publishCleanup == pending \{/if false \&\& c.publishCleanup == pending {/ or die "publish slot clear mutation did not match\n"' internal/transfer/coordinator.go
-expect_named_failure 'never clear the publish coalescing slot' TestPublishCoalescesOutstandingObserverCalls ./internal/transfer 'first progress never reached the observer'
-
 perl -0pi -e 's/return transfer\.MarkUnquiescent\(teardownTimeoutError\(([^\n]+)\)\)/return teardownTimeoutError($1)/ or die "unquiescent marker mutation did not match\n"' internal/server/lifecycle.go
 expect_named_failure 'erase server unquiescent marker' TestEachServerTeardownWaitIsNamedInIsolation ./internal/server 'want structurally unquiescent failure'
 

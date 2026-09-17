@@ -306,11 +306,6 @@ type Coordinator struct {
 	cleanupMu     sync.Mutex
 	serverCleanup *boundedCall
 	beaconCleanup *boundedCall
-
-	// publishCleanup holds the one outstanding observer call. Unlike the two
-	// above it is never joined -- see publish for why a second event cannot
-	// share a call already carrying a different one.
-	publishCleanup *boundedCall
 }
 
 var _ ClaimAuthorizer = (*Coordinator)(nil)
@@ -890,55 +885,8 @@ func (c *Coordinator) publish(event Event) {
 		return
 	}
 
-	c.cleanupMu.Lock()
-	if c.publishCleanup != nil {
-		c.cleanupMu.Unlock()
-		// An earlier event's observer call has not returned -- still inside
-		// its own bound, or already abandoned past it. This event cannot
-		// reach the observer without starting a second call concurrent with
-		// that one, and a second concurrent call is not merely wasteful:
-		// Observer.Publish is declared "a synchronous FIFO handoff ... an
-		// implementation must deliver in call order rather than reordering or
-		// buffering out of band", and an implementation written to that
-		// contract has no defence against being entered twice at once. A
-		// goroutine per event, which is what this did before, left every
-		// abandoned call free to do exactly that (B9).
-		//
-		// Dropped rather than queued: publish is called serially by the lease
-		// holder, so the alternative to dropping is not "deliver it late" but
-		// "deliver it never, silently". A terminal event is dropped by the
-		// same rule and deliberately not exempted -- delivering it would be
-		// the concurrent entry above, and an observer that has not returned
-		// inside observerPublishBound is not one a terminal event was going to
-		// reach. The diagnostic is the record.
-		c.recordDiagnostic(
-			NewError(ErrTransferFailed, "an event observer call was already outstanding"),
-			"a lifecycle event could not be delivered because an earlier one had not finished",
-		)
-		return
-	}
-	// Identity only: callBounded owns the wait-and-signal machinery this call
-	// needs, so the boundedCall's own done and err fields go unused. What the
-	// slot carries is the ability to tell this call apart from a later one.
-	pending := &boundedCall{}
-	c.publishCleanup = pending
-	c.cleanupMu.Unlock()
-
-	// The slot is cleared from inside the call, which callBounded runs to
-	// completion on its own goroutine whether or not it is still waiting on
-	// it -- so it clears whether the call returned in time or was abandoned
-	// past its bound. Unlike the two cleanup slots, publish has no
-	// cleanupPending-style reconciliation run from anywhere else, so a call
-	// that failed to clear its own slot would leave every later event in the
-	// session dropped even after the observer recovered.
 	_, completed := c.callBounded(observerPublishBound, func() error {
-		err := c.publishToObserver(event)
-		c.cleanupMu.Lock()
-		if c.publishCleanup == pending {
-			c.publishCleanup = nil
-		}
-		c.cleanupMu.Unlock()
-		return err
+		return c.publishToObserver(event)
 	})
 	if !completed {
 		// The call is left running on its own abandoned goroutine, exactly

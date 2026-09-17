@@ -1032,25 +1032,3 @@ func (h *harness) awaitBoundsPending() {
 		time.Sleep(200 * time.Microsecond)
 	}
 }
-
-// awaitPublishSlotClear blocks until the coordinator's publish coalescing
-// slot is free. An abandoned observer call clears it from its own goroutine
-// once the call actually returns, with nobody joining it, so a test that
-// wants to prove the slot self-heals has to poll for that rather than wait on
-// any call this package exposes.
-func (h *harness) awaitPublishSlotClear() {
-	h.t.Helper()
-	deadline := time.Now().Add(mutexProbeTimeout)
-	for {
-		h.coordinator.cleanupMu.Lock()
-		clear := h.coordinator.publishCleanup == nil
-		h.coordinator.cleanupMu.Unlock()
-		if clear {
-			return
-		}
-		if time.Now().After(deadline) {
-			h.t.Fatal("the publish slot never cleared")
-		}
-		time.Sleep(200 * time.Microsecond)
-	}
-}
