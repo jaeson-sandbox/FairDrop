@@ -164,7 +164,7 @@ real count is eight, corrected above. The Change Log's approved message said "dr
 window", which is false: `OnFileDrop` is registered drop-target-gated and `--wails-drop-target: drop`
 sits only on `.fd-drop-zone`, so a drag anywhere else is ignored — and `EXPERIENCE.md`'s own Recovery
 cell for the same row already said to use the drop zone, so the registry contradicted itself. The
-owner re-decided it as `FairDrop couldn't open the chooser. Try again, or drop the item on the zone
+owner re-decided it as `FairDrop couldn’t open the chooser. Try again, or drop the item on the zone
 above.` That wording error was mine: I offered the option without checking how drops are wired.
 
 *Two defects the suites could not see, both reproduced in Chromium.* The trigger could not close its
@@ -173,6 +173,23 @@ click that followed read `open === false` and reopened. And the copy confirmatio
 clipboard command is asynchronous, so a sender who clicks and tabs on has it resolve after focus has
 gone, leaving no blur to revert the label — D-114 returning by ordering. Both are fixed and pinned by
 tests that stage the real focus move rather than a synthetic event.
+
+*Three gaps closed after that, none of them a defect in shipped behaviour.* The menu claimed the
+ARIA menu-button pattern and implemented part of it: the trigger did not open on ArrowDown or
+ArrowUp, Escape did nothing while focus sat on the trigger (the state a pointer press leaves it in),
+Home and End did not move between items, the items each took a tab stop instead of a roving one, and
+`aria-controls` named an element that was not rendered. All five are now coded and mutation-killed.
+The menu was also measured at 320x900 and 1024x900 and nowhere else, so it gained a 200%-text case
+and one at the 640x480 minimum `main.go` actually sets.
+
+*And one vacuity in a test this story wrote.* That 640x480 case asserted the open menu's
+`getBoundingClientRect().bottom` stayed within `window.innerHeight`, and could not fail: opening the
+menu focuses its first item, Chromium scrolls a focused element into view, and a viewport-relative
+coordinate compared against the viewport measures that scroll rather than the layout — a mutation
+pushing the menu 600px down the page passed at `bottom = 479.95` in a 480px window, `scrollY = 723`.
+It now measures two scroll-invariant differences, the gap below the trigger and the menu's own
+height, which are also the two claims the design makes. Recorded in the evidence file as a sixth
+vacuous-test shape, and the first that mutating production code alone would not have surfaced.
 
 *KEEP.* The menu's Escape, focus-return, arrow-key and item-dispatch behaviour; the
 `chooser_failed` registry move; the browser-suite coverage of the open menu. All were independently
