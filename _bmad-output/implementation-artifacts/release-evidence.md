@@ -56,7 +56,7 @@ makes a named test fail. Everything a machine cannot observe is below.
 
 ## Artifact identity
 
-**v0.3.0 — built 2026-09-17, draft awaiting the owner.** Built by Release
+**v0.3.0 — published 2026-09-17, the current release.** Built by Release
 [35169193793](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35169193793) from
 `0db16580` at tag `v0.3.0`, each artifact on its own native runner after the full gate passed on
 both. The gate is `verify.yml` reused by `workflow_call`, so it is the same gate every pull request
@@ -69,10 +69,14 @@ runs, and it included the rendered accessibility suite on both desktop runners.
 
 First build to carry Stories 3.11, 3.12 and 4.2: nine reconciled error states, the rendered
 accessibility floor measured in real Chromium rather than read out of a stylesheet, the ten fixes
-the Epic 3 retrospective produced, and the four this week. Draft, not published — making a release
-visible on a public repository stays a person's act.
+the Epic 3 retrospective produced, and the four this week.
 
-**v0.2.0 — published 2026-09-13, superseded by the draft above.** Built by Release
+The workflow built it as a draft, because making a release visible on a public repository stays a
+person's act; the owner published it on 2026-09-17. The Windows artifact was then downloaded from
+the published release and `sha256sum --check` passed against its published `.sha256`, so the file a
+person gets is the file the runner built. What is downloadable now is this build.
+
+**v0.2.0 — published 2026-09-13, superseded,** built by Release
 [34734499181](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34734499181) from
 `7b59c373164c8bacdd4ae7c367ad3a231385a474`, each artifact on its own native runner after the full
 gate passed on both.
