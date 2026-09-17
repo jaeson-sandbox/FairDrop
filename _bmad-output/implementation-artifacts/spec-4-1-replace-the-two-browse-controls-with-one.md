@@ -2,7 +2,7 @@
 title: 'Story 4.1: Replace the Two Browse Controls with One'
 type: 'feature'
 created: '2026-09-17'
-status: 'in-review'
+status: 'done'
 baseline_commit: '84b0594c63f83b49ac1ece84cd5477de3fb9ea43'
 review_loop_iteration: 0
 context:
@@ -217,3 +217,72 @@ native drop has used it since Epic 1.
 - `cd frontend && npx tsc --noEmit -p tsconfig.json`; `npx vitest run`; `npm run test:browser`
 - The native run read with `gh run view --json conclusion,jobs`
 - Mutations: drop the menu's Escape handler; skip the focus return; let the chooser failure report `transfer_failed` again — each must fail a named test
+
+## Suggested Review Order
+
+**The control itself — start here**
+
+- One control replaces two; the menu absorbs the platform's split, not the label.
+  [`IdleView.tsx:162`](../../frontend/src/ui/IdleView.tsx#L162)
+
+- The drop zone stops opening a file-only chooser under a "file or folder" heading.
+  [`IdleView.tsx:76`](../../frontend/src/ui/IdleView.tsx#L76)
+
+- Focus lands in the menu on the open transition only, so re-renders never steal it back.
+  [`IdleView.tsx:175`](../../frontend/src/ui/IdleView.tsx#L175)
+
+- Escape and item choice return focus; a bare focus exit deliberately does not.
+  [`IdleView.tsx:193`](../../frontend/src/ui/IdleView.tsx#L193)
+
+**The two defects real Chromium found, and the suites could not**
+
+- The trigger's own press moves focus to it, which is not the sender leaving the menu.
+  [`IdleView.tsx:260`](../../frontend/src/ui/IdleView.tsx#L260)
+
+- Escape on the trigger, and arrows to open: the states a pointer press leaves behind.
+  [`IdleView.tsx:239`](../../frontend/src/ui/IdleView.tsx#L239)
+
+- The clipboard is async, so a copy can resolve after focus has already gone.
+  [`StagedView.tsx:105`](../../frontend/src/ui/StagedView.tsx#L105)
+
+- Blur reverts the label and the flag together, so a stranded confirmation cannot persist.
+  [`StagedView.tsx:130`](../../frontend/src/ui/StagedView.tsx#L130)
+
+**D-113: a fifth error code, moved through all eight places at once**
+
+- A chooser that never opened is not a transfer that stopped partway.
+  [`app.go:310`](../../app.go#L310)
+
+- The registry entry and its fixed public message; no path, no dialog text (AD-9).
+  [`errors.go:165`](../../internal/transfer/errors.go#L165)
+
+- The TypeScript half of the same pin, which must agree character for character.
+  [`errors.ts:64`](../../frontend/src/transfer/errors.ts#L64)
+
+- The label and the two item names, all three now carrying EXPERIENCE.md rows.
+  [`copy.ts:107`](../../frontend/src/ui/copy.ts#L107)
+
+**Layout — the app's first floating surface**
+
+- One control where a two-column grid was, and a menu positioned off it.
+  [`style.css:478`](../../frontend/src/style.css#L478)
+
+**Tests: what each one exists to catch**
+
+- The menu-button pattern, one case per gesture the review found missing.
+  [`IdleView.test.tsx:400`](../../frontend/src/ui/IdleView.test.tsx#L400)
+
+- A second press closes it: the focus move a real press performs, staged.
+  [`IdleView.test.tsx:371`](../../frontend/src/ui/IdleView.test.tsx#L371)
+
+- The rewritten 640x480 case; the first version measured Chromium's scroll.
+  [`accessibility.test.tsx:460`](../../frontend/browser/accessibility.test.tsx#L460)
+
+- The async copy, resolved after focus left, which no synthetic click reproduces.
+  [`StagedView.test.tsx:651`](../../frontend/src/ui/StagedView.test.tsx#L651)
+
+- The Go half of the code pin, asserting the wrapped dialog text stays unreachable.
+  [`app_test.go:918`](../../app_test.go#L918)
+
+- The citation rule run against a fixture, so it cannot pass by checking nothing.
+  [`main_test.go:855`](../../main_test.go#L855)
