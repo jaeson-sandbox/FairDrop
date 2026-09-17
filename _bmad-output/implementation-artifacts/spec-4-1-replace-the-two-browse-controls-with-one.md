@@ -127,10 +127,21 @@ the other); restyling two buttons (does not deliver the story).
 *The label.* `Choose a file or folder` -- it names both kinds and agrees with the drop zone's
 existing `copy.idle.instruction` rather than contradicting it.
 
-*D-113's message.* `FairDrop couldn't open the chooser. Try again, or drag the item onto the
-window.` It names what failed and offers the one recovery already present on the same screen, which
-matters most precisely when the dialog subsystem is the thing that is unwell. A fifth code, because
-`setup_failed` is a claim about an item the user chose and none was.
+*D-113's message.* `FairDrop couldn’t open the chooser. Try again, or drop the item on the zone
+above.` A fifth code, because `setup_failed` is a claim about an item the user chose and none was.
+It names what failed and offers the one recovery already present on the same screen, which matters
+most precisely when the dialog subsystem is the thing that is unwell.
+
+This wording is the corrected one. The first said `drag the item onto the window`, which the review
+caught as false: `OnFileDrop` is registered drop-target-gated and `--wails-drop-target: drop` sits
+only on `.fd-drop-zone`, so a drag anywhere else is ignored -- and `EXPERIENCE.md`'s own Recovery
+cell for the same row already said to use the drop zone, so the registry contradicted itself. The
+error was mine: the option was offered to the owner without checking how drops are wired.
+
+The apostrophe is the typographic one, as every registry message uses: of the nineteen messages in
+`internal/transfer/errors.go`, twelve carry an apostrophe and all twelve are curly, none straight.
+Earlier drafts here wrote it straight, which was an artifact of composing prose in a plain-text tool
+rather than a wording choice; the shipped string is what this records.
 
 *DESIGN.md's Selection Controls row.* Replaced with `One selection control, quieter than the drop
 zone.` The original balanced two peers; with one control that intent is moot, and what remains worth

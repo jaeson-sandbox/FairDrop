@@ -452,9 +452,10 @@ describe('WCAG 1.4.12 text-spacing overrides (D-068)', () => {
   doubling every text token is exactly what should overflow it if anything
   does. And it opens downward only -- `inset-block-start: 100%`, no flip, no
   max-height, no scroll -- while sitting low in Idle, below the drop zone, the
-  firewall preflight and any retained outcome. main.go sets the window's
-  minimum to 640x480, so that is the shape where an unflippable menu would run
-  past the bottom edge.
+  firewall preflight and any retained outcome. Idle is already taller than the
+  640x480 minimum main.go sets, so at that size the window scrolls and "past
+  the bottom edge" is not the failure to look for; a menu that detaches from
+  its control, or that grows taller than the window it opens in, is.
 */
 describe('the browse menu at the sizes the app really runs at (D-068)', () => {
     it('survives 200% text without overflowing or clipping', async () => {
@@ -466,7 +467,24 @@ describe('the browse menu at the sizes the app really runs at (D-068)', () => {
         assertNoFixedHeightClipsGrownText(container)
     })
 
-    it('fits inside the window at the 640x480 minimum main.go sets', async () => {
+    /*
+      Both measurements here are differences, and that is deliberate.
+
+      Opening the menu moves focus into its first item, and Chromium scrolls a
+      newly focused element into view. `getBoundingClientRect()` is
+      viewport-relative, so after that scroll the menu's `bottom` sits flush
+      against the viewport edge wherever it was actually laid out -- this case
+      first asserted `bottom <= window.innerHeight` and a mutation pushing the
+      menu 600px down the page still passed, at `scrollY = 723`. Any assertion
+      comparing one viewport-relative coordinate against the viewport is
+      measuring the browser's scroll-into-view, not this menu's layout.
+
+      A gap between two rects taken after the same scroll, and a height, are
+      both scroll-invariant, and between them they are the claim: the menu
+      hangs directly off the control that opened it, and the whole of it is
+      small enough to be read at once in the smallest window main.go allows.
+    */
+    it('hangs off its control and fits the 640x480 minimum main.go sets', async () => {
         await page.viewport(640, 480)
         const container = renderIdleMenuOpen()
 
@@ -474,13 +492,24 @@ describe('the browse menu at the sizes the app really runs at (D-068)', () => {
 
         const menu = container.querySelector<HTMLElement>('.fd-browse-menu')
         if (menu === null) throw new Error('.fd-browse-menu did not render')
-        const box = menu.getBoundingClientRect()
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+        const gap = menu.getBoundingClientRect().top - trigger.getBoundingClientRect().bottom
+
         expect(
-            box.bottom,
-            `the open menu reaches ${box.bottom.toFixed(1)}px, past the ${window.innerHeight}px window: ` +
-                'it opens downward only, with no flip, no max-height and no scroll, and the control it ' +
-                'hangs from sits low in Idle',
-        ).toBeLessThanOrEqual(window.innerHeight + 0.5)
+            gap,
+            `the open menu starts ${gap.toFixed(1)}px below the control it hangs from: it opens ` +
+                'downward only, with no flip, so a menu detached from its control is one the sender ' +
+                'has to go looking for',
+        ).toBeGreaterThanOrEqual(-0.5)
+        expect(gap, 'the same, in the other direction').toBeLessThanOrEqual(24)
+
+        const height = menu.getBoundingClientRect().height
+        expect(
+            height,
+            `the open menu is ${height.toFixed(1)}px tall in a ${window.innerHeight}px window: it ` +
+                'carries no max-height and no scroll of its own, so a menu taller than the window ' +
+                'could not be read in one piece',
+        ).toBeLessThanOrEqual(window.innerHeight)
     })
 })
 

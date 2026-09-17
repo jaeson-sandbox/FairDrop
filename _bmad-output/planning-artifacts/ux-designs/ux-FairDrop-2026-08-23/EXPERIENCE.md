@@ -89,6 +89,9 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.qr.alt` | QR accessible-name template | “Download QR code for [item name]” |
 | `copy.folder.note` | Folder note | “This folder downloads as a ZIP.” |
 | `copy.direct_link.action` | Direct-link action | “Copy download link” |
+| `copy.label.choose_file_or_folder` | Browse control | “Choose a file or folder” |
+| `copy.label.file` | Item kind, file | “File” |
+| `copy.label.folder` | Item kind, folder | “Folder” |
 | `copy.direct_link.helper` | Direct-link helper | “Open this link directly in the receiving device’s browser.” |
 | `copy.first_opener.warning` | First-opener warning | “One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.” |
 | `copy.network.disclosure` | Network disclosure | “Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.” |
