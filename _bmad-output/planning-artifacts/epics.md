@@ -34,7 +34,7 @@ This document provides the complete epic and story breakdown for FairDrop, decom
 
 FR1: Accept exactly one absolute path for a regular file or directory from the proven Wails native drop boundary.
 
-FR2: Provide keyboard-reachable native Select File and Select Directory actions without staging automatically; a cancelled dialog produces no transfer error.
+FR2: Provide a keyboard-reachable native way to choose either kind without staging automatically; a cancelled dialog produces no transfer error. (Amended 2026-09-17 by Story 4.1: this read "Select File and Select Directory actions" and described two controls. One control offering both kinds replaced them; the Wails commands keep those names.)
 
 FR3: Reject zero or multiple dropped paths, empty or missing paths, symbolic links, Windows reparse points, and non-regular special files with a stable safe error; never select the first item silently.
 
@@ -136,7 +136,7 @@ NFR15: The desktop UI targets WCAG 2.2 AA as a release gate, not an aspiration: 
 
 > **Binding UX contract.** `ux-designs/ux-FairDrop-2026-08-23/DESIGN.md` and `EXPERIENCE.md` are the binding UX companions, both `status: final` after a three-lens reviewer gate (rubric, accessibility, trust/cross-device; 33 findings, all resolved). `DESIGN.md` owns the visual token set, component visual specs, and contrast evidence. `EXPERIENCE.md` owns information architecture, the single copy registry, component behavior, state treatments, announcement ownership, and the accessibility floor. The requirements below restate the load-bearing obligations for story traceability; the companions remain authoritative on any detail they specify.
 
-UX-DR1: The Idle view provides one clearly marked native drop target plus semantic, keyboard-reachable Select File and Select Directory actions with visible focus.
+UX-DR1: The Idle view provides one clearly marked native drop target plus one semantic, keyboard-reachable control that reaches either kind, with visible focus. (Amended 2026-09-17 by Story 4.1, which replaced the two controls this named.)
 
 UX-DR2: The drop adapter accepts exactly one path; zero or multiple paths show a safe validation error and never stage the first item silently.
 
@@ -723,7 +723,7 @@ So that I always know what FairDrop is holding, what to do next, and what is act
 
 **Given** the Idle view
 **When** it renders
-**Then** it presents, in document order, the firewall preflight guidance, one clearly marked native drop target carrying `copy.idle.instruction`, semantic keyboard-reachable Select File and Select Directory controls, and the optional retained terminal outcome
+**Then** it presents, in document order, the firewall preflight guidance, one clearly marked native drop target carrying `copy.idle.instruction`, semantic keyboard-reachable Select File and Select Directory controls, and the optional retained terminal outcome *(the record of what Epic 1 accepted; Story 4.1 replaced the two controls with one in 2026-09-17, and UX-DR1 above carries the current rule)*
 **And** it keeps the inherited `--wails-drop-target: drop` property, adds no DOM drop handler or class-only gate, and shows no transfer history.
 
 **Given** a native drop callback or dialog result

@@ -110,7 +110,7 @@ Phase 1 proved integration facts that later UI work must retain:
 - Mark the drop zone through inherited CSS `--wails-drop-target: drop`; do not replace this with a DOM drop handler or class-only gate.
 - Treat the callback's `string[]` as untrusted shape: exactly one path may call `StageTransfer`; zero or multiple paths show a safe validation error and never select the first silently.
 
-Drag-and-drop is not the only input. The idle view provides semantic keyboard-reachable `SelectFile` and `SelectDirectory` actions backed by Wails native runtime dialogs, visible focus, and an `aria-live` region for staging and lifecycle changes. A cancelled dialog is not a transfer error. Phase 6 may revise the Phase 1 echo-only multi-file test, but it must retain coverage for array receipt, CSS targeting, and listener cleanup.
+Drag-and-drop is not the only input. The idle view provides one semantic keyboard-reachable control that reaches either kind, backed by Wails native runtime dialogs, with visible focus and an `aria-live` region for staging and lifecycle changes. It opens a `role="menu"` offering both kinds because Windows' `IFileOpenDialog` cannot present them in one dialog; the item chosen runs the matching `SelectFile` or `SelectDirectory` command, whose names are unchanged (Story 4.1). A cancelled dialog is not a transfer error. Phase 6 may revise the Phase 1 echo-only multi-file test, but it must retain coverage for array receipt, CSS targeting, and listener cleanup.
 
 ## HTTP protocol and security envelope
 

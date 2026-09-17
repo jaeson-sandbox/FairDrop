@@ -309,7 +309,7 @@ var registryEntries = []struct {
 	{"name_unsupported", "One name inside that folder can’t be sent safely. Rename it, then choose the folder again."},
 	{"name_warning", "Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items."},
 	{"shutting_down", "FairDrop is closing. Reopen it to start a transfer."},
-	{"chooser_failed", "FairDrop couldn’t open the chooser. Try again, or drag the item onto the window."},
+	{"chooser_failed", "FairDrop couldn’t open the chooser. Try again, or drop the item on the zone above."},
 }
 
 // TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage proves the four
@@ -798,21 +798,27 @@ func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
 	}
 
 	entries := deferredEntries(t, deferred)
-	if len(entries) == 0 {
-		t.Fatal("no deferred entries parsed, so this test would pass vacuously")
-	}
 
-	// Zero *open* entries is a legitimate state -- Story 4.1 discharged the
-	// last two (D-113, D-114) and left every remaining entry discharged or
-	// accepted -- so the vacuity guard above counts every entry the parser
-	// found, not merely the open ones: a broken deferredEntries parse is what
-	// this guards against, not a backlog that happens to be empty right now.
+	// Zero *open* entries is a legitimate state: Story 4.1 discharged the last
+	// two (D-113, D-114) and left every remaining entry discharged or accepted.
+	// So this cannot Fatal on an empty backlog the way it once did -- but it
+	// must not pretend to be checking something either. The loop below
+	// `continue`s past every discharged and accepted entry, so with none open
+	// its body runs zero times and the citation rule goes unexercised.
+	// TestTheCitationRuleItselfHolds below keeps that rule proven against a
+	// fixture whether or not the live backlog has anything open, and this
+	// reports plainly when the live pass checked nothing.
+	//
+	// Guarding on len(entries) would be dead code: deferredEntries Fatals when
+	// it parses fewer than two blocks, so it can never return an empty slice.
+	checked := 0
 	for _, entry := range entries {
 		id, owner := entry.id, entry.owner
 		if owner == "discharged" || owner == "accepted" {
 			continue
 		}
 
+		checked++
 		prefix := storyPrefix(owner)
 		if !cited[prefix][id] {
 			t.Errorf("%s is owned by %q, but Story %s's Closes line in epics.md does not name it: "+
@@ -823,6 +829,52 @@ func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
 			t.Errorf("%s is still open but its owner %q is already done: "+
 				"the finding belongs to nobody", id, owner)
 		}
+	}
+	if checked == 0 {
+		t.Logf("no open deferred entries, so the citation rule was not exercised against the live "+
+			"ledger on this run (%d entries, all discharged or accepted); "+
+			"TestTheCitationRuleItselfHolds is what keeps it proven", len(entries))
+	}
+}
+
+/*
+TestTheCitationRuleItselfHolds keeps the rule above proven when the backlog is
+empty.
+
+Story 4.1 discharged the last two open entries, and the loop above skips every
+discharged and accepted one -- so its body now runs zero times and deleting it
+entirely leaves the suite green. That is not a hypothetical: the review found
+it by reading, and the guard that was supposed to catch it could not, because
+deferredEntries Fatals before it could ever return an empty slice.
+
+An empty backlog is a good state, not a reason to weaken the rule. So the rule
+runs here against a fixture instead of against whatever the ledger happens to
+hold: an entry whose owning story names it stays silent, and one whose story
+does not is reported.
+*/
+func TestTheCitationRuleItselfHolds(t *testing.T) {
+	cited := map[string]map[string]bool{"4-1": {"D-113": true}}
+
+	for _, probe := range []struct {
+		name   string
+		id     string
+		owner  string
+		cited  bool
+		wanted bool
+	}{
+		{"an entry its owning story names", "D-113", "4-1-replace-the-two-browse-controls-with-one", true, false},
+		{"an entry its owning story never names", "D-999", "4-1-replace-the-two-browse-controls-with-one", false, true},
+	} {
+		t.Run(probe.name, func(t *testing.T) {
+			prefix := storyPrefix(probe.owner)
+			if prefix != "4-1" {
+				t.Fatalf("storyPrefix(%q) = %q, want 4-1 -- the rule reduces a story key to the pair "+
+					"it shares with an epics.md heading", probe.owner, prefix)
+			}
+			if missing := !cited[prefix][probe.id]; missing != probe.wanted {
+				t.Errorf("citation check for %s reported missing=%v, want %v", probe.id, missing, probe.wanted)
+			}
+		})
 	}
 }
 

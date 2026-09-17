@@ -229,6 +229,14 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     function handleMenuBlur(event: FocusEvent<HTMLDivElement>): void {
         const next = event.relatedTarget as Node | null
         if (next !== null && menuRef.current?.contains(next)) return
+        // Focus moving to the trigger is not the sender leaving the menu: it
+        // is a pointer press on the control itself, and mousedown focuses the
+        // trigger before the click that follows. Closing here would make that
+        // click read `open === false` and reopen the menu, so a second press
+        // could never dismiss it -- reproduced in Chromium, and invisible to
+        // both suites because fireEvent.click moves no focus. The trigger's
+        // own onClick owns that toggle; this handler stays out of its way.
+        if (next === triggerRef.current) return
         setOpen(false)
     }
 

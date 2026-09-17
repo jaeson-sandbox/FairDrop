@@ -77,8 +77,11 @@ not preclude and does not implement. Let a chooser diagnostic carry the attempte
   `EXPERIENCE.md:39` rather than as a `copy.*` registry row — so the new label needs both.
 - `app.go:288-321` — `chooseWith`. The `err != nil` branch returns `ErrTransferFailed` with a comment
   recording exactly why D-113 was left open; that comment is the thing to replace.
-- `internal/transfer/errors.go`, `docs/fairdrop-contracts.md`, `frontend/src/transfer/errors.ts`,
-  `internal/transfer/errors_test.go` — the five places a code moves through; the pin names all of them.
+- The **eight** places a code moves through, not the five this first said: `EXPERIENCE.md`,
+  `docs/fairdrop-contracts.md`, `internal/transfer/errors.go`, `internal/transfer/errors_test.go`,
+  `frontend/src/transfer/errors.ts`, `frontend/src/transfer/errors.test.ts`,
+  `frontend/src/ui/copy.test.ts`, and `main_test.go`'s own `registryEntries` literal — which drives
+  the cross-file pin and would otherwise stop checking a new code silently.
 - `frontend/src/ui/StagedView.tsx:~170` — the Copy button whose label swaps to `copy.copy.confirmation`
   and never swaps back (D-114).
 - `frontend/src/ui/styles.test.ts`, `frontend/browser/accessibility.test.tsx` — the 44px floor and the
@@ -137,6 +140,32 @@ later NSOpenPanel phase can drop the menu on macOS without amending the design c
 *Not changed:* the drop zone's own copy. `Drop one file or folder.` already agrees with the new
 label, so nothing needs reconciling beyond the Idle prose at EXPERIENCE.md:39 that still names two
 controls.
+
+**2026-09-17 (review).** Three review layers ran; two reproduced their findings in real Chromium
+rather than reasoning about them. Routed as `bad_spec` by the workflow's rules, and fixed in place
+on the owner's decision rather than reverted and re-derived — the implementation was sound in the
+large and the defects were precisely located, so re-deriving roughly seven hundred lines would have
+risked the verified-good parts to fix six located things. Recorded here because it is a deliberate
+deviation from the prescribed loopback, not an oversight.
+
+*What the spec got wrong.* The Code Map said "five places a code moves through" and named four; the
+real count is eight, corrected above. The Change Log's approved message said "drag the item onto the
+window", which is false: `OnFileDrop` is registered drop-target-gated and `--wails-drop-target: drop`
+sits only on `.fd-drop-zone`, so a drag anywhere else is ignored — and `EXPERIENCE.md`'s own Recovery
+cell for the same row already said to use the drop zone, so the registry contradicted itself. The
+owner re-decided it as `FairDrop couldn't open the chooser. Try again, or drop the item on the zone
+above.` That wording error was mine: I offered the option without checking how drops are wired.
+
+*Two defects the suites could not see, both reproduced in Chromium.* The trigger could not close its
+own menu — mousedown focuses the trigger, which fired the menu's blur handler and closed it, so the
+click that followed read `open === false` and reopened. And the copy confirmation could strand: the
+clipboard command is asynchronous, so a sender who clicks and tabs on has it resolve after focus has
+gone, leaving no blur to revert the label — D-114 returning by ordering. Both are fixed and pinned by
+tests that stage the real focus move rather than a synthetic event.
+
+*KEEP.* The menu's Escape, focus-return, arrow-key and item-dispatch behaviour; the
+`chooser_failed` registry move; the browser-suite coverage of the open menu. All were independently
+verified and none of it was the problem.
 
 ## Design Notes
 

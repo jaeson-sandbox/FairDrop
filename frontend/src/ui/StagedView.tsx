@@ -1,4 +1,4 @@
-import {useState} from 'react'
+import {useRef, useState} from 'react'
 import {CopyToClipboard} from '../../wailsjs/go/main/App'
 import {selectCommandError, selectWarnings} from '../transfer/selectors'
 import type {StagedTransferState} from '../transfer/state'
@@ -44,6 +44,10 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
     const warnings = selectWarnings(state)
     const commandError = selectCommandError(state)
     const [copied, setCopied] = useState(false)
+    // Whether the copy control holds focus right now. A ref rather than state
+    // because the asynchronous clipboard callback below reads it after the
+    // render that set it, and re-rendering on focus would buy nothing.
+    const focusedRef = useRef(false)
     const [showFullName, setShowFullName] = useState(false)
 
     const size = metadata.isDir
@@ -90,7 +94,15 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
         void Promise.resolve()
             .then(() => CopyToClipboard(metadata.url))
             .then(() => {
-                setCopied(true)
+                // Only claim the confirmation while the control still holds
+                // focus. The command is asynchronous, so a sender who clicks
+                // and tabs straight on can have it resolve after focus has
+                // already gone -- and then no blur is ever coming to revert
+                // the label, which is D-114 returning by the back door
+                // (reproduced in Chromium). The announcement still happens:
+                // the copy did succeed, and that is what the sender needs to
+                // hear regardless of where focus went.
+                if (focusedRef.current) setCopied(true)
                 onAnnounce?.(state.session.sessionId, copy.copy.confirmation)
             }, () => onCopyFailed?.(state.session.sessionId))
     }
@@ -115,7 +127,10 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
      * success or failure -- is what decides the label next, exactly as
      * before.
      */
-    const handleCopyBlur = () => setCopied(false)
+    const handleCopyBlur = () => {
+        focusedRef.current = false
+        setCopied(false)
+    }
 
     return (
         <div className="fd-region" data-phase-view="staged">
@@ -209,6 +224,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                         type="button"
                                         className={`fd-button fd-target ${copied ? 'fd-button--copied' : 'fd-button--primary'}`}
                                         onClick={handleCopy}
+                                        onFocus={() => { focusedRef.current = true }}
                                         onBlur={handleCopyBlur}
                                     >
                                         {copied ? copy.copy.confirmation : copy.directLink.action}

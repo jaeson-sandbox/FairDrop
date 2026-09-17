@@ -348,3 +348,35 @@ describe('Idle after a cancellation won its race', () => {
         expect(targets).toEqual(['idle-instruction', 'command-error'])
     })
 })
+
+/*
+  A second press on the control closes the menu it opened.
+
+  The review reproduced the opposite in Chromium: mousedown focuses the
+  trigger, which fires focusout from the menu subtree, which closed the menu --
+  and the click that followed then read `open === false` and reopened it, so
+  the control could never dismiss its own menu. Neither suite could see it,
+  because fireEvent.click moves no focus and even browser mode dispatches a
+  synthetic event with no default focus action.
+
+  So the focus move is staged explicitly here: blur the menu with relatedTarget
+  set to the trigger, which is exactly what a real mousedown does, and only
+  then click.
+*/
+describe('the browse control dismisses its own menu', () => {
+    it('closes on a second activation, after the focus move a real press performs', () => {
+        show()
+        const control = screen.getByRole('button', {name: 'Choose a file or folder'})
+
+        fireEvent.click(control)
+        expect(screen.getByRole('menu')).toBeTruthy()
+        expect(control.getAttribute('aria-expanded')).toBe('true')
+
+        // What a pointer press on the trigger does before its click lands.
+        fireEvent.blur(screen.getByRole('menu'), {relatedTarget: control})
+        fireEvent.click(control)
+
+        expect(screen.queryByRole('menu')).toBeNull()
+        expect(control.getAttribute('aria-expanded')).toBe('false')
+    })
+})

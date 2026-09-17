@@ -38,7 +38,7 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		{ErrNameUnsupported, "One name inside that folder can’t be sent safely. Rename it, then choose the folder again."},
 		{ErrNameWarning, "Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items."},
 		{ErrShuttingDown, "FairDrop is closing. Reopen it to start a transfer."},
-		{ErrChooserFailed, "FairDrop couldn’t open the chooser. Try again, or drag the item onto the window."},
+		{ErrChooserFailed, "FairDrop couldn’t open the chooser. Try again, or drop the item on the zone above."},
 	}
 
 	for _, test := range tests {
