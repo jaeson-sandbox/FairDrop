@@ -1,9 +1,11 @@
 import type {} from '@vitest/browser-playwright' // pulls in the CDPSession#send() augmentation for the playwright provider
-import {cleanup, render} from '@testing-library/react'
+import type {CSSProperties} from 'react'
+import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {cdp, page} from 'vitest/browser'
 import {afterEach, describe, expect, it, vi} from 'vitest'
-import type {StagedTransferState, TransferringTransferState} from '../src/transfer/state'
+import type {IdleTransferState, StagedTransferState, TransferringTransferState} from '../src/transfer/state'
 import type {FileMetadata, ProgressSnapshot} from '../src/transfer/types'
+import {IdleView} from '../src/ui/IdleView'
 import {StagedView} from '../src/ui/StagedView'
 import {TransferringView} from '../src/ui/TransferringView'
 import '../src/style.css'
@@ -18,8 +20,11 @@ import '../src/style.css'
   Chromium and measuring them. A rule that disagrees between the two suites is
   a finding to report, never a reason to loosen either one (spec Never list).
 
-  Only Staged and Transferring are rendered: they are the two views the
-  spec's Intent and I/O matrix name for every rendered check below.
+  Staged and Transferring are the two views the spec's Intent and I/O matrix
+  named for every rendered check below. Idle's browse menu joined them for
+  spec-4-1 (Story 4.1): it is the product's first floating surface, so the
+  same rendered proof -- targets, reflow, forced colors -- applies to it
+  measured open, not merely to its text in the stylesheet.
 */
 
 vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn().mockResolvedValue(undefined)}))
@@ -118,6 +123,27 @@ function renderStaged(): HTMLElement {
 
 function renderTransferring(): HTMLElement {
     return render(<TransferringView state={transferring()} onCancel={() => undefined}/>).container
+}
+
+const dropTargetStyle = {'--wails-drop-target': 'drop'} as CSSProperties
+
+function idle(): IdleTransferState {
+    return {phase: 'idle', retainedOutcome: null, commandError: null}
+}
+
+/** Idle with the browse menu already open -- the surface these checks measure. */
+function renderIdleMenuOpen(): HTMLElement {
+    const {container} = render(
+        <IdleView
+            state={idle()}
+            dropTargetStyle={dropTargetStyle}
+            cancelWon={false}
+            onSelectFile={() => undefined}
+            onSelectDirectory={() => undefined}
+        />,
+    )
+    fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+    return container
 }
 
 // Every rendered token or media-feature override below is applied to the
@@ -332,6 +358,11 @@ describe('reflow at 320 CSS pixels (D-068)', () => {
         await page.viewport(320, 900)
         assertNoHorizontalOverflow(renderTransferring())
     })
+
+    it('keeps the open browse menu scrolling only vertically, with nothing clipped', async () => {
+        await page.viewport(320, 900)
+        assertNoHorizontalOverflow(renderIdleMenuOpen())
+    })
 })
 
 describe('200% text (D-068)', () => {
@@ -419,6 +450,11 @@ describe('the 44px activation floor (D-068)', () => {
         await page.viewport(1024, 900)
         assertEveryTargetMeetsTheFloor(renderTransferring())
     })
+
+    it('measures the browse control and every open menu item at or above 44x44 CSS pixels', async () => {
+        await page.viewport(1024, 900)
+        assertEveryTargetMeetsTheFloor(renderIdleMenuOpen())
+    })
 })
 
 describe('forced colors (D-065)', () => {
@@ -440,6 +476,21 @@ describe('forced colors (D-065)', () => {
                 ).not.toBe('none')
             }
         }
+    })
+
+    it('keeps the open browse menu inside the system palette, with no exemption of its own', async () => {
+        await page.viewport(1024, 900)
+        await setForcedColorsActive(true)
+        const container = renderIdleMenuOpen()
+
+        for (const element of container.querySelectorAll<HTMLElement>('*')) {
+            const adjust = getComputedStyle(element).getPropertyValue('forced-color-adjust')
+            expect(
+                adjust,
+                `${describeElement(element)} computes forced-color-adjust: none -- the menu carries no exemption`,
+            ).not.toBe('none')
+        }
+        assertNoHorizontalOverflow(container)
     })
 
     it('captures the QR panel under forced colors -- a rendered capture, not a scan', async () => {

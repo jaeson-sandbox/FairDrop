@@ -79,7 +79,7 @@ afterEach(cleanup)
 describe('a focus target the screen does not carry', () => {
     it('never calls focus, and lets the transition complete anyway', () => {
         const view = mountWith(idle())
-        const anchor = screen.getByRole('button', {name: 'Select File'})
+        const anchor = screen.getByRole('button', {name: 'Choose a file or folder'})
         anchor.focus()
 
         // There is no outcome panel in Idle, so this target is absent.

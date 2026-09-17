@@ -1,4 +1,5 @@
-import type {CSSProperties} from 'react'
+import type {CSSProperties, FocusEvent, KeyboardEvent} from 'react'
+import {useEffect, useId, useRef, useState} from 'react'
 import {selectCommandError} from '../transfer/selectors'
 import type {IdleTransferState} from '../transfer/state'
 import {OutcomePanel} from './OutcomePanel'
@@ -23,7 +24,7 @@ interface IdleViewProps {
 
 /**
  * Idle: the drop target, the cancellation summary, a command failure, the
- * firewall preflight, the two browse controls, and recovery help, in that
+ * firewall preflight, the one browse control, and recovery help, in that
  * document order.
  *
  * The drop instruction leads because it is this region's `h1`. The spine's one
@@ -52,7 +53,7 @@ export function IdleView({
                   It leads because it is the answer to what just happened, and
                   because a retained Done or Error already renders above this
                   view from the shell -- an outcome that appeared under the
-                  selection controls was the odd one out.
+                  browse control was the odd one out.
 
                   Warning, not error. The spine's rule for `cancelled` is
                   "return to Idle; never render as Error", and `--color-error`
@@ -74,18 +75,19 @@ export function IdleView({
 
                 {/*
                   A drop target and nothing else. It carries no click handler
-                  and no tab stop: the two browse controls below are the pointer
-                  and keyboard path to both choosers.
+                  and no tab stop: the browse control below is the pointer and
+                  keyboard path to both choosers.
 
                   It used to open the file chooser on click, added when only
                   files could be sent. Once folders worked that shortcut
                   contradicted the instruction it sat under -- "file or folder"
                   -- by opening a picker that can only choose a file, and a live
                   run went straight into it. A native chooser is one kind or the
-                  other, so the honest click targets are the two labelled
-                  buttons. They stay below the firewall preflight, not inside
-                  this zone, because FR23 requires the preflight ahead of the
-                  selection controls.
+                  other, so the honest click target is the one labelled control,
+                  which opens a menu rather than assuming a kind itself. It
+                  stays below the firewall preflight, not inside this zone,
+                  because FR23 requires the preflight ahead of the selection
+                  control.
                 */}
                 <div
                     className="fd-drop-zone"
@@ -128,17 +130,151 @@ export function IdleView({
                     </dl>
                 </aside>
 
-                <div className="fd-selection">
-                    <button type="button" className="fd-button fd-target" onClick={onSelectFile}>
-                        {copy.label.selectFile}
-                    </button>
-                    <button type="button" className="fd-button fd-target" onClick={onSelectDirectory}>
-                        {copy.label.selectDirectory}
-                    </button>
-                </div>
+                <BrowseControl onSelectFile={onSelectFile} onSelectDirectory={onSelectDirectory}/>
 
                 <RecoveryHelp/>
             </section>
+        </div>
+    )
+}
+
+interface BrowseControlProps {
+    readonly onSelectFile: () => void
+    readonly onSelectDirectory: () => void
+}
+
+/**
+ * The one control that replaced the two browse buttons.
+ *
+ * Windows' `IFileOpenDialog` cannot offer a file and a folder chooser in one
+ * dialog the way macOS's `NSOpenPanel` can, so the label alone cannot promise
+ * both kinds without a click sometimes breaking that promise -- exactly
+ * `IdleView`'s old scar above. The menu is where that asymmetry is absorbed:
+ * the control's label never changes, and either item leads to the matching
+ * native chooser.
+ *
+ * This is the product's first floating surface, so it earns the ARIA menu
+ * button pattern rather than a plain toggle: `role="menu"`/`role="menuitem"`,
+ * Escape, and focus return to the trigger. Its open/closed state is local --
+ * not reducer state -- because nothing about it survives a re-render of Idle
+ * or needs to be reconstructed from a lifecycle event.
+ */
+function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
+    const [open, setOpen] = useState(false)
+    const triggerRef = useRef<HTMLButtonElement | null>(null)
+    const menuRef = useRef<HTMLDivElement | null>(null)
+    const firstItemRef = useRef<HTMLButtonElement | null>(null)
+    const triggerId = useId()
+    const menuId = useId()
+
+    // Opened, not merely rendered: the item the sender reaches with the very
+    // next keystroke is the first one, per "the menu opens, focus lands in
+    // it" (I/O matrix). Running this only on the open transition, rather than
+    // on every render, is what keeps a later re-render from stealing focus
+    // back off whichever item the sender has since moved to with the keyboard.
+    useEffect(() => {
+        if (open) firstItemRef.current?.focus()
+    }, [open])
+
+    /**
+     * Closes the menu and returns focus to the control that opened it.
+     *
+     * Used for Escape and for an item being chosen -- never for focus simply
+     * leaving the menu on its own, which is `handleMenuBlur` below and must
+     * not fight the sender's own focus move.
+     *
+     * Returning focus before the native chooser opens (rather than after)
+     * matters because the menu item that was just activated is about to
+     * unmount: if a dismissed dialog relies on the browser's own "return
+     * focus to whatever was focused when the dialog opened" behaviour --
+     * which nothing here has to reimplement -- that has to be a node that
+     * still exists once the dialog closes.
+     */
+    function closeAndReturnFocus(): void {
+        setOpen(false)
+        triggerRef.current?.focus()
+    }
+
+    function choose(action: () => void): void {
+        closeAndReturnFocus()
+        action()
+    }
+
+    function handleMenuKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+        if (event.key === 'Escape') {
+            event.preventDefault()
+            closeAndReturnFocus()
+            return
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+        event.preventDefault()
+
+        const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
+        if (items === undefined || items.length === 0) return
+        const itemList = [...items]
+        const currentIndex = itemList.indexOf(document.activeElement as HTMLButtonElement)
+        const delta = event.key === 'ArrowDown' ? 1 : -1
+        itemList[(currentIndex + delta + itemList.length) % itemList.length]?.focus()
+    }
+
+    /**
+     * Focus leaving the menu on its own -- Tab, or a pointer landing
+     * elsewhere -- closes the menu quietly, but must never pull focus back:
+     * `EXPERIENCE.md` allows no focus trap outside an OS dialog, and a menu
+     * that recaptured focus on every Tab-out would be exactly one, stranding
+     * a keyboard user between the trigger and the item that follows it.
+     * Escape is the one gesture that explicitly asks to return to the
+     * control; this handler leaves focus wherever the sender sent it.
+     */
+    function handleMenuBlur(event: FocusEvent<HTMLDivElement>): void {
+        const next = event.relatedTarget as Node | null
+        if (next !== null && menuRef.current?.contains(next)) return
+        setOpen(false)
+    }
+
+    return (
+        <div className="fd-selection">
+            <button
+                type="button"
+                id={triggerId}
+                ref={triggerRef}
+                className="fd-button fd-target"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                aria-controls={menuId}
+                onClick={() => setOpen((was) => !was)}
+            >
+                {copy.label.chooseFileOrFolder}
+            </button>
+            {open ? (
+                <div
+                    id={menuId}
+                    ref={menuRef}
+                    role="menu"
+                    aria-labelledby={triggerId}
+                    className="fd-browse-menu"
+                    onKeyDown={handleMenuKeyDown}
+                    onBlur={handleMenuBlur}
+                >
+                    <button
+                        type="button"
+                        role="menuitem"
+                        ref={firstItemRef}
+                        className="fd-button fd-target"
+                        onClick={() => choose(onSelectFile)}
+                    >
+                        {copy.label.file}
+                    </button>
+                    <button
+                        type="button"
+                        role="menuitem"
+                        className="fd-button fd-target"
+                        onClick={() => choose(onSelectDirectory)}
+                    >
+                        {copy.label.folder}
+                    </button>
+                </div>
+            ) : null}
         </div>
     )
 }

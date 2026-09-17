@@ -307,6 +307,63 @@ describe('copy feedback', () => {
         expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
         expect(onCopyFailed).toHaveBeenCalledWith(sessionId)
     })
+
+    /*
+      D-114: a successful copy used to rename this control to "Copied" for the
+      rest of the session, with no way back -- the one control that reaches
+      the capability URL lost the name that says what it does. Blur is the
+      sanctioned trigger: it fires only from the sender's own focus move, never
+      a timer EXPERIENCE.md forbids, so by the time the sender "returns to the
+      control" (the acceptance criterion's words) it already names the action
+      again.
+    */
+    it('reverts to the action label once focus leaves the control (D-114)', async () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        })
+        const button = screen.getByRole('button', {name: 'Copied'})
+
+        fireEvent.blur(button)
+
+        expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+        expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
+    })
+
+    it('still names the action when the sender returns to the control later', async () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        const button = () => screen.getByRole('button', {name: /^(Copy download link|Copied)$/})
+        await act(async () => {
+            fireEvent.click(button())
+        })
+        expect(button().textContent).toBe('Copied')
+
+        // The sender moves on -- Tab reaches Cancel, say -- and later returns.
+        fireEvent.blur(button(), {relatedTarget: screen.getByRole('button', {name: 'Cancel'})})
+        fireEvent.focus(button())
+
+        expect(button().textContent).toBe('Copy download link')
+        expect(screen.getByRole('button', {name: 'Copy download link'})).toBe(button())
+    })
+
+    it('does not revert while the same activation is still retrying (a click on "Copied")', async () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        })
+        expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
+
+        // A second click while still focused re-copies rather than losing the
+        // confirmation to a spurious revert -- no blur happened.
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Copied'}))
+        })
+
+        expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
+    })
 })
 
 describe('trust disclosures', () => {

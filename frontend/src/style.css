@@ -470,10 +470,44 @@ body {
     font-size: var(--text-display);
 }
 
+/*
+  One control now, not a pair: position: relative anchors the menu below it,
+  and the trigger fills the row for the same visual rhythm the two-button
+  grid gave the section it sits in.
+*/
 .fd-selection {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-3);
+    position: relative;
+    display: flex;
+}
+
+.fd-selection > .fd-button {
+    width: 100%;
+}
+
+/*
+  The product's first floating surface (spec-4-1). A functional boundary, not
+  the decorative paper shadow StagedView alone is allowed -- see "spends the
+  one sanctioned paper offset" in styles.test.ts.
+*/
+.fd-browse-menu {
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: 0;
+    z-index: 1;
+    margin-block-start: var(--spacing-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+    padding: var(--spacing-2);
+    min-inline-size: 200px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-md);
+}
+
+.fd-browse-menu .fd-button {
+    width: 100%;
+    text-align: start;
 }
 
 /*
@@ -873,7 +907,11 @@ body {
 }
 
 @media (max-width: 639px) {
-    .fd-selection,
+    /*
+      fd-selection dropped out of this collapse (spec-4-1): a single control
+      has no pair of columns left to fold, and its menu is already absolutely
+      positioned regardless of width.
+    */
     .fd-metrics {
         grid-template-columns: minmax(0, 1fr);
     }

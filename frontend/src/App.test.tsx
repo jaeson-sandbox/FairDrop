@@ -316,14 +316,16 @@ const cancelCases: Array<[string, TransferState]> = [
 ]
 
 describe('controller wiring', () => {
-    it('routes both browse controls to their own command', () => {
+    it('routes both kinds in the browse menu to their own command', () => {
         mountWith({phase: 'idle', retainedOutcome: null, commandError: null})
 
-        fireEvent.click(screen.getByRole('button', {name: 'Select File'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
         expect(mocks.selectFile).toHaveBeenCalledTimes(1)
         expect(mocks.selectDirectory).not.toHaveBeenCalled()
 
-        fireEvent.click(screen.getByRole('button', {name: 'Select Directory'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        fireEvent.click(screen.getByRole('menuitem', {name: 'Folder'}))
         expect(mocks.selectDirectory).toHaveBeenCalledTimes(1)
         expect(mocks.stage).not.toHaveBeenCalled()
     })

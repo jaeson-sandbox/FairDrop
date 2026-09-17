@@ -97,9 +97,14 @@ export const copy = {
 
     /** Functional words the spine names in prose rather than in the copy table. */
     label: {
-        /** Information Architecture: "Native drop target, Select File, Select Directory". */
-        selectFile: 'Select File',
-        selectDirectory: 'Select Directory',
+        /**
+         * Information Architecture, Idle row: "Native drop target, one browse
+         * control (`copy.label.chooseFileOrFolder`) opening a menu for file or
+         * folder". Replaces the retired `selectFile` / `selectDirectory` pair
+         * (Story 4.1): the label names both kinds itself, and the menu it
+         * opens is where the Windows/macOS dialog asymmetry is absorbed.
+         */
+        chooseFileOrFolder: 'Choose a file or folder',
         /** "Firewall Preflight and Recovery" bullet labels, in document order. */
         firewallHeading: 'Local network access',
         windows: 'Windows',
@@ -156,6 +161,7 @@ export const errorHeadings: Readonly<Record<TransferErrorCode, string>> = {
     name_unsupported: 'A name can’t be sent',
     name_warning: 'Some names may not save',
     shutting_down: 'FairDrop is closing',
+    chooser_failed: 'Couldn’t open the chooser',
 }
 
 /** The exact `PublicError.message` table, re-exported rather than restated. */

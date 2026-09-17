@@ -309,6 +309,7 @@ var registryEntries = []struct {
 	{"name_unsupported", "One name inside that folder can’t be sent safely. Rename it, then choose the folder again."},
 	{"name_warning", "Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items."},
 	{"shutting_down", "FairDrop is closing. Reopen it to start a transfer."},
+	{"chooser_failed", "FairDrop couldn’t open the chooser. Try again, or drag the item onto the window."},
 }
 
 // TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage proves the four
@@ -796,13 +797,21 @@ func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
 		t.Fatal("no Closes lines parsed from epics.md, so this test would pass vacuously")
 	}
 
-	var open int
-	for _, entry := range deferredEntries(t, deferred) {
+	entries := deferredEntries(t, deferred)
+	if len(entries) == 0 {
+		t.Fatal("no deferred entries parsed, so this test would pass vacuously")
+	}
+
+	// Zero *open* entries is a legitimate state -- Story 4.1 discharged the
+	// last two (D-113, D-114) and left every remaining entry discharged or
+	// accepted -- so the vacuity guard above counts every entry the parser
+	// found, not merely the open ones: a broken deferredEntries parse is what
+	// this guards against, not a backlog that happens to be empty right now.
+	for _, entry := range entries {
 		id, owner := entry.id, entry.owner
 		if owner == "discharged" || owner == "accepted" {
 			continue
 		}
-		open++
 
 		prefix := storyPrefix(owner)
 		if !cited[prefix][id] {
@@ -814,10 +823,6 @@ func TestEveryOpenDeferredEntryIsCitedByItsOwningStory(t *testing.T) {
 			t.Errorf("%s is still open but its owner %q is already done: "+
 				"the finding belongs to nobody", id, owner)
 		}
-	}
-
-	if open == 0 {
-		t.Fatal("no open deferred entries parsed, so this test would pass vacuously")
 	}
 }
 

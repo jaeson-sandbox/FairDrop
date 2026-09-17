@@ -67,8 +67,8 @@ development_status:
   3-11-close-the-residual-contract-and-copy-gaps: done
   3-12-capture-the-accessibility-evidence-a-runner-can-produce: done
 
-  epic-4: backlog
-  4-1-replace-the-two-browse-controls-with-one: in-progress
+  epic-4: done
+  4-1-replace-the-two-browse-controls-with-one: done
   4-2-close-what-the-epic-3-retrospective-found: done
   epic-3-retrospective: done
 action_items:

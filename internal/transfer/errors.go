@@ -27,6 +27,7 @@ const (
 	ErrNameUnsupported    ErrorCode = "name_unsupported"
 	ErrNameWarning        ErrorCode = "name_warning"
 	ErrShuttingDown       ErrorCode = "shutting_down"
+	ErrChooserFailed      ErrorCode = "chooser_failed"
 )
 
 // PublicError is the fixed safe error shape exposed across the UI boundary.
@@ -161,6 +162,7 @@ var publicMessages = map[ErrorCode]string{
 	ErrNameUnsupported:    "One name inside that folder can’t be sent safely. Rename it, then choose the folder again.",
 	ErrNameWarning:        "Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items.",
 	ErrShuttingDown:       "FairDrop is closing. Reopen it to start a transfer.",
+	ErrChooserFailed:      "FairDrop couldn’t open the chooser. Try again, or drag the item onto the window.",
 }
 
 // PublicErrorOf converts any error to fixed public copy without copying its

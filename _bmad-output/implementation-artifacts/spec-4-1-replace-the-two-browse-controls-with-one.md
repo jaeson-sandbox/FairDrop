@@ -2,7 +2,7 @@
 title: 'Story 4.1: Replace the Two Browse Controls with One'
 type: 'feature'
 created: '2026-09-17'
-status: 'in-progress'
+status: 'done'
 baseline_commit: '84b0594c63f83b49ac1ece84cd5477de3fb9ea43'
 review_loop_iteration: 0
 context:
@@ -88,14 +88,14 @@ not preclude and does not implement. Let a chooser diagnostic carry the attempte
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `EXPERIENCE.md` — register the control's label and any menu item copy by stable key, and reconcile the Idle prose at `:39` that names two controls.
-- [ ] `DESIGN.md` — replace the Selection Controls row with one that describes one control (Ask First).
-- [ ] `frontend/src/ui/copy.ts` — the new keys; retire the two old labels with their pins.
-- [ ] `frontend/src/ui/IdleView.tsx` — one control plus the menu: `role="menu"`, keyboard operation, Escape, focus return, 44px targets.
-- [ ] `app.go` + the five registry places — a code that describes a chooser that did not open (D-113).
-- [ ] `frontend/src/ui/StagedView.tsx` — the copy confirmation stops costing the control its name (D-114).
-- [ ] `frontend/browser/accessibility.test.tsx` — the menu measured open: targets, reflow, forced colors.
-- [ ] `evidence-4-1-replace-the-two-browse-controls-with-one.md`, D-113 and D-114 discharged, `epics.md` and `sprint-status.yaml` in step.
+- [x] `EXPERIENCE.md` — register the control's label and any menu item copy by stable key, and reconcile the Idle prose at `:39` that names two controls.
+- [x] `DESIGN.md` — replace the Selection Controls row with one that describes one control (Ask First).
+- [x] `frontend/src/ui/copy.ts` — the new keys; retire the two old labels with their pins.
+- [x] `frontend/src/ui/IdleView.tsx` — one control plus the menu: `role="menu"`, keyboard operation, Escape, focus return, 44px targets.
+- [x] `app.go` + the five registry places — a code that describes a chooser that did not open (D-113).
+- [x] `frontend/src/ui/StagedView.tsx` — the copy confirmation stops costing the control its name (D-114).
+- [x] `frontend/browser/accessibility.test.tsx` — the menu measured open: targets, reflow, forced colors.
+- [x] `evidence-4-1-replace-the-two-browse-controls-with-one.md`, D-113 and D-114 discharged, `epics.md` and `sprint-status.yaml` in step.
 
 **Acceptance Criteria:**
 - Given Idle, when a sender looks for how to send something, then exactly one browse control is present where two were, and its label names both kinds.

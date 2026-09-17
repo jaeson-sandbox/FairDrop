@@ -95,6 +95,28 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
             }, () => onCopyFailed?.(state.session.sessionId))
     }
 
+    /**
+     * Reverts the label the moment the sender's own focus leaves the control
+     * (D-114).
+     *
+     * A successful copy used to rename this button to `copy.copy.confirmation`
+     * for the rest of the session with no way back: `EXPERIENCE.md` bans
+     * frontend lifecycle timers, so nothing ever swapped it back, and the one
+     * control that reaches the capability URL lost the name that says what it
+     * does (WCAG 4.1.2) the moment it succeeded once.
+     *
+     * Blur is the trigger EXPERIENCE.md now sanctions for this control
+     * specifically: it fires only from the sender's own action -- tabbing on,
+     * clicking elsewhere -- never from a timer this product forbids, and by
+     * the time focus "returns to the control" later (the acceptance
+     * criterion's own words), the label has already reverted. It does not
+     * fire while a fresh click on the still-focused "Copied" button retries
+     * the copy (see the test beside this one): that click's own result --
+     * success or failure -- is what decides the label next, exactly as
+     * before.
+     */
+    const handleCopyBlur = () => setCopied(false)
+
     return (
         <div className="fd-region" data-phase-view="staged">
             <h1
@@ -187,6 +209,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                         type="button"
                                         className={`fd-button fd-target ${copied ? 'fd-button--copied' : 'fd-button--primary'}`}
                                         onClick={handleCopy}
+                                        onBlur={handleCopyBlur}
                                     >
                                         {copied ? copy.copy.confirmation : copy.directLink.action}
                                     </button>

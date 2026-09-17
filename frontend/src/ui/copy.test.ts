@@ -155,6 +155,7 @@ describe('approved product copy', () => {
             'help.differentLan',
             'help.receiverHttp',
             'idle.instruction',
+            'label.chooseFileOrFolder',
             'label.directLinkHeading',
             'label.file',
             'label.firewallHeading',
@@ -164,8 +165,6 @@ describe('approved product copy', () => {
             'label.macosRecovery',
             'label.metaSeparator',
             'label.of',
-            'label.selectDirectory',
-            'label.selectFile',
             'label.sending',
             'label.sent',
             'label.throughput',
@@ -197,8 +196,7 @@ describe('approved product copy', () => {
 
 describe('functional labels the spine names in prose', () => {
     it('holds the control, firewall, item and metric words used by the views', () => {
-        expect(copy.label.selectFile).toBe('Select File')
-        expect(copy.label.selectDirectory).toBe('Select Directory')
+        expect(copy.label.chooseFileOrFolder).toBe('Choose a file or folder')
         expect(copy.label.firewallHeading).toBe('Local network access')
         expect(copy.label.windows).toBe('Windows')
         expect(copy.label.macos).toBe('macOS')
@@ -246,6 +244,7 @@ describe('fixed error surface', () => {
             name_unsupported: 'A name can’t be sent',
             name_warning: 'Some names may not save',
             shutting_down: 'FairDrop is closing',
+            chooser_failed: 'Couldn’t open the chooser',
         })
     })
 

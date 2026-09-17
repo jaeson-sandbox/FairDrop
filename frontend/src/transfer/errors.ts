@@ -31,6 +31,7 @@ export const transferErrorCodes = [
     'name_unsupported',
     'name_warning',
     'shutting_down',
+    'chooser_failed',
 ] as const
 
 export type TransferErrorCode = (typeof transferErrorCodes)[number]
@@ -60,6 +61,7 @@ export const fixedErrorMessages: Readonly<Record<TransferErrorCode, string>> = {
     name_warning:
         'Some names in this folder can’t be saved on Windows — usually a colon, an asterisk, or a trailing dot or space. They’re sent unchanged; a Windows receiver may not be able to extract those items.',
     shutting_down: 'FairDrop is closing. Reopen it to start a transfer.',
+    chooser_failed: 'FairDrop couldn’t open the chooser. Try again, or drag the item onto the window.',
 }
 
 /** Reports whether a value is one of the stable backend failure codes. */
