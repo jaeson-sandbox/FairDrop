@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-17-2026 18:32
+last_updated: 09-17-2026 19:26
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -66,11 +66,12 @@ development_status:
   3-10-settle-the-release-blocking-platform-decisions: done
   3-11-close-the-residual-contract-and-copy-gaps: done
   3-12-capture-the-accessibility-evidence-a-runner-can-produce: done
-
-  epic-4: in-progress
-  4-1-replace-the-two-browse-controls-with-one: review
-  4-2-close-what-the-epic-3-retrospective-found: done
   epic-3-retrospective: done
+
+  epic-4: done
+  4-1-replace-the-two-browse-controls-with-one: done
+  4-2-close-what-the-epic-3-retrospective-found: done
+  epic-4-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
     epic: 1
