@@ -2,7 +2,7 @@
 title: 'Story 4.1: Replace the Two Browse Controls with One'
 type: 'feature'
 created: '2026-09-17'
-status: 'done'
+status: 'in-review'
 baseline_commit: '84b0594c63f83b49ac1ece84cd5477de3fb9ea43'
 review_loop_iteration: 0
 context:
@@ -53,7 +53,8 @@ not preclude and does not implement. Let a chooser diagnostic carry the attempte
 |----------|--------------|---------------------------|----------------|
 | Control activated, pointer or keyboard | Idle | The menu opens, focus lands in it, both kinds are offered | — |
 | A kind chosen | menu open | The matching native chooser opens; the menu closes | — |
-| Escape, or focus leaving the menu | menu open | The menu closes, focus returns to the control, nothing is announced | — |
+| Escape | menu open | The menu closes, focus returns to the control, nothing is announced | — |
+| Focus leaves the menu on its own (Tab, a click away) | menu open | The menu closes and focus goes where the user sent it | Recapturing it would be a focus trap, which `EXPERIENCE.md` bans outside OS dialogs |
 | Chooser returns a selection | any kind | Stages exactly as today, `itemKind` from the branch taken | — |
 | Chooser dismissed | empty result | Idle, silent, focus back on the control | Not an error |
 | Chooser fails to open | dialog error | A state that describes a chooser that did not open, never a stopped transfer | New code; no path in the message (AD-9, D-113) |
