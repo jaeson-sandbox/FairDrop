@@ -103,6 +103,40 @@ not preclude and does not implement. Let a chooser diagnostic carry the attempte
 - Given a chooser that fails to open, when the failure reaches the window, then it describes a chooser that did not open and names no path.
 - Given a link already copied, when the sender returns to the control later, then it still says what it does.
 
+## Evidence
+
+Audit, mutation tables and gate transcripts live in
+[evidence-4-1-replace-the-two-browse-controls-with-one.md](evidence-4-1-replace-the-two-browse-controls-with-one.md),
+created with the implementation.
+
+## Spec Change Log
+
+**2026-09-17 (approval).** Owner decisions taken before dispatch, so the Ask First list does not
+block the implementer.
+
+*The Windows split.* The single control opens a small menu offering both kinds. The menu is where
+the platform asymmetry is absorbed, so the label never promises what a click does not deliver.
+Rejected: a file-only chooser with folders by drag (re-creates IdleView's scar, and makes folders
+drag-only, which EXPERIENCE.md bans); two dialogs in sequence (asks the user to reject one to reach
+the other); restyling two buttons (does not deliver the story).
+
+*The label.* `Choose a file or folder` -- it names both kinds and agrees with the drop zone's
+existing `copy.idle.instruction` rather than contradicting it.
+
+*D-113's message.* `FairDrop couldn't open the chooser. Try again, or drag the item onto the
+window.` It names what failed and offers the one recovery already present on the same screen, which
+matters most precisely when the dialog subsystem is the thing that is unwell. A fifth code, because
+`setup_failed` is a claim about an item the user chose and none was.
+
+*DESIGN.md's Selection Controls row.* Replaced with `One selection control, quieter than the drop
+zone.` The original balanced two peers; with one control that intent is moot, and what remains worth
+stating is the hierarchy the owner set on 2026-09-13. It deliberately does not name the menu, so a
+later NSOpenPanel phase can drop the menu on macOS without amending the design contract.
+
+*Not changed:* the drop zone's own copy. `Drop one file or folder.` already agrees with the new
+label, so nothing needs reconciling beyond the Idle prose at EXPERIENCE.md:39 that still names two
+controls.
+
 ## Design Notes
 
 **The menu is the seam, and it is the story's real cost.** This is FairDrop's first floating
