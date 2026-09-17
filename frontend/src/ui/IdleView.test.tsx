@@ -63,8 +63,9 @@ describe('where the cancellation summary sits', () => {
 describe('the drop target is only a drop target', () => {
     // Reported from a live run: the zone said "file or folder" and clicking it
     // opened the file chooser, so a folder sender was handed a single-file
-    // picker. A native chooser is one kind or the other; the labelled buttons
-    // are the only honest click targets, so the zone opens nothing.
+    // picker. The labelled control below is the only honest click target --
+    // it offers both kinds and opens whichever the sender picks -- so the zone
+    // opens nothing.
     it('opens no chooser when the drop target is clicked', () => {
         const {onSelectFile, onSelectDirectory} = show()
 
@@ -74,7 +75,7 @@ describe('the drop target is only a drop target', () => {
         expect(onSelectDirectory).not.toHaveBeenCalled()
     })
 
-    it('keeps the zone out of the tab order, because the buttons are the keyboard path', () => {
+    it('keeps the zone out of the tab order, because the browse control is the keyboard path', () => {
         show()
         const zone = document.querySelector('.fd-drop-zone')!
 
@@ -233,7 +234,11 @@ describe('the browse menu', () => {
 
         expect(screen.queryByRole('menu')).toBeNull()
         expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Choose a file or folder'}))
-        expect(document.querySelector('[aria-live]')).toBeNull()
+        // Not asserted here: that nothing was announced. IdleView renders no
+        // live region in any state, so querying for one passes whatever the
+        // menu does -- the announcer belongs to App, and the one-owner rule is
+        // pinned there against the routing table. What this can honestly say
+        // is that the menu raised no error surface of its own.
         expect(document.querySelector('[role="alert"]')).toBeNull()
     })
 
@@ -378,5 +383,77 @@ describe('the browse control dismisses its own menu', () => {
 
         expect(screen.queryByRole('menu')).toBeNull()
         expect(control.getAttribute('aria-expanded')).toBe('false')
+    })
+})
+
+/*
+  The rest of the menu-button pattern, which the first pass claimed and did not
+  have.
+
+  The review found a menu that was a menu in role only: every item its own tab
+  stop rather than the pattern's single one, no Home or End, the arrow keys
+  that conventionally open a menu button doing nothing on the trigger, Escape
+  dead whenever focus sat on the trigger -- which is exactly where a pointer
+  press leaves it -- and aria-controls naming an element that does not exist
+  while the menu is closed.
+*/
+describe('the browse menu follows the menu-button pattern', () => {
+    function control(): HTMLElement {
+        return screen.getByRole('button', {name: 'Choose a file or folder'})
+    }
+
+    it('opens on ArrowDown and on ArrowUp, not only on activation', () => {
+        for (const key of ['ArrowDown', 'ArrowUp']) {
+            cleanup()
+            show()
+            fireEvent.keyDown(control(), {key})
+
+            expect(screen.getByRole('menu')).toBeTruthy()
+            expect(control().getAttribute('aria-expanded')).toBe('true')
+        }
+    })
+
+    it('closes on Escape while focus is still on the control', () => {
+        show()
+        fireEvent.click(control())
+        // What a pointer press leaves behind: the menu open, focus on the
+        // trigger rather than inside the menu.
+        fireEvent.blur(screen.getByRole('menu'), {relatedTarget: control()})
+
+        fireEvent.keyDown(control(), {key: 'Escape'})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+        expect(control().getAttribute('aria-expanded')).toBe('false')
+    })
+
+    it('is one tab stop, with the items reachable by arrow rather than by Tab', () => {
+        show()
+        fireEvent.click(control())
+
+        for (const item of screen.getAllByRole('menuitem')) {
+            expect(item.getAttribute('tabindex')).toBe('-1')
+        }
+    })
+
+    it('moves to the first and last item on Home and End', () => {
+        show()
+        fireEvent.click(control())
+        const items = screen.getAllByRole('menuitem')
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'End'})
+        expect(document.activeElement).toBe(items[items.length - 1])
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'Home'})
+        expect(document.activeElement).toBe(items[0])
+    })
+
+    it('names no menu in aria-controls while there is no menu', () => {
+        show()
+        expect(control().getAttribute('aria-controls')).toBeNull()
+
+        fireEvent.click(control())
+        const named = control().getAttribute('aria-controls')
+        expect(named).toBeTruthy()
+        expect(document.getElementById(named as string)).toBe(screen.getByRole('menu'))
     })
 })

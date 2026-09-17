@@ -361,7 +361,11 @@ describe('reflow at 320 CSS pixels (D-068)', () => {
 
     it('keeps the open browse menu scrolling only vertically, with nothing clipped', async () => {
         await page.viewport(320, 900)
-        assertNoHorizontalOverflow(renderIdleMenuOpen())
+        const container = renderIdleMenuOpen()
+        assertNoHorizontalOverflow(container)
+        // The name promised "nothing clipped" and only the overflow half was
+        // measured. Both halves now are.
+        assertNoFixedHeightClipsGrownText(container)
     })
 })
 
@@ -437,6 +441,46 @@ describe('WCAG 1.4.12 text-spacing overrides (D-068)', () => {
         assertTextSpacingIsInEffect(container)
         assertNoHorizontalOverflow(container)
         assertNoFixedHeightClipsGrownText(container)
+    })
+})
+
+/*
+  The first floating surface, at the sizes the product actually runs at.
+
+  The menu was measured at 320x900 and 1024x900 and nowhere else, which left
+  two gaps the review named. It is a fixed-width panel of full-width rows, so
+  doubling every text token is exactly what should overflow it if anything
+  does. And it opens downward only -- `inset-block-start: 100%`, no flip, no
+  max-height, no scroll -- while sitting low in Idle, below the drop zone, the
+  firewall preflight and any retained outcome. main.go sets the window's
+  minimum to 640x480, so that is the shape where an unflippable menu would run
+  past the bottom edge.
+*/
+describe('the browse menu at the sizes the app really runs at (D-068)', () => {
+    it('survives 200% text without overflowing or clipping', async () => {
+        await page.viewport(1024, 900)
+        doubleTextTokens()
+        const container = renderIdleMenuOpen()
+
+        assertNoHorizontalOverflow(container)
+        assertNoFixedHeightClipsGrownText(container)
+    })
+
+    it('fits inside the window at the 640x480 minimum main.go sets', async () => {
+        await page.viewport(640, 480)
+        const container = renderIdleMenuOpen()
+
+        assertNoHorizontalOverflow(container)
+
+        const menu = container.querySelector<HTMLElement>('.fd-browse-menu')
+        if (menu === null) throw new Error('.fd-browse-menu did not render')
+        const box = menu.getBoundingClientRect()
+        expect(
+            box.bottom,
+            `the open menu reaches ${box.bottom.toFixed(1)}px, past the ${window.innerHeight}px window: ` +
+                'it opens downward only, with no flip, no max-height and no scroll, and the control it ' +
+                'hangs from sits low in Idle',
+        ).toBeLessThanOrEqual(window.innerHeight + 0.5)
     })
 })
 

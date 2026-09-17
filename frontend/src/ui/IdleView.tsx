@@ -206,15 +206,46 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
             closeAndReturnFocus()
             return
         }
-        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+        const navigation = ['ArrowDown', 'ArrowUp', 'Home', 'End']
+        if (!navigation.includes(event.key)) return
         event.preventDefault()
 
         const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
         if (items === undefined || items.length === 0) return
         const itemList = [...items]
+        if (event.key === 'Home') {
+            itemList[0]?.focus()
+            return
+        }
+        if (event.key === 'End') {
+            itemList[itemList.length - 1]?.focus()
+            return
+        }
         const currentIndex = itemList.indexOf(document.activeElement as HTMLButtonElement)
         const delta = event.key === 'ArrowDown' ? 1 : -1
         itemList[(currentIndex + delta + itemList.length) % itemList.length]?.focus()
+    }
+
+    /**
+     * The trigger's own keys, which the menu's handler cannot see.
+     *
+     * ArrowDown and ArrowUp open a menu button -- the convention every native
+     * menu follows, and the gesture a keyboard sender reaches for before
+     * finding out that Enter also works. Escape matters here for a different
+     * reason: a pointer press leaves focus on the trigger while the menu is
+     * open, so without this the one gesture that means "put this away" would
+     * do nothing in exactly the state a mouse user is most likely to be in.
+     */
+    function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>): void {
+        if (event.key === 'Escape') {
+            if (!open) return
+            event.preventDefault()
+            setOpen(false)
+            return
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+        event.preventDefault()
+        setOpen(true)
     }
 
     /**
@@ -249,8 +280,12 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                 className="fd-button fd-target"
                 aria-haspopup="menu"
                 aria-expanded={open}
-                aria-controls={menuId}
+                // Only while the menu exists: aria-controls names an element by
+                // id, and pointing at one that is not rendered is a dangling
+                // reference for anything that resolves it.
+                aria-controls={open ? menuId : undefined}
                 onClick={() => setOpen((was) => !was)}
+                onKeyDown={handleTriggerKeyDown}
             >
                 {copy.label.chooseFileOrFolder}
             </button>
@@ -268,6 +303,10 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                         type="button"
                         role="menuitem"
                         ref={firstItemRef}
+                        // Roving tabindex: the menu is one stop in the tab
+                        // order, not one per item. Arrows move within it; Tab
+                        // leaves it, which is what closes it.
+                        tabIndex={-1}
                         className="fd-button fd-target"
                         onClick={() => choose(onSelectFile)}
                     >
@@ -276,6 +315,7 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                     <button
                         type="button"
                         role="menuitem"
+                        tabIndex={-1}
                         className="fd-button fd-target"
                         onClick={() => choose(onSelectDirectory)}
                     >
