@@ -24,8 +24,9 @@ from a shell. Receiver-side facts can only come from the person holding the rece
 
 ## What machines verified
 
-Against `7b59c373164c8bacdd4ae7c367ad3a231385a474` (`main`, 2026-09-13), through the Release
-workflow's own gate. The Release run reuses `verify.yml` by `workflow_call` rather than restating
+Against `0db16580` (`main`, tag `v0.3.0`, 2026-09-17), through the Release workflow's own gate --
+Release [35169193793](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35169193793), all six
+jobs green. The Release run reuses `verify.yml` by `workflow_call` rather than restating
 it, so the gate below is the same gate every pull request runs.
 
 | Check | Where it ran | Identity | Result |
@@ -55,7 +56,23 @@ makes a named test fail. Everything a machine cannot observe is below.
 
 ## Artifact identity
 
-**v0.2.0 — published 2026-09-13, the current release.** Built by Release
+**v0.3.0 — built 2026-09-17, draft awaiting the owner.** Built by Release
+[35169193793](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35169193793) from
+`0db16580` at tag `v0.3.0`, each artifact on its own native runner after the full gate passed on
+both. The gate is `verify.yml` reused by `workflow_call`, so it is the same gate every pull request
+runs, and it included the rendered accessibility suite on both desktop runners.
+
+| Artifact | Size | SHA-256 |
+| --- | ---: | --- |
+| `fairdrop.exe` | 13,713,920 | `30120a41ff9c36b7ab566f28d4304c67459f7e9e79d76cdcea2d81dc47ddf4f1` |
+| `fairdrop-macos.zip` | 4,585,248 | `fae558e68610b67160643630252217e9e8b440ce1fa93bd02bbc8f4c6fcd08d6` |
+
+First build to carry Stories 3.11, 3.12 and 4.2: nine reconciled error states, the rendered
+accessibility floor measured in real Chromium rather than read out of a stylesheet, the ten fixes
+the Epic 3 retrospective produced, and the four this week. Draft, not published — making a release
+visible on a public repository stays a person's act.
+
+**v0.2.0 — published 2026-09-13, superseded by the draft above.** Built by Release
 [34734499181](https://github.com/jaeson-sandbox/FairDrop/actions/runs/34734499181) from
 `7b59c373164c8bacdd4ae7c367ad3a231385a474`, each artifact on its own native runner after the full
 gate passed on both.
