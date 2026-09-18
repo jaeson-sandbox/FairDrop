@@ -1492,7 +1492,7 @@ coordination logic -- `Stage`, `AuthorizeClaim`, the unwind family, publish and 
 extracted file named for the one concern it owns.
 
 *Where 830 comes from, and why it is not lower.* Measured, not estimated: the four regions and the
-three constants that belong to them are 188 + ~15 lines, taking 1009 to roughly 806. An earlier
+three constants that belong to them are 188 + ~15 lines, taking 1008 to roughly 805. An earlier
 draft of this criterion said "under 750", which was an estimate and was wrong by about 56 lines. That
 number was reachable only by also moving the operation lease and the publish family, and this epic
 deliberately keeps both with the coordination core -- so the line count follows the scope rather than

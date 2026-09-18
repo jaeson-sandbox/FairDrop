@@ -74,7 +74,7 @@ development_status:
   epic-4-retrospective: done
 
   epic-5: in-progress
-  5-1-split-internal-transfer-coordinator-go: backlog
+  5-1-split-internal-transfer-coordinator-go: in-progress
   epic-5-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"

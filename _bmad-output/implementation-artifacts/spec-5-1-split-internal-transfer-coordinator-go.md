@@ -2,7 +2,7 @@
 title: 'Story 5.1: Split internal/transfer/coordinator.go'
 type: 'refactor'
 created: '2026-09-17'
-status: 'draft'
+status: 'ready-for-dev'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-5-context.md'
@@ -57,7 +57,7 @@ the record rather than maintain it.
 
 ## Code Map
 
-- `internal/transfer/coordinator.go` -- 1009 lines, the only file edited by removal. Measured
+- `internal/transfer/coordinator.go` -- 1008 lines, the only file edited by removal. Measured
   regions to move (non-overlapping line union = **188 lines**, plus ~15 lines of constants):
   - *diagnostics* -- `type diagnostic`, `type diagnosticSink`, `var diagnosticOverflow`,
     `record`, `snapshot` (~108-166). Depends only on `sync`, `ErrorCode`, `ErrTransferFailed`,
@@ -106,7 +106,7 @@ the record rather than maintain it.
 ## Design Notes
 
 **Why 830 and not 750.** The epic first said 750; that was an estimate and wrong by ~56 lines. The
-measured union of the four regions is 188 lines, plus ~15 of constants, taking 1009 to roughly 806.
+measured union of the four regions is 188 lines, plus ~15 of constants, taking 1008 to roughly 805.
 750 was reachable only by also moving the operation lease and the publish family, which this story
 keeps with the coordination core on purpose. The count follows the scope.
 
