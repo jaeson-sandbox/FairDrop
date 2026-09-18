@@ -15,6 +15,14 @@
  *    rather than tabulating -- control names, the firewall block's own headings,
  *    metric captions, and byte units. Each carries its source in a comment.
  *
+ * That split is enforced, not merely described: `copy.test.ts` reads the table
+ * and requires a row for every leaf outside `label` and `unit`, so new approved
+ * copy cannot ship untabulated (D-119). Three `label` entries are tabulated all
+ * the same -- `chooseFileOrFolder`, `file` and `folder` are approved wording the
+ * owner decided, not structural words -- and any row that exists must quote its
+ * string exactly. Whether a new `label` entry earns a row stays a judgement:
+ * nothing mechanical separates `Choose a file or folder` from `Wire bytes`.
+ *
  * Error text is not restated here at all: `errorMessages` re-exports the frozen
  * table the reducer already validates against, so the two cannot drift apart.
  */
