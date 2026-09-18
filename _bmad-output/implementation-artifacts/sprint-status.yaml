@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-17-2026 19:26
+last_updated: 09-17-2026 21:56
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -71,7 +71,7 @@ development_status:
   epic-4: done
   4-1-replace-the-two-browse-controls-with-one: done
   4-2-close-what-the-epic-3-retrospective-found: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
     epic: 1
@@ -254,3 +254,40 @@ action_items:
     owner: "Epic 4"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-14.md"
+  - id: "epic-4-retro-item-24-decide-how-release-and-deferral-work-get"
+    epic: 4
+    action: "Decide how release-and-deferral work gets governed: a story with a spec
+      and review, or a sanctioned lightweight bmad-build path with a named artifact.
+      Unspecced production work on an unnamed branch should stop."
+    owner: "Jaeson"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+  - id: "epic-4-retro-item-25-split-internal-transfer-coordinator-go-c"
+    epic: 4
+    action: "Split internal/transfer/coordinator.go. Carried forward from the Epic
+      3 retrospective and now partially done, the bounded-call subsystem already being
+      out."
+    owner: "a future story"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+  - id: "epic-4-retro-item-26-amend-the-epic-3-exclusion-in-epics-md-t"
+    epic: 4
+    action: "Amend the Epic 3 exclusion in epics.md to record that roughly a third
+      of the coordinator split shipped anyway."
+    owner: "Jaeson"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+  - id: "epic-4-retro-item-27-decide-whether-commit-subjects-should-ca"
+    epic: 4
+    action: "Decide whether commit subjects should carry story ids, or stop reading
+      git_evidence.py stories field as evidence in retrospectives."
+    owner: "Jaeson"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+  - id: "epic-4-retro-item-28-extract-browsecontrol-from-idleview-tsx"
+    epic: 4
+    action: "Extract BrowseControl from IdleView.tsx when a second floating surface
+      appears, not before."
+    owner: "a future story"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
