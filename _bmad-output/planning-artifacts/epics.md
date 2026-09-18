@@ -1389,6 +1389,8 @@ So that the guarantees Epic 3 shipped are ones a broken build actually fails on.
 
 **Excluded, and still open as action items:** whether the three stream copy loops stay independent (needs an owner decision) and splitting `internal/transfer/coordinator.go` (a refactor that deserves a story not also fixing ten unrelated things).
 
+*Amended 2026-09-17 (Epic 4 retrospective, action item 26).* The coordinator exclusion did not hold. Part of the split -- the bounded-call subsystem, 167 net lines -- shipped during this epic anyway, on an unspecced branch, which is the finding that produced AGENTS.md's rule that production changes need a story. The remainder became Epic 5, and `coordinator.go` is now 790 lines rather than 1008. The exclusion is left standing above rather than rewritten, because it records what was decided at the time; this note records what actually happened. The stream copy loops remain genuinely open and still need the owner's decision.
+
 **Closes:** Epic 3 retrospective items 12 through 21.
 
 ### Story 4.1: Replace the Two Browse Controls with One
