@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-17-2026 22:30
+last_updated: 09-17-2026 23:05
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -74,7 +74,7 @@ development_status:
   epic-4-retrospective: done
 
   epic-5: in-progress
-  5-1-split-internal-transfer-coordinator-go: in-progress
+  5-1-split-internal-transfer-coordinator-go: review
   epic-5-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"

@@ -2,7 +2,7 @@
 title: 'Story 5.1: Split internal/transfer/coordinator.go'
 type: 'refactor'
 created: '2026-09-17'
-status: 'in-review'
+status: 'done'
 baseline_commit: '96284e9b43cacd6e54f27114d53d21dac031fdd6'
 review_loop_iteration: 0
 context:
@@ -171,3 +171,46 @@ them would rewrite a closed record.
 - `git diff --name-only` -- expected: no path ending `_test.go`
 - `go doc -all ./internal/transfer` before and after -- expected: identical
 - `wc -l internal/transfer/coordinator.go` -- expected: under 830
+
+## Suggested Review Order
+
+**What moved, and the shape each file took**
+
+- The precedent every new file follows: package clause, imports, file header.
+  [`bounded.go:1`](../../internal/transfer/bounded.go#L1)
+
+- The sink, and the header the review corrected: Diagnose writes beside it, never reads it.
+  [`diagnostics.go:5`](../../internal/transfer/diagnostics.go#L5)
+
+- The state machine, the largest region moved, with its two const blocks.
+  [`session.go:8`](../../internal/transfer/session.go#L8)
+
+- Two independent draws; neither is derived from the other.
+  [`identity.go:10`](../../internal/transfer/identity.go#L10)
+
+- Two constructors, one of which nothing executed until this branch.
+  [`warnings.go:11`](../../internal/transfer/warnings.go#L11)
+
+**What deliberately stayed**
+
+- The coordination core the story refused to touch: 211 lines, still here.
+  [`coordinator.go:216`](../../internal/transfer/coordinator.go#L216)
+
+- Named in the Never clause, and the reason D-122 is deferred rather than patched.
+  [`coordinator.go:563`](../../internal/transfer/coordinator.go#L563)
+
+**The two pins the review proved were missing**
+
+- A literal cap where a self-referential assertion used to sit (D-120).
+  [`coordinator_outcomes_test.go:980`](../../internal/transfer/coordinator_outcomes_test.go#L980)
+
+- The warning nothing ran, now pinned code, message and the absent count (D-121).
+  [`coordinator_stage_test.go:573`](../../internal/transfer/coordinator_stage_test.go#L573)
+
+- The backup list that did not know the four new files existed (D-124).
+  [`verify-native-mutations.sh:8`](../../scripts/verify-native-mutations.sh#L8)
+
+**Read last, and read critically**
+
+- Why the go doc check proved nothing, and what the covering command showed.
+  [`evidence-5-1:27`](evidence-5-1-split-internal-transfer-coordinator-go.md#L27)
