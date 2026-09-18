@@ -53,3 +53,8 @@ frontend/package.json.md5
 # `npm run test:browser`, including the retained forced-colors capture under
 # frontend/browser/captures/, which is tracked separately and on purpose.
 frontend/.vitest-attachments/
+
+# Python bytecode. The bmad skill trees ship .py scripts; running any of them
+# leaves __pycache__ beside the source, and ten such files had been committed.
+__pycache__/
+*.py[cod]
