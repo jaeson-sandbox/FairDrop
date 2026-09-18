@@ -2,7 +2,8 @@
 title: 'Story 5.1: Split internal/transfer/coordinator.go'
 type: 'refactor'
 created: '2026-09-17'
-status: 'ready-for-dev'
+status: 'in-progress'
+baseline_commit: '96284e9b43cacd6e54f27114d53d21dac031fdd6'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-5-context.md'
@@ -82,15 +83,15 @@ the record rather than maintain it.
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `internal/transfer/diagnostics.go` -- create; move the five diagnostics declarations and
+- [x] `internal/transfer/diagnostics.go` -- create; move the five diagnostics declarations and
   `maxDiagnostics` -- the sink's only writer and reader now live beside it.
-- [ ] `internal/transfer/session.go` -- create; move `sessionState`, `resource`, their const blocks,
+- [x] `internal/transfer/session.go` -- create; move `sessionState`, `resource`, their const blocks,
   `session` and its three methods -- the state machine is one unit.
-- [ ] `internal/transfer/identity.go` -- create; move `newIdentity`, `randomHex`, `capabilityURL`,
+- [x] `internal/transfer/identity.go` -- create; move `newIdentity`, `randomHex`, `capabilityURL`,
   `identityBytes`, `downloadPathPrefix` -- identity and the URL it builds.
-- [ ] `internal/transfer/warnings.go` -- create; move the two `Warning` constructors.
-- [ ] `internal/transfer/coordinator.go` -- remove exactly those declarations; change nothing else.
-- [ ] Verify no test file changed: `git diff --name-only` must list no `_test.go` path.
+- [x] `internal/transfer/warnings.go` -- create; move the two `Warning` constructors.
+- [x] `internal/transfer/coordinator.go` -- remove exactly those declarations; change nothing else.
+- [x] Verify no test file changed: `git diff --name-only` must list no `_test.go` path.
 
 **Acceptance Criteria:**
 - Given the split is applied, when `git diff --stat` is read, then no `_test.go` file appears in it.
@@ -100,6 +101,12 @@ the record rather than maintain it.
   of `diagnosticSink`, `session`, `newIdentity`, or `beaconWarning`.
 - Given each new file, when opened, then it declares one concern and carries the comments that
   explained that concern in the original.
+
+## Evidence
+
+[evidence-5-1-split-internal-transfer-coordinator-go.md](evidence-5-1-split-internal-transfer-coordinator-go.md)
+-- the faithfulness proof (pure deletion, 194/194 lines verbatim), the `go doc` byte-comparison, the
+six-mutation table and the matrix audit.
 
 ## Spec Change Log
 
