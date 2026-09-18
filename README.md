@@ -12,11 +12,30 @@ Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the wi
 | --- | --- | --- |
 | 1 — Share one file | Native drop or browse, QR/direct URL, one-shot download, honest progress, cancel, accessibility contract | Done, verified on a real phone, merged to `main` |
 | 2 — Share one folder | Safe directory staging through native no-follow handles; streamed ZIP with no temp archive | Done and merged; receiver-side observations remain recorded as incomplete |
-| 3 — Run reliably on supported desktops | Twelve stories covering native CI/releases, lifecycle and platform hardening, error/event handling, and verification evidence | Stories 3.1–3.7 done; 3.8 folder-safety checkpoint verified, cleanup next |
+| 3 — Run reliably on supported desktops | Twelve stories covering native CI/releases, lifecycle and platform hardening, error/event handling, and verification evidence | Done and merged; all twelve stories, retrospective accepted |
+| 4 — Refine the selection experience | One browse control where two were, opening a menu the platform asymmetry hides behind; a coded chooser failure; the Copy button stops renaming itself permanently | Done and merged |
+| 5 — Make the transfer coordinator legible | `coordinator.go` 1008 → 790 lines, four self-contained concerns moved into files named for them, no behaviour change | Done and merged |
 
 This is a personal project. [Automated verification is the release gate](docs/release-policy.md);
 manual device/browser and accessibility observations are optional, not invented
 passes. Known test failures still block acceptance.
+
+## Using it
+
+1. Launch FairDrop. The first run asks for firewall access — allow it on **Private networks
+   only**, and leave Public off. Only one copy runs at a time; launching it again restores the
+   window you already have.
+2. Give it one file or folder, either by dropping it on the zone at the top or through the
+   **Choose a file or folder** control. The control opens a small menu because Windows' native
+   dialog cannot offer both kinds at once; either item leads to the matching chooser.
+3. Scan the QR code from a browser on the same Wi-Fi, or open the direct link. **The first
+   device to open the link gets the download** — including a link preview, so avoid pasting it
+   into a chat that fetches URLs.
+4. A folder arrives as a ZIP, streamed rather than staged, so nothing extra is written on the
+   sending side.
+
+Cancel at any point. The window returns to idle and everything it held is released — there is
+no history, because nothing was kept.
 
 ## Read these first
 
@@ -28,7 +47,7 @@ The project is built by a sequence of agents, so the documents are the memory. I
    - `docs/fairdrop-architecture.md` — the as-built architecture
    - `_bmad-output/planning-artifacts/architecture/.../ARCHITECTURE-SPINE.md` — the invariants (AD-1 … AD-12)
 3. `_bmad-output/planning-artifacts/epics.md` — requirements inventory and every story's acceptance criteria.
-4. `_bmad-output/implementation-artifacts/` — per-story specs (`spec-*.md`) with their mutation evidence and review triage, `sprint-status.yaml`, `deferred-work.md` (every open finding, each with an owning story), and the epic retrospectives.
+4. `_bmad-output/implementation-artifacts/` — per-story specs (`spec-*.md`) with their mutation evidence and review triage, `sprint-status.yaml`, `deferred-work.md` (every recorded finding: `discharged` once fixed, `accepted` when reviewed and deliberately left, or carrying the story key that will resolve it), and the epic retrospectives.
 5. The UX spine: `_bmad-output/planning-artifacts/ux-designs/.../EXPERIENCE.md` (copy registry, flows, announcement ownership) and `DESIGN.md` (tokens, contrast evidence).
 
 `docs/fairdrop-spec.md` is the original narrative spec and is superseded; it is kept for traceability only.
@@ -51,7 +70,9 @@ gofmt -l . && go vet ./...           # must be clean
 go tool staticcheck ./...            # must be clean; go.mod tool directive, not golangci-lint
 go test -count=1 ./...               # Go suite
 go test -count=1 -race ./...         # requires cgo; see AGENTS.md
-cd frontend && npm test && npm run build
+cd frontend && npm test              # jsdom suite
+cd frontend && npm run test:browser  # real Chromium: reflow, 200% text, target floor, forced colors
+cd frontend && npm run build
 ```
 
 A live folder download that fails on a phone leaves no trail inside the app. Run the

@@ -1,5 +1,5 @@
 import type {CSSProperties} from 'react'
-import {cleanup, fireEvent, render, screen} from '@testing-library/react'
+import {cleanup, createEvent, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {IdleTransferState} from '../transfer/state'
 import type {PublicError} from '../transfer/types'
@@ -433,6 +433,49 @@ describe('the browse menu follows the menu-button pattern', () => {
         for (const item of screen.getAllByRole('menuitem')) {
             expect(item.getAttribute('tabindex')).toBe('-1')
         }
+    })
+
+    /*
+      Found by hand on the built binary, not by any suite.
+
+      The trigger is the only tabbable element in Idle -- every other focusable
+      node here carries tabIndex={-1}, and RecoveryHelp has none -- so Tab out
+      of a menu item finds nothing after it, wraps around the document, and
+      lands back on the trigger. handleMenuBlur cannot tell that from the
+      mousedown a pointer press performs, so its trigger guard kept the menu
+      open with focus on the button, where ArrowDown only re-opened an already
+      open menu and read as dead.
+
+      Tab closes the menu, which is the menu-button pattern and is also the only
+      option that does not trap: cycling Tab between the two items would leave a
+      keyboard sender no way out, and EXPERIENCE.md allows no focus trap outside
+      an OS dialog.
+    */
+    it('closes on Tab, which in this view wraps focus back onto the control', () => {
+        show()
+        fireEvent.click(control())
+        const menu = screen.getByRole('menu')
+
+        // Captured rather than fired blind: closing the menu is only half of
+        // it. Calling preventDefault here would swallow the Tab, so focus would
+        // never move and the sender would be stranded on an unmounted item --
+        // the same trap by another route. jsdom cannot observe real tab
+        // movement, but it can observe that the key was left alone.
+        const tab = createEvent.keyDown(menu, {key: 'Tab'})
+        fireEvent(menu, tab)
+
+        expect(screen.queryByRole('menu')).toBeNull()
+        expect(control().getAttribute('aria-expanded')).toBe('false')
+        expect(tab.defaultPrevented, 'Tab must reach the browser so focus moves').toBe(false)
+    })
+
+    it('closes on Shift+Tab as well, since that leaves the menu too', () => {
+        show()
+        fireEvent.click(control())
+
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'Tab', shiftKey: true})
+
+        expect(screen.queryByRole('menu')).toBeNull()
     })
 
     it('moves to the first and last item on Home and End', () => {

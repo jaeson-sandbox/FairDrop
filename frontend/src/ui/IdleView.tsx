@@ -206,6 +206,24 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
             closeAndReturnFocus()
             return
         }
+        // Tab leaves the menu, so the menu closes. Handled here rather than in
+        // handleMenuBlur because that handler cannot tell this apart from a
+        // pointer press: the trigger is the only tabbable element in Idle --
+        // every other focusable node carries tabIndex={-1} -- so Tab out of an
+        // item wraps around the document and lands back on the trigger, which
+        // is exactly the relatedTarget a mousedown produces. Found by hand on
+        // the built binary, where it left the menu open with focus on the
+        // button and ArrowDown re-opening an already open menu, reading as
+        // dead.
+        //
+        // No preventDefault: focus should move. And Tab is not made to cycle
+        // the items, which would strand a keyboard sender inside a menu whose
+        // only way out is the one tab stop it just left -- the focus trap
+        // EXPERIENCE.md forbids outside an OS dialog.
+        if (event.key === 'Tab') {
+            setOpen(false)
+            return
+        }
         const navigation = ['ArrowDown', 'ArrowUp', 'Home', 'End']
         if (!navigation.includes(event.key)) return
         event.preventDefault()
