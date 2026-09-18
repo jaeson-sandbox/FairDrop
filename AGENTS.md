@@ -211,6 +211,13 @@ supported no-follow queries; preserve content-read separation and identity check
   none of that, more than the story alongside it that had all of it. Docs, ledger entries and
   test-only pins may go on a named branch without a story; anything that changes what ships
   may not.
+- **One carve-out, added 2026-09-18 the first time the rule met a bug rather than a feature:**
+  a *defect fix* may go on a named branch without a story when the defect is already observed,
+  a failing test is written **before** the fix, and the fix is mutation-verified like any other.
+  The failing test is what replaces the spec — it states the intent, and it cannot be satisfied
+  by the wrong change. This covers a bug found in acceptance testing; it does not cover new
+  behaviour, a refactor, or "while I was in there". If the fix grows past the failing test that
+  motivated it, it has stopped being a defect fix and needs a story.
 
 ## Testing standards, learned the hard way
 
