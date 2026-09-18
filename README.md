@@ -6,25 +6,11 @@ Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged cop
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-## Status
-
-| Epic | What it delivers | State |
-| --- | --- | --- |
-| 1 — Share one file | Native drop or browse, QR/direct URL, one-shot download, honest progress, cancel, accessibility contract | Done, verified on a real phone, merged to `main` |
-| 2 — Share one folder | Safe directory staging through native no-follow handles; streamed ZIP with no temp archive | Done and merged; receiver-side observations remain recorded as incomplete |
-| 3 — Run reliably on supported desktops | Twelve stories covering native CI/releases, lifecycle and platform hardening, error/event handling, and verification evidence | Done and merged; all twelve stories, retrospective accepted |
-| 4 — Refine the selection experience | One browse control where two were, opening a menu the platform asymmetry hides behind; a coded chooser failure; the Copy button stops renaming itself permanently | Done and merged |
-| 5 — Make the transfer coordinator legible | `coordinator.go` 1008 → 790 lines, four self-contained concerns moved into files named for them, no behaviour change | Done and merged |
-
-**v1.0.0** — the planned scope is complete: FR1–FR24 across all five epics, each with a
-retrospective. The canonical SPEC's success signal (a file and a folder, sent from the desktop
-and downloaded by a nearby browser) was observed by hand on 2026-09-18 rather than inferred, which
-is what the 1 is for; `_bmad-output/implementation-artifacts/release-evidence.md` records exactly
-which rows that pass covers and which it does not.
-
-This is a personal project. [Automated verification is the release gate](docs/release-policy.md);
-manual device/browser and accessibility observations are optional, not invented
-passes. Known test failures still block acceptance.
+**v1.0.0.** The planned scope is complete — FR1–FR24 across five epics, each with a
+retrospective. What makes it a 1 rather than another 0.x is that the product's success signal
+was *observed* on 2026-09-18 rather than inferred: a file and a folder sent from the desktop,
+downloaded by a phone on the same Wi-Fi, contents read and matched. Earlier releases rested on
+the sender-side log and an automated gate alone.
 
 ## Using it
 
@@ -32,7 +18,7 @@ passes. Known test failures still block acceptance.
    only**, and leave Public off. Only one copy runs at a time; launching it again restores the
    window you already have.
 2. Give it one file or folder, either by dropping it on the zone at the top or through the
-   **Choose a file or folder** control. The control opens a small menu because Windows' native
+   **Choose a file or folder** control. That control opens a small menu because Windows' native
    dialog cannot offer both kinds at once; either item leads to the matching chooser.
 3. Scan the QR code from a browser on the same Wi-Fi, or open the direct link. **The first
    device to open the link gets the download** — including a link preview, so avoid pasting it
@@ -42,60 +28,6 @@ passes. Known test failures still block acceptance.
 
 Cancel at any point. The window returns to idle and everything it held is released — there is
 no history, because nothing was kept.
-
-## Read these first
-
-The project is built by a sequence of agents, so the documents are the memory. In order:
-
-1. `AGENTS.md` — conventions, environment pitfalls, and the testing standards this repo learned the hard way. Read it before running anything.
-2. `_bmad-output/specs/spec-fairdrop/SPEC.md` — the canonical product contract, with its companions:
-   - `docs/fairdrop-contracts.md` — binding types, ports, events, error codes, HTTP matrix, source-mutation policy
-   - `docs/fairdrop-architecture.md` — the as-built architecture
-   - `_bmad-output/planning-artifacts/architecture/.../ARCHITECTURE-SPINE.md` — the invariants (AD-1 … AD-12)
-3. `_bmad-output/planning-artifacts/epics.md` — requirements inventory and every story's acceptance criteria.
-4. `_bmad-output/implementation-artifacts/` — per-story specs (`spec-*.md`) with their mutation evidence and review triage, `sprint-status.yaml`, `deferred-work.md` (every recorded finding: `discharged` once fixed, `accepted` when reviewed and deliberately left, or carrying the story key that will resolve it), and the epic retrospectives.
-5. The UX spine: `_bmad-output/planning-artifacts/ux-designs/.../EXPERIENCE.md` (copy registry, flows, announcement ownership) and `DESIGN.md` (tokens, contrast evidence).
-
-`docs/fairdrop-spec.md` is the original narrative spec and is superseded; it is kept for traceability only.
-
-## Build, run, verify
-
-`.github/workflows/verify.yml` is the canonical gate: it runs natively on `windows-latest`
-and `macos-latest` for every pull request and every push to `main`/`epic-*`, in the fixed
-order below, and `verify_workflow_test.go` fails, naming the break, if a step or a pin is
-removed. Run the same commands locally, in the same order, before pushing.
-
-Go and the Wails CLI are not on the default PATH here, and `-race` needs a C toolchain — see
-"Environment and verification pitfalls" in `AGENTS.md` before running these.
-
-```sh
-wails build                          # builds frontend + Go, emits build/bin/fairdrop.exe
-./build/bin/fairdrop.exe             # run from a shell to see the stderr lifecycle log
-
-gofmt -l . && go vet ./...           # must be clean
-go tool staticcheck ./...            # must be clean; go.mod tool directive, not golangci-lint
-go test -count=1 ./...               # Go suite
-go test -count=1 -race ./...         # requires cgo; see AGENTS.md
-cd frontend && npm test              # jsdom suite
-cd frontend && npm run test:browser  # real Chromium: reflow, 200% text, target floor, forced colors
-cd frontend && npm run build
-```
-
-A live folder download that fails on a phone leaves no trail inside the app. Run the
-production staging-and-archive path over the same folder to rule the archive in or out:
-
-```sh
-FAIRDROP_DIAGNOSE='C:\path\to\folder' go test -count=1 -run TestDiagnoseRealFolder -v ./internal/stream/
-```
-
-## Workflow
-
-Branch per epic (`epic-2-share-one-folder`); never commit to `main` directly. Every
-verified-green milestone is committed and pushed. A finished epic gets a retrospective
-(`epic-N-retro-*.md`), then merges to `main` with `--no-ff`. Stories are built with the
-`bmad-build` workflow: a frozen spec, an implementation, three adversarial review layers, and
-mutation testing as the acceptance bar — a load-bearing guarantee that no test fails when broken
-is not considered verified.
 
 ## Trust model
 
@@ -107,3 +39,65 @@ receiver.
 Release artifacts match that limit: no code signing, no notarization, no auto-update, and no
 Linux packaging. The macOS build carries only Wails' ad-hoc `codesign --sign -`, present so the
 OS will launch it, not a developer-identity signature or notarization.
+
+## Build and verify
+
+`.github/workflows/verify.yml` is the canonical gate: it runs natively on `windows-latest` and
+`macos-latest` for every pull request and every push to `main`/`epic-*`, and
+`verify_workflow_test.go` fails, naming the break, if a step or a pin is removed. Run the same
+commands locally, in the same order, before pushing.
+
+Go and the Wails CLI are not on the default PATH here, and `-race` needs a C toolchain — see
+"Environment and verification pitfalls" in `AGENTS.md` first.
+
+```sh
+wails build                          # frontend + Go, emits build/bin/fairdrop.exe
+./build/bin/fairdrop.exe             # run from a shell to see the stderr lifecycle log
+
+gofmt -l . && go vet ./...           # must be clean
+go tool staticcheck ./...            # go.mod tool directive, not golangci-lint
+go test -count=1 ./...
+go test -count=1 -race ./...         # requires cgo; see AGENTS.md
+cd frontend && npm test              # jsdom suite
+cd frontend && npm run test:browser  # real Chromium: reflow, 200% text, targets, forced colors
+cd frontend && npm run build
+```
+
+A live folder download that fails on a phone leaves no trail inside the app. Run the production
+staging-and-archive path over the same folder to rule the archive in or out:
+
+```sh
+FAIRDROP_DIAGNOSE='C:\path\to\folder' go test -count=1 -run TestDiagnoseRealFolder -v ./internal/stream/
+```
+
+## How it was built
+
+FairDrop was built by a sequence of AI agents, so the documents are the memory rather than a
+by-product. If you are picking the project up — human or otherwise — read in this order:
+
+1. `AGENTS.md` — conventions, environment pitfalls, and the testing standards this repo learned
+   the hard way. Read it before running anything.
+2. `_bmad-output/specs/spec-fairdrop/SPEC.md` — the canonical contract, with its companions:
+   `docs/fairdrop-contracts.md` (types, ports, events, error codes, HTTP matrix),
+   `docs/fairdrop-architecture.md` (as-built), and the architecture spine's invariants
+   (AD-1 … AD-12) under `_bmad-output/planning-artifacts/architecture/`.
+3. `_bmad-output/planning-artifacts/epics.md` — the requirements inventory and every story's
+   acceptance criteria.
+4. `_bmad-output/implementation-artifacts/` — per-story specs and their mutation evidence,
+   `sprint-status.yaml`, `deferred-work.md`, the epic retrospectives, and
+   `release-evidence.md`, which records what each release actually verified and what it did not.
+5. The UX spine under `_bmad-output/planning-artifacts/ux-designs/` — `EXPERIENCE.md` (copy
+   registry, flows, announcement ownership) and `DESIGN.md` (tokens, contrast evidence).
+
+Stories are built with the `bmad-build` workflow: a frozen spec, an implementation, three
+adversarial review layers, and mutation testing as the acceptance bar — a load-bearing guarantee
+that no test fails when you break it is not considered verified. A branch per epic, never a
+commit straight to `main`, and a retrospective before the epic closes.
+
+This is a personal project. [Automated verification is the release
+gate](docs/release-policy.md); manual device, browser and accessibility observations are
+optional and are recorded at the strength they were actually observed, never rounded up to a
+pass. Known test failures still block acceptance.
+
+`docs/fairdrop-spec.md` is the original narrative spec, superseded and kept only for
+traceability.
