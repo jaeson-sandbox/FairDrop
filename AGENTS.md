@@ -204,6 +204,13 @@ supported no-follow queries; preserve content-read separation and identity check
 - A finished phase or epic merges into `main` with `--no-ff`, and `main` is pushed, so the
   next branch forks from a real baseline instead of stacking on its predecessor.
 - Remote is `https://github.com/jaeson-sandbox/FairDrop.git`; `gh` is authenticated.
+- **Production code changes need a story.** Owner decision, 2026-09-17, from the Epic 4
+  retrospective's F1: closing deferrals and cutting a release is story-shaped work and goes
+  through `bmad-build` like anything else — spec, I/O matrix, three review layers, evidence
+  file. The retrospective found 582 lines of production Go across six files on a branch with
+  none of that, more than the story alongside it that had all of it. Docs, ledger entries and
+  test-only pins may go on a named branch without a story; anything that changes what ships
+  may not.
 
 ## Testing standards, learned the hard way
 

@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-17-2026 21:56
+last_updated: 09-17-2026 22:14
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -260,7 +260,7 @@ action_items:
       and review, or a sanctioned lightweight bmad-build path with a named artifact.
       Unspecced production work on an unnamed branch should stop."
     owner: "Jaeson"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
   - id: "epic-4-retro-item-25-split-internal-transfer-coordinator-go-c"
     epic: 4
@@ -268,7 +268,7 @@ action_items:
       3 retrospective and now partially done, the bounded-call subsystem already being
       out."
     owner: "a future story"
-    status: open
+    status: in-progress
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
   - id: "epic-4-retro-item-26-amend-the-epic-3-exclusion-in-epics-md-t"
     epic: 4
