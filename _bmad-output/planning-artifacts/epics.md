@@ -1487,8 +1487,17 @@ removed or renamed.
 
 **Given** `coordinator.go` after the split
 **When** its length is measured
-**Then** it is under 750 lines and holds the coordination logic -- `Stage`, `AuthorizeClaim`, the
-unwind family, publish and lease -- with each extracted file named for the one concern it owns.
+**Then** none of the four named regions remains in it, and it ends under 830 lines, holding the
+coordination logic -- `Stage`, `AuthorizeClaim`, the unwind family, publish and lease -- with each
+extracted file named for the one concern it owns.
+
+*Where 830 comes from, and why it is not lower.* Measured, not estimated: the four regions and the
+three constants that belong to them are 188 + ~15 lines, taking 1009 to roughly 806. An earlier
+draft of this criterion said "under 750", which was an estimate and was wrong by about 56 lines. That
+number was reachable only by also moving the operation lease and the publish family, and this epic
+deliberately keeps both with the coordination core -- so the line count follows the scope rather than
+the scope being widened to flatter a number. If the split lands materially above 830, something was
+moved that this epic did not scope, and that is a finding rather than a pass.
 
 **Given** the extracted concerns
 **When** a reader opens any new file
