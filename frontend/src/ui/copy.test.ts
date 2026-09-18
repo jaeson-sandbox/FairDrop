@@ -1,3 +1,5 @@
+import {readFileSync, readdirSync} from 'node:fs'
+import {resolve} from 'node:path'
 import {describe, expect, it} from 'vitest'
 import {fixedErrorMessages} from '../transfer/errors'
 import {copy, errorHeadings, errorMessages, qrAltFor} from './copy'
@@ -367,6 +369,114 @@ describe('registry immutability', () => {
             mutable.busy = 'Busy'
         }).toThrow()
         expect(errorHeadings.busy).toBe('FairDrop is still busy')
+    })
+})
+
+/*
+  The third side of the triangle, and the one that was missing (D-119).
+
+  Above, every string is pinned against a literal written at the assertion
+  site, and every key path against a written-out list -- so a renamed or added
+  leaf fails here. Neither reads EXPERIENCE.md. The spine's "Voice and Tone"
+  table is the document that makes a string *approved*, and Story 4.1 shipped
+  three new ones whose rows existed only because someone went looking: nothing
+  would have failed without them.
+
+  The gap runs one way. A row naming no leaf is dead and harmless; a leaf with
+  no row is unapproved copy on the screen. Both are checked below anyway,
+  because a dead row is how a rename hides.
+
+  What stays human: whether a *new* `label` entry is approved copy that belongs
+  in the table (`chooseFileOrFolder`, `file` and `folder` are, and are
+  tabulated) or a structural word the spine names in prose (`windows`,
+  `throughput`). No mechanical line separates those -- both groups are short
+  and both contain spaces -- so this pins the half that can be pinned: every
+  non-label, non-unit leaf needs a row, and every row that exists must agree.
+*/
+describe('the spine table and the registry that quotes it', () => {
+    // Vitest roots at frontend/, the same anchor progressSpeech.test.ts uses.
+    const designs = resolve(process.cwd(), '..', '_bmad-output', 'planning-artifacts', 'ux-designs')
+    const folders = readdirSync(designs).filter((entry) => entry.startsWith('ux-'))
+    // Thrown, not expected: this runs at collection time, where a failed
+    // expectation belongs to no test and would be reported as an empty file
+    // rather than as the missing spine it is.
+    if (folders.length !== 1) throw new Error(`expected one ux-* design folder, found ${folders.length}`)
+    const spine = readFileSync(resolve(designs, folders[0], 'EXPERIENCE.md'), 'utf8')
+
+    // The table quotes values typographically; copy.ts stores them bare.
+    const openQuote = String.fromCharCode(0x201C)
+    const closeQuote = String.fromCharCode(0x201D)
+
+    /** `copy.direct_link.action` -> `directLink.action`, dropping the registry name. */
+    function pathOf(id: string): string {
+        return id
+            .replace('copy.', '')
+            .split('.')
+            .map((part) => part.replace(/_(.)/g, (_, letter: string) => letter.toUpperCase()))
+            .join('.')
+    }
+
+    function valueAt(path: string): string | undefined {
+        let node: unknown = copy
+        for (const key of path.split('.')) {
+            if (typeof node !== 'object' || node === null) return undefined
+            node = (node as Record<string, unknown>)[key]
+        }
+        return typeof node === 'string' ? node : undefined
+    }
+
+    const rows = spine
+        .split(/\r?\n/)
+        .filter((line) => line.trimStart().startsWith('| `copy.'))
+        .map((line) => {
+            const cells = line.split('|')
+            // A value carrying a raw pipe would truncate silently; fail instead.
+            expect(cells, `${line.slice(0, 48)} splits into five table cells`).toHaveLength(5)
+            const id = cells[1].trim().replace(/`/g, '')
+            const quoted = cells[3].trim()
+            expect(
+                quoted.startsWith(openQuote) && quoted.endsWith(closeQuote),
+                `${id} is typographically quoted`,
+            ).toBe(true)
+            return {id, value: quoted.slice(1, -1)}
+        })
+
+    /*
+      A parser that matched nothing would make both cases below pass over an
+      empty set. A count alone is not enough either -- a regex that captured
+      the id and dropped the value would still count rows -- so one known pair
+      is asserted whole.
+    */
+    it('parses the table it is about to check', () => {
+        expect(rows.length, 'rows parsed from the Voice and Tone table').toBeGreaterThan(30)
+        expect(rows).toContainEqual({id: 'copy.idle.instruction', value: 'Drop one file or folder.'})
+    })
+
+    it('quotes, in every row, the exact string the registry holds', () => {
+        for (const {id, value} of rows) {
+            expect(valueAt(pathOf(id)), `${id} names a registry string`).toBeTypeOf('string')
+            expect(value, `${id} in EXPERIENCE.md matches copy.ts`).toBe(valueAt(pathOf(id)))
+        }
+    })
+
+    it('registers every approved string, so new copy cannot ship untabulated', () => {
+        const tabulated = new Set(rows.map((row) => pathOf(row.id)))
+        const approved: string[] = []
+        const walk = (value: object, prefix: string): void => {
+            for (const [key, nested] of Object.entries(value)) {
+                const path = prefix === '' ? key : `${prefix}.${key}`
+                if (typeof nested === 'string') approved.push(path)
+                else walk(nested as object, path)
+            }
+        }
+        walk(copy, '')
+
+        // `label` and `unit` are the functional words the spine writes in prose
+        // rather than tabulating; copy.ts's own header draws that line.
+        const needsARow = approved.filter((path) => !path.startsWith('label.') && !path.startsWith('unit.'))
+        expect(needsARow.length, 'approved strings found to check').toBeGreaterThan(20)
+
+        expect(needsARow.filter((path) => !tabulated.has(path))).toEqual([])
     })
 })
 
