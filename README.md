@@ -16,6 +16,12 @@ Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the wi
 | 4 — Refine the selection experience | One browse control where two were, opening a menu the platform asymmetry hides behind; a coded chooser failure; the Copy button stops renaming itself permanently | Done and merged |
 | 5 — Make the transfer coordinator legible | `coordinator.go` 1008 → 790 lines, four self-contained concerns moved into files named for them, no behaviour change | Done and merged |
 
+**v1.0.0** — the planned scope is complete: FR1–FR24 across all five epics, each with a
+retrospective. The canonical SPEC's success signal (a file and a folder, sent from the desktop
+and downloaded by a nearby browser) was observed by hand on 2026-09-18 rather than inferred, which
+is what the 1 is for; `_bmad-output/implementation-artifacts/release-evidence.md` records exactly
+which rows that pass covers and which it does not.
+
 This is a personal project. [Automated verification is the release gate](docs/release-policy.md);
 manual device/browser and accessibility observations are optional, not invented
 passes. Known test failures still block acceptance.

@@ -13,7 +13,7 @@
   "info": {
     "companyName": "FairDrop",
     "productName": "FairDrop",
-    "productVersion": "0.3.0",
+    "productVersion": "1.0.0",
     "copyright": "Copyright © 2026 Jaeson Martin",
     "comments": "Ephemeral local P2P file transfer"
   }
