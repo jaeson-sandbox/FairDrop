@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-17-2026 23:12
+last_updated: 09-17-2026 23:33
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -75,7 +75,7 @@ development_status:
 
   epic-5: done
   5-1-split-internal-transfer-coordinator-go: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
     epic: 1
@@ -272,7 +272,7 @@ action_items:
       3 retrospective and now partially done, the bounded-call subsystem already being
       out."
     owner: "a future story"
-    status: in-progress
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
   - id: "epic-4-retro-item-26-amend-the-epic-3-exclusion-in-epics-md-t"
     epic: 4
@@ -295,3 +295,25 @@ action_items:
     owner: "a future story"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+  - id: "epic-5-retro-item-29-give-parallel-review-agents-their-own-gi"
+    epic: 5
+    action: "Give parallel review agents their own git worktrees. Three layers shared
+      one working tree and one left a mutation in it; a fourth used worktrees unprompted
+      and left it clean."
+    owner: "Jaeson"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-17.md"
+  - id: "epic-5-retro-item-30-size-mutation-batteries-by-declaration-r"
+    epic: 5
+    action: "Size mutation batteries by declaration rather than by file or concern,
+      and state the denominator. One-per-concern hid an entirely unexercised function."
+    owner: "process"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-17.md"
+  - id: "epic-5-retro-item-31-mutation-test-a-verification-command-bef"
+    epic: 5
+    action: "Mutation-test a verification command before citing it as evidence. The
+      go doc check could not have failed and reached a merged evidence file."
+    owner: "process"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-17.md"
