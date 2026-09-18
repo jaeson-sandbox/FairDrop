@@ -561,6 +561,51 @@ func TestStageDiscardsAStaleResult(t *testing.T) {
 	}
 }
 
+// D-121. warnings.go held two constructors and only beaconWarning was ever
+// executed: giving unportableNamesWarning the beacon code, or building it from
+// the wrong registry entry, left all eight packages green. No test staged an
+// item whose UnportableNames was non-zero, so the branch never ran.
+//
+// The count is asserted absent as well as the code being right. AD-9 keeps the
+// number of offending entries inside the process -- it is a count of the user's
+// own filesystem -- so a message that started interpolating it would be a
+// disclosure, not a nicety.
+func TestStageWarnsWhenTheSelectionHoldsNamesWindowsCannotSave(t *testing.T) {
+	h := newHarness(t)
+	h.source.inspect = func(context.Context, string) (StagedItem, error) {
+		item := testItem()
+		item.Kind = ItemDirectory
+		item.UnportableNames = 3
+		return item, nil
+	}
+
+	metadata := h.stageSuccessfully()
+
+	if got := h.state(); got != stateStaged {
+		t.Errorf("state is %q, want %q -- unportable names warn, they never refuse", got, stateStaged)
+	}
+	if len(metadata.Warnings) != 1 {
+		t.Fatalf("warnings are %+v, want exactly one", metadata.Warnings)
+	}
+	// A literal built from the registry, not unportableNamesWarning(): asserting
+	// the constructor against itself is what let both its code and its message
+	// drift with the suite green.
+	want := Warning{
+		Code:    WarnUnportableNames,
+		Message: PublicErrorOf(NewError(ErrNameWarning, "")).Message,
+	}
+	if metadata.Warnings[0] != want {
+		t.Errorf("warning is %+v, want the fixed %+v", metadata.Warnings[0], want)
+	}
+	if strings.Contains(metadata.Warnings[0].Message, "3") {
+		t.Errorf("the warning message %q carries the offending count; AD-9 keeps it inside the process",
+			metadata.Warnings[0].Message)
+	}
+	if metadata.URL != testURL || metadata.QR == "" {
+		t.Error("the session is not usable even though nothing was refused")
+	}
+}
+
 func TestStageCommitsWithAWarningWhenOnlyTheBeaconFails(t *testing.T) {
 	h := newHarness(t)
 	h.network.startBeacon = func(context.Context, BeaconRequest) error {
