@@ -2,7 +2,7 @@
 title: 'Story 5.1: Split internal/transfer/coordinator.go'
 type: 'refactor'
 created: '2026-09-17'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '96284e9b43cacd6e54f27114d53d21dac031fdd6'
 review_loop_iteration: 0
 context:
@@ -97,8 +97,10 @@ the record rather than maintain it.
 - Given the split is applied, when `git diff --stat` is read, then no `_test.go` file appears in it.
 - Given the package before and after, when `go doc -all ./internal/transfer` is diffed, then the
   output is byte-identical.
-- Given `coordinator.go` after the move, when measured, then it is under 830 lines and contains none
-  of `diagnosticSink`, `session`, `newIdentity`, or `beaconWarning`.
+- Given `coordinator.go` after the move, when measured, then it is under 830 lines and contains no
+  *declaration* of `diagnosticSink`, `session`, `newIdentity`, or `beaconWarning`. References to all
+  four remain and must: the coordinator still holds a `diagnosticSink` field, still calls
+  `newIdentity` and `beaconWarning`, and still names `session` throughout.
 - Given each new file, when opened, then it declares one concern and carries the comments that
   explained that concern in the original.
 
@@ -109,6 +111,37 @@ the record rather than maintain it.
 six-mutation table and the matrix audit.
 
 ## Spec Change Log
+
+**2026-09-17 (review).** Three layers ran. The move itself was independently reproduced by two of
+them and needed no change; every finding below is about the spec's wording or the evidence's claims,
+so the code was not re-derived and no loopback was taken. Recorded here because that is a deliberate
+deviation from the prescribed `bad_spec` loopback, not an oversight.
+
+*What the spec got wrong.* Acceptance Criterion 3 said `coordinator.go` must contain "none of
+`diagnosticSink`, `session`, `newIdentity`, or `beaconWarning`". As written it could never pass --
+`session` alone appears 47 times as a type reference, and the coordinator still calls the other
+three. It meant "no declaration of", and now says so. The audit that should have caught this walked
+the five I/O-matrix rows and never touched the four-item Acceptance Criteria list at all.
+
+*What the evidence overclaimed, corrected in place.* The `go doc -all` byte-comparison was presented
+as the second of three faithfulness checks and as "stronger than the tests still pass". It is
+insensitive to this entire story: every one of the 194 moved lines is unexported and `go doc -all`
+prints only exported symbols, so zero moved symbols appear in the output that was compared. The
+covering command, `go doc -all -u`, was not run at the time; run since, it shows a real 36-line
+diff -- the three moved constants now render as three separate `const` groups instead of members of
+the coordinator's single block. Benign, and no doc text changed, but it is exactly what the stated
+bar existed to surface.
+
+*Deviation from "byte-identical apart from its new file".* Two file headers were written that were
+not in the original, and one of them was false: it described the `Diagnose` seam as reading the
+sink, when `coordinator.go:80-88` and `recordDiagnostic` make it a parallel write destination. The
+header is corrected rather than removed, and the two files that had none gained one -- the Code Map
+names `bounded.go` as the precedent to follow and `bounded.go` carries a file header, so headers are
+specified by reference and their *absence* was the deviation.
+
+*KEEP.* The move itself: pure deletion, 194/194 lines verbatim, the four regions and their three
+constants placed as specified, and `beaconInstanceBase` left in `coordinator.go`. All independently
+reproduced by two review layers.
 
 ## Design Notes
 

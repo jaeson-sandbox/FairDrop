@@ -1,5 +1,10 @@
 package transfer
 
+// This file holds the two Staged warning constructors. A warning is not a
+// failure: it travels beside a transfer that still works, so each one carries
+// fixed registry copy and a stable code, and neither the offending entry names
+// nor their count leave the process (AD-9).
+
 // unportableNamesWarning is the Staged warning for a folder holding entries a
 // Windows receiver cannot save. Fixed registry copy, like every warning: the
 // number of offending entries and their names stay inside the process.

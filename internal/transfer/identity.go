@@ -7,6 +7,12 @@ import (
 	"net/netip"
 )
 
+// This file holds session identity and the URL a receiver is handed: two
+// independent random draws, and the capability URL built from one of them.
+// The session ID and the capability token are never derived from each other --
+// the token is an HTTP capability and the ID is correlation the UI is shown,
+// so learning either must teach nothing about the other.
+
 const (
 	// identityBytes is the width of each independent random identifier. Two
 	// separate draws of this many bytes give a session ID and a capability

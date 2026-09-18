@@ -2,10 +2,13 @@ package transfer
 
 import "sync"
 
-// This file holds the bounded diagnostics ring buffer: an internal cleanup
-// record the coordinator writes to and a test (or the injected Diagnose seam)
-// reads from. It never carries adapter text, only a stable code and a message
-// this package chose (AD-9).
+// This file holds the bounded diagnostics ring buffer: the internal cleanup
+// record that only a test reads today (D-098). It is not the Diagnose seam --
+// recordDiagnostic is the single write path that feeds both, so the seam is a
+// parallel destination rather than a reader of this sink, and it keeps
+// receiving calls after the cap here has stopped keeping them. Nothing stored
+// here carries adapter text, only a stable code and a message this package
+// chose (AD-9).
 
 const (
 	// maxDiagnostics bounds the internal cleanup record. A session produces a
