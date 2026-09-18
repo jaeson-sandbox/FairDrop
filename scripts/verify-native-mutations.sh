@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 scratch="$(mktemp -d)"
 platform="$(go env GOOS)"
-files=(internal/source/source.go internal/source/prepared.go internal/transfer/archive_name.go internal/transfer/coordinator.go internal/transfer/bounded.go internal/transfer/errors.go internal/network/beacon.go internal/network/network.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go selection_source.go single_instance_darwin.go .github/workflows/verify.yml)
+files=(internal/source/source.go internal/source/prepared.go internal/transfer/archive_name.go internal/transfer/coordinator.go internal/transfer/bounded.go internal/transfer/diagnostics.go internal/transfer/session.go internal/transfer/identity.go internal/transfer/warnings.go internal/transfer/errors.go internal/network/beacon.go internal/network/network.go internal/server/handler.go internal/server/lifecycle.go internal/stream/payload.go internal/stream/archive.go selection_source.go single_instance_darwin.go .github/workflows/verify.yml)
 if [[ "$platform" == linux || "$platform" == darwin ]]; then
   files+=("internal/source/handle_${platform}.go" internal/source/handle_posix.go)
 fi

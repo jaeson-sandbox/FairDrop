@@ -972,8 +972,13 @@ func TestTheDiagnosticSinkSaysWhenItStoppedRecording(t *testing.T) {
 	}
 
 	entries := h.coordinator.diagnostics.snapshot()
-	if len(entries) != maxDiagnostics {
-		t.Fatalf("the sink holds %d entries, want exactly its %d cap", len(entries), maxDiagnostics)
+	// A literal, not maxDiagnostics: driving the loop from the constant and
+	// then asserting against the same constant moved both sides together, so
+	// any positive cap passed identically (D-120). The loop bound above and
+	// the seam count below stay derived, because those two are meant to track
+	// the constant -- this one is meant to pin it.
+	if len(entries) != 32 {
+		t.Fatalf("the sink holds %d entries, want exactly its %d cap", len(entries), 32)
 	}
 	if last := entries[len(entries)-1]; last != diagnosticOverflow {
 		t.Errorf("the last entry is %+v, want the overflow marker %+v -- a full sink that says "+

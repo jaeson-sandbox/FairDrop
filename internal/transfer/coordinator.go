@@ -4,36 +4,19 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"io"
-	"net/netip"
 	"slices"
 	"sync"
 	"time"
 )
 
 const (
-	// identityBytes is the width of each independent random identifier. Two
-	// separate draws of this many bytes give a session ID and a capability
-	// token of 128 bits each, which is the contract's floor.
-	identityBytes = 16
-
-	// downloadPathPrefix must stay identical to the route internal/server
-	// registers as "/download/{token}" in handler.go. The two cannot share a
-	// constant without inverting the dependency direction -- the server
-	// imports this package -- so a change to either one has to move both.
-	downloadPathPrefix = "/download/"
-
 	// beaconInstanceBase is the only instance text this coordinator supplies.
 	// It is a fixed literal on purpose: the network adapter appends a host
 	// label and a random per-process suffix, and nothing about the selected
 	// item may reach a discovery record.
 	beaconInstanceBase = "fairdrop"
-
-	// maxDiagnostics bounds the internal cleanup record. A session produces a
-	// handful at most, and the sink exists to be inspected, not to grow.
-	maxDiagnostics = 32
 
 	// AdapterCleanupBound is the ceiling on one external port call the operation
 	// lease holds across: ServerPort.Stop and NetworkPort.StopBeacon. Neither
@@ -77,147 +60,6 @@ const (
 	// (D-034).
 	observerPublishBound = 5 * time.Second
 )
-
-// sessionState is the coordinator's lifecycle state. STAGING and CLAIMING are
-// internal: they exist so a long setup or handshake stays interruptible, and
-// the UI never sees them. DONE and ERROR are terminal holding states: the
-// session's resources are already released there, and only the reset that
-// clears the session still has to happen.
-type sessionState string
-
-const (
-	stateIdle         sessionState = "IDLE"
-	stateStaging      sessionState = "STAGING"
-	stateStaged       sessionState = "STAGED"
-	stateClaiming     sessionState = "CLAIMING"
-	stateTransferring sessionState = "TRANSFERRING"
-	stateDone         sessionState = "DONE"
-	stateError        sessionState = "ERROR"
-)
-
-// resource names one thing a session acquires from an adapter. Stage appends
-// each in acquisition order and unwind walks the list backwards, so reverse
-// release is structural rather than a comment somebody has to keep true.
-type resource int
-
-const (
-	resourceServer resource = iota
-	resourceBeacon
-)
-
-// diagnostic is one internal cleanup note. It carries a stable code and a
-// message this package chose, never adapter text: adapter text is exactly
-// where absolute paths and capability tokens live.
-type diagnostic struct {
-	code    ErrorCode
-	message string
-}
-
-type diagnosticSink struct {
-	mu         sync.Mutex
-	entries    []diagnostic
-	overflowed bool
-}
-
-// diagnosticOverflow replaces whatever entry would have been silently
-// dropped once the sink is full. A truncated sink is indistinguishable from
-// a complete one to anything that reads it, and this package's whole reason
-// for keeping the sink is to be inspected (D-031) -- so the last slot is
-// reserved for saying so, once, rather than left to keep dropping silently
-// forever after.
-var diagnosticOverflow = diagnostic{
-	code:    ErrTransferFailed,
-	message: "further diagnostics were dropped: the sink reached its limit",
-}
-
-func (s *diagnosticSink) record(entry diagnostic) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.overflowed {
-		return
-	}
-	if len(s.entries) >= maxDiagnostics-1 {
-		s.entries = append(s.entries, diagnosticOverflow)
-		s.overflowed = true
-		return
-	}
-	s.entries = append(s.entries, entry)
-}
-
-func (s *diagnosticSink) snapshot() []diagnostic {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	out := make([]diagnostic, len(s.entries))
-	copy(out, s.entries)
-	return out
-}
-
-// session is everything one staged transfer owns.
-//
-// Field ownership splits three ways, and mixing them is what a race here would
-// look like:
-//
-//   - id, token, generation, ctx and cancel are set before the session is
-//     installed and never change, so any goroutine may read them.
-//   - cancelled, terminal, stopReset, seq, stagedAt and startedAt are guarded
-//     by Coordinator.mu.
-//   - everything else belongs to whichever operation holds the lease. The
-//     lease is a channel handoff, so it carries the happens-before edge that
-//     lets the claim path read what Stage wrote.
-type session struct {
-	id         SessionID
-	token      CapabilityToken
-	generation uint64
-	ctx        context.Context
-	cancel     context.CancelFunc
-
-	cancelled bool
-	// terminal records that this session's one Complete or Failed outcome has
-	// been accepted. It is set the moment the outcome is taken, before the
-	// resources are released and the settled state is committed, so
-	// exactly-once acceptance does not depend on where that transition lands.
-	terminal bool
-	// stopReset cancels the armed three-second reset. It is nil whenever no
-	// reset is pending, so a Cancel that finds it nil has nothing to stop.
-	stopReset StopTimer
-	seq       uint64
-	stagedAt  time.Time
-	startedAt time.Time
-
-	item     StagedItem
-	url      string
-	qrBase64 string
-	warnings []Warning
-	acquired []resource
-
-	drainerDone chan struct{}
-}
-
-// hold records a resource as live, in acquisition order.
-func (s *session) hold(held resource) {
-	s.acquired = append(s.acquired, held)
-}
-
-// stop cancels the session's data-plane context. The caller must not hold the
-// state mutex: cancelling runs whatever is waiting on the context, and the
-// no-lock-across-a-call rule covers those continuations too.
-func (s *session) stop() {
-	if s.cancel != nil {
-		s.cancel()
-	}
-}
-
-// release forgets a resource the operation just gave up, so a later unwind
-// does not try to release it twice.
-func (s *session) release(freed resource) {
-	kept := s.acquired[:0]
-	for _, held := range s.acquired {
-		if held != freed {
-			kept = append(kept, held)
-		}
-	}
-	s.acquired = kept
-}
 
 // StopTimer cancels a scheduled callback. Like time.Timer.Stop it reports
 // whether it stopped the callback before it ran, and calling it after the
@@ -945,64 +787,4 @@ func (c *Coordinator) ready() error {
 		return NewError(ErrSetupFailed, "FairDrop is not ready to stage a transfer")
 	}
 	return nil
-}
-
-// newIdentity draws the session ID and the capability token as two independent
-// values. Neither is derived from the other: the token is an HTTP capability
-// and the session ID is correlation the UI is shown, so learning either one
-// must teach nothing about the other.
-func (c *Coordinator) newIdentity() (SessionID, CapabilityToken, error) {
-	id, err := c.randomHex()
-	if err != nil {
-		return "", "", err
-	}
-	token, err := c.randomHex()
-	if err != nil {
-		return "", "", err
-	}
-	return SessionID(id), CapabilityToken(token), nil
-}
-
-func (c *Coordinator) randomHex() (string, error) {
-	source := c.entropy
-	if source == nil {
-		source = rand.Reader
-	}
-	raw := make([]byte, identityBytes)
-	if _, err := io.ReadFull(source, raw); err != nil {
-		// Called from Stage before c.mu.Lock(): no state has changed and no
-		// resource has been acquired, so this is a pre-transfer setup failure,
-		// not an interrupted transfer (D-025).
-		return "", WrapError(ErrSetupFailed, "FairDrop could not create a transfer session", err)
-	}
-	return hex.EncodeToString(raw), nil
-}
-
-// capabilityURL is the one place the token becomes a shareable string.
-func capabilityURL(address netip.Addr, port int, token CapabilityToken) string {
-	endpoint := netip.AddrPortFrom(address, uint16(port))
-	return "http://" + endpoint.String() + downloadPathPrefix + string(token)
-}
-
-// unportableNamesWarning is the Staged warning for a folder holding entries a
-// Windows receiver cannot save. Fixed registry copy, like every warning: the
-// number of offending entries and their names stay inside the process.
-func unportableNamesWarning() Warning {
-	public := PublicErrorOf(NewError(ErrNameWarning, "selection holds names a Windows receiver cannot save"))
-	return Warning{Code: WarnUnportableNames, Message: public.Message}
-}
-
-// beaconWarning is the fixed non-fatal warning for a discovery failure. Its
-// copy comes from the public registry rather than from the adapter, so no
-// adapter text can reach the UI through it, and its code is constrained to the
-// WarningCode type so the frontend's parser cannot meet one it does not
-// recognise (Epic 1 retrospective item 3).
-//
-// This comment sat above unportableNamesWarning between Story 3.11 and the
-// Epic 3 retrospective, which inserted that function between the comment and
-// the function it describes. `go doc` printed it under the wrong name and
-// printed nothing under this one (A7).
-func beaconWarning() Warning {
-	public := PublicErrorOf(NewError(ErrBeaconWarning, "device discovery is unavailable"))
-	return Warning{Code: WarnBeaconUnavailable, Message: public.Message}
 }

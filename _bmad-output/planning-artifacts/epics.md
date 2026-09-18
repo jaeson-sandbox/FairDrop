@@ -219,9 +219,15 @@ Maintainers can verify and ship a single-instance FairDrop application through r
 
 ### Epic 4: Refine the Selection Experience
 
-A sender chooses what to send through one control rather than answering a file-or-folder question before they have done anything. Created 2026-09-13 from an owner observation about the Idle screen; scoped to one story so far.
+A sender chooses what to send through one control rather than answering a file-or-folder question before they have done anything. Created 2026-09-13 from an owner observation about the Idle screen; it began scoped to one story and closed with two, 4.2 having been added to absorb the Epic 3 retrospective's findings.
 
 **FRs covered:** none new; refines FR23-FR24's surface within the existing UX contract.
+
+### Epic 5: Make the Transfer Coordinator Legible
+
+A maintainer can find the code that owns a concern without reading a thousand-line file first. Created 2026-09-17 from the Epic 4 retrospective's F3, which carried the item forward from the Epic 3 retrospective a second time.
+
+**FRs covered:** none. This changes no behaviour and no contract; it moves code.
 
 > **Cross-cutting rule.** FR coverage identifies primary epic ownership, not the full acceptance surface. Every story also inherits the relevant NFRs, architecture requirements, binding contracts, and UX requirements. Unit, integration, race, and accessibility verification lands with the behavior it proves; Epic 3 owns native packaging, release automation, platform smoke tests, and single-instance release behavior rather than deferred testing debt.
 
@@ -1428,3 +1434,77 @@ So that I am not asked to classify my thing before I have chosen it.
 **Given** any label this story introduces
 **When** it is written
 **Then** it enters `EXPERIENCE.md` by stable key first and moves the registry, the contract, the Go table and the TypeScript mirror together, as Story 3.5 established.
+
+## Epic 5: Make the Transfer Coordinator Legible
+
+A maintainer can find the code that owns a concern without reading a thousand-line file first.
+Created 2026-09-17 from the Epic 4 retrospective's F3, which carried the item forward from the
+Epic 3 retrospective a second time.
+
+**FRs covered:** none. This changes no behaviour and no contract; it moves code.
+
+### Story 5.1: Split internal/transfer/coordinator.go
+
+As a maintainer,
+I want the coordinator's self-contained concerns in files of their own,
+So that a lifecycle change does not start by scrolling past a diagnostics ring buffer.
+
+**Why now, and why it kept being deferred:** the Epic 3 retrospective named this and excluded it as
+"a refactor that deserves a story not also fixing ten unrelated things". Epic 4 then did roughly a
+third of it anyway -- `bounded.go` lifted 167 net lines out -- on a branch with no story, which is
+the F1 finding this epic's own governance rule now forbids. So the remaining split is the first
+work to run under that rule.
+
+**What the file actually holds,** so the next session does not re-derive it. At 1008 lines it is the
+largest production file in the repository, 29% larger than the next (`internal/server/lifecycle.go`
+at 784). Four regions are self-contained and three are not:
+
+- `diagnostic`, `diagnosticSink`, `diagnosticOverflow`, `record`, `snapshot` -- a bounded ring
+  buffer with an overflow sentinel. Touches nothing else.
+- `sessionState`, `resource`, `session`, `hold`, `stop`, `release` -- the session state machine and
+  its resource ledger.
+- `newIdentity`, `randomHex`, `capabilityURL` -- identity and URL construction.
+- `unportableNamesWarning`, `beaconWarning` -- two warning constructors.
+- **Not separable here:** `Stage` (211 lines), `AuthorizeClaim`, and the unwind family
+  (`failStage`, `unwind`, `releaseAcquired`, `afterStep`). These are the coordination itself and
+  splitting them is a different, riskier story.
+
+**Deliberately not in scope:** renaming anything, changing any signature, altering any behaviour, or
+restructuring `Stage`. This story moves code between files in the same package and does nothing
+else.
+
+**Acceptance Criteria:**
+
+**Given** the refactor is complete
+**When** the full suite runs
+**Then** every test passes with **zero edits to any `_test.go` file** -- the files stay in package
+`transfer`, so a move that needed a test changed was not a move.
+
+**Given** the public surface
+**When** it is compared before and after
+**Then** `go doc` output for the package is byte-identical, and no exported identifier is added,
+removed or renamed.
+
+**Given** `coordinator.go` after the split
+**When** its length is measured
+**Then** none of the four named regions remains in it, and it ends under 830 lines, holding the
+coordination logic -- `Stage`, `AuthorizeClaim`, the unwind family, publish and lease -- with each
+extracted file named for the one concern it owns.
+
+*Where 830 comes from, and why it is not lower.* Measured, not estimated: the four regions and the
+three constants that belong to them are 188 + ~15 lines, taking 1008 to roughly 805. An earlier
+draft of this criterion said "under 750", which was an estimate and was wrong by about 56 lines. That
+number was reachable only by also moving the operation lease and the publish family, and this epic
+deliberately keeps both with the coordination core -- so the line count follows the scope rather than
+the scope being widened to flatter a number. If the split lands materially above 830, something was
+moved that this epic did not scope, and that is a finding rather than a pass.
+
+**Given** the extracted concerns
+**When** a reader opens any new file
+**Then** it compiles as a unit a reviewer can read in one sitting, and the comment that explained
+each region inside `coordinator.go` moves with the code rather than being left behind or rewritten.
+
+**Given** this is the first story under the 2026-09-17 governance rule
+**When** it runs
+**Then** it produces a spec, three review layers and an evidence file, as AGENTS.md now requires of
+anything that changes what ships.
