@@ -146,16 +146,19 @@ any test.
   Triggered by all three review layers independently, and confirmed by mutation rather than
   argument: an invisible master, an opaque backdrop sparing only the four sampled corners, an
   opaque-white small `.ico` entry, a hue-swapped master against a stale `.ico`, and a
-  re-derivation with `ERODE_PX = 0` leaving 1,276 near-white halo pixels — **all five passed the
-  original criteria.** Root cause is mine and sits outside the frozen block: the criteria named
-  the *sampling method* ("four corner pixels", "central 40%") as though it were the *property*
-  ("no opaque backdrop survived", "this is real artwork"). Amended to state each property, the
-  region that establishes it, and the mutation that must fail it. Also corrected: the claim that
-  a 48x48 entry proves generation "from the master" — it proves only that some winicon-produced
-  `.ico` is present — and the attribution of the size set to winicon rather than to Wails.
-  **KEEP:** the logo-2 artwork choice and its edge-energy justification; the measured crop
-  geometry `(896, 239, 1920, 1232)` at radius 226; the analytic inset-plus-radius-reduction
-  erosion; and the refusal to assert Pillow-byte-identity, which remains correct.
+  re-derivation with `ERODE_PX = 0` leaving a bloom halo (1,327 opaque pixels with every channel
+  above 200 in the outer 12px ring, against 0 for the committed asset; the review layer that
+  raised it reported 1,276, measured before the alpha fix below, which darkened RGB and so
+  cleared the threshold less often) — **all five passed the original criteria.** Root cause is
+  mine and sits outside the frozen block: the criteria named the *sampling method* ("four
+  corner pixels", "central 40%") as though it were the *property* ("no opaque backdrop
+  survived", "this is real artwork"). Amended to state each property, the region that
+  establishes it, and the mutation that must fail it. Also corrected: the claim that a 48x48
+  entry proves generation "from the master" — it proves only that some winicon-produced `.ico`
+  is present — and the attribution of the size set to winicon rather than to Wails. **KEEP:**
+  the logo-2 artwork choice and its edge-energy justification; the measured crop geometry
+  `(896, 239, 1920, 1232)` at radius 226; the analytic inset-plus-radius-reduction erosion; and
+  the refusal to assert Pillow-byte-identity, which remains correct.
 
 ## Design Notes
 
