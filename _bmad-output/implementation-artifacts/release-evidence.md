@@ -189,3 +189,32 @@ runner has ever executed on the machine they target.
 - **2026-09-04, folder chooser.** The drop zone read "file or folder" but its click opened the
   file-only chooser, and the folder chooser opened at an arbitrary directory. Both fixed in
   `f2ea414` and `9ca2616`; row 1 used the drop target.
+
+## Pre-publication security audit (v1.0.0, 2026-09-18)
+
+Run before the v1.0.0 draft was published, because this repository is public and a secret
+committed once stays in the history whether or not it is later deleted. Scope was the **entire
+history**, not the current tree: 269 commits and 3,099 objects across all refs.
+
+| Checked | How | Result |
+|---|---|---|
+| Provider credentials | AWS `AKIA`, GitHub `ghp_`/`github_pat_`, Slack `xox*`, OpenAI `sk-`, `BEGIN PRIVATE KEY`, `aws_secret_access_key`, bearer tokens — over every historical diff | **none, ever** |
+| Credential files | Every path ever added (`--diff-filter=A`), including files since deleted: `.env`, `.pem`, `.key`, `.p12`, `id_rsa`, `.netrc`, `.npmrc` | **none, ever** |
+| Credential-shaped assignments | `api_key`/`password`/`secret` set to a literal of 8+ characters, excluding obvious placeholders | **none** |
+| Leaked capability token (AD-9) | 32-hex-character strings in added lines | only patterned fixtures — `0123456789abcdef…`, `ffffffff…`, `11111111…` — never a random token |
+| Live artifacts | `gh release`/tag assets | binaries and checksums only |
+
+**Recorded, not remediated.** Three disclosures are real but judged not worth their fix:
+
+- Two commits authored from a university address (D-127). Removing it rewrites every SHA the
+  artifact trail cites.
+- `C:/Users/jaeso/AppData/Local/Temp/...` paths cited in the Story 3.7 and 3.8 evidence files.
+  They name log files no one else can read and expose only a Windows username already public in
+  267 commit author lines. A credibility wart rather than a leak: evidence should not cite
+  something unreadable.
+- `192.168.1.169` in row 1 of the manual table — an RFC1918 address, unroutable and useless off
+  that LAN.
+
+**Enabled the same day:** GitHub secret scanning and push protection, so a future accident is
+blocked at push rather than found by an audit. Dependabot security updates remain off.
+
