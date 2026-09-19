@@ -229,6 +229,14 @@ A maintainer can find the code that owns a concern without reading a thousand-li
 
 **FRs covered:** none. This changes no behaviour and no contract; it moves code.
 
+### Epic 6: Replace the Placeholder App Icon
+
+A user launching FairDrop sees the FairDrop mark in the Windows taskbar, the exe's Properties pane,
+the NSIS installer, and the macOS Dock -- not the stock Wails "W" scaffold default v1.0.0 shipped.
+Created 2026-09-19 from an owner-supplied candidate render.
+
+**FRs covered:** none. This changes a build asset, not application behaviour.
+
 > **Cross-cutting rule.** FR coverage identifies primary epic ownership, not the full acceptance surface. Every story also inherits the relevant NFRs, architecture requirements, binding contracts, and UX requirements. Unit, integration, race, and accessibility verification lands with the behavior it proves; Epic 3 owns native packaging, release automation, platform smoke tests, and single-instance release behavior rather than deferred testing debt.
 
 ## Epic 1: Share One File with a Nearby Device
@@ -1510,3 +1518,57 @@ each region inside `coordinator.go` moves with the code rather than being left b
 **When** it runs
 **Then** it produces a spec, three review layers and an evidence file, as AGENTS.md now requires of
 anything that changes what ships.
+
+## Epic 6: Replace the Placeholder App Icon
+
+A user launching FairDrop sees the FairDrop mark in the Windows taskbar, the exe's Properties pane,
+the NSIS installer, and the macOS Dock. Created 2026-09-19: `build/appicon.png` and
+`build/windows/icon.ico` were still byte-identical to the Wails 2.15.0 scaffold defaults, so v1.0.0
+shipped a stock white "W" everywhere the operating system shows the app an icon.
+
+**FRs covered:** none. This changes a build asset, not application behaviour.
+
+### Story 6.1: Replace the Placeholder App Icon
+
+As a user,
+I want to see FairDrop's own mark instead of the Wails scaffold's white "W",
+So that the app I launched is recognisably the one I meant to open.
+
+**Why logo 2 over logo 1, and why no small-size variant.** Three candidate renders were supplied and
+measured, not preferred: logo 2 carries 61-90% more edge energy (mean |gradient luminance| per opaque
+pixel) than logo 1 at every taskbar size -- 60.3 vs 37.5 at 16px. Logo 1 is copper-on-copper and its
+relief resolves to a featureless blob below ~48px; logo 2's mark and field differ in luminance, so the
+glyph survives down to 16px and no separate simplified small-size variant is needed. The revision
+(`fairdrop_logo2_revised.jpg`) was used over the unrevised render purely for extractability: its
+plaque is dark-on-light rather than brown-on-brown, so the silhouette fit lands at rms 1.74px instead
+of being eyeballed, and the crop lands on an exact 1024px width.
+
+**None of the three candidates carries an alpha channel** -- all are opaque JPEGs, including the one
+whose backdrop is drawn as a transparency checkerboard, which is decoration, not alpha. A naive
+format conversion would have shipped that checkerboard as an opaque grey backdrop.
+
+**Acceptance Criteria:**
+
+**Given** `build/windows/icon.ico`
+**When** its ICONDIR is parsed
+**Then** it carries a 48x48 entry -- the size `leaanthony/winicon` emits and the Wails 2.15.0
+scaffold default lacks -- proving it was generated from `build/appicon.png` by `wails build` rather
+than inherited from the scaffold.
+
+**Given** either shipped asset (`build/appicon.png` or `build/windows/icon.ico`)
+**When** its four corner pixels are sampled
+**Then** alpha is 0, so no opaque backdrop survived the derivation.
+
+**Given** either shipped asset
+**When** mean HSV saturation over its central 40% is measured
+**Then** it exceeds 0.25 -- the placeholder measures 0.01, the derived master measures 0.57.
+
+**Given** the full gate on all three platforms (Windows, macOS, and the Linux adapter suite)
+**When** it runs
+**Then** it passes, and each assertion above fails by name when its asset is mutated.
+
+**Given** `build/appicon-source.jpg` and `scripts/build-appicon.py`
+**When** a future session needs to re-derive the master at higher fidelity
+**Then** both the original candidate JPEG and the derivation script are committed, so the master is
+reproducible rather than a one-off nobody can regenerate. Byte-identity across Pillow versions is not
+asserted -- that would pin the runner's Pillow build rather than this repo's code.

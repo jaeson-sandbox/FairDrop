@@ -26,9 +26,11 @@ The `windows` directory contains the manifest and rc files used when building wi
 These may be customised for your application. To return these files to the default state, simply delete them and
 build with `wails build`.
 
-- `icon.ico` - The icon used for the application. This is used when building using `wails build`. If you wish to
-  use a different icon, simply replace this file with your own. If it is missing, a new `icon.ico` file
-  will be created using the `appicon.png` file in the build directory.
+- `icon.ico` - The icon used for the application. `wails build` generates it from `appicon.png`, but **only
+  when `icon.ico` is absent** -- that is the sole trigger, not a fallback alongside some other path. Once the
+  file exists, `wails build` never regenerates or overwrites it, even after `appicon.png` changes. To pick up
+  a new `appicon.png`, delete `icon.ico` first and rebuild. If you wish to use a different icon directly,
+  replace this file with your own instead.
 - `installer/*` - The files used to create the Windows installer. These are used when building using `wails build`.
 - `info.json` - Application details used for Windows builds. The data here will be used by the Windows installer,
   as well as the application itself (right click the exe -> properties -> details)
