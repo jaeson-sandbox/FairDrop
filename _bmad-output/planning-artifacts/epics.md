@@ -231,9 +231,7 @@ A maintainer can find the code that owns a concern without reading a thousand-li
 
 ### Epic 6: Replace the Placeholder App Icon
 
-A user launching FairDrop sees the FairDrop mark in the Windows taskbar, the exe's Properties pane,
-the NSIS installer, and the macOS Dock -- not the stock Wails "W" scaffold default v1.0.0 shipped.
-Created 2026-09-19 from an owner-supplied candidate render.
+A user launching FairDrop sees the FairDrop mark on the exe's own icon, in the Windows taskbar, in the NSIS installer, and in the macOS Dock -- not the stock Wails "W" scaffold default v1.0.0 shipped. Created 2026-09-19 from an owner-supplied candidate render.
 
 **FRs covered:** none. This changes a build asset, not application behaviour.
 
@@ -1521,10 +1519,7 @@ anything that changes what ships.
 
 ## Epic 6: Replace the Placeholder App Icon
 
-A user launching FairDrop sees the FairDrop mark in the Windows taskbar, the exe's Properties pane,
-the NSIS installer, and the macOS Dock. Created 2026-09-19: `build/appicon.png` and
-`build/windows/icon.ico` were still byte-identical to the Wails 2.15.0 scaffold defaults, so v1.0.0
-shipped a stock white "W" everywhere the operating system shows the app an icon.
+A user launching FairDrop sees the FairDrop mark on the exe's own icon, in the Windows taskbar, in the NSIS installer, and in the macOS Dock. Created 2026-09-19: `build/appicon.png` and `build/windows/icon.ico` were still byte-identical to the Wails 2.15.0 scaffold defaults, so v1.0.0 shipped a stock white "W" everywhere the operating system shows the app an icon.
 
 **FRs covered:** none. This changes a build asset, not application behaviour.
 
@@ -1547,25 +1542,45 @@ of being eyeballed, and the crop lands on an exact 1024px width.
 whose backdrop is drawn as a transparency checkerboard, which is decoration, not alpha. A naive
 format conversion would have shipped that checkerboard as an opaque grey backdrop.
 
-**Acceptance Criteria:**
+**Acceptance Criteria:** amended in review loop 1 -- each names the mutation that must fail it, and
+"fails by name" means the named test, not any test. The original criteria named the sampling method
+("four corner pixels", "central 40%") rather than the property being checked, and five mutations that
+should have failed all passed; see the spec's Spec Change Log.
 
-**Given** `build/windows/icon.ico`
-**When** its ICONDIR is parsed
-**Then** it carries a 48x48 entry -- the size `leaanthony/winicon` emits and the Wails 2.15.0
-scaffold default lacks -- proving it was generated from `build/appicon.png` by `wails build` rather
-than inherited from the scaffold.
+**Freshness.** Given both shipped assets, when the master is downsampled to a shared entry size,
+then its mean per-channel RGBA distance from the matching `.ico` entry is within a tolerance
+absorbing winicon's Catmull-Rom resampling but not different artwork. *Mutation:* replace the master
+with hue-swapped artwork, leave the `.ico` -- must fail.
 
-**Given** either shipped asset (`build/appicon.png` or `build/windows/icon.ico`)
-**When** its four corner pixels are sampled
-**Then** alpha is 0, so no opaque backdrop survived the derivation.
+**No opaque backdrop.** Given either asset, when the outer border ring is measured, then it holds no
+opaque pixel whose channels all exceed 200, and the ring is overwhelmingly transparent. Four corner
+pixels are not sufficient: on a centred rounded rect they are transparent by construction.
+*Mutations:* re-derive with `ERODE_PX = 0`; make the backdrop opaque everywhere except the four
+corners -- both must fail.
 
-**Given** either shipped asset
-**When** mean HSV saturation over its central 40% is measured
-**Then** it exceeds 0.25 -- the placeholder measures 0.01, the derived master measures 0.57.
+**Real colour.** Given either asset, when mean HSV saturation over the central 40% is measured
+skipping fully transparent pixels, then it exceeds 0.25, and the test fails if no opaque pixel
+remains there. *Mutation:* set the master's alpha to 0 everywhere, keeping colour -- must fail.
+
+**Alpha applied once.** Given the master, when pixels at partial alpha are compared with their local
+opaque reference, then their RGB matches within tolerance. *Mutation:* composite the plaque onto the
+canvas using itself as the mask -- must fail. A real defect found in review, not a hypothetical: it
+darkens the feather and halves its width.
+
+**Master geometry.** Given the master, then it is exactly 1024x1024 RGBA carrying a real transparent
+band top and bottom. *Mutation:* stretch the plaque square to fill -- must fail.
+
+**Small sizes.** Given the `.ico`, then its 16x16 and 32x32 entries decode and satisfy the colour
+assertion -- the sizes the artwork was chosen for. *Mutation:* replace a small entry with opaque
+white -- must fail.
+
+**Toolchain provenance.** Given the `.ico`, then it carries the full 256/128/64/48/32/16 set that
+**Wails** passes to `winicon.GenerateIcon` at `packager.go:217` -- winicon emits whatever list it is
+handed, so this pins a Wails literal, not a winicon behaviour.
 
 **Given** the full gate on all three platforms (Windows, macOS, and the Linux adapter suite)
 **When** it runs
-**Then** it passes, and each assertion above fails by name when its asset is mutated.
+**Then** it passes.
 
 **Given** `build/appicon-source.jpg` and `scripts/build-appicon.py`
 **When** a future session needs to re-derive the master at higher fidelity

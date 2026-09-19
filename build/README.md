@@ -8,6 +8,20 @@ The structure is:
 * darwin - macOS specific files
 * windows - Windows specific files
 
+## App Icon
+
+- `appicon.png` - the single art source for every platform's icon. `wails build` derives macOS's
+  `iconfile.icns` from it on every build, and Windows' `icon.ico` from it the one time `icon.ico` is
+  absent (see the Windows section below).
+- `appicon-source.jpg` - the original candidate JPEG `appicon.png` was derived from, committed
+  alongside it so the master is reproducible rather than a one-off nobody can regenerate.
+- `../scripts/build-appicon.py` - the derivation itself: crops the plaque out of `appicon-source.jpg`
+  and synthesises real alpha, since none of the owner's candidate renders carries any. Re-run it by
+  hand with `python scripts/build-appicon.py` from the repository root after replacing
+  `appicon-source.jpg`, then re-derive `icon.ico` per the Windows section below. It is not part of
+  any automated pipeline -- its output is committed, and CI checks the committed files, not the
+  script.
+
 ## Mac
 
 The `darwin` directory holds files specific to Mac builds.

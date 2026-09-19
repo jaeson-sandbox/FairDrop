@@ -58,3 +58,12 @@ frontend/.vitest-attachments/
 # leaves __pycache__ beside the source, and ten such files had been committed.
 __pycache__/
 *.py[cod]
+
+# The owner's original app-icon candidate renders, supplied at the repo root
+# during Story 6.1. Only the chosen one is committed, as build/appicon-source.jpg
+# -- these are the other two candidates plus a duplicate of the chosen one at
+# its original location, kept locally for reference but not meant to be a
+# second copy in git.
+/fairdrop_logo.jpg
+/fairdrop_logo2.jpg
+/fairdrop_logo2_revised.jpg

@@ -1,10 +1,10 @@
 ---
-title: 'Replace the placeholder app icon'
+title: 'Story 6.1: Replace the Placeholder App Icon'
 type: 'feature'
 created: '2026-09-19'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 'de16807eedb8482aac82e9862161fb89aabfb7b2'
-review_loop_iteration: 0
+review_loop_iteration: 1
 context: []
 ---
 
@@ -59,10 +59,16 @@ or any transfer behaviour. Introduce a system tray; this app has none.
 - `build/appicon.png` -- the master. Currently byte-identical to
   `wails/v2@v2.15.0/pkg/buildassets/build/appicon.png`.
 - `build/windows/icon.ico` -- byte-identical to the Wails default; entries 256/128/64/**24**/32/16,
-  not the winicon size set, proving it came from the scaffold and never from a build.
-- `wails/v2@v2.15.0/pkg/commands/build/packager.go:202` -- `generateIcoFile` wraps generation in
+  not the full size set Wails asks `winicon.GenerateIcon` for, proving it came from the scaffold and
+  never from a build.
+- `wails/v2@v2.15.0/pkg/commands/build/packager.go:204` -- `generateIcoFile` wraps generation in
   `if !fs.FileExists(icoFile)`. This is the whole reason the Windows icon never updated.
-- `.../packager.go:99` -- `processDarwinIcon`, unconditional, so macOS needs no equivalent step.
+- `.../packager.go:134` -- `processDarwinIcon`'s definition, unconditional, so macOS needs no
+  equivalent step; called from `.../packager.go:99`.
+- `.../packager.go:217` -- `winicon.GenerateIcon(..., []int{256, 128, 64, 48, 32, 16})`: the size set
+  is a **Wails** literal passed in at the call site, not a winicon behaviour --
+  `leaanthony/winicon@v1.0.0/generate.go` emits whatever list it is handed. A maintainer chasing a
+  size-set change after a Wails upgrade should start here, not in winicon.
 - `leaanthony/winicon@v1.0.0/generate.go` -- emits **PNG-compressed** ICO entries, so stdlib
   `image/png` decodes them after parsing the 6-byte ICONDIR + 16-byte entries. No new dependency.
 - `release_identity_test.go` -- precedent for a root `package main` test reading shipped files as
@@ -104,17 +110,52 @@ or any transfer behaviour. Introduce a system tray; this app has none.
   `6-1-replace-the-placeholder-app-icon`, and `epic-6-retrospective`.
 
 **Acceptance Criteria:**
-- Given `build/windows/icon.ico`, when its ICONDIR is parsed, then it carries a **48×48** entry —
-  the size winicon emits and the scaffold's file lacks — proving it was generated from the master
-  by this toolchain rather than inherited.
-- Given either shipped asset, when its four corner pixels are sampled, then alpha is 0, so no
-  opaque backdrop survives the derivation.
-- Given either shipped asset, when mean HSV saturation over its central 40% is measured, then it
-  exceeds 0.25 — the placeholder measures 0.01, logo 2 measures 0.57.
-- Given the full gate on all three platforms, when it runs, then it passes, and each assertion
-  above fails **by name** when its asset is mutated.
+Each criterion names the mutation that must fail it. "Fails by name" means the named test, not
+any test.
+
+- **Freshness.** Given both shipped assets, when the master is downsampled to a shared entry
+  size, then its mean per-channel RGBA distance from the matching `.ico` entry is within a
+  tolerance absorbing winicon's Catmull-Rom resampling but not different artwork. *Mutation:*
+  replace the master with hue-swapped artwork, leave the `.ico` **-> must fail.**
+- **No opaque backdrop.** Given either asset, when the outer 12px border ring is measured, then
+  it holds no opaque pixel whose channels all exceed 200, and the ring is overwhelmingly
+  transparent. Four corner pixels are **not** sufficient: on a centred rounded rect they are
+  transparent by construction. *Mutations:* re-derive with `ERODE_PX = 0`; make the backdrop
+  opaque everywhere except the four corners **-> both must fail.**
+- **Real colour.** Given either asset, when mean HSV saturation over the central 40% is measured
+  **skipping fully transparent pixels**, then it exceeds 0.25, and the test fails if no opaque
+  pixel remains there. *Mutation:* set the master's alpha to 0 everywhere, keeping colour
+  **-> must fail** (an invisible icon is not real colour).
+- **Alpha applied once.** Given the master, when pixels at partial alpha are compared with the
+  opaque edge colour, then their RGB matches within tolerance. *Mutation:* composite the plaque
+  onto the canvas using itself as the mask **-> must fail.** This is a real defect found in
+  review, not a hypothetical: it darkens the feather and halves its width.
+- **Master geometry.** Given the master, then it is exactly 1024x1024 RGBA carrying a fully
+  transparent band top and bottom. *Mutation:* stretch the plaque square to fill **-> must fail.**
+- **Small sizes.** Given the `.ico`, then its 16x16 and 32x32 entries decode and satisfy the
+  colour assertion -- the sizes the artwork was chosen for. *Mutation:* replace a small entry
+  with opaque white **-> must fail.**
+- **Toolchain provenance.** Given the `.ico`, then it carries the full 256/128/64/48/32/16 set
+  that **Wails** passes to `winicon.GenerateIcon` at `packager.go:217` -- winicon emits whatever
+  list it is handed, so this pins a Wails literal, not a winicon behaviour.
+- Given the full gate on all three platforms, when it runs, then it passes.
 
 ## Spec Change Log
+
+- **2026-09-19 — review loop 1: the acceptance criteria under-specified every assertion.**
+  Triggered by all three review layers independently, and confirmed by mutation rather than
+  argument: an invisible master, an opaque backdrop sparing only the four sampled corners, an
+  opaque-white small `.ico` entry, a hue-swapped master against a stale `.ico`, and a
+  re-derivation with `ERODE_PX = 0` leaving 1,276 near-white halo pixels — **all five passed the
+  original criteria.** Root cause is mine and sits outside the frozen block: the criteria named
+  the *sampling method* ("four corner pixels", "central 40%") as though it were the *property*
+  ("no opaque backdrop survived", "this is real artwork"). Amended to state each property, the
+  region that establishes it, and the mutation that must fail it. Also corrected: the claim that
+  a 48x48 entry proves generation "from the master" — it proves only that some winicon-produced
+  `.ico` is present — and the attribution of the size set to winicon rather than to Wails.
+  **KEEP:** the logo-2 artwork choice and its edge-energy justification; the measured crop
+  geometry `(896, 239, 1920, 1232)` at radius 226; the analytic inset-plus-radius-reduction
+  erosion; and the refusal to assert Pillow-byte-identity, which remains correct.
 
 ## Design Notes
 
