@@ -121,8 +121,10 @@ or any transfer behaviour. Introduce a system tray; this app has none.
 
 **Acceptance Criteria:**
 
-Each criterion names the mutation that must fail it. Every tolerance is a factor applied to a
-value measured against the committed assets, never an absolute chosen for headroom -- loops 2 and 3
+Each criterion names the mutation that must fail it. The freshness bound is a factor applied to
+a per-entry measured value; the remaining constants are absolutes, each bracketed by a measured
+mutation on its far side and logged on every run so drift is visible. An absolute with a probed
+boundary is honest; an absolute chosen for headroom is what loops 2 and 3 shipped -- loops 2 and 3
 both shipped an absolute that had never had its boundary measured. The mutation table is derived by
 `scripts/verify-asset-mutations.py`, not written by hand.
 

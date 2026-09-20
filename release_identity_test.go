@@ -167,6 +167,9 @@ func TestReleaseIdentityAgreesAcrossWailsJSONTemplatesAndMainGo(t *testing.T) {
 	for _, want := range []string{
 		`"file_version": "{{.Info.ProductVersion}}"`,
 		`"ProductVersion": "{{.Info.ProductVersion}}"`,
+		// Added by Story 6.2: without it the built exe carries no FileVersion
+		// string at all, which is what D-128 half-diagnosed.
+		`"FileVersion": "{{.Info.ProductVersion}}"`,
 		`"CompanyName": "{{.Info.CompanyName}}"`,
 		`"FileDescription": "{{.Info.ProductName}}"`,
 		`"ProductName": "{{.Info.ProductName}}"`,

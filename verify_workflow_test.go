@@ -246,6 +246,7 @@ func nativeProofGaps(workflow string) []string {
 	var gaps []string
 	for _, pin := range []struct{ job, step, command, condition string }{
 		{desktop, "Native macOS unusable-lock launch smoke", "run: bash scripts/smoke-darwin-unusable-lock.sh", "if: runner.os == 'macOS'"},
+		{desktop, "Built Windows exe embeds the committed resources", "go test -count=1 -run '^TestExeResources' -v ./...", "if: runner.os == 'Windows'"},
 		{desktop, "Report native platform coverage and capability skips", "run: go test -count=1 -v -run 'Test(POSIX|Linux|Darwin|Native|StageTransferResolves|StageTransferRefusesSelected)' ./...", "if: always()"},
 		{desktop, "Prove native acceptance tests detect broken guards", "run: bash scripts/verify-native-mutations.sh", "if: always()"},
 		{linux, "Prove native acceptance tests detect broken guards", "run: bash scripts/verify-native-mutations.sh", ""},
@@ -304,6 +305,11 @@ fi
 if ! git -c core.fileMode=false diff --quiet -- frontend/wailsjs; then
   echo "wails build changed frontend/wailsjs -- the committed bindings are stale:" >&2
   git -c core.fileMode=false diff -- frontend/wailsjs >&2
+  exit 1
+fi
+if [ -n "$(git status --porcelain -- build/windows/icon.ico)" ]; then
+  echo "build/windows/icon.ico is missing from git or was changed by wails build:" >&2
+  git status --porcelain -- build/windows/icon.ico >&2
   exit 1
 fi`, ""},
 		{"verify", "gofmt -l", `unformatted="$(gofmt -l .)"
@@ -527,6 +533,7 @@ func TestVerifyWorkflowRunsEveryStepInTheRequiredOrder(t *testing.T) {
 
 	steps := []string{
 		"- name: wails build",
+		"- name: Built Windows exe embeds the committed resources",
 		"- name: Check for bindings drift and a restored .gitkeep",
 		"- name: gofmt -l",
 		"- name: go vet",

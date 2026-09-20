@@ -127,6 +127,16 @@ jobs:
         if: runner.os == 'macOS'
         run: bash scripts/smoke-darwin-unusable-lock.sh
 
+      # Everything else in this job checks the files the exe is built FROM.
+      # This checks the exe itself: that the icon and version resources
+      # actually landed in it. Story 6.1's eight assertions all pass on a
+      # binary whose resource embedding regressed, because none of them opens
+      # one. It runs here, right after the build, because the artifact only
+      # exists between this step and the end of the job.
+      - name: Built Windows exe embeds the committed resources
+        if: runner.os == 'Windows'
+        run: go test -count=1 -run '^TestExeResources' -v ./...
+
       # A regenerated-but-uncommitted frontend/wailsjs means the committed
       # bindings are stale, and a missing frontend/dist/.gitkeep would break
       # embedding on the next clean clone.
@@ -134,6 +144,13 @@ jobs:
       # core.fileMode=false because the macOS generator writes the binding
       # files 0755 while they are committed 0644, so every macOS run reports
       # a mode-only diff. A permission bit is not stale bindings; content is.
+      #
+      # The icon.ico clause exists because wails build GENERATES that file
+      # whenever it is absent (packager.go:204), so an .ico missing from git
+      # would be manufactured by the runner and then satisfy every icon
+      # assertion against a file the repository does not contain. Untracked
+      # counts here, unlike the bindings check above, precisely because that
+      # is the failure mode.
       - name: Check for bindings drift and a restored .gitkeep
         run: |
           if [ ! -f frontend/dist/.gitkeep ]; then
@@ -143,6 +160,11 @@ jobs:
           if ! git -c core.fileMode=false diff --quiet -- frontend/wailsjs; then
             echo "wails build changed frontend/wailsjs -- the committed bindings are stale:" >&2
             git -c core.fileMode=false diff -- frontend/wailsjs >&2
+            exit 1
+          fi
+          if [ -n "$(git status --porcelain -- build/windows/icon.ico)" ]; then
+            echo "build/windows/icon.ico is missing from git or was changed by wails build:" >&2
+            git status --porcelain -- build/windows/icon.ico >&2
             exit 1
           fi
 

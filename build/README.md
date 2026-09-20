@@ -35,7 +35,13 @@ The structure is:
   python scripts/build-appicon.py     # runs from any directory; rewrites build/appicon.png
   rm build/windows/icon.ico           # Wails only generates it when it is ABSENT
   wails build                         # regenerates icon.ico from the new master
-  python scripts/verify-asset-mutations.py   # re-derive the mutation evidence
+  # 3. Re-measure measuredEntryDistance255 in appicon_test.go: new artwork moves
+  #    all six same-artwork distances, and until they are updated the first
+  #    `go test` reports a correct tree as a stale-icon bug.
+  # 4. COMMIT all three binaries, THEN re-derive the evidence. The driver
+  #    restores assets from HEAD between cases, so running it against
+  #    uncommitted work would discard exactly what you just produced.
+  python scripts/verify-asset-mutations.py   # after committing, never before
   ```
 
   **Commit all three binaries** — `appicon-source.jpg`, `appicon.png` and `windows/icon.ico`.

@@ -1,6 +1,6 @@
 package main
 
-// appicon_test.go pins the eight acceptance criteria in
+// appicon_test.go pins the seven asset acceptance criteria in
 // _bmad-output/implementation-artifacts/spec-6-1-replace-the-placeholder-app-icon.md
 // against both shipped icon assets: build/appicon.png, the 1024x1024 RGBA
 // master, and build/windows/icon.ico, which `wails build` generates from it.
@@ -111,12 +111,16 @@ const (
 	// except the four corners" mutation, which measures far below it.
 	minRingTransparentFraction = 0.75
 
-	// freshnessEntrySize is the shared .ico entry size the "Freshness"
-	// criterion downsamples the master to and compares against. 256 is
-	// chosen because it is the largest entry the toolchain-provenance size
-	// set guarantees is present, which minimises resampling-filter noise
-	// relative to a smaller shared size.
-	freshnessEntrySize = 256
+	// largestEntrySize is the .ico entry the border-ring and central-colour
+	// assertions measure. 256 is the largest the toolchain-provenance size set
+	// guarantees, and the only one whose ring is wide enough relative to the
+	// corner radius for the transparent-fraction check to mean anything.
+	//
+	// It was named largestEntrySize until review loop 4: freshness now
+	// compares EVERY entry and no longer uses it, so the old name and comment
+	// described a caller that had stopped existing -- the same
+	// comment-disagrees-with-code defect loop 3 was opened by.
+	largestEntrySize = 256
 
 	// freshnessToleranceFactor multiplies each entry's own measured
 	// same-artwork distance (measuredEntryDistance255) to get its bound.
@@ -719,6 +723,15 @@ func TestAppIconMasterGeometry(t *testing.T) {
 	assertTransparentBand(t, appIconPath, img, "top", true, minTransparentBandRows, maxTransparentBandRows)
 	assertTransparentBand(t, appIconPath, img, "bottom", false, minTransparentBandRows, maxTransparentBandRows)
 
+	// The bands must also MATCH each other: a range alone lets the plaque sit
+	// up to 28 rows off-centre while both ends stay inside 12-40. The genuine
+	// master is 21/22, uneven by one only because 1024-993 is odd.
+	if top, bottom := contiguousTransparentRows(img, true), contiguousTransparentRows(img, false); abs(top-bottom) > 1 {
+		t.Errorf("%s: transparent bands are %d rows top and %d bottom, differing by %d -- the plaque "+
+			"is off-centre; centring a %d-row plaque in %d leaves bands within one row of each other",
+			appIconPath, top, bottom, abs(top-bottom), wantMasterSize-31, wantMasterSize)
+	}
+
 	for _, side := range []struct {
 		name     string
 		fromLeft bool
@@ -782,7 +795,7 @@ func TestAppIconNoOpaqueBackdrop(t *testing.T) {
 	assertBorderRingHasNoOpaqueBackdrop(t, appIconPath, master, borderRingWidth, true)
 
 	entries := readICOEntries(t, windowsIcoPath)
-	entry := entryOfSize(t, windowsIcoPath, entries, freshnessEntrySize)
+	entry := entryOfSize(t, windowsIcoPath, entries, largestEntrySize)
 	icoImg := decodeICOEntryImage(t, windowsIcoPath, entry)
 	label := fmt.Sprintf("%s (%dx%d entry)", windowsIcoPath, entry.width, entry.height)
 	assertBorderRingHasNoOpaqueBackdrop(t, label, icoImg, ringWidthFor(entry.width), true)
@@ -796,7 +809,7 @@ func TestAppIconCarriesRealColour(t *testing.T) {
 	assertCentralSaturationExceeds(t, appIconPath, master, minCentralSaturation)
 
 	entries := readICOEntries(t, windowsIcoPath)
-	entry := entryOfSize(t, windowsIcoPath, entries, freshnessEntrySize)
+	entry := entryOfSize(t, windowsIcoPath, entries, largestEntrySize)
 	icoImg := decodeICOEntryImage(t, windowsIcoPath, entry)
 	label := fmt.Sprintf("%s (%dx%d entry)", windowsIcoPath, entry.width, entry.height)
 	assertCentralSaturationExceeds(t, label, icoImg, minCentralSaturation)
@@ -890,8 +903,13 @@ func TestAppIconMasterMatchesIcoFreshness(t *testing.T) {
 	// are the sizes Windows actually draws in the taskbar, and the sizes the
 	// artwork was chosen for. This also subsumes the coloured-backdrop case
 	// the border-ring check admits it cannot see.
-	checked := 0
+	compared := map[int]bool{}
 	for _, entry := range entries {
+		if entry.width != entry.height {
+			t.Errorf("%s declares a %dx%d entry; a non-square entry has no square size whose "+
+				"tolerance applies", windowsIcoPath, entry.width, entry.height)
+			continue
+		}
 		icoImg := decodeICOEntryImage(t, windowsIcoPath, entry)
 		downsampled := downsampleBoxAverage(masterGrid, entry.width, entry.height)
 		icoGrid := gridOf(icoImg)
@@ -919,7 +937,19 @@ func TestAppIconMasterMatchesIcoFreshness(t *testing.T) {
 		// rather than only becoming apparent when it finally crosses.
 		t.Logf("%dx%d: distance %.3f (measured %.3f, bound %.3f)",
 			entry.width, entry.height, dist, measured, tolerance)
-		checked++
+		compared[entry.width] = true
+
+		// A bound derived from a measurement is only honest while the
+		// measurement holds. If a toolchain change moved the real distance
+		// well BELOW the recorded one, every bound would silently become
+		// several times too wide -- the factor drifting exactly as an absolute
+		// would. Catch that from underneath too, and name the constant.
+		if dist < measured/2 {
+			t.Errorf("%s: the %dx%d distance is %.3f, less than half the %.3f recorded in "+
+				"measuredEntryDistance255 -- the recorded value is stale, so every bound derived "+
+				"from it is too wide. Re-measure with scripts/verify-asset-mutations.py.",
+				windowsIcoPath, entry.width, entry.height, dist, measured)
+		}
 
 		if dist > tolerance {
 			t.Errorf("%s downsampled to %dx%d differs from %s's %dx%d entry by a mean %.3f per "+
@@ -931,10 +961,16 @@ func TestAppIconMasterMatchesIcoFreshness(t *testing.T) {
 		}
 	}
 
-	if checked != len(wantIcoSizes) {
-		t.Errorf("%s: compared %d entries against the master, want %d -- a short or unexpected entry "+
-			"set would let this test pass while checking fewer images than the .ico holds",
-			windowsIcoPath, checked, len(wantIcoSizes))
+	// Distinct SIZES, not a count of entries: two entries at one size with
+	// another absent would otherwise reach six and leave a size never compared.
+	for _, size := range wantIcoSizes {
+		if !compared[size] {
+			t.Errorf("%s: the %dx%d entry was never compared against the master", windowsIcoPath, size, size)
+		}
+	}
+	if len(compared) != len(wantIcoSizes) {
+		t.Errorf("%s: compared %d distinct sizes against the master, want %d",
+			windowsIcoPath, len(compared), len(wantIcoSizes))
 	}
 }
 
@@ -1203,6 +1239,18 @@ func TestAppIconSourceRenderIsThePinnedGeometry(t *testing.T) {
 			"cannot be re-derived from this file",
 			appIconSource, b.Dx(), b.Dy(), wantSourceWidth, wantSourceHeight)
 	}
+	// scripts/build-appicon.py pins the same digest. Nothing but a README step
+	// keeps the two in step, so assert their agreement here rather than trusting
+	// that whoever updates one remembers the other.
+	script, err := os.ReadFile(filepath.Join("scripts", "build-appicon.py"))
+	if err != nil {
+		t.Fatalf("read the derivation script: %v", err)
+	}
+	if want := fmt.Sprintf("EXPECTED_SOURCE_SHA256 = %q", wantSourceSHA256); !bytes.Contains(script, []byte(want)) {
+		t.Errorf("scripts/build-appicon.py does not pin %s -- the test and the derivation would "+
+			"accept different renders, and only a README step keeps them aligned", wantSourceSHA256)
+	}
+
 	if got := hex.EncodeToString(sha256Sum(data)); got != wantSourceSHA256 {
 		t.Errorf("%s has sha256 %s, want %s -- this is not the render the crop geometry was fitted "+
 			"against. If the artwork is deliberately changing, re-fit the geometry and update both "+
@@ -1229,4 +1277,11 @@ func absDiffF(a, b uint8) float64 {
 		return float64(a - b)
 	}
 	return float64(b - a)
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }

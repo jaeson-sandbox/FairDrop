@@ -61,7 +61,9 @@ BASELINE = {}
 
 
 def restore():
-    subprocess.run(["git", "checkout", "--", *ASSETS], cwd=REPO, check=True)
+    # HEAD, not the index: `git checkout -- path` restores from the INDEX, so a
+    # mutation that had been staged would be restored right back into place.
+    subprocess.run(["git", "checkout", "HEAD", "--", *ASSETS], cwd=REPO, check=True)
     for path in ASSETS:
         if sha(path) != BASELINE[path]:
             sys.exit("RESTORE FAILED for %s -- aborting rather than mutating further" % path)
@@ -73,11 +75,18 @@ def run_tests():
         ["go", "test", "-count=1", "-run", "^TestAppIcon", "-v", "."],
         capture_output=True, text=True, env=ENV, cwd=REPO,
     )
-    return {
+    failing = {
         line.split()[2].replace("TestAppIcon", "")
         for line in proc.stdout.splitlines()
         if line.startswith("--- FAIL:")
-    }, proc.stdout
+    }
+    ran = any(line.startswith(("--- PASS:", "--- FAIL:")) for line in proc.stdout.splitlines())
+    if not ran:
+        # A compile error or a panic before the first test line produces an
+        # empty failing set, which would otherwise score as "nothing failed"
+        # for every case in the table.
+        sys.exit("go test produced no test result lines -- the package did not run:\n" + proc.stdout)
+    return failing, proc.stdout
 
 
 def load(path):
@@ -133,9 +142,18 @@ def derive(erode=9, premultiply=0.0, stretch=False):
     plaque.putalpha(mask)
     if stretch:
         plaque = plaque.resize((CANVAS_SIZE, CANVAS_SIZE), Image.LANCZOS)
+    pos = ((CANVAS_SIZE - plaque.width) // 2, (CANVAS_SIZE - plaque.height) // 2)
     canvas = Image.new("RGBA", (CANVAS_SIZE, CANVAS_SIZE), (0, 0, 0, 0))
-    canvas.paste(plaque, ((CANVAS_SIZE - plaque.width) // 2, (CANVAS_SIZE - plaque.height) // 2))
-    if premultiply:
+    canvas.paste(plaque, pos)
+    if premultiply >= 1.0:
+        # The defect exactly as it shipped: pasting the plaque using ITSELF as
+        # the mask. PIL blends all four bands against the transparent-black
+        # canvas, so RGB is premultiplied a second time AND alpha becomes
+        # a^2/255. Scaling RGB alone reproduces only half of it, and the alpha
+        # half is what moves the bands, the ring and the freshness distance.
+        canvas = Image.new("RGBA", (CANVAS_SIZE, CANVAS_SIZE), (0, 0, 0, 0))
+        canvas.paste(plaque, pos, plaque)
+    elif premultiply:
         px = canvas.load()
         for y in range(CANVAS_SIZE):
             for x in range(CANVAS_SIZE):
@@ -207,12 +225,58 @@ def narrow_master(shrink=240):
     canvas.save(REPO / PNG)
 
 
+def _opaque_backdrop():
+    img = load(PNG)
+    px = img.load()
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] == 0:
+                px[x, y] = (190, 190, 190, 255)
+    for corner in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+        px[corner] = (0, 0, 0, 0)
+    img.save(REPO / PNG)
+
+
+def _rgb_master():
+    load(PNG).convert("RGB").save(REPO / PNG)
+
+
+def _one_pixel(size):
+    entries = read_ico()
+    target = next(e for e in entries if e["w"] == size)
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    img.putpixel((size // 2, size // 2), (200, 60, 20, 255))
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    target["data"] = buf.getvalue()
+    write_ico(entries)
+
+
+def _trailing_only():
+    """The premultiply defect confined to the right half of every row."""
+    derive()
+    img = load(PNG)
+    px = img.load()
+    for y in range(CANVAS_SIZE):
+        for x in range(CANVAS_SIZE // 2, CANVAS_SIZE):
+            r, g, b, a = px[x, y]
+            if 0 < a < 255:
+                px[x, y] = (r * a // 255, g * a // 255, b * a // 255, a)
+    img.save(REPO / PNG)
+
+
 CASES = [
+    # +1 is the boundary the acceptance criterion actually states, so it is an
+    # asserted case rather than only an optional --measure probe.
+    ("master brightened +1/255, .ico stale", lambda: brighten(1), "MasterMatchesIcoFreshness"),
     ("master brightened +2/255, .ico stale", lambda: brighten(2), "MasterMatchesIcoFreshness"),
     ("master hue-swapped, .ico stale", lambda: _hue(), "MasterMatchesIcoFreshness"),
-    ("16x16 entry a flat coloured square", lambda: flat_entry(16), "MasterMatchesIcoFreshness"),
-    ("48x48 entry a flat coloured square", lambda: flat_entry(48), "MasterMatchesIcoFreshness"),
-    ("128x128 entry a flat coloured square", lambda: flat_entry(128), "MasterMatchesIcoFreshness"),
+    # Generated from wantIcoSizes rather than a hand-picked subset: the
+    # criterion says "any single entry", and listing three of six sizes left
+    # half of them unexercised by the script the spec calls canonical.
+    *[("%dx%d entry a flat coloured square" % (n, n), (lambda n=n: flat_entry(n)),
+       "MasterMatchesIcoFreshness") for n in (256, 128, 64, 48, 32, 16)],
     ("16x16 entry opaque white", lambda: flat_entry(16, (255, 255, 255, 255)),
      "EveryIcoEntryCarriesTheArtwork"),
     ("re-derived with ERODE_PX = 0", lambda: derive(erode=0), "NoOpaqueBackdrop"),
@@ -220,6 +284,11 @@ CASES = [
     ("premultiply defect, full", lambda: derive(premultiply=1.0), "MasterAppliesAlphaOnce"),
     ("premultiply defect, 20% (ratio bound only)", lambda: derive(premultiply=0.20),
      "MasterAppliesAlphaOnce"),
+    # Loop 2's hand-written table ran this and loop 3's derived table dropped it,
+    # which is a regression in EXECUTED coverage for the exact machinery loop 2
+    # added: without it, a trailing-edge regression would be caught only by the
+    # run-count floor, and no case would demonstrate that.
+    ("premultiply defect, trailing edge only", _trailing_only, "MasterAppliesAlphaOnce"),
     ("plaque stretched to fill canvas", lambda: derive(stretch=True), "MasterGeometry"),
     ("plaque narrowed 240px (columns)", narrow_master, "MasterGeometry"),
     ("master fully blank", blank_master, "MasterGeometry"),
@@ -229,7 +298,13 @@ CASES = [
     (".ico gains an extra 24x24 entry", extra_entry, "IcoCarriesTheFullWailsSizeSet"),
     ("source render deleted", lambda: os.remove(REPO / SRC), "SourceRenderIsThePinnedGeometry"),
     ("source render replaced, same size", lambda: _swap_source(), "SourceRenderIsThePinnedGeometry"),
+    # Named by the criteria but absent from the table until review loop 4.
+    ("backdrop opaque except the four corners", _opaque_backdrop, "NoOpaqueBackdrop"),
+    ("master saved without an alpha channel", _rgb_master, "MasterGeometry"),
+    ("16x16 entry, one opaque pixel in its centre", lambda: _one_pixel(16),
+     "EveryIcoEntryCarriesTheArtwork"),
 ]
+
 
 
 def _hue():
@@ -254,6 +329,11 @@ def main():
                         help="also probe the freshness boundary size by size")
     args = parser.parse_args()
 
+    dirty = subprocess.run(["git", "status", "--porcelain", "--", *ASSETS],
+                           capture_output=True, text=True, cwd=REPO).stdout.strip()
+    if dirty:
+        sys.exit("these assets are modified; commit or restore them first, or a mutated file "
+                 "becomes the baseline every case is scored against:\n" + dirty)
     for path in ASSETS:
         BASELINE[path] = sha(path)
 
@@ -266,9 +346,18 @@ def main():
     print("|---|---|---|---|")
     bad = 0
     for i, (label, mutate, want) in enumerate(CASES, 1):
-        restore()
-        mutate()
-        failing, _ = run_tests()
+        try:
+            restore()
+            mutate()
+            if all(sha(p) == BASELINE[p] for p in ASSETS if os.path.exists(REPO / p)) and \
+                    all(os.path.exists(REPO / p) for p in ASSETS):
+                sys.exit("case %d (%s) changed nothing -- it would be scored without having run" % (i, label))
+            failing, _ = run_tests()
+        except BaseException:
+            # Never leave a mutated binary asset in the tree, including on
+            # KeyboardInterrupt.
+            restore()
+            raise
         named = want in failing
         if not named:
             bad += 1
@@ -283,7 +372,13 @@ def main():
             if delta:
                 brighten(delta)
             failing, _ = run_tests()
-            print("  +%-3d %s" % (delta, "CAUGHT" if "MasterMatchesIcoFreshness" in failing else "missed"))
+            caught = "MasterMatchesIcoFreshness" in failing
+            print("  +%-3d %s" % (delta, "CAUGHT" if caught else "missed"))
+            # +0 is the genuine asset and must pass; every step above it must be
+            # caught. A regression here is a real finding, not a printout.
+            if (delta == 0) == caught:
+                bad += 1
+                print("       ^ unexpected: the boundary the spec states has moved")
         restore()
 
     sys.exit(1 if bad else 0)

@@ -2,7 +2,8 @@
 title: 'Story 6.2: Pin What Ships, Not the Template'
 type: 'feature'
 created: '2026-09-19'
-status: 'draft'
+status: 'in-progress'
+baseline_commit: '611cad441173b94dcba2f11ade94c2d121f870db'
 review_loop_iteration: 0
 context: []
 ---
@@ -43,13 +44,19 @@ string and moving the string table off the language-neutral key.
 exe. Touch the artwork, the derivation, or `scripts/build-appicon.py`. Add an image pipeline to
 `verify.yml`; a test step and a drift-check line are not that.
 
+**Deliberately out of scope, stated rather than silently absent:** the macOS product icon. Wails
+derives `iconfile.icns` from `appicon.png` on every build, and nothing is committed under
+`build/darwin/` except the two plists, so the `.app`'s icon is unverified at the product layer
+exactly as the exe's was. This story covers Windows because that is where the stale-`.ico` defect
+actually lives; the macOS half is a separate deferred entry, not an unstated omission.
+
 ## I/O & Edge-Case Matrix
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
 | Windows CI after `wails build` | exe present, resources intact | `RT_ICON` = {256,128,64,48,32,16}, payloads match `icon.ico` | — |
 | Resource embedding regresses | `.syso` step fails or `.ico` unparseable | exe ships the shell default icon | new test fails, naming the exe |
-| `icon.ico` missing from git | runner regenerates it during `wails build` | working tree is dirty after the build | drift check fails, naming `build/` |
+| `icon.ico` missing from git | runner regenerates it during `wails build` | the path shows as **untracked** | the drift clause uses `git status --porcelain`, not `git diff`, because diff never reports untracked paths |
 | Local run, no build | `build/bin/fairdrop.exe` absent | test skips | never a false failure |
 | Version strings read by .NET | language-neutral table | PowerShell reads blank (D-128) | test reads the resource block directly and pins the real values |
 
@@ -136,5 +143,6 @@ Each criterion names the mutation that must fail it, measured against a real bui
 - `go test -count=1 -run TestVerifyWorkflow -v .` -- the three pins must accept the new step.
 - `gofmt -l . && go vet ./... && go tool staticcheck ./...`
 - `go test -count=1 ./... && go test -count=1 -race ./...`
-- `CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build ./...` -- the new file is `//go:build windows`,
-  so confirm the darwin and linux type-checks still pass.
+- `CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go vet ./...`, and the same for `linux/amd64` -- **vet,
+  not build**: `go build` never compiles `_test.go` files on any GOOS, so a cross `go build` would
+  prove nothing about a `_test.go` file that is the whole of this story.

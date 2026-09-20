@@ -30,3 +30,4 @@ go.sum text eol=lf
 *.pyc binary
 *.jpg binary
 *.jpeg binary
+*.webp binary
