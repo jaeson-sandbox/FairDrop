@@ -1657,3 +1657,131 @@ Windows-targeted ICO regeneration. Product and package metadata agree on 1.1.0.
 Acceptance requires the complete mutation inventories, a successful native Windows/macOS gate
 and Linux adapter job at the exact merge candidate, a non-fast-forward merge, and downloaded
 artifact checksum verification before publication. D-131 and D-132 remain accepted limitations.
+
+## Epic 7: Rebuild the Interface on the Quartz Spine
+
+A sender opening FairDrop on either platform sees an interface that reads as part of the operating system: neutral materials, one signal colour, real layered depth, the platform's own display face, and a completion state that says something. Created 2026-09-20 from two owner observations and two defects found while investigating them.
+
+The owner's observations: the controls read as unpolished, and a successful transfer renders "a small bit of text and a bunch of empty space". The first is a styling problem. **The second is not.** `DoneTransferState` carries only `{phase, session, outcome}`, and `session` is a `SessionCursor` of `{sessionId, lastSeq}` -- the reducer drops `metadata` at the staged-to-done transition and discards the `ProgressSnapshot` that `TransferCompleteEvent` carries. The success screen is empty because nothing remains in state to draw. No stylesheet fixes that.
+
+The direction is **Quartz**, staged at `_bmad-output/planning-artifacts/ux-designs/quartz-proposed-2026-09-20/DESIGN.md` -- deliberately **not** named `ux-*`, so the one-folder assertion stays green until Story 7.1 promotes it to `ux-FairDrop-quartz-2026-09-20/` and deletes the Paper Relay folder in the same commit. Quartz supersedes Paper Relay / Terracotta Linen in full. Owner-approved 2026-09-20 against a rendered five-state proposal in both colour schemes.
+
+**Binding constraint: one look on both platforms.** No rule may depend on a macOS-only capability. Window vibrancy and `-apple-` material APIs are forbidden because WebView2 cannot reproduce them. In-page translucency is permitted and is additionally published as the opaque colour it resolves to, because the contrast proof is computed from opaque tokens.
+
+**Two traps found during planning, recorded so no story rediscovers them:**
+- `frontend/src/ui/styles.test.ts` asserts **exactly one** `ux-*` folder exists under `_bmad-output/planning-artifacts/ux-designs`. The Quartz folder must **replace** the Paper Relay folder in the same commit. Two folders fail the entire frontend suite as a length assertion, not as contrast drift.
+- The Quartz palette was validated against both WCAG floors before being written down, but the **soft separator deliberately fails 3:1** (1.45 light, 1.75 dark) and so would any control distinguished only by its fill. Quartz therefore keeps the spine's two-token split: `separator` is decorative and legal only between paragraphs; `control-border` (`#86868B` light, `#7A7A82` dark, the lightest greys clearing 3:1 against every surface they touch) is required on anything operable.
+
+**FRs covered:** no new FRs. FR23 is amended in scope by Story 7.3 and the amendment is recorded in DESIGN.md.
+
+### Story 7.1: Replace the Token Layer
+
+As a maintainer,
+I want the Quartz tokens to be the only palette, type ramp, elevation set and shape scale the stylesheet declares,
+So that every later story in this epic reads a token rather than inventing a value.
+
+**Scope:** `frontend/src/style.css`'s `@theme` block and dark override, the Quartz DESIGN.md's two contrast tables, `frontend/src/ui/styles.test.ts`, and the deletion of `ux-FairDrop-2026-08-23/` and `frontend/src/assets/fonts/`. Component rules may be updated only where a renamed token forces it; no layout or markup changes.
+
+**Acceptance Criteria:**
+
+- Given `style.css`, then it declares every Quartz light value as a Tailwind v4 theme variable and the dark half as exact authored values rather than an inversion, and the QR substrate stays out of the dark override. *Mutation:* derive any dark value by filter or inversion -> must fail.
+- Given the suite, when it recomputes each ratio from the tokens `style.css` declares, then DESIGN.md publishes every figure unrounded and the document's `status` is no longer `draft`. **Copy the figures from the test's own output; do not hand-compute one.** *Mutation:* hand-edit any published figure by one digit -> must fail.
+- Given the two-token split, then every text pair clears 4.5:1 and every **functional boundary** clears 3:1 unrounded in both modes, while `separator` is asserted **not** to be used as a sole boundary anywhere. *Mutation:* replace a `control-border` use with `separator` -> must fail, naming the control.
+- Given no font file ships, then `frontend/src/assets/fonts/` is deleted, no `@font-face` rule exists, and the suite asserts no font is fetched or bundled. *Mutation:* reintroduce an `@font-face` -> must fail. This retires the Nunito single-weight and faux-bold assertions, which have nothing left to protect.
+- Given the elevation rule, then the three shadow tokens are declared once, the primary button's is the **only** gradient in the stylesheet, and no element carries more than three shadow layers. *Mutations:* add a second gradient; put a gradient behind text; add a fourth shadow layer -> all must fail. This replaces the paper-offset assertion, which must be deleted rather than left passing against a token that no longer exists.
+- Given `forced-colors: active`, then it supersedes the authored dark palette (declared after it, which is the only reason it wins), drops every shadow and gradient, and leaves `forced-color-adjust: none` on the QR substrate and nowhere else.
+- Given `prefers-reduced-motion: reduce`, then every animation and transition is neutralised and nothing that carries meaning is removed.
+- Given `main_test.go`, then `BackgroundColour` still tracks `--color-canvas` in both schemes. The pin reads the value out of `style.css`, so it should follow the new canvas automatically -- **verify this rather than assuming it**, since the light and dark canvases both changed.
+- Given exactly one `ux-*` folder, then it is the Quartz one and Paper Relay is deleted in the same commit.
+- Given the full gate on both platforms, when it runs, then it passes.
+
+### Story 7.2: Rebuild the Control System
+
+As a sender,
+I want buttons, fields and the browse menu to look and feel like controls the operating system would ship,
+So that the app reads as finished rather than as a prototype.
+
+**Scope:** the `.fd-button` family (primary, secondary, quiet), the focus ring, the URL field, the copy-feedback state, and the browse menu surface. Markup changes only where a control needs a glyph or a wrapper.
+
+**Acceptance Criteria:**
+
+- Given the primary control, then it carries the single permitted gradient, a 1px inset top highlight, `{elevation.sh-btn}`, `{rounded.md}`, `{typography.control}`, a 40px visible height and a 44px activation target, and scales to 0.975 on `:active`.
+- Given the secondary control, then it carries a fill **and** a functional boundary, because the fill alone is 1.22:1 against surface and cannot be the cue that identifies a control. *Mutation:* remove the boundary and keep the fill -> must fail.
+- Given the focus ring, then it is a 3px `{colors.focus}` outline at 2px offset, painted on the Tab-reachable controls only and on no routed landing target. The existing assertion that no landing target paints a ring stays binding and must still pass unchanged.
+- Given the browse menu, then it is a `{rounded.lg}` surface at `{elevation.sh-3}` with a functional boundary, and the focused item is distinguished by the primary fill **and** a tint halo, not by the focus ring alone.
+- Given the copy control, then the label swap to `copy.copy.confirmation` cannot reflow its row, and the label still reverts on blur (D-114). The existing fixed-width assertion stays binding.
+- Given every activation target, then it meets the 44px floor in both dimensions through one rule.
+- Given the full gate, when it runs, then it passes, and the existing `IdleView`, `StagedView`, `TransferringView` and `OutcomePanel` suites pass **unchanged** except where a test asserts a literal colour or radius.
+
+### Story 7.3: Rebuild Idle
+
+As a sender,
+I want Idle to open as a tool rather than as a document,
+So that the thing I came to do is the most prominent thing on screen.
+
+**Scope:** `IdleView.tsx`, `RecoveryHelp.tsx`, the drop zone, and the two new disclosures. The `BrowseControl` keyboard behaviour is **not** in scope and must not be touched -- its Escape, Tab, arrow and blur handling each encode a reproduced defect, and the macOS Tab fix landed separately on `fix-macos-tab-focus`.
+
+**Acceptance Criteria:**
+
+- Given the drop zone, then it is a `{rounded.xxl}` surface at `{elevation.sh-2}` with a 2px dashed inner rule inset 7px at an 18px concentric radius, a tinted circular glyph, and the display heading as its `h1`. It carries no click handler and no tab stop, exactly as now.
+- Given the native drag-active state, then the inner rule goes solid `{colors.primary}`, the fill goes `{colors.primary-tint}` and the glyph lifts -- and the fill is never the only cue. Given `--wails-drop-target: drop` is inherited, then it is **not** replaced by a DOM drop handler.
+- Given the firewall preflight, then it renders above the browse control and is present on first paint, inside a disclosure collapsed by default, whose summary names the topic and which is keyboard-operable. **This amends FR23 from "expanded and preceding" to "present and preceding"; DESIGN.md records the trade and the fallback.** Given acceptance rejects the amendment, then the disclosure ships `open` and nothing else changes.
+- Given the recovery guidance, then every string `RecoveryHelp` renders today is still rendered, in a second disclosure, with none deleted. *Mutation:* drop any recovery string -> must fail naming it.
+- Given a command failure, then the outcome panel still renders between the drop zone and the preflight, and its focus target is unchanged.
+- Given the cancel-winning summary, then it still leads the region, still takes focus, and is still styled as a warning rather than an error.
+- Given reflow to 320 CSS pixels, then Idle is one column with no page-level horizontal scrolling and no clipped action; the browse control stays out of the pair-collapse media query.
+- Given the full gate, when it runs, then it passes, and `App.focus.test.tsx` passes unchanged.
+
+### Story 7.4: Retain What Completion Needs
+
+As a sender,
+I want the finished-transfer screen to tell me what was sent,
+So that completion is an answer rather than an empty window.
+
+**This is a state-shape story, not a styling one, and it must land before 7.5 can render anything true.**
+
+**Scope:** `DoneTransferState`, the staged/transferring-to-done reducer transition, `RetainedDoneOutcome`, and the selectors that read them.
+
+**Acceptance Criteria:**
+
+- Given a `transfer-complete` event, when the reducer handles it, then `DoneTransferState` retains the session's `FileMetadata` and the event's final `ProgressSnapshot`, both of which are already in hand at that transition and are currently discarded. *Mutation:* drop either -> must fail.
+- Given a retained Done outcome in Idle, then it carries the same two values, so a reset does not empty the panel the sender is still looking at.
+- Given the receipt's figures, then the bytes shown are the **wire bytes actually sent** from the retained snapshot, never the logical size and never a placeholder. *Mutation:* substitute `metadata.size` for `progress.bytesSent` -> must fail.
+- Given no clock exists, then **no duration is added, retained, or displayed.** `EXPERIENCE.md` forbids frontend lifecycle timers and no backend timing is captured; a duration would have to be invented. *Mutation:* add an elapsed-time field -> the suite must fail, naming the ban.
+- Given an error outcome, then its state shape is unchanged: this story does not add a receipt to the error path.
+- Given the full gate, when it runs, then it passes, and `state.test.ts`, `selectors.test.ts` and `useTransfer.test.tsx` are extended rather than loosened.
+
+### Story 7.5: Rebuild Progress and the Outcome Panel
+
+As a sender,
+I want sending and finishing to be the two states that look most considered,
+So that the moments I actually watch are the ones that feel finished.
+
+**Depends on 7.4.**
+
+**Scope:** `TransferringView.tsx`, `OutcomePanel.tsx`, the progress meter, and the completion receipt.
+
+**Acceptance Criteria:**
+
+- Given a determinate transfer, then the percentage renders in `{typography.numeric}` with tabular numerals, wire bytes first and throughput second beside it, above an 8px `{rounded.full}` track with a functional boundary and a gradient fill.
+- Given an unknown total or a known-empty file, then the existing presentations are preserved exactly: a static unknown pattern with no sweep, shimmer or blink, and a decorative known-empty track. No fake ZIP or empty-file percentage.
+- Given a Done outcome, then the panel renders the success disc with a stroke-drawn check, the display heading, the body, the **two-cell** receipt from Story 7.4's retained state, a primary next action, and Dismiss where the caller supplies it. Every outcome still carries a control, including a live one (D-059).
+- Given `prefers-reduced-motion: reduce`, then the check is **fully drawn and not animated**. *Mutation:* leave it at `stroke-dashoffset: 32` under reduced motion -> must fail, because the check is a state cue and removing it removes meaning.
+- Given an Error outcome, then the same composition renders in the error pair with the `!` glyph, the heading and message read from the fixed registry **by code** rather than from the error value, and no raw diagnostics. There is no `role="alert"` in any form.
+- Given focus routing, then every routed landing target keeps its `data-focus-target`, keeps `tabIndex={-1}`, and paints no focus ring.
+- Given the full gate, when it runs, then it passes.
+
+### Story 7.6: Prove the Rebuild on Both Platforms
+
+As a maintainer,
+I want the epic's visual and behavioural claims verified rather than asserted,
+So that "looks finished" is evidence rather than an opinion.
+
+**Acceptance Criteria:**
+
+- Given the built binary on macOS **and** on Windows, when each of the five states is reached, then a screenshot of each is captured and retained in the evidence file, and the two platforms are compared for any divergence the one-look constraint forbids.
+- Given the macOS binary, then Tab reaches the browse control and ArrowDown opens the menu with the first item focused -- the `fix-macos-tab-focus` behaviour, re-proven against the rebuilt stylesheet, since the focus ring is now a different token.
+- Given both colour schemes, then each is observed at the OS preference with no first-paint flash, which is what `BackgroundColour` tracking `--color-canvas` protects.
+- Given the 640x480 native minimum and a 320 CSS pixel content width, then no action is clipped and no page-level horizontal scrollbar appears in any state.
+- Given `docs/release-policy.md`, then manual observations are recorded honestly as observed or not observed, and none is fabricated. Automated checks remain mandatory.
+- Given the full gate on both platforms, when it runs, then it passes.
