@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest'
 import {publicError} from '../transfer/errors'
 import {createInitialTransferState, transferReducer} from '../transfer/state'
 import type {TransferState} from '../transfer/state'
-import type {FileMetadata, Warning} from '../transfer/types'
+import type {FileMetadata, ProgressSnapshot, Warning} from '../transfer/types'
 import {parseWarning} from '../transfer/validation'
 import {focusSelector, focusTargets, routeTransition, type Announcement} from './announce'
 
@@ -55,7 +55,15 @@ function transferring(overrides: Partial<Extract<TransferState, {phase: 'transfe
     }
 }
 
-const done: TransferState = {phase: 'done', session: {sessionId, lastSeq: 5}, outcome: {kind: 'done'}}
+const finalProgress: ProgressSnapshot = {
+    bytesSent: 8_400_000, totalBytes: 8_400_000, totalKnown: true, percent: 100, speedBytesPerSec: 0,
+}
+
+const done: TransferState = {
+    phase: 'done',
+    session: {sessionId, lastSeq: 5},
+    outcome: {kind: 'done', metadata: metadata(), progress: finalProgress},
+}
 
 const terminalError: TransferState = {
     phase: 'error',
@@ -153,7 +161,7 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
     [
         'Reset after terminal Done',
         done,
-        idle({retainedOutcome: {kind: 'done'}}),
+        idle({retainedOutcome: {kind: 'done', metadata: metadata(), progress: finalProgress}}),
         null,
     ],
     [
@@ -164,7 +172,7 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
     ],
     [
         'Dismiss retained outcome',
-        idle({retainedOutcome: {kind: 'done'}}),
+        idle({retainedOutcome: {kind: 'done', metadata: metadata(), progress: finalProgress}}),
         createInitialTransferState(),
         {row: 'dismiss-retained', owner: 'focus', target: 'idle-instruction'},
     ],
@@ -345,7 +353,7 @@ describe('rows the table names but a reducer transition cannot produce', () => {
     })
 
     it('says nothing when a reset lands on Idle with a retained outcome still attached', () => {
-        expect(routeTransition(staged(), idle({retainedOutcome: {kind: 'done'}}))).toBeNull()
+        expect(routeTransition(staged(), idle({retainedOutcome: {kind: 'done', metadata: metadata(), progress: finalProgress}}))).toBeNull()
     })
 
     it('refuses to treat a `cancelled` command error as a failure worth focusing', () => {

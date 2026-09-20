@@ -22,6 +22,10 @@ const metadata = {
     warnings: [],
 } as const
 
+const finalProgress = {
+    bytesSent: 100, totalBytes: 100, totalKnown: true, percent: 100, speedBytesPerSec: 0,
+} as const
+
 describe('progress presentation modes', () => {
     it('derives the determinate percentage from the authoritative byte pair', () => {
         expect(selectProgressSnapshot({
@@ -140,7 +144,9 @@ describe('state-aware selectors', () => {
             commandError: null,
         }
         const done: TransferState = {
-            phase: 'done', session: {sessionId: metadata.sessionId, lastSeq: 3}, outcome: {kind: 'done'},
+            phase: 'done',
+            session: {sessionId: metadata.sessionId, lastSeq: 3},
+            outcome: {kind: 'done', metadata, progress: finalProgress},
         }
 
         expect(selectProgress(transferring)).toMatchObject({mode: 'known-positive', value: 25})
@@ -320,8 +326,8 @@ describe('terminal and retained outcomes', () => {
         expect(selectOutcome({
             phase: 'done',
             session: {sessionId: metadata.sessionId, lastSeq: 4},
-            outcome: {kind: 'done'},
-        })).toEqual({kind: 'done', retained: false})
+            outcome: {kind: 'done', metadata, progress: finalProgress},
+        })).toEqual({kind: 'done', retained: false, metadata, progress: finalProgress})
 
         expect(selectOutcome({
             phase: 'error',
@@ -339,13 +345,60 @@ describe('terminal and retained outcomes', () => {
     })
 
     it('presents the same outcome as retained once reset has cleared the session', () => {
-        expect(selectOutcome({phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null}))
-            .toEqual({kind: 'done', retained: true})
+        expect(selectOutcome({
+            phase: 'idle',
+            retainedOutcome: {kind: 'done', metadata, progress: finalProgress},
+            commandError: null,
+        })).toEqual({kind: 'done', retained: true, metadata, progress: finalProgress})
         expect(selectOutcome({
             phase: 'idle',
             retainedOutcome: {kind: 'error', error: publicError('source_changed')},
             commandError: null,
         })?.retained).toBe(true)
+    })
+
+    /*
+      Given a retained Done outcome in Idle, it carries the same two retained
+      values a live Done carried -- so a reset does not empty the panel the
+      sender is still looking at.
+    */
+    it('carries the same retained metadata and progress a live Done outcome carried', () => {
+        const live = selectOutcome({
+            phase: 'done',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'done', metadata, progress: finalProgress},
+        })
+        const retained = selectOutcome({
+            phase: 'idle',
+            retainedOutcome: {kind: 'done', metadata, progress: finalProgress},
+            commandError: null,
+        })
+
+        expect(live?.kind).toBe('done')
+        expect(retained?.kind).toBe('done')
+        expect(live?.kind === 'done' && retained?.kind === 'done'
+            ? [live.metadata, live.progress]
+            : null).toEqual(retained?.kind === 'done' ? [retained.metadata, retained.progress] : null)
+    })
+
+    /*
+      *Mutation:* substitute `metadata.size` for `progress.bytesSent` -> must
+      fail. Distinguishable because nothing forces them equal: this metadata
+      describes a directory (`size` is the logical placeholder, 0) while the
+      wire actually sent bytes for the ZIP it produced.
+    */
+    it('reads bytes from the retained progress snapshot, never from metadata.size', () => {
+        const dirMetadata = {...metadata, isDir: true, size: 0}
+        const wireProgress = {bytesSent: 4_096, totalBytes: 0, totalKnown: false, percent: 0, speedBytesPerSec: 512}
+
+        const outcome = selectOutcome({
+            phase: 'done',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'done', metadata: dirMetadata, progress: wireProgress},
+        })
+
+        expect(outcome?.kind === 'done' ? outcome.progress.bytesSent : null).toBe(4_096)
+        expect(outcome?.kind === 'done' ? outcome.metadata.size : null).toBe(0)
     })
 
     it('refuses to present a cancellation as an outcome panel', () => {

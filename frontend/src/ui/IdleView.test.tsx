@@ -13,6 +13,19 @@ function idle(overrides: Partial<IdleTransferState> = {}): IdleTransferState {
     return {phase: 'idle', retainedOutcome: null, commandError: null, ...overrides}
 }
 
+const doneReceipt = {
+    metadata: {
+        sessionId: '0123456789abcdef0123456789abcdef',
+        name: 'report.pdf',
+        size: 100,
+        isDir: false,
+        url: 'http://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210',
+        qrBase64: 'iVBORw0KGgo=',
+        warnings: [],
+    },
+    progress: {bytesSent: 100, totalBytes: 100, totalKnown: true, percent: 100, speedBytesPerSec: 0},
+}
+
 function show(
     state: IdleTransferState = idle(),
     handlers: Record<string, () => void> = {},
@@ -299,14 +312,14 @@ describe('what Idle no longer owns', () => {
     // keeps across the reset. Rebuilding it here would drop the focus that is
     // sitting on it -- see App.test.tsx, "reset after a terminal outcome".
     it('renders no outcome panel for a retained outcome', () => {
-        show(idle({retainedOutcome: {kind: 'done'}}))
+        show(idle({retainedOutcome: {kind: 'done', ...doneReceipt}}))
 
         expect(document.querySelector('.fd-outcome')).toBeNull()
         expect(screen.queryByRole('button', {name: 'Dismiss'})).toBeNull()
     })
 
     it('renders exactly one Idle phase view whatever it carries', () => {
-        show(idle({retainedOutcome: {kind: 'done'}}))
+        show(idle({retainedOutcome: {kind: 'done', ...doneReceipt}}))
 
         expect(document.querySelectorAll('[data-phase-view]')).toHaveLength(1)
         expect(document.querySelector('[data-phase-view]')?.getAttribute('data-phase-view')).toBe('idle')

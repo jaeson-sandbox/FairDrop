@@ -1,6 +1,6 @@
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, describe, expect, it, vi} from 'vitest'
-import type {PublicError} from '../transfer/types'
+import type {FileMetadata, ProgressSnapshot, PublicError} from '../transfer/types'
 import {OutcomePanel} from './OutcomePanel'
 
 afterEach(cleanup)
@@ -11,9 +11,31 @@ function panel(): HTMLElement {
     return found as HTMLElement
 }
 
+const doneMetadata: FileMetadata = {
+    sessionId: '0123456789abcdef0123456789abcdef',
+    name: 'report.pdf',
+    size: 100,
+    isDir: false,
+    url: 'http://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210',
+    qrBase64: 'iVBORw0KGgo=',
+    warnings: [],
+}
+
+const doneProgress: ProgressSnapshot = {
+    bytesSent: 100,
+    totalBytes: 100,
+    totalKnown: true,
+    percent: 100,
+    speedBytesPerSec: 10,
+}
+
+function doneOutcome(retained: boolean) {
+    return {kind: 'done', retained, metadata: doneMetadata, progress: doneProgress} as const
+}
+
 describe('the Done panel', () => {
     it('says only that FairDrop finished sending', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
 
         expect(screen.getByRole('heading').textContent).toBe('Transfer finished')
         expect(screen.getByText('FairDrop finished sending the item.')).toBeTruthy()
@@ -21,7 +43,7 @@ describe('the Done panel', () => {
     })
 
     it('claims nothing about the receiver, its storage, or the download', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
 
         const text = panel().textContent ?? ''
         for (const claim of ['saved', 'received', 'downloaded', 'stored', 'Files']) {
@@ -36,7 +58,7 @@ describe('the Done panel', () => {
     // (D-059). The expectation moved because the contract did.
     it('carries the control a live terminal outcome is given, so a lost reset cannot strand it', () => {
         const dismiss = vi.fn()
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}} onDismiss={dismiss}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)} onDismiss={dismiss}/>)
 
         const control = screen.getByRole('button')
         fireEvent.click(control)
@@ -44,7 +66,7 @@ describe('the Done panel', () => {
     })
 
     it('offers no control when the caller supplies no handler', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
 
         expect(screen.queryByRole('button')).toBeNull()
     })
@@ -53,7 +75,7 @@ describe('the Done panel', () => {
 describe('the retained outcome node', () => {
     it('keeps the same visible content and adds Dismiss', () => {
         const onDismiss = vi.fn()
-        render(<OutcomePanel outcome={{kind: 'done', retained: true}} onDismiss={onDismiss}/>)
+        render(<OutcomePanel outcome={doneOutcome(true)} onDismiss={onDismiss}/>)
 
         expect(screen.getByRole('heading').textContent).toBe('Transfer finished')
         const dismiss = screen.getByRole('button', {name: 'Dismiss'})
@@ -64,7 +86,7 @@ describe('the retained outcome node', () => {
     })
 
     it('marks itself retained so a reader can tell status from session', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: true}} onDismiss={vi.fn()}/>)
+        render(<OutcomePanel outcome={doneOutcome(true)} onDismiss={vi.fn()}/>)
 
         expect(panel().getAttribute('data-retained')).toBe('true')
     })
@@ -112,7 +134,7 @@ describe('the Error panel', () => {
 
 describe('heading rank and phase ownership', () => {
     it('owns the document heading when it is the whole phase view', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}} level={1} phaseView/>)
+        render(<OutcomePanel outcome={doneOutcome(false)} level={1} phaseView/>)
 
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
         expect(panel().getAttribute('data-phase-view')).toBe('outcome')
@@ -122,7 +144,7 @@ describe('heading rank and phase ownership', () => {
         // Rank and phase are separate props because reset changes only one of
         // them: the user must be looking at the same node, at the same weight,
         // while Idle becomes the phase view underneath it.
-        render(<OutcomePanel outcome={{kind: 'done', retained: true}} level={1} onDismiss={vi.fn()}/>)
+        render(<OutcomePanel outcome={doneOutcome(true)} level={1} onDismiss={vi.fn()}/>)
 
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
         expect(panel().hasAttribute('data-phase-view')).toBe(false)
@@ -147,7 +169,7 @@ describe('the focused container has a name', () => {
       role="textbox" div out of StagedView.
     */
     it.each([
-        ['done', {kind: 'done', retained: false} as const, 'Transfer finished'],
+        ['done', doneOutcome(false), 'Transfer finished'],
         ['error', {kind: 'error', retained: false, error: {code: 'transfer_failed', message: 'x'} as PublicError} as const,
             'Transfer stopped'],
     ])('names the %s panel with its own heading', (_name, outcome, heading) => {
@@ -162,19 +184,51 @@ describe('the focused container has a name', () => {
 
 describe('focus surface', () => {
     it('is reachable by a programmatic focus move without joining the Tab order', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
 
         // Story 1.10 routes focus; this story only guarantees the target exists.
         expect(panel().getAttribute('tabindex')).toBe('-1')
     })
 
     it('never paints its state with color alone', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
         const icon = document.querySelector('.fd-outcome__icon')
 
         expect(icon?.textContent).toBe('✓')
         expect(icon?.getAttribute('aria-hidden')).toBe('true')
         // The heading text is the real cue; the glyph only reinforces it.
         expect(screen.getByRole('heading').textContent).toBe('Transfer finished')
+    })
+})
+
+/*
+  Story 7.4 proof: the retained receipt values reach the view. The receipt's
+  markup, layout and styling belong to Story 7.5 -- this only guarantees the
+  wire is connected, using a non-visible attribute rather than rendered text.
+*/
+describe('completion receipt values (Story 7.4 wiring)', () => {
+    it('exposes the retained item name and wire bytes sent, live or retained', () => {
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
+        expect(panel().getAttribute('data-receipt-name')).toBe('report.pdf')
+        expect(panel().getAttribute('data-receipt-bytes-sent')).toBe('100')
+    })
+
+    it('carries the same receipt values once the outcome is retained in Idle', () => {
+        render(<OutcomePanel outcome={doneOutcome(true)} onDismiss={vi.fn()}/>)
+        expect(panel().getAttribute('data-receipt-name')).toBe('report.pdf')
+        expect(panel().getAttribute('data-receipt-bytes-sent')).toBe('100')
+    })
+
+    it('shows the wire bytes actually sent, never the logical file size', () => {
+        const outcome = {
+            kind: 'done',
+            retained: false,
+            metadata: {...doneMetadata, size: 999_999},
+            progress: {...doneProgress, bytesSent: 100},
+        } as const
+        render(<OutcomePanel outcome={outcome}/>)
+
+        expect(panel().getAttribute('data-receipt-bytes-sent')).toBe('100')
+        expect(panel().getAttribute('data-receipt-bytes-sent')).not.toBe('999999')
     })
 })

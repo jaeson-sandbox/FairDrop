@@ -178,6 +178,14 @@ const metadata = {
     warnings: [],
 }
 
+const finalProgress = {
+    bytesSent: 100,
+    totalBytes: 100,
+    totalKnown: true,
+    percent: 100,
+    speedBytesPerSec: 0,
+}
+
 // The mock functions live here; App.harness.tsx only shapes and mounts
 // whatever controller it is handed, typed so a new TransferController member
 // is a type error in that one shared place rather than a silent gap here.
@@ -222,7 +230,7 @@ const phaseCases: Array<[string, TransferState, string]> = [
             cancelPending: false,
             commandError: null,
         }, 'transferring'],
-        ['done', {phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done'}}, 'outcome'],
+        ['done', {phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', metadata, progress: finalProgress}}, 'outcome'],
         ['error', {
             phase: 'error',
             session: {sessionId, lastSeq: 4},
@@ -258,7 +266,7 @@ describe('one view per phase', () => {
     })
 
     it('gives the terminal outcome the document heading', () => {
-        mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done'}})
+        mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', metadata, progress: finalProgress}})
 
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
     })
@@ -331,7 +339,7 @@ describe('controller wiring', () => {
     })
 
     it('routes Dismiss to the retained-outcome command', () => {
-        mountWith({phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null})
+        mountWith({phase: 'idle', retainedOutcome: {kind: 'done', metadata, progress: finalProgress}, commandError: null})
 
         fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
         expect(mocks.dismissRetained).toHaveBeenCalledTimes(1)
@@ -386,7 +394,7 @@ const transferringState: TransferState = {
     cancelPending: false,
     commandError: null,
 }
-const doneState: TransferState = {phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done'}}
+const doneState: TransferState = {phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', metadata, progress: finalProgress}}
 
 const discoveryWarning = 'Device discovery isn’t available. The QR code and download link still work.'
 
@@ -438,7 +446,7 @@ describe('focus-owned transitions', () => {
         ],
         [
             'Dismiss retained outcome',
-            {phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null},
+            {phase: 'idle', retainedOutcome: {kind: 'done', metadata, progress: finalProgress}, commandError: null},
             idleState,
             'idle-instruction',
         ],
@@ -677,7 +685,7 @@ describe('reset after a terminal outcome', () => {
         const panel = document.activeElement
         expect(panel).toBe(document.querySelector('[data-outcome="done"]'))
 
-        transitionTo(view, {phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null})
+        transitionTo(view, {phase: 'idle', retainedOutcome: {kind: 'done', metadata, progress: finalProgress}, commandError: null})
 
         // The identical DOM node, still focused: reset is the one row whose
         // owner is None, so neither mechanism may fire and focus may not move.
@@ -706,7 +714,7 @@ describe('reset after a terminal outcome', () => {
     it('shows the retained node above a newer command failure, and both at once', () => {
         mountWith({
             phase: 'idle',
-            retainedOutcome: {kind: 'done'},
+            retainedOutcome: {kind: 'done', metadata, progress: finalProgress},
             commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
         })
 
@@ -797,7 +805,7 @@ describe('progress speech across two transfers', () => {
             expect(announcer().textContent).toBe('1.0 MB of 100.0 MB · 1%')
 
             transitionTo(view, doneState)
-            transitionTo(view, {phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null})
+            transitionTo(view, {phase: 'idle', retainedOutcome: {kind: 'done', metadata, progress: finalProgress}, commandError: null})
             transitionTo(view, stagedState)
             transitionTo(view, transferringState)
 
@@ -881,7 +889,7 @@ describe('a live terminal outcome is never a dead end', () => {
     // "a live terminal outcome is cancellable" drives the real hook and is the
     // half that would have caught it.
     it('offers a control on a live Done that cancels the held session', () => {
-        mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done'}} as TransferState)
+        mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', metadata, progress: finalProgress}} as TransferState)
 
         fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
 
@@ -890,7 +898,7 @@ describe('a live terminal outcome is never a dead end', () => {
     })
 
     it('still dismisses locally when the outcome is retained', () => {
-        mountWith({phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null} as TransferState)
+        mountWith({phase: 'idle', retainedOutcome: {kind: 'done', metadata, progress: finalProgress}, commandError: null} as TransferState)
 
         fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
 

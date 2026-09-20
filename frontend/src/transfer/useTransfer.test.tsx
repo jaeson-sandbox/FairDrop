@@ -806,3 +806,59 @@ describe('a failed clipboard write reaches the reducer', () => {
         expect(hook.result.current.state).toBe(before)
     })
 })
+
+/*
+  Story 7.4, driven through the real hook rather than the reducer directly.
+
+  state.test.ts proves the reducer's transition retains metadata and the
+  final snapshot; this proves the retained values actually reach a real
+  useTransfer consumer -- through the real Wails event listeners, a real
+  stage() round trip, and a real transfer-reset -- rather than only living in
+  an isolated reducer call.
+*/
+describe('the completion receipt reaches a live consumer (Story 7.4)', () => {
+    it('carries the retained metadata and final progress on a live Done outcome', async () => {
+        mocks.stageTransfer.mockResolvedValue(metadata({name: 'report.pdf'}))
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.stage('C:\\report.pdf') })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        })
+
+        const state = hook.result.current.state
+        expect(state.phase).toBe('done')
+        expect(state.phase === 'done' ? state.outcome.metadata.name : null).toBe('report.pdf')
+        expect(state.phase === 'done' ? state.outcome.progress.bytesSent : null).toBe(100)
+    })
+
+    it('keeps the same receipt once transfer-reset retains the outcome in Idle', async () => {
+        mocks.stageTransfer.mockResolvedValue(metadata({name: 'report.pdf'}))
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.stage('C:\\report.pdf') })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        })
+        const live = hook.result.current.state
+        expect(live.phase).toBe('done')
+        const liveReceipt = live.phase === 'done'
+            ? {metadata: live.outcome.metadata, progress: live.outcome.progress}
+            : null
+
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+
+        const retained = hook.result.current.state
+        expect(retained.phase).toBe('idle')
+        const retainedReceipt = retained.phase === 'idle' && retained.retainedOutcome?.kind === 'done'
+            ? {metadata: retained.retainedOutcome.metadata, progress: retained.retainedOutcome.progress}
+            : null
+
+        // Given a retained Done outcome in Idle, it carries the same two
+        // values -- reset must not empty the panel the sender is looking at.
+        expect(retainedReceipt).toEqual(liveReceipt)
+        expect(retainedReceipt).not.toBeNull()
+    })
+})

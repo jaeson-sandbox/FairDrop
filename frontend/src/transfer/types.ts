@@ -82,6 +82,10 @@ export type PendingItemKind = 'file' | 'directory' | 'unknown'
 
 export interface RetainedDoneOutcome {
     readonly kind: 'done'
+    /** The session's file/folder metadata, retained so the receipt can name what was sent. */
+    readonly metadata: FileMetadata
+    /** The final `transfer-complete` snapshot, retained so the receipt can show wire bytes actually sent. */
+    readonly progress: ProgressSnapshot
 }
 
 export interface RetainedErrorOutcome {

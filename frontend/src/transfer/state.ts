@@ -48,7 +48,13 @@ export interface TransferringTransferState {
 export interface DoneTransferState {
     readonly phase: 'done'
     readonly session: SessionCursor
-    readonly outcome: {readonly kind: 'done'}
+    readonly outcome: {
+        readonly kind: 'done'
+        /** The session's file/folder metadata, retained for the completion receipt. */
+        readonly metadata: FileMetadata
+        /** The `transfer-complete` event's final snapshot -- wire bytes actually sent, never `metadata.size`. */
+        readonly progress: ProgressSnapshot
+    }
 }
 
 export interface ErrorTransferState {
@@ -230,7 +236,11 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                         outcome: {kind: 'error', error: publicError('transfer_failed')},
                     }
                 }
-                return {phase: 'done', session, outcome: {kind: 'done'}}
+                return {
+                    phase: 'done',
+                    session,
+                    outcome: {kind: 'done', metadata: state.metadata, progress: event.progress},
+                }
             }
             if (event.kind === 'transfer-error') {
                 // Same rule, easier answer: this event is already a failure, so
@@ -249,7 +259,11 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
             if (event.kind !== 'transfer-reset') return state
             return {
                 phase: 'idle',
-                retainedOutcome: {kind: 'done'},
+                retainedOutcome: {
+                    kind: 'done',
+                    metadata: state.outcome.metadata,
+                    progress: state.outcome.progress,
+                },
                 commandError: null,
             }
 
