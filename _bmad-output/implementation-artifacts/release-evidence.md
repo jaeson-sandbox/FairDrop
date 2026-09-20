@@ -56,11 +56,33 @@ makes a named test fail. Everything a machine cannot observe is below.
 
 ## Artifact identity
 
-**v1.1.0 — candidate, not yet released.** Source metadata and the locally packaged
-Mac bundle identify as 1.1.0. The merge SHA, tag SHA, native Release workflow run,
-artifact sizes, post-transit SHA-256 values, and publication status must be inserted
-from observed remote results. Until then this paragraph is preparation, not release
-evidence; v1.0.0 remains the current published release.
+**v1.1.0 — published 2026-09-20, current release.** Final candidate
+`54a5f87223f34647aed40344296d79824a33d4bd` passed all three jobs in both PR
+[35499365200](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35499365200) and push
+[35499362706](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35499362706): native
+Windows, native macOS, and the Linux adapter job each concluded **success** on the exact
+candidate. It was merged by merge commit `cb40879764a31c512ba835f9c638c959ffa7adfd`, and
+annotated tag `v1.1.0` points to that same commit. Release
+[35500351435](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35500351435) completed with
+all six jobs successful: Linux gate `106050918775`, macOS gate `106050918841`, Windows gate
+`106050918926`, Windows build `106052726162`, macOS build `106052726659`, and release
+`106053084898`. The non-draft, non-prerelease
+[release](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.1.0) was published at
+2026-09-20 09:03:07 UTC and is marked latest.
+
+| Artifact | Size | SHA-256 |
+| --- | ---: | --- |
+| `fairdrop.exe` | 13,819,904 | `79b12f642728e09d59600d88c8d36a615b1e1106c26e07e9f5c7d373538f0a98` |
+| `fairdrop-macos.zip` | 6,256,840 | `128de947600e6c7485c7dfb1fee57f609e585e987fb097dc33041464d77abecc` |
+
+Both published artifacts and checksum files were downloaded from the release; `shasum -c`
+passed, and the files were byte-identical to the inspected CI artifacts. The downloaded Mac
+bundle reports both plist versions as 1.1.0, passes strict deep codesign verification, and its
+icon decodes to the exact 1024px RGBA master. The downloaded Windows executable passed both
+existing PE resource tests through the portable byte parser: all six icon distances were zero
+and product identity/version was 1.1.0. That is byte inspection on macOS, not Windows execution.
+The locked Mac prevented an additional GUI launch of the downloaded artifact; the local 1.1.0
+native launch is recorded in the Story 6.3 evidence.
 
 **v0.3.0 — published 2026-09-17, superseded by v1.0.0.** Built by Release
 [35169193793](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35169193793) from
@@ -155,7 +177,7 @@ behaviour above is what Story 3.1 proved against fake runtime seams.
 ## Optional manual checks
 
 Optional under the release policy. Each row says what would have to be observed, so that anyone
-who does run one can fill it in, and against which build. `v1.0.0` is the current published release;
+who does run one can fill it in, and against which build. `v1.1.0` is the current published release;
 `v0.1.0` is still downloadable and predates most of the later work, so a
 row recorded against it says little about the code today.
 

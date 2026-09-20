@@ -2,7 +2,7 @@
 title: 'Story 6.3: Verify and Release 1.1.0'
 type: 'chore'
 created: '2026-09-20'
-status: 'in-review'
+status: 'done'
 baseline_commit: '023faaad6fdafe60a44556190a6d95d4c78a4c2d'
 review_loop_iteration: 0
 context: ['{project-root}/AGENTS.md']
@@ -70,7 +70,7 @@ macOS regression gate, signing, notarization, or installer is required here.
 - [x] `AGENTS.md`, `build/README.md`, Story 6.2 spec, `epics.md` — reconcile actual gate order, absence-based gating, 0409/FileVersion behavior, calibration command, and Windows-specific regeneration. Record the supersession of obsolete frozen wording under this approved story.
 - [x] `wails.json`, both frontend package files, `README.md` — set 1.1.0 identity and accurate release description.
 - [x] `epics.md`, `sprint-status.yaml`, `deferred-work.md`, retrospective/evidence files — register Story 6.3, record three review layers, discharge only proved items, and reassess acceptance while preserving history.
-- [ ] `docs/release-notes-1.1.0.md`, `release-evidence.md` — prepare notes, then record exact merge/tag SHA, run/job conclusions, artifact sizes and checksums after release.
+- [x] `docs/release-notes-1.1.0.md`, `release-evidence.md` — prepare notes, then record exact merge/tag SHA, run/job conclusions, artifact sizes and checksums after release.
 
 **Acceptance Criteria:**
 - Given the final mutation inventory, when it executes, then every declared case fails the named assertion, absence skips only locally, and inputs are restored with complete evidence retained.
@@ -84,6 +84,10 @@ macOS regression gate, signing, notarization, or installer is required here.
 See `evidence-6-3-verify-and-release-1-1-0.md` for review, mutation, gate and release results.
 
 ## Spec Change Log
+
+- 2026-09-20: Recorded the successful final-candidate PR and push gates, merge commit,
+  annotated tag, successful Release workflow, published artifact identities, and
+  post-transit checksum verification. Story accepted and closed.
 
 ## Execution ownership
 
