@@ -16,11 +16,26 @@ The structure is:
 - `appicon-source.jpg` - the original candidate JPEG `appicon.png` was derived from, committed
   alongside it so the master is reproducible rather than a one-off nobody can regenerate.
 - `../scripts/build-appicon.py` - the derivation itself: crops the plaque out of `appicon-source.jpg`
-  and synthesises real alpha, since none of the owner's candidate renders carries any. Re-run it by
-  hand with `python scripts/build-appicon.py` from the repository root after replacing
-  `appicon-source.jpg`, then re-derive `icon.ico` per the Windows section below. It is not part of
-  any automated pipeline -- its output is committed, and CI checks the committed files, not the
+  and synthesises real alpha, since none of the owner's candidate renders carries any. It is not part
+  of any automated pipeline -- its output is committed, and CI checks the committed files, not the
   script.
+
+  **Requires Pillow** (`pip install Pillow`); the committed master was produced with Pillow 12.3.0.
+  The script deliberately does not guarantee byte-identical output across Pillow versions, so the
+  version is recorded here rather than pinned in a lockfile the repo does not otherwise have.
+
+  To re-derive after replacing `appicon-source.jpg`:
+
+  ```sh
+  python scripts/build-appicon.py     # runs from any directory; rewrites build/appicon.png
+  rm build/windows/icon.ico           # Wails only generates it when it is ABSENT
+  wails build                         # regenerates icon.ico from the new master
+  ```
+
+  **Commit both regenerated binaries.** `appicon.png` alone is not enough: leaving a stale
+  `icon.ico` beside a new master is the exact failure this whole section exists to prevent, and it
+  is what shipped the Wails placeholder through v1.0.0. `TestAppIconMasterMatchesIcoFreshness`
+  fails if the two disagree.
 
 ## Mac
 

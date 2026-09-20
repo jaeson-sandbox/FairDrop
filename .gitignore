@@ -64,6 +64,6 @@ __pycache__/
 # -- these are the other two candidates plus a duplicate of the chosen one at
 # its original location, kept locally for reference but not meant to be a
 # second copy in git.
-/fairdrop_logo.jpg
-/fairdrop_logo2.jpg
-/fairdrop_logo2_revised.jpg
+# Root-anchored literals missed a candidate kept in a subdirectory or saved
+# with the four-letter extension, so match by shape instead.
+**/fairdrop_logo*.jp*g

@@ -4,7 +4,7 @@ type: 'feature'
 created: '2026-09-19'
 status: 'in-review'
 baseline_commit: 'de16807eedb8482aac82e9862161fb89aabfb7b2'
-review_loop_iteration: 1
+review_loop_iteration: 2
 context: []
 ---
 
@@ -13,7 +13,8 @@ context: []
 ## Intent
 
 **Problem:** `build/appicon.png` and `build/windows/icon.ico` are still byte-identical to the
-Wails 2.15.0 scaffold defaults — v1.0.0 shipped a stock white "W" in the Windows taskbar, the
+Wails 2.15.0 scaffold defaults — v1.0.0 shipped the stock placeholder, a white field
+carrying a dark "W", in the Windows taskbar, the
 exe's Properties pane, the NSIS installer and the macOS Dock. The owner supplied three candidate
 renders. **None carries an alpha channel** — all are JPEGs, including the one whose backdrop is
 drawn as a transparency checkerboard, which is opaque pixels like any other. A format conversion
@@ -74,8 +75,9 @@ or any transfer behaviour. Introduce a system tray; this app has none.
 - `release_identity_test.go` -- precedent for a root `package main` test reading shipped files as
   data. The new test is a sibling: image decoding is different mechanics from text pinning.
 - `build/darwin/Info.plist:18` + `Info.dev.plist:18` (`CFBundleIconFile` = `iconfile`) and
-  `installer/project.nsi:53-54` (`MUI_ICON` = `..\icon.ico`) -- read-only; both pick up the
-  regenerated files automatically. Nothing embeds the icon; it is purely a build asset.
+  `installer/project.nsi:53` (`MUI_ICON`) and `:54` (`MUI_UNICON`, the **uninstaller** icon --
+  a second user-visible surface this change updates) both = `..\icon.ico` -- read-only; all
+  pick up the regenerated files automatically. Nothing embeds the icon; it is a build asset.
 - `scripts/verify-native-mutations.sh` -- mutates `.go` sources only, so asset mutations are
   recorded manually in the evidence file instead.
 
@@ -108,36 +110,58 @@ or any transfer behaviour. Introduce a system tray; this app has none.
   single-story shape.
 - [x] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- register `epic-6`,
   `6-1-replace-the-placeholder-app-icon`, and `epic-6-retrospective`.
+- [x] `.gitattributes` -- add `*.jpg` and `*.jpeg` to the binary list, which a 2MB committed
+  JPEG otherwise sits outside.
+- [x] `.gitignore` -- ignore the owner's candidate renders by shape (`**/fairdrop_logo*.jp*g`),
+  since only the chosen one is committed, under `build/appicon-source.jpg`.
+- [x] `_bmad-output/implementation-artifacts/deferred-work.md` -- D-128 (withdrawn), D-129 and
+  D-130.
+- [x] `_bmad-output/implementation-artifacts/evidence-6-1-replace-the-placeholder-app-icon.md`
+  -- the mutation table, per the house rule that evidence never lives in the spec.
 
 **Acceptance Criteria:**
-Each criterion names the mutation that must fail it. "Fails by name" means the named test, not
-any test.
 
-- **Freshness.** Given both shipped assets, when the master is downsampled to a shared entry
-  size, then its mean per-channel RGBA distance from the matching `.ico` entry is within a
-  tolerance absorbing winicon's Catmull-Rom resampling but not different artwork. *Mutation:*
-  replace the master with hue-swapped artwork, leave the `.ico` **-> must fail.**
-- **No opaque backdrop.** Given either asset, when the outer 12px border ring is measured, then
-  it holds no opaque pixel whose channels all exceed 200, and the ring is overwhelmingly
-  transparent. Four corner pixels are **not** sufficient: on a centred rounded rect they are
-  transparent by construction. *Mutations:* re-derive with `ERODE_PX = 0`; make the backdrop
-  opaque everywhere except the four corners **-> both must fail.**
-- **Real colour.** Given either asset, when mean HSV saturation over the central 40% is measured
-  **skipping fully transparent pixels**, then it exceeds 0.25, and the test fails if no opaque
-  pixel remains there. *Mutation:* set the master's alpha to 0 everywhere, keeping colour
-  **-> must fail** (an invisible icon is not real colour).
-- **Alpha applied once.** Given the master, when pixels at partial alpha are compared with the
-  opaque edge colour, then their RGB matches within tolerance. *Mutation:* composite the plaque
-  onto the canvas using itself as the mask **-> must fail.** This is a real defect found in
-  review, not a hypothetical: it darkens the feather and halves its width.
-- **Master geometry.** Given the master, then it is exactly 1024x1024 RGBA carrying a fully
-  transparent band top and bottom. *Mutation:* stretch the plaque square to fill **-> must fail.**
-- **Small sizes.** Given the `.ico`, then its 16x16 and 32x32 entries decode and satisfy the
-  colour assertion -- the sizes the artwork was chosen for. *Mutation:* replace a small entry
-  with opaque white **-> must fail.**
-- **Toolchain provenance.** Given the `.ico`, then it carries the full 256/128/64/48/32/16 set
-  that **Wails** passes to `winicon.GenerateIcon` at `packager.go:217` -- winicon emits whatever
-  list it is handed, so this pins a Wails literal, not a winicon behaviour.
+Each criterion names the mutation that must fail it, and every tolerance states the measured
+value it was calibrated against. "Fails by name" means the named test, not any test.
+
+- **Freshness.** Given both shipped assets, when the master is downsampled to a shared entry size,
+  then its mean per-channel RGBA distance from the matching `.ico` entry is at most **8x the
+  measured same-artwork distance** (0.62, box-averaging against Catmull-Rom), not an absolute
+  number chosen for headroom. *Mutations:* a hue-swapped master; **and a uniform +24/255
+  brightening of the master with the `.ico` left stale** -- the realistic "revised the artwork,
+  forgot to delete `icon.ico`" case **-> both must fail.** At tolerance 18.0 the second passed,
+  leaving a stale icon shipping green up to roughly a 10% tonal revision.
+- **No opaque backdrop.** Given the master **and every `.ico` entry**, when each asset's border
+  ring is measured at a width scaled to its own resolution, then it holds no opaque pixel whose
+  channels all exceed 200. Four corner pixels are not sufficient: on a centred rounded rect they
+  are transparent by construction. *Mutations:* re-derive with `ERODE_PX = 0`; make the backdrop
+  opaque except the four corners; make a 16x16 entry a fully opaque coloured field **-> all must
+  fail.**
+- **Real colour.** Given the master and every `.ico` entry, when mean HSV saturation over the
+  central 40% is measured **skipping fully transparent pixels**, then it exceeds 0.25 and at least
+  half the central region is opaque. *Mutations:* set the master's alpha to 0 keeping colour; leave
+  a single opaque pixel in a small entry's centre **-> both must fail.**
+- **Alpha applied once.** Given the master, when partial-alpha pixels are compared with their local
+  opaque reference **on both the leading and trailing edge of every row**, then RGB matches within
+  tolerance. *Mutation:* composite the plaque onto the canvas using itself as the mask **-> must
+  fail**, and must fail when that defect is confined to the trailing edge alone. Roughly half the
+  boundary was previously discarded unmeasured.
+- **Master geometry.** Given the master, then it is exactly 1024x1024, carries a real alpha channel,
+  and its transparent bands are **15 rows top and 16 bottom (the 1024x993 plaque centred), bounded
+  above as well as below**. *Mutations:* stretch the plaque square to fill; substitute a fully blank
+  transparent canvas; substitute the scaffold placeholder **-> all must fail.** A floor alone passed
+  all three.
+- **Small sizes.** Given the `.ico`, then **every** entry decodes, its decoded dimensions equal the
+  size its directory declares, and it satisfies the colour and backdrop criteria -- not only the
+  largest and the two smallest. *Mutation:* replace any single entry with opaque white **-> must
+  fail, naming that size.**
+- **Toolchain provenance.** Given the `.ico`, then its entry set **equals** {256,128,64,48,32,16},
+  the literal Wails passes to `winicon.GenerateIcon` at `packager.go:217`. *Mutations:* drop the 48;
+  add a scaffold 24 alongside it **-> both must fail.** "Contains" would accept the superset.
+- **Source provenance.** Given `build/appicon-source.jpg`, then it is present and 2816x1536 -- the
+  geometry `CROP_BOX` and `CORNER_RADIUS` were fitted against. *Mutation:* delete it **-> must
+  fail.** It is the only committed copy and the reproducibility claim rests on it, yet the whole
+  suite passed with the file absent.
 - Given the full gate on all three platforms, when it runs, then it passes.
 
 ## Spec Change Log

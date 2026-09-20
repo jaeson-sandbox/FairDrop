@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"math"
 	"os"
@@ -48,6 +49,7 @@ import (
 var (
 	appIconPath    = filepath.Join("build", "appicon.png")
 	windowsIcoPath = filepath.Join("build", "windows", "icon.ico")
+	appIconSource  = filepath.Join("build", "appicon-source.jpg")
 )
 
 const (
@@ -56,11 +58,23 @@ const (
 	wantMasterSize = 1024
 
 	// minCentralSaturation sits strictly between the scaffold placeholder's
-	// measured 0.01 and the derived master's measured 0.57 (see the spec's
-	// Design Notes), so it discriminates a reverted placeholder from real
-	// artwork without being tuned to either exact value. Used by the "Real
-	// colour" and "Small sizes" criteria.
+	// measured 0.010 and the derived master's measured 0.592 (both recomputed
+	// exactly as meanCentralSaturation does -- central 40%, skipping alpha 0,
+	// over 167,281 pixels -- after the review-loop-1 alpha fix changed the
+	// master's pixel data; an earlier comment here said 0.57, measured before
+	// it). It discriminates a reverted placeholder from real artwork without
+	// being tuned to either exact value. Used by the "Real colour" and "Small
+	// sizes" criteria.
 	minCentralSaturation = 0.25
+
+	// minCentralOpaqueFraction is how much of the central 40% must actually
+	// be opaque for a saturation mean over it to mean anything. Without this,
+	// a single opaque pixel anywhere in the central region satisfies the
+	// "Real colour" criterion: the mean is taken over opaque pixels only, so
+	// one saturated pixel in an otherwise empty field scores perfectly. The
+	// master and every .ico entry are solid plaque across their whole centre,
+	// so they measure 1.0 here.
+	minCentralOpaqueFraction = 0.5
 
 	// borderRingWidth is the outer-ring width the "No opaque backdrop"
 	// criterion measures, in the pixel space of whichever asset is being
@@ -91,15 +105,26 @@ const (
 	// relative to a smaller shared size.
 	freshnessEntrySize = 256
 
-	// freshnessTolerance255 is the maximum allowed mean per-channel
-	// distance (rescaled to an 8-bit 0-255 scale) between the master,
-	// box-downsampled to freshnessEntrySize, and the .ico's matching entry.
-	// This test's box averaging is not the same filter winicon's
-	// Catmull-Rom scale uses, so some distance is expected between
-	// same-artwork assets; the tolerance is sized to absorb that but not a
-	// different image -- see the freshness test's doc comment for the
-	// measured calibration numbers.
-	freshnessTolerance255 = 18.0
+	// measuredSameArtworkDistance255 is what this test's box averaging
+	// actually measures against winicon's Catmull-Rom scale on genuinely
+	// matching assets: 0.62. It is recorded as its own constant so a future
+	// Wails or winicon resampling change is diagnosed as a filter change
+	// (this number moves) rather than blamed on artwork drift.
+	measuredSameArtworkDistance255 = 0.62
+
+	// freshnessTolerance255 is the maximum allowed mean per-channel distance
+	// (0-255 scale) between the master, box-downsampled to freshnessEntrySize,
+	// and the .ico's matching entry.
+	//
+	// It is 8x the measured same-artwork distance, NOT a round number chosen
+	// for headroom. Review loop 2 found this constant at 18.0 -- 29x the real
+	// signal -- and measured what that permitted: brightening every
+	// non-transparent pixel of the master by +8, +16 and +24/255 while leaving
+	// icon.ico stale ALL PASSED, and +32 was the first that failed. That is the
+	// "revised the artwork, forgot to delete icon.ico" case this criterion
+	// exists for, shipping green up to roughly a 10% tonal revision -- the
+	// exact defect class Epic 6 was created to fix. At 8x, +8 is caught.
+	freshnessTolerance255 = 8 * measuredSameArtworkDistance255
 )
 
 // wantIcoSizes is the literal Wails passes to winicon.GenerateIcon at
@@ -206,16 +231,26 @@ func readICOEntries(t *testing.T, path string) []icoEntry {
 // name (naming the size and what was actually present) if none matches.
 func entryOfSize(t *testing.T, path string, entries []icoEntry, size int) icoEntry {
 	t.Helper()
+	var matches []icoEntry
 	for _, e := range entries {
 		if e.width == size && e.height == size {
-			return e
+			matches = append(matches, e)
 		}
+	}
+	if len(matches) == 1 {
+		return matches[0]
 	}
 	sizes := make([]string, 0, len(entries))
 	for _, e := range entries {
 		sizes = append(sizes, fmt.Sprintf("%dx%d", e.width, e.height))
 	}
-	t.Fatalf("%s carries no %dx%d entry (has %v)", path, size, size, sizes)
+	if len(matches) == 0 {
+		t.Fatalf("%s carries no %dx%d entry (has %v)", path, size, size, sizes)
+	}
+	// Two entries at one size means "the" entry at that size is ambiguous,
+	// and every assertion below would silently measure whichever came first.
+	t.Fatalf("%s declares %d separate %dx%d entries (has %v) -- which one ships is ambiguous",
+		path, len(matches), size, size, sizes)
 	return icoEntry{}
 }
 
@@ -235,6 +270,13 @@ func decodeICOEntryImage(t *testing.T, path string, e icoEntry) image.Image {
 	img, err := png.Decode(bytes.NewReader(e.data))
 	if err != nil {
 		t.Fatalf("%s: decode the %dx%d entry as PNG: %v", path, e.width, e.height, err)
+	}
+	// The directory's declared size is metadata; the embedded PNG carries its
+	// own dimensions. If they disagree, every assertion that selects an entry
+	// by declared size is measuring a different image than it names.
+	if b := img.Bounds(); b.Dx() != e.width || b.Dy() != e.height {
+		t.Fatalf("%s: the entry its directory declares as %dx%d decodes as %dx%d",
+			path, e.width, e.height, b.Dx(), b.Dy())
 	}
 	return img
 }
@@ -287,7 +329,7 @@ func minByte(a, b, c uint8) uint8 {
 // an invisible icon must not be able to claim "real colour" by leaving
 // fully-transparent, high-saturation pixel data behind alpha 0. opaqueCount
 // is the number of pixels the mean was computed over.
-func meanCentralSaturation(img image.Image) (mean float64, opaqueCount int) {
+func meanCentralSaturation(img image.Image) (mean float64, opaqueCount, centralCount int) {
 	bounds := img.Bounds()
 	w, h := bounds.Dx(), bounds.Dy()
 	x0 := bounds.Min.X + int(float64(w)*0.3)
@@ -298,6 +340,7 @@ func meanCentralSaturation(img image.Image) (mean float64, opaqueCount int) {
 	var total float64
 	for y := y0; y < y1; y++ {
 		for x := x0; x < x1; x++ {
+			centralCount++
 			r, g, b, a := straightRGBA(img.At(x, y))
 			if a == 0 {
 				continue
@@ -307,23 +350,32 @@ func meanCentralSaturation(img image.Image) (mean float64, opaqueCount int) {
 		}
 	}
 	if opaqueCount == 0 {
-		return 0, 0
+		return 0, 0, centralCount
 	}
-	return total / float64(opaqueCount), opaqueCount
+	return total / float64(opaqueCount), opaqueCount, centralCount
 }
 
 // assertCentralSaturationExceeds pins the "Real colour" criterion.
 func assertCentralSaturationExceeds(t *testing.T, label string, img image.Image, min float64) {
 	t.Helper()
-	mean, n := meanCentralSaturation(img)
+	mean, n, central := meanCentralSaturation(img)
 	if n == 0 {
 		t.Errorf("%s: every pixel in the central 40%% is fully transparent, so no colour could be "+
 			"measured -- an invisible icon is not real colour", label)
 		return
 	}
+	// A mean taken over opaque pixels only is meaningless when almost none
+	// are opaque: one saturated pixel in an empty central field would score
+	// perfectly. Require the region to be substantially filled first.
+	if fraction := float64(n) / float64(central); fraction < minCentralOpaqueFraction {
+		t.Errorf("%s: only %d of %d central-40%% pixels (%.1f%%) are non-transparent, want at least "+
+			"%.0f%% -- a saturation mean over a nearly empty region proves nothing",
+			label, n, central, fraction*100, minCentralOpaqueFraction*100)
+		return
+	}
 	if mean <= min {
 		t.Errorf("%s: mean central-40%% HSV saturation over %d opaque pixels = %.3f, want > %.2f -- "+
-			"this is what the Wails scaffold's white-field, black-\"W\" placeholder (~0.01) measures",
+			"this is what the Wails scaffold's white-field, black-\"W\" placeholder (~0.010) measures",
 			label, n, mean, min)
 	}
 }
@@ -338,7 +390,19 @@ func assertCentralSaturationExceeds(t *testing.T, label string, img image.Image,
 // show up here), and the ring as a whole is overwhelmingly (not
 // necessarily 100%) transparent, since a genuine derivation still carries a
 // feathered transition zone with some low, non-zero alpha in the ring.
-func assertBorderRingHasNoOpaqueBackdrop(t *testing.T, label string, img image.Image, ringWidth int) {
+//
+// checkTransparentFraction gates the second property, because it is
+// geometry-dependent in a way the first is not. The ring counts as mostly
+// transparent only where it is wide relative to the plaque's corner radius:
+// measured on the genuine assets, the master's 12px ring is 85% transparent
+// and the .ico's 256 entry clears the bar, but the smaller entries fall to
+// 71.7% (128), 34.0% (48) and 6.7% (16) -- not because a backdrop survived
+// but because a 1px ring on a 16px tile is almost entirely plaque edge. The
+// near-white property holds at every size and is what actually detects a
+// baked checkerboard or bloom; a deliberately opaque *coloured* backdrop on a
+// small entry is outside what this assertion can see, and is stated here
+// rather than implied away.
+func assertBorderRingHasNoOpaqueBackdrop(t *testing.T, label string, img image.Image, ringWidth int, checkTransparentFraction bool) {
 	t.Helper()
 	bounds := img.Bounds()
 	w, h := bounds.Dx(), bounds.Dy()
@@ -378,6 +442,9 @@ func assertBorderRingHasNoOpaqueBackdrop(t *testing.T, label string, img image.I
 			label, ringWidth, nearWhiteOpaque, nearWhiteChannel, firstNearWhite)
 	}
 
+	if !checkTransparentFraction {
+		return
+	}
 	transparentFraction := float64(transparent) / float64(total)
 	if transparentFraction < minRingTransparentFraction {
 		t.Errorf("%s: only %.1f%% of the outer %dpx border ring is fully transparent, want at least "+
@@ -488,6 +555,19 @@ func meanChannelDistance255(a, b pixelGrid) float64 {
 // 12 sits with real margin on both sides of that gap.
 const minTransparentBandRows = 12
 
+// maxTransparentBandRows bounds the same band from above, and exists because
+// a floor alone does not pin geometry at all -- it pins "there is some empty
+// space at the edges", which artwork-free images satisfy best of all.
+// Measured in review loop 2: the Wails scaffold placeholder this story
+// replaces yields 115 top / 97 bottom, and a fully blank transparent
+// 1024x1024 canvas yields 1024 / 1024. Both passed a floor-only check, so a
+// test named "master geometry" passed on an image containing no artwork.
+//
+// The genuine master measures 21 / 22: the deliberate 15/16px centring band
+// from the 1024x993 plaque, plus the plaque's own ~6px erosion margin. 40
+// sits well above that and far below the placeholder's 97.
+const maxTransparentBandRows = 40
+
 // contiguousTransparentRows counts consecutive fully-transparent rows
 // starting from img's top (fromTop) or bottom edge and moving inward,
 // stopping at the first row containing any non-transparent pixel.
@@ -519,7 +599,7 @@ func contiguousTransparentRows(img image.Image, fromTop bool) int {
 // master must carry a real transparent band top and bottom from centring
 // the non-square plaque in the square canvas, not artwork stretched to
 // fill it.
-func assertTransparentBand(t *testing.T, label string, img image.Image, which string, fromTop bool, min int) {
+func assertTransparentBand(t *testing.T, label string, img image.Image, which string, fromTop bool, min, max int) {
 	t.Helper()
 	got := contiguousTransparentRows(img, fromTop)
 	if got < min {
@@ -527,6 +607,13 @@ func assertTransparentBand(t *testing.T, label string, img image.Image, which st
 			"the master must carry a real transparent band top and bottom from centring the non-square "+
 			"plaque in the square canvas, not the plaque stretched to fill it (which leaves only the "+
 			"erosion's own few-pixel margin)", label, got, which, min)
+	}
+	if got > max {
+		t.Errorf("%s: %d contiguous fully-transparent row(s) from the %s edge, want <= %d -- the "+
+			"plaque should fill the canvas but for its centring band, so a band this deep means the "+
+			"artwork is shrunken, inset, or absent (the Wails scaffold placeholder measures 115/97 "+
+			"here and a fully blank canvas 1024/1024, and both passed while this bound was missing)",
+			label, got, which, max)
 	}
 }
 
@@ -544,15 +631,44 @@ func TestAppIconMasterGeometry(t *testing.T) {
 	if cfg.Width != wantMasterSize || cfg.Height != wantMasterSize {
 		t.Errorf("%s is %dx%d, want exactly %dx%d", appIconPath, cfg.Width, cfg.Height, wantMasterSize, wantMasterSize)
 	}
-	switch cfg.ColorModel {
-	case color.NRGBAModel, color.RGBAModel, color.NRGBA64Model, color.RGBA64Model:
-	default:
-		t.Errorf("%s decodes with colour model %T, want an RGBA model with an alpha channel", appIconPath, cfg.ColorModel)
+	// cfg.ColorModel cannot do this job: Go's image/png maps truecolour
+	// *without* alpha to color.RGBAModel (reader.go, cbTC8) and 16-bit
+	// truecolour to color.RGBA64Model, so a switch accepting those accepts an
+	// alpha-less PNG -- confirmed in review loop 2 by re-saving the master as
+	// mode RGB, which produced no colour-model error at all. Read the IHDR
+	// colour-type byte instead, which states the fact directly.
+	if ct, ok := pngColourType(data); !ok {
+		t.Errorf("%s: could not read the PNG IHDR colour-type byte", appIconPath)
+	} else if ct != pngTruecolourAlpha && ct != pngGreyscaleAlpha {
+		t.Errorf("%s: PNG colour type is %d, want %d (truecolour with alpha) or %d "+
+			"(greyscale with alpha) -- the master must carry a real alpha channel, and types "+
+			"0/2/3 do not", appIconPath, ct, pngTruecolourAlpha, pngGreyscaleAlpha)
 	}
 
 	img := decodePNGFile(t, appIconPath)
-	assertTransparentBand(t, appIconPath, img, "top", true, minTransparentBandRows)
-	assertTransparentBand(t, appIconPath, img, "bottom", false, minTransparentBandRows)
+	assertTransparentBand(t, appIconPath, img, "top", true, minTransparentBandRows, maxTransparentBandRows)
+	assertTransparentBand(t, appIconPath, img, "bottom", false, minTransparentBandRows, maxTransparentBandRows)
+}
+
+const (
+	// PNG IHDR colour-type values that carry an alpha channel intrinsically.
+	// Types 0 (greyscale), 2 (truecolour) and 3 (palette) do not; a palette
+	// PNG can carry transparency via a tRNS chunk, which this master is not
+	// and which is deliberately not accepted here.
+	pngGreyscaleAlpha  = 4
+	pngTruecolourAlpha = 6
+)
+
+// pngColourType returns the IHDR colour-type byte. A PNG is an 8-byte
+// signature, then a 4-byte length, then "IHDR", then 13 bytes of header
+// whose 10th byte is the colour type.
+func pngColourType(data []byte) (byte, bool) {
+	const colourTypeOffset = 8 + 4 + 4 + 9
+	if len(data) <= colourTypeOffset || !bytes.Equal(data[:len(pngMagic)], pngMagic) ||
+		!bytes.Equal(data[12:16], []byte("IHDR")) {
+		return 0, false
+	}
+	return data[colourTypeOffset], true
 }
 
 // ringWidthFor scales borderRingWidth to an asset's own resolution,
@@ -579,13 +695,13 @@ func ringWidthFor(assetSize int) int {
 // -> must fail.
 func TestAppIconNoOpaqueBackdrop(t *testing.T) {
 	master := decodePNGFile(t, appIconPath)
-	assertBorderRingHasNoOpaqueBackdrop(t, appIconPath, master, borderRingWidth)
+	assertBorderRingHasNoOpaqueBackdrop(t, appIconPath, master, borderRingWidth, true)
 
 	entries := readICOEntries(t, windowsIcoPath)
 	entry := entryOfSize(t, windowsIcoPath, entries, freshnessEntrySize)
 	icoImg := decodeICOEntryImage(t, windowsIcoPath, entry)
 	label := fmt.Sprintf("%s (%dx%d entry)", windowsIcoPath, entry.width, entry.height)
-	assertBorderRingHasNoOpaqueBackdrop(t, label, icoImg, ringWidthFor(entry.width))
+	assertBorderRingHasNoOpaqueBackdrop(t, label, icoImg, ringWidthFor(entry.width), true)
 }
 
 // TestAppIconCarriesRealColour pins the "Real colour" criterion against
@@ -602,18 +718,27 @@ func TestAppIconCarriesRealColour(t *testing.T) {
 	assertCentralSaturationExceeds(t, label, icoImg, minCentralSaturation)
 }
 
-// TestAppIconSmallIcoEntriesCarryRealColour pins the "Small sizes"
-// criterion: the .ico's 16x16 and 32x32 entries -- the sizes the artwork
-// was actually chosen for, per the spec's edge-energy measurement -- must
-// each independently satisfy the colour assertion. Mutation: replace a
-// small entry with opaque white -> must fail.
-func TestAppIconSmallIcoEntriesCarryRealColour(t *testing.T) {
+// TestAppIconEveryIcoEntryCarriesTheArtwork pins the "Small sizes"
+// criterion. Every entry is decoded and checked, not a chosen few: review
+// loop 2 found three of the six (128, 64, 48) were read as directory
+// metadata only and never decoded at all, so a stale or corrupt entry at any
+// of those sizes shipped with the suite green. The 16 and 32 entries matter
+// most -- they are the sizes the artwork was chosen for, per the spec's
+// edge-energy measurement -- but "every" is what makes the criterion mean
+// what it says. Mutation: replace any single entry with opaque white ->
+// must fail, naming that size.
+func TestAppIconEveryIcoEntryCarriesTheArtwork(t *testing.T) {
 	entries := readICOEntries(t, windowsIcoPath)
-	for _, size := range []int{16, 32} {
-		entry := entryOfSize(t, windowsIcoPath, entries, size)
+	if len(entries) < len(wantIcoSizes) {
+		t.Fatalf("%s carries %d entries, want at least %d -- a short set would make this loop "+
+			"pass by checking fewer images than the .ico is supposed to hold",
+			windowsIcoPath, len(entries), len(wantIcoSizes))
+	}
+	for _, entry := range entries {
 		img := decodeICOEntryImage(t, windowsIcoPath, entry)
 		label := fmt.Sprintf("%s (%dx%d entry)", windowsIcoPath, entry.width, entry.height)
 		assertCentralSaturationExceeds(t, label, img, minCentralSaturation)
+		assertBorderRingHasNoOpaqueBackdrop(t, label, img, ringWidthFor(entry.width), false)
 	}
 }
 
@@ -643,6 +768,27 @@ func TestAppIconIcoCarriesTheFullWailsSizeSet(t *testing.T) {
 		t.Errorf("%s is missing size(s) %v from the set {%v} Wails passes to winicon.GenerateIcon at "+
 			"packager.go:217 (has %v)", windowsIcoPath, missing, wantIcoSizes, sizes)
 	}
+
+	// Equality, not containment. A superset satisfies "carries the full set"
+	// while carrying provenance this criterion is meant to reject -- a
+	// hand-assembled .ico keeping the scaffold's 24x24 alongside a 48x48
+	// would pass a missing-sizes check alone.
+	want := map[int]bool{}
+	for _, size := range wantIcoSizes {
+		want[size] = true
+	}
+	var unexpected []string
+	for _, e := range entries {
+		if e.width != e.height || !want[e.width] {
+			unexpected = append(unexpected, fmt.Sprintf("%dx%d", e.width, e.height))
+		}
+	}
+	if len(unexpected) > 0 || len(entries) != len(wantIcoSizes) {
+		t.Errorf("%s carries %d entries %v, want exactly the %d-entry set {%v} winicon.GenerateIcon "+
+			"emits for the literal at packager.go:217 (unexpected: %v) -- an extra entry means this "+
+			".ico was not produced by that call alone",
+			windowsIcoPath, len(entries), sizes, len(wantIcoSizes), wantIcoSizes, unexpected)
+	}
 }
 
 // TestAppIconMasterMatchesIcoFreshness pins the "Freshness" criterion.
@@ -657,12 +803,23 @@ func TestAppIconMasterMatchesIcoFreshness(t *testing.T) {
 	downsampled := downsampleBoxAverage(gridOf(master), entry.width, entry.height)
 	icoGrid := gridOf(icoImg)
 
+	// Catch a dimension mismatch here rather than letting
+	// meanChannelDistance255 return math.MaxFloat64, which would fail this
+	// test reporting 1.8e308 per channel and hide the real cause.
+	if downsampled.w != icoGrid.w || downsampled.h != icoGrid.h {
+		t.Fatalf("%s: the %dx%d entry decoded at %dx%d, so it cannot be compared against the master "+
+			"downsampled to %dx%d", windowsIcoPath, entry.width, entry.height,
+			icoGrid.w, icoGrid.h, downsampled.w, downsampled.h)
+	}
+
 	dist := meanChannelDistance255(downsampled, icoGrid)
 	if dist > freshnessTolerance255 {
 		t.Errorf("%s downsampled to %dx%d differs from %s's %dx%d entry by a mean %.2f per channel "+
-			"(0-255 scale), want <= %.2f -- more than box-averaging-vs-Catmull-Rom resampling noise "+
-			"explains, so the .ico does not look like it was generated from this master",
-			appIconPath, entry.width, entry.height, windowsIcoPath, entry.width, entry.height, dist, freshnessTolerance255)
+			"(0-255 scale), want <= %.2f (8x the %.2f these same assets measure when they genuinely "+
+			"match) -- so the .ico was not generated from this master. If you changed the artwork, "+
+			"delete %s and re-run `wails build`: Wails only ever generates it when it is absent.",
+			appIconPath, entry.width, entry.height, windowsIcoPath, entry.width, entry.height,
+			dist, freshnessTolerance255, measuredSameArtworkDistance255, windowsIcoPath)
 	}
 }
 
@@ -700,6 +857,12 @@ const (
 	// systematically darkening RGB in proportion to how low alpha is
 	// produces. See the evidence file for both measurements.
 	maxLowAlphaMeanDeviation = 8.0
+
+	// maxLowToHighDeviationRatio bounds the low-alpha bucket against the
+	// high-alpha one, so the alpha-correlated asymmetry this test is named
+	// for is asserted rather than merely printed. Genuine master: 3.19 / 2.47
+	// = 1.3. With the premultiply defect: 27.96 / 3.93 = 7.1.
+	maxLowToHighDeviationRatio = 2.5
 )
 
 // TestAppIconMasterAppliesAlphaOnce pins the "Alpha applied once" criterion.
@@ -720,11 +883,15 @@ const (
 // transition.
 //
 // Instead this pools every short (<= maxTransitionRunLength), cleanly
-// bounded transition run in the whole master -- one row can cross the
-// plaque's outer alpha boundary at most once, so each row contributes at
-// most one run -- and compares every pixel in a run against that run's own
-// immediately-following opaque pixel, which is guaranteed to be the same
-// local feature. Pooling thousands of samples this way averages out the
+// bounded transition run in the whole master. A row crosses the plaque's
+// outer alpha boundary TWICE -- entering on the left and leaving on the
+// right -- so each row contributes up to two runs, and both are measured: an
+// earlier version's comment claimed a single crossing and its code discarded
+// every trailing run, leaving half the boundary unchecked. Each run's pixels
+// are compared against the adjacent opaque pixel on the side the run meets
+// it (the one it reaches on a leading edge, the one it left on a trailing
+// edge), which is guaranteed to be the same local feature. Pooling
+// thousands of samples this way averages out the
 // photographic noise (a zero-mean, alpha-independent nuisance) while
 // staying highly sensitive to the defect's actual signature: a mean
 // deviation for low-alpha pixels that is dramatically larger than for
@@ -737,53 +904,74 @@ func TestAppIconMasterAppliesAlphaOnce(t *testing.T) {
 	var lowSamples, highSamples []float64
 	runsUsed := 0
 
+	flush := func(run []partialPixel, ref partialPixel) {
+		for _, p := range run {
+			dev := (absDiffF(p.r, ref.r) + absDiffF(p.g, ref.g) + absDiffF(p.b, ref.b)) / 3
+			if p.a < lowAlphaThreshold255 {
+				lowSamples = append(lowSamples, dev)
+			} else {
+				highSamples = append(highSamples, dev)
+			}
+		}
+		runsUsed++
+	}
+
 	for row := 0; row < h; row++ {
 		y := bounds.Min.Y + row
 		var run []partialPixel
+		var lastOpaque partialPixel
+		haveOpaque, poisoned := false, false
 		for col := 0; col < w; col++ {
 			x := bounds.Min.X + col
 			r, g, b, a := straightRGBA(img.At(x, y))
 			switch {
 			case a == 0:
-				run = nil
+				// Trailing edge. An earlier version discarded these runs
+				// outright, which threw away roughly half the boundary
+				// unmeasured (969 leading runs used against 979 trailing runs
+				// dropped), so a defect confined to the plaque's right or
+				// bottom edge would not have been seen. The reference is the
+				// opaque pixel the run just left, not one it never reaches.
+				if !poisoned && len(run) > 0 && haveOpaque {
+					flush(run, lastOpaque)
+				}
+				run, haveOpaque, poisoned = nil, false, false
 			case a == 255:
-				if len(run) > 0 {
-					for _, p := range run {
-						dev := (absDiffF(p.r, r) + absDiffF(p.g, g) + absDiffF(p.b, b)) / 3
-						if p.a < lowAlphaThreshold255 {
-							lowSamples = append(lowSamples, dev)
-						} else {
-							highSamples = append(highSamples, dev)
-						}
-					}
-					runsUsed++
+				if !poisoned && len(run) > 0 {
+					flush(run, partialPixel{r, g, b, a})
 				}
 				run = nil
+				lastOpaque, haveOpaque = partialPixel{r, g, b, a}, true
 			default:
 				run = append(run, partialPixel{r, g, b, a})
 				if len(run) > maxTransitionRunLength {
 					// Likely crossing a rounded corner at a shallow angle
-					// rather than the plaque's straight edge: bail on this
-					// run's earlier pixels rather than eventually comparing
-					// them against a reference pixel that may belong to a
-					// different feature. Scanning continues from here, so a
-					// short clean tail before the next alpha==0/255 is still
-					// captured.
+					// rather than the plaque's straight edge, where the
+					// nearest opaque pixel can belong to a different feature.
+					// Poison the rest of the row rather than merely dropping
+					// these pixels: clearing `run` alone still let the run's
+					// final short tail reach the pool this guard exists to
+					// keep out. The poison clears at the next alpha == 0,
+					// which is a clean feature boundary.
+					poisoned = true
 					run = nil
 				}
 			}
 		}
+		// A row ending mid-run has no closing reference, so it is dropped.
 	}
 
-	if runsUsed < 100 || len(lowSamples) == 0 || len(highSamples) == 0 {
+	if runsUsed < 100 || len(lowSamples) < 200 || len(highSamples) < 200 {
 		t.Fatalf("%s: found only %d usable transition run(s) (%d low-alpha, %d high-alpha samples), "+
-			"too few to measure reliably -- this assertion would be unreliable or vacuous",
+			"too few to measure reliably -- a mean over a handful of noisy pixels would decide this "+
+			"criterion, so it would be unreliable or vacuous",
 			appIconPath, runsUsed, len(lowSamples), len(highSamples))
 	}
 
 	lowMean := meanFloat(lowSamples)
 	highMean := meanFloat(highSamples)
-	if lowMean > maxLowAlphaMeanDeviation {
+	switch {
+	case lowMean > maxLowAlphaMeanDeviation:
 		t.Errorf("%s: partial-alpha pixels with alpha < %d deviate from their transition run's local "+
 			"opaque reference pixel by a mean of %.2f (0-255 scale, %d samples across %d runs); "+
 			"alpha >= %d pixels deviate by only %.2f (%d samples) -- RGB drifting further from the "+
@@ -791,6 +979,57 @@ func TestAppIconMasterAppliesAlphaOnce(t *testing.T) {
 			"own alpha as the paste mask) looks like, want <= %.2f",
 			appIconPath, lowAlphaThreshold255, lowMean, len(lowSamples), runsUsed,
 			lowAlphaThreshold255, highMean, len(highSamples), maxLowAlphaMeanDeviation)
+	case lowMean > highMean*maxLowToHighDeviationRatio:
+		// The absolute bound alone leaves the asymmetry this test is named for
+		// unchecked: noisier artwork could raise both buckets together and
+		// still be correct, while a defect that scales with (1 - alpha/255)
+		// shows up as a ratio no amount of uniform noise produces. Genuine
+		// master: 3.19 low against 2.47 high, a ratio of 1.3. With the
+		// premultiply defect: 27.96 against 3.93, a ratio of 7.1.
+		t.Errorf("%s: low-alpha pixels deviate %.2f from their local opaque reference while "+
+			"high-alpha pixels deviate only %.2f -- a ratio of %.1f, want <= %.1f. Uniform "+
+			"photographic noise raises both buckets together; deviation that grows as alpha falls "+
+			"is the signature of alpha applied twice.",
+			appIconPath, lowMean, highMean, lowMean/highMean, maxLowToHighDeviationRatio)
+	}
+}
+
+const (
+	// wantSourceWidth and wantSourceHeight are the render dimensions
+	// scripts/build-appicon.py's CROP_BOX (896, 239, 1920, 1232) and
+	// CORNER_RADIUS (226) were fitted against by least squares. Crop geometry
+	// is meaningless against a different-sized source, and Pillow pads an
+	// out-of-range crop silently rather than failing.
+	wantSourceWidth  = 2816
+	wantSourceHeight = 1536
+)
+
+// TestAppIconSourceRenderIsThePinnedGeometry pins the "Source provenance"
+// criterion. build/appicon-source.jpg is the only committed copy of the
+// owner's render -- .gitignore excludes the originals from the repo root --
+// and both epics.md's reproducibility criterion and build/README.md's
+// re-derivation instructions rest on it. Nothing verified it before: review
+// loop 2 renamed the file out of the tree and the entire suite still passed,
+// so the provenance could be deleted, truncated or replaced with a different
+// render while the gate stayed green. The script's own size guard runs only
+// when a human runs the script.
+//
+// Mutation: delete build/appicon-source.jpg -> must fail.
+func TestAppIconSourceRenderIsThePinnedGeometry(t *testing.T) {
+	data, err := os.ReadFile(appIconSource)
+	if err != nil {
+		t.Fatalf("read %s: %v -- this is the only committed copy of the render the master is "+
+			"derived from, and scripts/build-appicon.py cannot run without it", appIconSource, err)
+	}
+	cfg, err := jpeg.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("decode %s's JPEG header: %v", appIconSource, err)
+	}
+	if cfg.Width != wantSourceWidth || cfg.Height != wantSourceHeight {
+		t.Errorf("%s is %dx%d, want %dx%d -- scripts/build-appicon.py's CROP_BOX and CORNER_RADIUS "+
+			"were fitted against that exact render, so a different size means the committed master "+
+			"cannot be re-derived from this file",
+			appIconSource, cfg.Width, cfg.Height, wantSourceWidth, wantSourceHeight)
 	}
 }
 

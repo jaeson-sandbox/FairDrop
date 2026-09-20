@@ -1,8 +1,11 @@
 # Evidence: Story 6.1: Replace the Placeholder App Icon
 
-Baseline: `de16807eedb8482aac82e9862161fb89aabfb7b2`. This file covers review loop 1: the P1-P11 patch
-list three review layers produced against the story's first pass, and the re-verification that
-followed. `scripts/verify-native-mutations.sh` mutates `.go` sources only, so — per the spec's Code
+Baseline: `de16807eedb8482aac82e9862161fb89aabfb7b2`. This file covers review loops 1 and 2. Loop 1 is the
+P1-P11 patch list three review layers produced against the first pass; the sections below
+document P1-P4 in detail because they were code defects, while P5-P11 (test rewrites,
+citation fixes, docs, `.gitattributes`/`.gitignore`) are visible in the diff and left
+undocumented here deliberately -- an earlier header claimed to cover all eleven and did
+not. Loop 2 is the Q1-Q18 list, recorded in its own section at the end. `scripts/verify-native-mutations.sh` mutates `.go` sources only, so — per the spec's Code
 Map — the asset mutations below are recorded here by hand rather than by that harness.
 
 ## P1: the shipped master applied alpha twice
@@ -147,3 +150,94 @@ Read stage by stage, all against the final working tree:
 - Byte-identity of `scripts/build-appicon.py`'s output across Pillow versions remains explicitly
   unasserted, per the spec's Design Notes — that would pin the runner's Pillow build, not this
   repo's code.
+
+## Review loop 2
+
+Loop 1 hardened the assertions; loop 2 found that hardening still under-specified, in the same way
+and for the same reason -- the acceptance criteria named a *sampling method* where they meant a
+*property*. Every number below was measured against the committed assets before any change was
+made, not taken from a reviewer's report.
+
+### What the loop-1 assertions still permitted
+
+| mutation of the committed assets | loop-1 result |
+|---|---|
+| master brightened +8/255, `.ico` left stale | all seven passed |
+| master brightened +16/255, `.ico` left stale | all seven passed |
+| master brightened +24/255, `.ico` left stale | all seven passed |
+| master brightened +32/255, `.ico` left stale | caught |
+| fully blank transparent 1024x1024 canvas | `MasterGeometry` **passed** |
+| Wails scaffold placeholder as master | `MasterGeometry`, `NoOpaqueBackdrop` **passed** |
+| master re-saved with no alpha channel | colour-model branch raised nothing |
+| `build/appicon-source.jpg` deleted | whole suite passed |
+| premultiply defect on the trailing edge only | not measurable -- see below |
+
+The freshness tolerance was `18.0` where the same assets measure `0.62` when they genuinely
+match: a pass corridor 29x the real signal, which let an artwork revision up to roughly 10% of
+full scale ship a stale Windows icon green. That is the exact defect class Epic 6 exists to fix.
+
+`MasterGeometry` checked a *floor* of 12 contiguous transparent rows with no ceiling. The
+placeholder measures 115/97 and a blank canvas 1024/1024, so a test named "master geometry"
+passed on an image containing no artwork at all. The genuine master measures 21/22.
+
+`MasterAppliesAlphaOnce` measured half the boundary. Its comment claimed "one row can cross the
+plaque's outer alpha boundary at most once"; a row crosses twice, entering and leaving, and the
+implementation reset its run buffer on `alpha == 0`, discarding every trailing-edge transition
+before a reference pixel was reached -- 969 leading runs used against 979 trailing runs dropped.
+
+### Loop-2 mutation table
+
+Every criterion's named mutation, run against the real files, each restored and sha256-verified
+between runs. "Named test" is the one the criterion names; other tests failing alongside it are
+listed where they did.
+
+| # | mutation | named test that failed | also failed |
+|---|---|---|---|
+| 1 | master +8/255, `.ico` stale | `MasterMatchesIcoFreshness` | — |
+| 2 | master +24/255, `.ico` stale | `MasterMatchesIcoFreshness` | — |
+| 3 | hue-swapped master | `MasterMatchesIcoFreshness` | — |
+| 4 | re-derive with `ERODE_PX = 0` | `NoOpaqueBackdrop` | `MasterAppliesAlphaOnce` |
+| 5 | backdrop opaque except the 4 corners | `NoOpaqueBackdrop` | Geometry, Freshness, AlphaOnce |
+| 6 | 16x16 entry all opaque white | `EveryIcoEntryCarriesTheArtwork` | — |
+| 7 | master alpha 0, colour intact | `CarriesRealColour` | Geometry, Freshness, AlphaOnce |
+| 8 | 16x16 entry, one opaque pixel | `EveryIcoEntryCarriesTheArtwork` | — |
+| 9 | premultiply (whole image) | `MasterAppliesAlphaOnce` | — |
+| 10 | **premultiply, trailing edge only** | `MasterAppliesAlphaOnce` | — |
+| 11 | stretch plaque to fill | `MasterGeometry` | Backdrop, Freshness, AlphaOnce |
+| 12 | fully blank transparent canvas | `MasterGeometry` | Colour, Freshness, AlphaOnce |
+| 13 | scaffold placeholder as master | `MasterGeometry` | Colour, Freshness, AlphaOnce |
+| 14 | master saved without alpha | `MasterGeometry` | Backdrop, Freshness, AlphaOnce |
+| 15 | 48x48 entry dropped | `IcoCarriesTheFullWailsSizeSet` | EveryIcoEntry |
+| 16 | **extra 24x24 entry added** | `IcoCarriesTheFullWailsSizeSet` | — |
+| 17 | `.ico` reverted to scaffold | `IcoCarriesTheFullWailsSizeSet` | Colour, EveryIcoEntry, Freshness |
+| 18 | `build/appicon-source.jpg` deleted | `SourceRenderIsThePinnedGeometry` | — |
+
+18 of 18 failed their named test. Mutations 10, 12, 13, 14, 16 and 18 are new in loop 2 and had
+no coverage at all before it; 1 and 2 passed before it.
+
+### One false failure found and fixed during loop 2, not papered over
+
+Extending the border-ring assertion to every `.ico` entry failed on the genuine assets: the 128,
+64, 48, 32 and 16 entries measured 71.7%, 66.7%, 34.0%, 25.8% and 6.7% transparent against a 75%
+floor. That is not a surviving backdrop -- it is geometry. `ringWidthFor` clamps to 1px at small
+sizes, and a 1px ring on a 16px tile is almost entirely plaque edge, because the rounded corner
+that makes the ring mostly-transparent at 1024px is only ~3px across at 16px.
+
+The near-white property generalises; the transparent-fraction property does not. So the fraction
+check is now gated to the master and the 256 entry, where the ring is wide relative to the corner
+radius, and the near-white check runs on every entry. The limit this leaves is stated in the
+assertion's own doc comment rather than implied away: a deliberately opaque *coloured* backdrop on
+a small entry is outside what it can see.
+
+### Calibration recorded rather than round-numbered
+
+- `freshnessTolerance255` is now `8 * measuredSameArtworkDistance255` (0.62), not an absolute
+  constant. The measured floor is its own named constant so a future Wails or winicon resampling
+  change moves a number that says what it is, rather than being blamed on artwork drift.
+- `maxTransparentBandRows = 40`, against the genuine master's 21/22 and the placeholder's 97.
+- `maxLowToHighDeviationRatio = 2.5`: genuine master 3.19/2.47 = 1.3; with the premultiply defect
+  27.96/3.93 = 7.1. This asserts the alpha-correlated asymmetry the test is named for, which the
+  absolute bound alone left unchecked -- uniform noise raises both buckets together.
+- `minCentralSaturation`'s comment said the master measures 0.57; recomputed exactly as the code
+  does, it is **0.592**. The 0.57 predated loop 1's alpha fix.
+

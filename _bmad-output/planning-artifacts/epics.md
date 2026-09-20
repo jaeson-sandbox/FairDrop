@@ -1519,14 +1519,14 @@ anything that changes what ships.
 
 ## Epic 6: Replace the Placeholder App Icon
 
-A user launching FairDrop sees the FairDrop mark on the exe's own icon, in the Windows taskbar, in the NSIS installer, and in the macOS Dock. Created 2026-09-19: `build/appicon.png` and `build/windows/icon.ico` were still byte-identical to the Wails 2.15.0 scaffold defaults, so v1.0.0 shipped a stock white "W" everywhere the operating system shows the app an icon.
+A user launching FairDrop sees the FairDrop mark on the exe's own icon, in the Windows taskbar, in the NSIS installer, and in the macOS Dock. Created 2026-09-19: `build/appicon.png` and `build/windows/icon.ico` were still byte-identical to the Wails 2.15.0 scaffold defaults, so v1.0.0 shipped the stock placeholder -- a white field carrying a dark "W" -- everywhere the operating system shows the app an icon.
 
 **FRs covered:** none. This changes a build asset, not application behaviour.
 
 ### Story 6.1: Replace the Placeholder App Icon
 
 As a user,
-I want to see FairDrop's own mark instead of the Wails scaffold's white "W",
+I want to see FairDrop's own mark instead of the Wails scaffold's white field and dark "W",
 So that the app I launched is recognisably the one I meant to open.
 
 **Why logo 2 over logo 1, and why no small-size variant.** Three candidate renders were supplied and

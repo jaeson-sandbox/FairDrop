@@ -25,9 +25,10 @@ see what changed, and delete + regenerate build/windows/icon.ico with
 file when it is absent.
 """
 
+import hashlib
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 # Resolved from this file's location rather than left relative, so the script
 # behaves the same run from the repository root or from anywhere else --
@@ -43,6 +44,12 @@ OUTPUT = REPO_ROOT / "build" / "appicon.png"
 # without updating CROP_BOX) would produce a silently wrong master instead of
 # a loud failure. main() asserts this before cropping.
 EXPECTED_SOURCE_SIZE = (2816, 1536)
+
+# A size check alone cannot tell one 2816x1536 render from another -- the
+# owner supplied three candidates at identical dimensions, and cropping the
+# wrong one by geometry fitted against this one would produce a plausible but
+# wrong master. Pinning the bytes names that swap immediately.
+EXPECTED_SOURCE_SHA256 = "b0aeab41a13f4b81fd0eea778323979708594c7fd862f20bb415183be41f61b0"
 
 # Measured by least-squares fit over 60 rows of the source render's
 # rounded-rect silhouette, rms 1.74px (see the spec's Code Map). Box is
@@ -107,6 +114,12 @@ def build_mask(size):
 
     inset = ERODE_PX * SUPERSAMPLE
     radius = max((CORNER_RADIUS - ERODE_PX) * SUPERSAMPLE, 0)
+    if big[0] - 2 * inset < 2 * radius or big[1] - 2 * inset < 2 * radius:
+        raise SystemExit(
+            f"ERODE_PX={ERODE_PX} and CORNER_RADIUS={CORNER_RADIUS} do not fit a "
+            f"{width}x{height} crop: the two corner arcs would overlap. PIL raises an opaque "
+            f"ValueError here, so this names the constants instead."
+        )
     # PIL's rounded_rectangle treats its box as inclusive of both endpoints
     # (a box of (0, 0, N, N) spans N+1 pixels), so a box built as
     # (inset, inset, big-inset, big-inset) draws one supersampled pixel past
@@ -124,7 +137,27 @@ def build_mask(size):
 
 
 def main():
-    source = Image.open(SOURCE).convert("RGB")
+    # The two guards below raise a named SystemExit; a missing file would
+    # otherwise fall out of Image.open as a bare traceback, and since
+    # .gitignore now excludes the candidate renders from the repo root, a
+    # missing source is the likeliest of the three failures.
+    if not SOURCE.is_file():
+        raise SystemExit(
+            f"{SOURCE} not found. It is the only committed copy of the render the master is "
+            f"derived from -- restore it from git rather than substituting another file."
+        )
+    digest = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
+    if digest != EXPECTED_SOURCE_SHA256:
+        raise SystemExit(
+            f"{SOURCE} has sha256 {digest}, expected {EXPECTED_SOURCE_SHA256}: this is not the "
+            f"render CROP_BOX and CORNER_RADIUS were fitted against. If you are deliberately "
+            f"changing the artwork, re-fit the geometry and update both constants."
+        )
+
+    # exif_transpose before anything else: a re-export carrying EXIF
+    # Orientation 3 has identical dimensions and rotated content, so the size
+    # check below would pass while CROP_BOX landed on the wrong region.
+    source = ImageOps.exif_transpose(Image.open(SOURCE)).convert("RGB")
     if source.size != EXPECTED_SOURCE_SIZE:
         raise SystemExit(
             f"{SOURCE} is {source.size[0]}x{source.size[1]}, expected "
