@@ -160,8 +160,11 @@ func TestReleaseIdentityAgreesAcrossWailsJSONTemplatesAndMainGo(t *testing.T) {
 	}
 
 	// build/windows/info.json: every field templates from wails.json's info
-	// block with no edit needed -- confirmed here, not changed, per the Code
-	// Map.
+	// block. Story 6.2 DID change this file -- it added the FileVersion string
+	// and moved the table off the language-neutral key -- so the older "not
+	// changed" note here was false the moment that landed. What these pins
+	// assert is unchanged: that each field still templates rather than
+	// hardcoding a literal.
 	winInfoPath := filepath.Join("build", "windows", "info.json")
 	winInfo := readTextFile(t, winInfoPath)
 	for _, want := range []string{

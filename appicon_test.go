@@ -116,7 +116,7 @@ const (
 	// guarantees, and the only one whose ring is wide enough relative to the
 	// corner radius for the transparent-fraction check to mean anything.
 	//
-	// It was named largestEntrySize until review loop 4: freshness now
+	// It was named freshnessEntrySize until review loop 4: freshness now
 	// compares EVERY entry and no longer uses it, so the old name and comment
 	// described a caller that had stopped existing -- the same
 	// comment-disagrees-with-code defect loop 3 was opened by.

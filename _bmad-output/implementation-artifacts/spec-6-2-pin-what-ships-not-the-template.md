@@ -2,7 +2,7 @@
 title: 'Story 6.2: Pin What Ships, Not the Template'
 type: 'feature'
 created: '2026-09-19'
-status: 'in-review'
+status: 'done'
 baseline_commit: '611cad441173b94dcba2f11ade94c2d121f870db'
 review_loop_iteration: 0
 context: []

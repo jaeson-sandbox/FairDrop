@@ -2,7 +2,7 @@
 title: 'Story 6.1: Replace the Placeholder App Icon'
 type: 'feature'
 created: '2026-09-19'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'de16807eedb8482aac82e9862161fb89aabfb7b2'
 review_loop_iteration: 3
 context: []
