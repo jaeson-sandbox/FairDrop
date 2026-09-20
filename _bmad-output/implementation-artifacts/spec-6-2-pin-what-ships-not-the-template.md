@@ -2,7 +2,7 @@
 title: 'Story 6.2: Pin What Ships, Not the Template'
 type: 'feature'
 created: '2026-09-19'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '611cad441173b94dcba2f11ade94c2d121f870db'
 review_loop_iteration: 0
 context: []
@@ -98,20 +98,20 @@ Sites the change touches:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `exe_resources_windows_test.go` -- new, `//go:build windows`: walk the exe's resource
+- [x] `exe_resources_windows_test.go` -- new, `//go:build windows`: walk the exe's resource
   directory and pin `RT_ICON` and `RT_VERSION` against the committed assets.
-- [ ] `.github/workflows/verify.yml` -- add the Windows-gated step after `wails build`, and extend
+- [x] `.github/workflows/verify.yml` -- add the Windows-gated step after `wails build`, and extend
   the post-build drift check from `frontend/` to also cover `build/windows/icon.ico`.
-- [ ] `verify_workflow_test.go` -- update all three pins named in the Code Map.
-- [ ] `build/windows/info.json` -- add the `FileVersion` string and move the table off the
+- [x] `verify_workflow_test.go` -- update all three pins named in the Code Map.
+- [x] `build/windows/info.json` -- add the `FileVersion` string and move the table off the
   language-neutral key, so .NET-based tooling can read what Win32 already reads.
-- [ ] `_bmad-output/planning-artifacts/epics.md` -- add Story 6.2 under Epic 6 with a
+- [x] `_bmad-output/planning-artifacts/epics.md` -- add Story 6.2 under Epic 6 with a
   `**Closes:** D-128, D-129, D-130` line, which `TestEveryOpenDeferredEntryIsCitedByItsOwningStory`
   requires.
-- [ ] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- register the story.
-- [ ] `_bmad-output/implementation-artifacts/deferred-work.md` -- set D-128, D-129 and D-130 to
+- [x] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- register the story.
+- [x] `_bmad-output/implementation-artifacts/deferred-work.md` -- set D-128, D-129 and D-130 to
   `discharged`.
-- [ ] `_bmad-output/implementation-artifacts/evidence-6-2-pin-what-ships-not-the-template.md` --
+- [x] `_bmad-output/implementation-artifacts/evidence-6-2-pin-what-ships-not-the-template.md` --
   the mutation table.
 
 **Acceptance Criteria:**

@@ -10,9 +10,11 @@ three stale numbers into a merged evidence file; loop 3 found them.
 
 Run it from anywhere:
 
-    python scripts/verify-asset-mutations.py            # mutation table
-    python scripts/verify-asset-mutations.py --measure  # also re-measure the
-                                                        # calibration constants
+    python scripts/verify-asset-mutations.py            # Story 6.1's table
+    python scripts/verify-asset-mutations.py --measure  # also probe the
+                                                        # freshness boundary
+    python scripts/verify-asset-mutations.py --exe      # Story 6.2's table
+                                                        # (needs a built exe)
 
 Every mutation is applied to the real committed assets, the real test suite is
 run against it, and the asset is restored from git and sha256-verified before
@@ -38,7 +40,10 @@ REPO = Path(__file__).resolve().parents[1]
 PNG = "build/appicon.png"
 ICO = "build/windows/icon.ico"
 SRC = "build/appicon-source.jpg"
+WAILS_JSON = "wails.json"
+EXE = "build/bin/fairdrop.exe"
 ASSETS = (PNG, ICO, SRC)
+EXE_ASSETS = (ICO, WAILS_JSON)
 
 # Mirrors scripts/build-appicon.py; imported by value rather than by import so
 # a mutation of that script cannot quietly change what this driver compares to.
@@ -323,11 +328,112 @@ def _swap_source():
     Image.open(REPO / SRC).rotate(180).save(REPO / SRC, quality=95)
 
 
+def _exe_tests():
+    """Failing and skipped TestExeResources* names."""
+    proc = subprocess.run(
+        ["go", "test", "-count=1", "-run", "^TestExeResources", "-v", "."],
+        capture_output=True, text=True, env=ENV, cwd=REPO,
+    )
+    if not any(l.startswith(("--- PASS:", "--- FAIL:", "--- SKIP:")) for l in proc.stdout.splitlines()):
+        sys.exit("go test produced no test result lines -- the package did not run:\n" + proc.stdout)
+    fail = {l.split()[2].replace("TestExeResources", "")
+            for l in proc.stdout.splitlines() if l.startswith("--- FAIL:")}
+    skip = {l.split()[2].replace("TestExeResources", "")
+            for l in proc.stdout.splitlines() if l.startswith("--- SKIP:")}
+    return fail, skip
+
+
+def run_exe_table():
+    """Story 6.2: does the built-exe assertion actually bite?
+
+    Mutates the COMMITTED .ico and wails.json rather than the exe, because the
+    exe is a build product: an exe that disagrees with the committed inputs is
+    exactly the regression, and it is reachable without patching a PE by hand.
+    """
+    if not os.path.exists(REPO / EXE):
+        sys.exit("%s is absent -- run `wails build` first; this table is about the built product" % EXE)
+
+    dirty = subprocess.run(["git", "status", "--porcelain", "--", *EXE_ASSETS],
+                           capture_output=True, text=True, cwd=REPO).stdout.strip()
+    if dirty:
+        sys.exit("commit or restore these first:\n" + dirty)
+    baseline = {p: sha(p) for p in EXE_ASSETS}
+
+    def restore_exe():
+        subprocess.run(["git", "checkout", "HEAD", "--", *EXE_ASSETS], cwd=REPO, check=True)
+        for p in EXE_ASSETS:
+            if sha(p) != baseline[p]:
+                sys.exit("RESTORE FAILED for " + p)
+
+    def stale_ico():
+        entries = read_ico()
+        target = next(e for e in entries if e["w"] == 64)
+        img = Image.open(io.BytesIO(target["data"])).convert("RGBA")
+        r, g, b, a = img.split()
+        buf = io.BytesIO()
+        Image.merge("RGBA", (b, r, g, a)).save(buf, "PNG")
+        target["data"] = buf.getvalue()
+        write_ico(entries)
+
+    def bump_version():
+        import json
+        data = json.loads((REPO / WAILS_JSON).read_text(encoding="utf-8"))
+        data["info"]["productVersion"] = "9.9.9"
+        (REPO / WAILS_JSON).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    cases = [
+        ("committed .ico no longer matches the exe", stale_ico, "EmbedTheCommittedIcon"),
+        ("wails.json productVersion bumped, no rebuild", bump_version, "CarryTheCommittedIdentity"),
+    ]
+
+    fail, skip = _exe_tests()
+    if fail or skip:
+        sys.exit("baseline is not green (failing %s, skipped %s)" % (sorted(fail), sorted(skip)))
+    print("baseline: all TestExeResources* pass against the built exe\n")
+
+    print("| # | mutation | named test | killed |")
+    print("|---|---|---|---|")
+    bad = 0
+    for i, (label, mutate, want) in enumerate(cases, 1):
+        try:
+            restore_exe()
+            mutate()
+            fail, _ = _exe_tests()
+        except BaseException:
+            restore_exe()
+            raise
+        named = want in fail
+        if not named:
+            bad += 1
+        print("| %d | %s | `%s` | %s |" % (i, label, want, "yes" if named else "**NO**"))
+    restore_exe()
+
+    # The skip must be a skip: absent build must never pass silently.
+    os.rename(REPO / EXE, str(REPO / EXE) + ".probe")
+    try:
+        fail, skip = _exe_tests()
+    finally:
+        os.rename(str(REPO / EXE) + ".probe", REPO / EXE)
+    ok = not fail and len(skip) == 2
+    if not ok:
+        bad += 1
+    print("| %d | exe absent | both tests | %s |"
+          % (len(cases) + 1, "skipped, not passed" if ok else "**NO -- %s / %s**" % (sorted(fail), sorted(skip))))
+
+    print("\n%d of %d exe mutations behaved as required." % (len(cases) + 1 - bad, len(cases) + 1))
+    return 1 if bad else 0
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--measure", action="store_true",
                         help="also probe the freshness boundary size by size")
+    parser.add_argument("--exe", action="store_true",
+                        help="run Story 6.2's built-exe table instead (needs `wails build` first)")
     args = parser.parse_args()
+
+    if args.exe:
+        sys.exit(run_exe_table())
 
     dirty = subprocess.run(["git", "status", "--porcelain", "--", *ASSETS],
                            capture_output=True, text=True, cwd=REPO).stdout.strip()
