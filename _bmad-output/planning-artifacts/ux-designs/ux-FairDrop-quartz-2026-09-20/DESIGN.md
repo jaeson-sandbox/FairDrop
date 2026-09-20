@@ -150,7 +150,7 @@ the frontmatter in ordinary colour modes.
 | Text | `{colors.text}` / `{colors.text-dark}`; `{colors.muted}` / `{colors.muted-dark}` | Muted is readable secondary copy, never disabled text. |
 | Decorative edge | `{colors.separator}` / `{colors.separator-dark}` | Dividers inside a surface, and nothing else. Never the sole boundary for a control, drop target, QR, progress track, or status. It deliberately does **not** meet 3:1 — it is not a boundary, it is a rule between paragraphs. |
 | Functional boundary | `{colors.control-border}` / `{colors.control-border-dark}` | Required on controls, the rest-state drop target, the QR frame, the URL field, and the progress-track outline. These values were chosen as the lightest greys that still clear 3:1 against every surface they touch. |
-| Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, and `{colors.primary-hi}` / `{colors.primary-hi-dark}` as the gradient's top stop | The single strongest action, the progress fill, and the item-kind pill. Never status decoration. |
+| Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, and `{colors.primary-hi}` / `{colors.primary-hi-dark}` as the gradient's top stop | The single strongest action, the (solid) progress fill, and the item-kind pill. Never status decoration. |
 | Focus | `{colors.focus}` / `{colors.focus-dark}` | A 3px outline at 2px offset. Scoped to keyboard-operable controls only — see the amendment carried forward below. |
 | Outcomes | Success, warning, error, each with a tint | Always pair colour with outline, glyph, or literal text. |
 | QR | `{colors.qr-surface}` / `{colors.qr-ink}` in both modes | Fixed high-contrast substrate; never recolour, invert, texture, rotate, round modules, or overlay a logo. Unchanged from Paper Relay and non-negotiable — it is a scan-reliability constraint, not a style choice. |
@@ -310,7 +310,13 @@ Rules, all enforceable:
   where the element is a control. This is what keeps forced-colors honest.
 - **Exactly one gradient exists in the product**: the primary button's
   `{colors.primary-hi}` → `{colors.primary}` vertical fill, plus its 1px inset top
-  highlight. No other gradient is permitted, and none may sit behind text.
+  highlight. No other gradient is permitted, and none may sit behind text. The
+  progress fill is therefore solid, not a gradient.
+- **One `repeating-linear-gradient` is exempt** and is not a gradient in this
+  rule's sense: the unknown-total meter's static diagonal pattern, which carries
+  a state distinction rather than decoration and never moves.
+  `styles.test.ts` encodes the exemption as a `(?<!repeating-)` lookbehind, so a
+  decorative gradient cannot smuggle itself in under that name.
 - **No ambient glow, no blur behind text, no more than three shadow layers on any
   element**, and no shadow on the app shell, which takes its outermost elevation
   from native window chrome.
@@ -356,7 +362,7 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 | **Warning Banner** | `{rounded.md}`, warning tint, inset warning boundary, leading glyph, heading plus message. Inline, non-modal, never a full fill. |
 | **Trusted-LAN Note** | Muted copy behind a 3px `{rounded.xs}` warning-coloured bar. Literal plain-HTTP and local-network disclosure; never green or lock-shaped. |
 | **Progress Card** | `{rounded.xxl}` surface at `{elevation.sh-3}`: kind pill and name, then the percentage in `{typography.numeric}` with wire bytes and throughput right-aligned beside it, then the track, then Cancel. |
-| **Progress Meter** | 8px `{rounded.full}` track at `{colors.track}` with a functional boundary; fill is the one permitted gradient's horizontal sibling — `{colors.primary}` → `{colors.primary-hi}`. Determinate value, static unknown pattern, or decorative known-empty track. No fake ZIP or empty-file percentage, and no sweep, shimmer or blink. |
+| **Progress Meter** | 8px `{rounded.full}` track at `{colors.track}` with a functional boundary; fill is **solid** `{colors.primary}`, not a gradient -- the single-gradient rule is absolute and the button already spends it. Determinate value, static unknown pattern, or decorative known-empty track. No fake ZIP or empty-file percentage, and no sweep, shimmer or blink. |
 | **Transfer Metrics** | Wire bytes first, throughput second, tabular numerals. |
 | **Cancel Action** | Quiet text action at full target size; error-coloured on hover and focus. |
 | **Outcome Panel — Done** | Centred composition at `{elevation.sh-3}`: a 74px success-tint disc with a stroke-drawn check, `{typography.display}` heading, muted body, the **completion receipt**, then the primary next action and a quiet Dismiss. This is the state that previously rendered a heading and one line into a mostly empty window. |
