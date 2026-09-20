@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-20-2026 01:40
+last_updated: 09-20-2026 03:40
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -80,7 +80,7 @@ development_status:
   epic-6: in-progress
   6-1-replace-the-placeholder-app-icon: done
   6-2-pin-what-ships-not-the-template: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
     epic: 1
@@ -322,3 +322,26 @@ action_items:
     owner: "process"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-17.md"
+  - id: "epic-6-retro-item-32-complete-declared-windows-mutation-proof"
+    epic: 6
+    action: "Complete and retain the declared missing-RT_ICON and regenerated-ICO
+      drift-step mutations, plus the neutral-language-key proof; reconcile evidence
+      to the final head (F1)."
+    owner: "Epic 6 verification owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-09-20.md"
+  - id: "epic-6-retro-item-33-complete-asset-guard-mutation-inventory"
+    epic: 6
+    action: "Add isolated proofs for D-133 guards, derive D-134 size cases from the
+      canonical declaration, and publish the final mutation inventory and denominator
+      (F2)."
+    owner: "Epic 6 test owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-09-20.md"
+  - id: "epic-6-retro-item-34-reconcile-build-and-verification-docs"
+    epic: 6
+    action: "Reconcile D-135 and the recorded env-gating deviation, and qualify the
+      Windows ICO regeneration recipe for macOS hosts (F4)."
+    owner: "Jaeson / documentation owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-09-20.md"
