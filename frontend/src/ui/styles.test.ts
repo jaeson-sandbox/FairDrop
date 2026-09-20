@@ -468,6 +468,98 @@ describe('guarantees a stylesheet edit could silently undo', () => {
             const layers = value.replace(/rgba?\([^)]*\)/g, 'rgb').split(',')
             expect(layers.length, value.trim()).toBeLessThanOrEqual(3)
         }
+
+        /*
+          The primary control is the one place a `--shadow-sh-*` token and an
+          extra literal layer sit in the same declaration (its 1px inset
+          highlight). Counted separately, as the two loops above do, neither
+          the token's own two layers nor the declaration's two comma-separated
+          pieces (`var(--shadow-sh-1)` counts as one piece, `inset ...` as the
+          other) can ever exceed 3 -- so a third layer added *inside* the sh-1
+          token would still read as "2" from the declaration side and "3" from
+          the token side, both individually under the ceiling, while the
+          control would really be painting four. This resolves the var()
+          reference against its own current definition and counts what the
+          browser actually composites.
+        */
+        const sh1Definition = theme.match(/--shadow-sh-1:\s*([^;]+);/)?.[1] ?? ''
+        expect(sh1Definition, 'sh-1 token value').toBeTruthy()
+        const resolvedPrimaryShadow = primaryButton
+            .match(/box-shadow:\s*([^;]+);/)?.[1]
+            .replace('var(--shadow-sh-1)', sh1Definition) ?? ''
+        expect(resolvedPrimaryShadow, 'resolved .fd-button--primary box-shadow').toBeTruthy()
+        const resolvedLayers = resolvedPrimaryShadow.replace(/rgba?\([^)]*\)/g, 'rgb').split(',')
+        expect(resolvedLayers.length, resolvedPrimaryShadow.trim()).toBeLessThanOrEqual(3)
+    })
+})
+
+describe('the button family (Story 7.2)', () => {
+    it('gives the primary control its elevation token, a 40px height token and the press scale', () => {
+        const primary = block('.fd-button--primary {')
+        // DESIGN.md's Elevation table has no dedicated button step; `sh-1` --
+        // the lightest of the three -- is the closest match to "a resting
+        // surface", and it is what keeps this control inside the three-layer
+        // ceiling: two layers from the token plus the one inset highlight.
+        expect(primary).toContain('box-shadow: var(--shadow-sh-1), inset 0 1px 0 rgb(255 255 255 / 0.4);')
+
+        const base = block('.fd-button {')
+        expect(base).toContain('block-size: var(--spacing-control-height);')
+
+        // Every button, not only the primary one -- DESIGN.md's Motion section
+        // makes the press scale general ("Buttons scale to 0.975 on :active.
+        // Nothing else scales."), so this is one rule rather than one per
+        // variant.
+        expect(stylesheet).toMatch(/\.fd-button:active \{\s*transform: scale\(0\.975\);\s*\}/)
+    })
+
+    it('gives the secondary control a fill on top of the shared boundary, never instead of it', () => {
+        const secondary = block('.fd-button--secondary {')
+        // --color-fill-strong against --color-surface is 1.22:1 -- visible
+        // enough to read, nowhere near load-bearing -- so the 1px
+        // --color-control-border this rule inherits from .fd-button is what
+        // actually identifies the control as operable.
+        expect(secondary).toContain('background: var(--color-fill-strong);')
+        // A `border`/`border-color` declaration here would substitute a
+        // boundary rather than adding a fill on top of the shared one; this
+        // is the mutation the acceptance criterion names ("remove the
+        // boundary and keep the fill -> must fail").
+        expect(secondary).not.toMatch(/\bborder(-color)?\s*:/)
+
+        const base = block('.fd-button {')
+        expect(base).toContain('var(--color-control-border)')
+    })
+})
+
+describe('the browse menu surface (Story 7.2)', () => {
+    it('is a rounded.lg surface at sh-3 with a functional boundary', () => {
+        const menu = block('.fd-browse-menu {')
+        expect(menu).toContain('border-radius: var(--radius-lg);')
+        expect(menu).toContain('box-shadow: var(--shadow-sh-3);')
+        expect(menu).toContain('var(--color-control-border)')
+    })
+
+    it('gives menu items the sm radius', () => {
+        const items = block('.fd-browse-menu .fd-button {')
+        expect(items).toContain('border-radius: var(--radius-sm);')
+    })
+
+    it('distinguishes the focused item by primary fill and a tint halo, not the ring alone', () => {
+        const focused = block('.fd-browse-menu .fd-button:focus-visible {')
+        expect(focused).toContain('background: var(--color-primary);')
+        expect(focused).toMatch(/box-shadow:\s*0 0 0 4px var\(--color-primary-tint\);/)
+
+        // The shared ring rule still applies to these items -- they are plain
+        // .fd-button elements -- so the fill and halo above sit alongside it
+        // rather than replacing it.
+        expect(stylesheet).toMatch(/\.fd-button:focus-visible,\s*\.fd-url:focus-visible \{/)
+    })
+})
+
+describe('the copy control takes the success tint (Story 7.2)', () => {
+    it('paints the fill, not only the border and text', () => {
+        const copied = block('.fd-button--copied {')
+        expect(copied).toContain('background: var(--color-success-tint);')
+        expect(copied).toContain('border-color: var(--color-success);')
     })
 })
 

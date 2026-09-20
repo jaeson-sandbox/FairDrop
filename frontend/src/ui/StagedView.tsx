@@ -175,7 +175,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                             */}
                             <button
                                 type="button"
-                                className="fd-button fd-name-toggle fd-target"
+                                className="fd-button fd-button--secondary fd-name-toggle fd-target"
                                 aria-expanded={showFullName}
                                 aria-controls="fd-item-name"
                                 aria-describedby="fd-item-name-full"

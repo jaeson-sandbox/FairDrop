@@ -135,6 +135,15 @@
     */
     --focus-ring-width: 3px;
     --focus-ring-offset: 2px;
+
+    /*
+      One easing curve for the whole product -- the decelerate curve platform
+      animations use. Motion durations live on the declarations that use them
+      (120ms press, 150-200ms hover/fill) rather than as tokens here, because
+      DESIGN.md's Motion section publishes them as prose, not a frontmatter
+      table the way colors, type, radii, spacing and elevation are.
+    */
+    --ease-decelerate: cubic-bezier(.32, .72, 0, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -287,6 +296,10 @@ body {
 }
 
 .fd-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    block-size: var(--spacing-control-height);
     padding-inline: var(--spacing-4);
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-md);
@@ -297,24 +310,60 @@ body {
     font-weight: var(--font-weight-control);
     line-height: var(--leading-control);
     cursor: pointer;
+    transition: transform 120ms var(--ease-decelerate),
+        background-color 150ms var(--ease-decelerate),
+        border-color 150ms var(--ease-decelerate);
+}
+
+/*
+  120ms press, the one accent every button shares. `.fd-target`'s min-block-size
+  already forces the real hit box to 44px on every button in the app today, so
+  this is the only place the press feedback needs to live: one rule, and
+  `prefers-reduced-motion` already neutralises its transition through the
+  universal `*` rule below, the same seam every other transition in this sheet
+  relies on.
+*/
+.fd-button:active {
+    transform: scale(0.975);
 }
 
 /*
   The one gradient the product ships: the primary button's primary-hi -> primary
-  vertical fill, plus a 1px inset top highlight. Forced colors overrides this
-  selector directly below, after the dark block, so no authored hue -- gradient
-  or otherwise -- survives into that mode.
+  vertical fill, plus a 1px inset top highlight. `{elevation.sh-btn}` names a
+  resting surface, so it reads as `sh-1` here -- the token spent on the drop
+  zone's disclosure rows, the lightest of the three steps -- since DESIGN.md's
+  Elevation table has no dedicated button step and this is the closest match:
+  two shadow layers plus the one inset highlight is exactly the sheet's
+  three-layer ceiling. Forced colors overrides this selector directly below,
+  after the dark block, so no authored hue -- gradient or otherwise -- survives
+  into that mode.
 */
 .fd-button--primary {
     border-color: var(--color-primary);
     background: linear-gradient(var(--color-primary-hi), var(--color-primary));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
+    box-shadow: var(--shadow-sh-1), inset 0 1px 0 rgb(255 255 255 / 0.4);
     color: var(--color-primary-ink);
 }
 
 .fd-button--primary:hover {
     background: var(--color-primary-hi);
     border-color: var(--color-primary-hi);
+}
+
+/*
+  Secondary: a fill on top of the shared functional boundary above, never
+  instead of it. `--color-fill-strong` against `--color-surface` is 1.22:1 --
+  visible enough to read as a control, nowhere near a load-bearing ratio -- so
+  the 1px `--color-control-border` this rule inherits from `.fd-button` is what
+  actually identifies it as operable. Removing that boundary while keeping this
+  fill is exactly the mutation `styles.test.ts` names.
+*/
+.fd-button--secondary {
+    background: var(--color-fill-strong);
+}
+
+.fd-button--secondary:hover {
+    background: var(--color-fill);
 }
 
 /* Cancel and Dismiss: quiet text actions that still own a full target. */
@@ -400,8 +449,13 @@ body {
     color: var(--color-muted);
 }
 
-/* Copy Feedback: the same control, in success text. No toast, no layout shift. */
+/*
+  Copy Feedback: the same control, taking the success tint and boundary --
+  never a toast, never a layout shift (the fixed-width rule below is what
+  guarantees the latter).
+*/
 .fd-button--copied {
+    background: var(--color-success-tint);
     border-color: var(--color-success);
     color: var(--color-success);
 }
@@ -502,9 +556,11 @@ body {
 }
 
 /*
-  The product's first floating surface (spec-4-1). A functional boundary, not
-  the decorative separator -- see "the decorative edge stays decorative" in
-  styles.test.ts.
+  The product's first floating surface (spec-4-1), raised to the same step as
+  the packet and the outcome panel -- it is the focal object of an open menu,
+  the same way those are the focal object of their own lifecycle state. A
+  functional boundary, not the decorative separator -- see "the decorative
+  edge stays decorative" in styles.test.ts.
 */
 .fd-browse-menu {
     position: absolute;
@@ -515,16 +571,39 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-1);
-    padding: var(--spacing-2);
+    padding: 5px;
     min-inline-size: 200px;
     background: var(--color-surface);
     border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sh-3);
 }
 
 .fd-browse-menu .fd-button {
     width: 100%;
     text-align: start;
+    border-color: transparent;
+    background: transparent;
+    border-radius: var(--radius-sm);
+}
+
+.fd-browse-menu .fd-button:hover {
+    background: var(--color-fill);
+}
+
+/*
+  The focused item is distinguished by the primary fill plus a tint halo, not
+  by the shared focus ring alone -- DESIGN.md's Browse Menu row, restated
+  because the ring by itself repeats the same cue every other Tab-reachable
+  control already carries. The ring stays too, painted by the shared
+  `.fd-button:focus-visible` rule above; this adds the fill and the halo on
+  top of it rather than instead of it.
+*/
+.fd-browse-menu .fd-button:focus-visible {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary-ink);
+    box-shadow: 0 0 0 4px var(--color-primary-tint);
 }
 
 /*
@@ -720,8 +799,8 @@ body {
     min-inline-size: 0;
     padding: var(--spacing-3);
     border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    background: var(--color-fill);
     color: var(--color-text);
     font-family: var(--font-code);
     font-size: var(--text-code);
