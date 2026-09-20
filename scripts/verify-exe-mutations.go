@@ -18,6 +18,11 @@ const (
 	dirFlag = uint32(0x80000000)
 )
 
+type icoEntry struct {
+	header  []byte
+	payload []byte
+}
+
 func main() {
 	if len(os.Args) != 3 {
 		fmt.Fprintln(os.Stderr, "usage: verify-exe-mutations <strip-icon|hue-ico> <path>")
@@ -47,10 +52,6 @@ func hueICO(path string) error {
 		return fmt.Errorf("%s is not an ICO file", path)
 	}
 	count := int(binary.LittleEndian.Uint16(raw[4:6]))
-	type icoEntry struct {
-		header  []byte
-		payload []byte
-	}
 	entries := make([]icoEntry, 0, count)
 	found := false
 	for index := 0; index < count; index++ {
@@ -94,8 +95,12 @@ func hueICO(path string) error {
 	if !found {
 		return fmt.Errorf("%s has no 64px ICO entry", path)
 	}
+	return os.WriteFile(path, repackICO(raw[:6], entries), 0o644)
+}
+
+func repackICO(header []byte, entries []icoEntry) []byte {
 	var rebuilt bytes.Buffer
-	rebuilt.Write(raw[:6])
+	rebuilt.Write(header)
 	offset := 6 + 16*len(entries)
 	for _, entry := range entries {
 		header := append([]byte(nil), entry.header...)
@@ -107,7 +112,7 @@ func hueICO(path string) error {
 	for _, entry := range entries {
 		rebuilt.Write(entry.payload)
 	}
-	return os.WriteFile(path, rebuilt.Bytes(), 0o644)
+	return rebuilt.Bytes()
 }
 
 func stripIcon(path string) error {

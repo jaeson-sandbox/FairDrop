@@ -42,9 +42,18 @@ process was quit, the rebuilt bundle launched to the normal idle window with its
 heading and choose control. This is a native launch observation, not a transfer,
 Dock-icon, signing-identity or notarization claim.
 
-Native Windows executable mutations, the exact candidate CI conclusions, merge/tag
-SHA, release artifact sizes, downloaded checksums, and publication status remain
-externally gated and are intentionally unclaimed until observed by the release owner.
+The exact final-head CI conclusions, merge/tag SHA, release artifact sizes, downloaded
+checksums, and publication status remain externally gated and are intentionally unclaimed.
+
+Native Windows PR run **35499106925**, job **106047534078**, executed the built-resource
+baseline and all five executable probes successfully: stale committed ICO, stale product
+version, structurally missing RT_ICON, rebuilt neutral `0000` language key, and exact
+two-test absence skips. It also rebuilt after removing the ICO and observed the canonical
+drift check reject the regenerated untracked path. The six complete executable transcripts
+downloaded from the job are retained in `evidence-6-3-windows-mutation-logs/`; inspection
+confirmed the missing 16px assertion, embedded `000004b0` neutral-table assertion, and
+both missing-executable diagnostics. This proves the scoped Windows mutations, not the
+full final-head gate; the run's Linux and macOS jobs later failed on the portable test defect below.
 
 ## Review layers
 
@@ -54,7 +63,8 @@ A regression test now reproduces that input and the helper repacks every payload
 rewrites all offsets. Review also required process-exit/result agreement, diagnostics
 scoped to the intended test block, stable inventory pins, fresh log directories,
 explicit regenerated-ICO proof, catchable-interrupt wording, and candidate-aware release
-documentation. The actionable fixes are implemented; native Windows execution remains unclaimed.
+documentation. The actionable fixes are implemented; a green native gate at the final
+reviewed head remains unclaimed.
 The driver now refuses mutation mode outside GitHub Actions unless the caller explicitly
 marks the checkout disposable. CI runs in a fresh checkout that is discarded with the job;
 local evidence runs in a detached disposable worktree. Catchable SIGINT/SIGTERM paths restore
@@ -62,3 +72,10 @@ their snapshots, while SIGKILL cannot execute cleanup and is handled by discardi
 The review suggestion to claim restoration of every path a full Wails rebuild might touch was
 rejected as broader than the implementation can prove: explicit mutation inputs and the exe are
 hash-restored, final CI drift checks other build outputs, and the whole checkout is disposable.
+
+The first candidate Linux CI run exposed a Go-version-sensitive regression test: Go 1.27's
+PNG encoder made the hue-mutated 64px payload larger, while pinned CI Go 1.26.7 made it five
+bytes smaller. The mutation succeeded under both; only the test's size assumption was wrong.
+The replacement verifies the committed icon's actual hue-rotated pixels and every entry
+boundary, then separately feeds `repackICO` a deterministic grown payload and asserts that
+the following offset is rewritten. Both tests pass under Go 1.26.7 and Go 1.27.0.

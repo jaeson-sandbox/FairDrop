@@ -1,0 +1,12 @@
+=== RUN   TestExeResourcesEmbedTheCommittedIcon
+    exe_resources_windows_test.go:230: 256x256: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 128x128: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 64x64: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 48x48: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 32x32: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 16x16: exe vs committed .ico distance 0.000
+--- PASS: TestExeResourcesEmbedTheCommittedIcon (0.01s)
+=== RUN   TestExeResourcesCarryTheCommittedIdentity
+--- PASS: TestExeResourcesCarryTheCommittedIdentity (0.00s)
+PASS
+ok  	fairdrop	0.051s

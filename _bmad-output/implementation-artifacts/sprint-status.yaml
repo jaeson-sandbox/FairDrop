@@ -329,7 +329,7 @@ action_items:
       drift-step mutations, plus the neutral-language-key proof; reconcile evidence
       to the final head (F1)."
     owner: "Epic 6 verification owner"
-    status: in-progress
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-09-20.md"
   - id: "epic-6-retro-item-33-complete-asset-guard-mutation-inventory"
     epic: 6
@@ -337,12 +337,12 @@ action_items:
       canonical declaration, and publish the final mutation inventory and denominator
       (F2)."
     owner: "Epic 6 test owner"
-    status: in-progress
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-09-20.md"
   - id: "epic-6-retro-item-34-reconcile-build-and-verification-docs"
     epic: 6
     action: "Reconcile D-135 and the recorded env-gating deviation, and qualify the
       Windows ICO regeneration recipe for macOS hosts (F4)."
     owner: "Jaeson / documentation owner"
-    status: in-progress
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-09-20.md"

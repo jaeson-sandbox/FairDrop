@@ -65,11 +65,11 @@ macOS regression gate, signing, notarization, or installer is required here.
 
 **Execution:**
 - [x] `scripts/verify-asset-mutations.py` — derive sizes, add the four isolated cases, restore every mutated source, and retain unique complete logs.
-- [ ] `exe_resources_windows_test.go`, `scripts/verify-exe-mutations.go` — execute the missing built-resource and language-key probes using standard-library tooling; preserve local skip behavior.
-- [ ] `.github/workflows/verify.yml`, `verify_workflow_test.go`, `scripts/verify-build-asset-drift.sh` — execute native Windows proof and the exact drift rejection in isolation; keep pins synchronized and avoid Pillow/image derivation in CI.
+- [x] `exe_resources_windows_test.go`, `scripts/verify-exe-mutations.go` — execute the missing built-resource and language-key probes using standard-library tooling; preserve local skip behavior.
+- [x] `.github/workflows/verify.yml`, `verify_workflow_test.go`, `scripts/verify-build-asset-drift.sh` — execute native Windows proof and the exact drift rejection in isolation; keep pins synchronized and avoid Pillow/image derivation in CI.
 - [x] `AGENTS.md`, `build/README.md`, Story 6.2 spec, `epics.md` — reconcile actual gate order, absence-based gating, 0409/FileVersion behavior, calibration command, and Windows-specific regeneration. Record the supersession of obsolete frozen wording under this approved story.
 - [x] `wails.json`, both frontend package files, `README.md` — set 1.1.0 identity and accurate release description.
-- [ ] `epics.md`, `sprint-status.yaml`, `deferred-work.md`, retrospective/evidence files — register Story 6.3, record three review layers, discharge only proved items, and reassess acceptance while preserving history.
+- [x] `epics.md`, `sprint-status.yaml`, `deferred-work.md`, retrospective/evidence files — register Story 6.3, record three review layers, discharge only proved items, and reassess acceptance while preserving history.
 - [ ] `docs/release-notes-1.1.0.md`, `release-evidence.md` — prepare notes, then record exact merge/tag SHA, run/job conclusions, artifact sizes and checksums after release.
 
 **Acceptance Criteria:**
