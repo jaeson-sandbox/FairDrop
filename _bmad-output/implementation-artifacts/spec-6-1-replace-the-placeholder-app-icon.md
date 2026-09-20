@@ -4,7 +4,7 @@ type: 'feature'
 created: '2026-09-19'
 status: 'in-review'
 baseline_commit: 'de16807eedb8482aac82e9862161fb89aabfb7b2'
-review_loop_iteration: 2
+review_loop_iteration: 3
 context: []
 ---
 
@@ -121,50 +121,64 @@ or any transfer behaviour. Introduce a system tray; this app has none.
 
 **Acceptance Criteria:**
 
-Each criterion names the mutation that must fail it, and every tolerance states the measured
-value it was calibrated against. "Fails by name" means the named test, not any test.
+Each criterion names the mutation that must fail it. Every tolerance is a factor applied to a
+value measured against the committed assets, never an absolute chosen for headroom -- loops 2 and 3
+both shipped an absolute that had never had its boundary measured. The mutation table is derived by
+`scripts/verify-asset-mutations.py`, not written by hand.
 
-- **Freshness.** Given both shipped assets, when the master is downsampled to a shared entry size,
-  then its mean per-channel RGBA distance from the matching `.ico` entry is at most **8x the
-  measured same-artwork distance** (0.62, box-averaging against Catmull-Rom), not an absolute
-  number chosen for headroom. *Mutations:* a hue-swapped master; **and a uniform +24/255
-  brightening of the master with the `.ico` left stale** -- the realistic "revised the artwork,
-  forgot to delete `icon.ico`" case **-> both must fail.** At tolerance 18.0 the second passed,
-  leaving a stale icon shipping green up to roughly a 10% tonal revision.
-- **No opaque backdrop.** Given the master **and every `.ico` entry**, when each asset's border
-  ring is measured at a width scaled to its own resolution, then it holds no opaque pixel whose
-  channels all exceed 200. Four corner pixels are not sufficient: on a centred rounded rect they
-  are transparent by construction. *Mutations:* re-derive with `ERODE_PX = 0`; make the backdrop
-  opaque except the four corners; make a 16x16 entry a fully opaque coloured field **-> all must
-  fail.**
+- **Freshness, every entry.** Given the master and **each** `.ico` entry, when the master is
+  downsampled to that entry's size, then their mean per-channel distance is at most 1.5x the
+  distance measured for that size when they genuinely match (0.616 at 256 through 4.109 at 16).
+  *Mutations:* a hue-swapped master; a uniform **+1/255** brightening with the `.ico` left stale;
+  any single entry replaced by a flat coloured square **-> all must fail.** Measured boundary: +0
+  passes, +1 fails. Loop 3 found five of six entries could be flat squares with the suite green.
+- **No opaque backdrop.** Given the master and every `.ico` entry, when the border ring is measured
+  at a width scaled to that asset's resolution, then it holds no opaque near-white pixel; the
+  ring's transparent *fraction* is additionally checked where the ring is wide relative to the
+  corner radius (the master and the 256 entry), because at 16px a 1px ring is legitimately 93%
+  plaque. A coloured backdrop is caught by Freshness, not here. *Mutations:* re-derive with
+  `ERODE_PX = 0`; backdrop opaque except the four corners; a 16x16 entry of opaque white.
 - **Real colour.** Given the master and every `.ico` entry, when mean HSV saturation over the
-  central 40% is measured **skipping fully transparent pixels**, then it exceeds 0.25 and at least
-  half the central region is opaque. *Mutations:* set the master's alpha to 0 keeping colour; leave
-  a single opaque pixel in a small entry's centre **-> both must fail.**
+  central 40% is measured skipping transparent pixels, then it exceeds 0.25 and at least half that
+  region is opaque. *Mutation:* master alpha 0 with colour intact **-> must fail.**
 - **Alpha applied once.** Given the master, when partial-alpha pixels are compared with their local
-  opaque reference **on both the leading and trailing edge of every row**, then RGB matches within
-  tolerance. *Mutation:* composite the plaque onto the canvas using itself as the mask **-> must
-  fail**, and must fail when that defect is confined to the trailing edge alone. Roughly half the
-  boundary was previously discarded unmeasured.
-- **Master geometry.** Given the master, then it is exactly 1024x1024, carries a real alpha channel,
-  and its transparent bands are **15 rows top and 16 bottom (the 1024x993 plaque centred), bounded
-  above as well as below**. *Mutations:* stretch the plaque square to fill; substitute a fully blank
-  transparent canvas; substitute the scaffold placeholder **-> all must fail.** A floor alone passed
-  all three.
-- **Small sizes.** Given the `.ico`, then **every** entry decodes, its decoded dimensions equal the
-  size its directory declares, and it satisfies the colour and backdrop criteria -- not only the
-  largest and the two smallest. *Mutation:* replace any single entry with opaque white **-> must
-  fail, naming that size.**
+  opaque reference **on both the leading and trailing edge of every row**, then mean low-alpha
+  deviation is at most 8.0 **and** at most 2.0x the high-alpha deviation. Genuine: 3.172 / 2.621 =
+  1.21. *Mutations:* a full premultiply (27.96, trips the absolute bound); and a **20%** one
+  (6.946 / 3.001 = 2.31) which stays under the absolute bound and is caught only by the ratio
+  **-> both must fail.** Without the second, the ratio constant is decoration.
+- **Master geometry.** Given the master, then it is exactly 1024x1024, its PNG IHDR colour type
+  carries an alpha channel, its transparent bands are **12-40 rows** top and bottom (the genuine
+  master measures 21/22: the 15/16px centring band plus the erosion's own margin) and **1-12
+  columns** left and right (genuine 6/6, since the plaque spans the full width). *Mutations:*
+  stretch to fill; narrow the plaque 240px; a blank canvas; the scaffold placeholder; a master
+  saved without alpha **-> all must fail.** A floor with no ceiling passed the first three.
 - **Toolchain provenance.** Given the `.ico`, then its entry set **equals** {256,128,64,48,32,16},
-  the literal Wails passes to `winicon.GenerateIcon` at `packager.go:217`. *Mutations:* drop the 48;
-  add a scaffold 24 alongside it **-> both must fail.** "Contains" would accept the superset.
-- **Source provenance.** Given `build/appicon-source.jpg`, then it is present and 2816x1536 -- the
-  geometry `CROP_BOX` and `CORNER_RADIUS` were fitted against. *Mutation:* delete it **-> must
-  fail.** It is the only committed copy and the reproducibility claim rests on it, yet the whole
-  suite passed with the file absent.
+  the literal Wails passes to `winicon.GenerateIcon` at `packager.go:217`. *Mutations:* drop the
+  48; add a scaffold 24 **-> both must fail.**
+- **Source provenance.** Given `build/appicon-source.jpg`, then it decodes fully (not just its
+  header), is 2816x1536, and its sha256 equals the digest `scripts/build-appicon.py` pins.
+  *Mutations:* delete it; replace it with a different 2816x1536 render **-> both must fail.** Loop
+  3 found the whole suite passed with the file deleted, and again with it swapped.
 - Given the full gate on all three platforms, when it runs, then it passes.
 
 ## Spec Change Log
+
+- **2026-09-19 — review loop 3: the loop-2 criteria were under-specified the same way loop 1's
+  were, and this is now a pattern rather than an incident.** Three findings, each measured before
+  being believed. (1) Only the 256 `.ico` entry was ever compared against the master, so replacing
+  any of the 16, 32, 48, 64 or 128 entries with a flat coloured square passed the entire suite —
+  the sizes Windows actually draws. (2) Loop 2 replaced an absolute freshness tolerance of 18.0
+  with an absolute 4.96 and reported the stale-icon gap closed; measuring the new boundary showed
+  +6/255 (a 2.4% tonal revision) still passed. (3) `MasterGeometry` checked rows but never columns,
+  so a plaque narrowed by 240px passed the test named for geometry. Root cause, again, is mine and
+  outside the frozen block: a constant picked for headroom and confirmed by one mutation on its far
+  side, rather than derived from a measurement with its boundary probed. Every tolerance is now a
+  factor times a measured value, every measured value is logged each run, and the mutation table is
+  derived by `scripts/verify-asset-mutations.py` — loop 2's hand-written table carried three
+  stale numbers into a merged evidence file. **KEEP:** the per-entry freshness shape, which
+  subsumes the coloured-backdrop case the ring check admits it cannot see; the measured crop
+  geometry; and the refusal to assert Pillow byte-identity.
 
 - **2026-09-19 — review loop 1: the acceptance criteria under-specified every assertion.**
   Triggered by all three review layers independently, and confirmed by mutation rather than

@@ -65,5 +65,9 @@ __pycache__/
 # its original location, kept locally for reference but not meant to be a
 # second copy in git.
 # Root-anchored literals missed a candidate kept in a subdirectory or saved
-# with the four-letter extension, so match by shape instead.
-**/fairdrop_logo*.jp*g
+# with the four-letter extension, so match by shape instead. Case is spelled
+# out because git pathspec matching is case-sensitive, and the owner's next
+# export may not be a JPEG at all.
+**/fairdrop_logo*.[jJ][pP]*[gG]
+**/fairdrop_logo*.[pP][nN][gG]
+**/fairdrop_logo*.[wW][eE][bB][pP]

@@ -1542,48 +1542,98 @@ of being eyeballed, and the crop lands on an exact 1024px width.
 whose backdrop is drawn as a transparency checkerboard, which is decoration, not alpha. A naive
 format conversion would have shipped that checkerboard as an opaque grey backdrop.
 
-**Acceptance Criteria:** amended in review loop 1 -- each names the mutation that must fail it, and
-"fails by name" means the named test, not any test. The original criteria named the sampling method
-("four corner pixels", "central 40%") rather than the property being checked, and five mutations that
-should have failed all passed; see the spec's Spec Change Log.
+**Acceptance Criteria:** amended in review loop 3; the spec carries the authoritative
+wording and the derivation of every number.
 
-**Freshness.** Given both shipped assets, when the master is downsampled to a shared entry size,
-then its mean per-channel RGBA distance from the matching `.ico` entry is within a tolerance
-absorbing winicon's Catmull-Rom resampling but not different artwork. *Mutation:* replace the master
-with hue-swapped artwork, leave the `.ico` -- must fail.
+Each criterion names the mutation that must fail it. Every tolerance is a factor applied to a
+value measured against the committed assets, never an absolute chosen for headroom -- loops 2 and 3
+both shipped an absolute that had never had its boundary measured. The mutation table is derived by
+`scripts/verify-asset-mutations.py`, not written by hand.
 
-**No opaque backdrop.** Given either asset, when the outer border ring is measured, then it holds no
-opaque pixel whose channels all exceed 200, and the ring is overwhelmingly transparent. Four corner
-pixels are not sufficient: on a centred rounded rect they are transparent by construction.
-*Mutations:* re-derive with `ERODE_PX = 0`; make the backdrop opaque everywhere except the four
-corners -- both must fail.
-
-**Real colour.** Given either asset, when mean HSV saturation over the central 40% is measured
-skipping fully transparent pixels, then it exceeds 0.25, and the test fails if no opaque pixel
-remains there. *Mutation:* set the master's alpha to 0 everywhere, keeping colour -- must fail.
-
-**Alpha applied once.** Given the master, when pixels at partial alpha are compared with their local
-opaque reference, then their RGB matches within tolerance. *Mutation:* composite the plaque onto the
-canvas using itself as the mask -- must fail. A real defect found in review, not a hypothetical: it
-darkens the feather and halves its width.
-
-**Master geometry.** Given the master, then it is exactly 1024x1024 RGBA carrying a real transparent
-band top and bottom. *Mutation:* stretch the plaque square to fill -- must fail.
-
-**Small sizes.** Given the `.ico`, then its 16x16 and 32x32 entries decode and satisfy the colour
-assertion -- the sizes the artwork was chosen for. *Mutation:* replace a small entry with opaque
-white -- must fail.
-
-**Toolchain provenance.** Given the `.ico`, then it carries the full 256/128/64/48/32/16 set that
-**Wails** passes to `winicon.GenerateIcon` at `packager.go:217` -- winicon emits whatever list it is
-handed, so this pins a Wails literal, not a winicon behaviour.
-
-**Given** the full gate on all three platforms (Windows, macOS, and the Linux adapter suite)
-**When** it runs
-**Then** it passes.
+- **Freshness, every entry.** Given the master and **each** `.ico` entry, when the master is
+  downsampled to that entry's size, then their mean per-channel distance is at most 1.5x the
+  distance measured for that size when they genuinely match (0.616 at 256 through 4.109 at 16).
+  *Mutations:* a hue-swapped master; a uniform **+1/255** brightening with the `.ico` left stale;
+  any single entry replaced by a flat coloured square **-> all must fail.** Measured boundary: +0
+  passes, +1 fails. Loop 3 found five of six entries could be flat squares with the suite green.
+- **No opaque backdrop.** Given the master and every `.ico` entry, when the border ring is measured
+  at a width scaled to that asset's resolution, then it holds no opaque near-white pixel; the
+  ring's transparent *fraction* is additionally checked where the ring is wide relative to the
+  corner radius (the master and the 256 entry), because at 16px a 1px ring is legitimately 93%
+  plaque. A coloured backdrop is caught by Freshness, not here. *Mutations:* re-derive with
+  `ERODE_PX = 0`; backdrop opaque except the four corners; a 16x16 entry of opaque white.
+- **Real colour.** Given the master and every `.ico` entry, when mean HSV saturation over the
+  central 40% is measured skipping transparent pixels, then it exceeds 0.25 and at least half that
+  region is opaque. *Mutation:* master alpha 0 with colour intact **-> must fail.**
+- **Alpha applied once.** Given the master, when partial-alpha pixels are compared with their local
+  opaque reference **on both the leading and trailing edge of every row**, then mean low-alpha
+  deviation is at most 8.0 **and** at most 2.0x the high-alpha deviation. Genuine: 3.172 / 2.621 =
+  1.21. *Mutations:* a full premultiply (27.96, trips the absolute bound); and a **20%** one
+  (6.946 / 3.001 = 2.31) which stays under the absolute bound and is caught only by the ratio
+  **-> both must fail.** Without the second, the ratio constant is decoration.
+- **Master geometry.** Given the master, then it is exactly 1024x1024, its PNG IHDR colour type
+  carries an alpha channel, its transparent bands are **12-40 rows** top and bottom (the genuine
+  master measures 21/22: the 15/16px centring band plus the erosion's own margin) and **1-12
+  columns** left and right (genuine 6/6, since the plaque spans the full width). *Mutations:*
+  stretch to fill; narrow the plaque 240px; a blank canvas; the scaffold placeholder; a master
+  saved without alpha **-> all must fail.** A floor with no ceiling passed the first three.
+- **Toolchain provenance.** Given the `.ico`, then its entry set **equals** {256,128,64,48,32,16},
+  the literal Wails passes to `winicon.GenerateIcon` at `packager.go:217`. *Mutations:* drop the
+  48; add a scaffold 24 **-> both must fail.**
+- **Source provenance.** Given `build/appicon-source.jpg`, then it decodes fully (not just its
+  header), is 2816x1536, and its sha256 equals the digest `scripts/build-appicon.py` pins.
+  *Mutations:* delete it; replace it with a different 2816x1536 render **-> both must fail.** Loop
+  3 found the whole suite passed with the file deleted, and again with it swapped.
+- Given the full gate on all three platforms, when it runs, then it passes.
 
 **Given** `build/appicon-source.jpg` and `scripts/build-appicon.py`
 **When** a future session needs to re-derive the master at higher fidelity
 **Then** both the original candidate JPEG and the derivation script are committed, so the master is
 reproducible rather than a one-off nobody can regenerate. Byte-identity across Pillow versions is not
 asserted -- that would pin the runner's Pillow build rather than this repo's code.
+
+### Story 6.2: Pin What Ships, Not the Template
+
+As a maintainer,
+I want the built exe's own resources asserted rather than the files it was built from,
+So that a regression in resource embedding fails the gate instead of shipping a default icon.
+
+**Closes:** D-128, D-129, D-130.
+
+**Why this is a story and not a footnote.** Every assertion Story 6.1 added reads the *input*
+assets under `build/`, never the *product* under `build/bin/`. If the resource-embedding path
+regressed, the exe would fall back to the shell's default icon and all eight tests would still
+pass. The sibling version-string resources are unverified at the same layer:
+`release_identity_test.go` pins ProductName, ProductVersion and CompanyName as they appear in
+`build/windows/info.json`'s **template** and passes, while nothing opens a built binary. The one
+time a person did look, during Story 6.1's manual pass, they reached a wrong conclusion (D-128)
+from a tool that cannot read a language-neutral string table -- which is the argument for an
+automated check, not against one.
+
+**The mechanism is verified, not assumed.** Walking the exe's PE resource directory with the
+standard library reaches `RT_ICON` (six PNG payloads decoding to 256/128/64/48/32/16 RGBA, the
+same set `icon.ico` carries), `RT_GROUP_ICON` and `RT_VERSION`. `debug/pe` supplies the section
+table; the three-level directory walk is manual, as no stdlib package exposes it. No new
+dependency.
+
+**Deliberately not in scope:** the artwork, the derivation, and anything Story 6.1 already pins
+about the committed assets. This story pins the exe.
+
+**Acceptance Criteria:**
+
+- **The exe's icon is the committed one.** Given a built exe, when its `RT_ICON` payloads are
+  decoded, then their sizes equal {256,128,64,48,32,16} and each matches the same-sized `icon.ico`
+  entry within the per-size tolerance Story 6.1 calibrated. *Mutations:* build with a stale `.ico`;
+  strip an `RT_ICON` entry -- both must fail, naming the exe.
+- **The exe's identity is the committed one.** Given a built exe, when `RT_VERSION`'s string table
+  is read through the resource block (not .NET's `FileVersionInfo`, which cannot see a
+  language-neutral table), then ProductName, CompanyName, ProductVersion and FileVersion match
+  `wails.json`. *Mutation:* change `wails.json`'s productVersion without rebuilding -- must fail.
+- **Absent build skips, never passes.** Given no `build/bin/fairdrop.exe`, when the suite runs,
+  then the test skips, gated as `TestDarwinBuiltAppSurvivesUnusableLock` is. *Mutation:* make it
+  fatal on a missing exe and confirm a bare local `go test ./...` then fails.
+- **A missing committed `.ico` cannot be manufactured by CI.** Given `icon.ico` deleted from git,
+  when the Windows job runs, then the post-build drift check fails naming `build/`. Today it is
+  scoped to `frontend/` only.
+- Given the full gate on all three platforms, when it runs, then it passes.
+

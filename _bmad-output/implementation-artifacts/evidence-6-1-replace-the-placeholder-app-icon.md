@@ -241,3 +241,91 @@ a small entry is outside what it can see.
 - `minCentralSaturation`'s comment said the master measures 0.57; recomputed exactly as the code
   does, it is **0.592**. The 0.57 predated loop 1's alpha fix.
 
+## Review loop 3
+
+Loop 2 hardened the assertions and still left three holes, each of the same shape as loop 1's and
+loop 2's: an assertion pinned a sampling method rather than a property, and a tolerance was picked
+for headroom rather than derived from a measured boundary.
+
+### What loop 2's assertions still permitted
+
+| mutation of the committed assets | loop-2 result |
+|---|---|
+| any of the 16/32/48/64/128 entries replaced by a flat coloured square | **entire suite passed** |
+| master brightened +2, +4 or +6/255 with the `.ico` left stale | **all passed** (+8 was the first caught) |
+| plaque narrowed 240px | `MasterGeometry` did not fire |
+| `build/appicon-source.jpg` swapped for a different 2816x1536 render | **entire suite passed** |
+
+Only the 256 entry was ever compared against the master, so five of six entries -- the sizes
+Windows actually draws in the taskbar -- could hold no artwork at all. The freshness tolerance had
+been changed from an absolute 18.0 to an absolute 4.96 and reported as closing the stale-icon gap;
+the new boundary was never measured, and it sat at a 2.4% tonal revision.
+
+Two constants were also wrong in their own comments. `maxLowToHighDeviationRatio` claimed the
+genuine master measures 3.19 / 2.47 = 1.3; it measures **3.172 / 2.621 = 1.21**. And the ratio
+branch sat in a `switch` after the absolute bound, which both premultiply mutations trip first, so
+by this repo's own standard the constant was decoration.
+
+### What changed
+
+Freshness now compares **every** entry against the master, each against its own measured
+same-artwork distance (0.616 at 256 rising to 4.109 at 16, because the two resampling filters
+disagree more the further the downsample goes) times a factor of 1.5. A factor cannot drift away
+from its measurement the way an absolute can. Geometry bounds columns as well as rows. The
+alpha-once test counts leading and trailing runs separately, flushes a run that reaches the right
+image edge, guards against a zero high-alpha mean, and evaluates its two bounds independently.
+Sample floors moved from 5% of the measured values to roughly half.
+
+Every measured value is now logged on each run (`go test -run TestAppIcon -v`), so drift toward a
+bound is visible rather than discovered.
+
+### Derived mutation table
+
+Produced by `scripts/verify-asset-mutations.py`, which applies each mutation to the real committed
+assets, runs the real suite, and restores from git with a sha256 check between cases. It is the
+asset-side equivalent of `scripts/verify-native-mutations.sh`, and it exists because loop 2's table
+was hand-written and carried three stale numbers into a merged evidence file -- exactly what
+AGENTS.md's Story 3.8 lesson warns about.
+
+```
+baseline: all TestAppIcon* pass
+
+| # | mutation | named test | killed |
+|---|---|---|---|
+| 1 | master brightened +2/255, .ico stale | `MasterMatchesIcoFreshness` | yes |
+| 2 | master hue-swapped, .ico stale | `MasterMatchesIcoFreshness` | yes |
+| 3 | 16x16 entry a flat coloured square | `MasterMatchesIcoFreshness` | yes |
+| 4 | 48x48 entry a flat coloured square | `MasterMatchesIcoFreshness` | yes |
+| 5 | 128x128 entry a flat coloured square | `MasterMatchesIcoFreshness` | yes |
+| 6 | 16x16 entry opaque white | `EveryIcoEntryCarriesTheArtwork` | yes |
+| 7 | re-derived with ERODE_PX = 0 | `NoOpaqueBackdrop` | yes |
+| 8 | master alpha 0, colour intact | `CarriesRealColour` | yes |
+| 9 | premultiply defect, full | `MasterAppliesAlphaOnce` | yes |
+| 10 | premultiply defect, 20% (ratio bound only) | `MasterAppliesAlphaOnce` | yes |
+| 11 | plaque stretched to fill canvas | `MasterGeometry` | yes |
+| 12 | plaque narrowed 240px (columns) | `MasterGeometry` | yes |
+| 13 | master fully blank | `MasterGeometry` | yes |
+| 14 | master is the Wails scaffold placeholder | `MasterGeometry` | yes |
+| 15 | .ico reverted to the Wails scaffold | `IcoCarriesTheFullWailsSizeSet` | yes |
+| 16 | .ico 48x48 entry dropped | `IcoCarriesTheFullWailsSizeSet` | yes |
+| 17 | .ico gains an extra 24x24 entry | `IcoCarriesTheFullWailsSizeSet` | yes |
+| 18 | source render deleted | `SourceRenderIsThePinnedGeometry` | yes |
+| 19 | source render replaced, same size | `SourceRenderIsThePinnedGeometry` | yes |
+
+19 of 19 mutations failed their named test.
+
+freshness boundary, master brightened by +N with the .ico left stale:
+  +0   missed
+  +1   CAUGHT
+  +2   CAUGHT
+  +3   CAUGHT
+  +4   CAUGHT
+```
+
+Case 10 is the one that earns the ratio bound its place: a 20% premultiply measures 6.946 against
+a high-alpha 3.001, which stays **under** the absolute bound of 8.0 and is caught only by the
+ratio. The full premultiply trips both, so it proves nothing about the ratio on its own.
+
+The freshness boundary is now measured rather than asserted: +0 (the genuine asset) passes and
++1/255 fails, against loop 2's first catch at +8.
+

@@ -24,18 +24,25 @@ The structure is:
   The script deliberately does not guarantee byte-identical output across Pillow versions, so the
   version is recorded here rather than pinned in a lockfile the repo does not otherwise have.
 
-  To re-derive after replacing `appicon-source.jpg`:
+  To re-derive after replacing `appicon-source.jpg`, **in this order** — the
+  script refuses any render it has not been told about, so the constants come first:
 
   ```sh
+  # 1. Point the pins at the new render. Both must change together:
+  #    EXPECTED_SOURCE_SHA256 in scripts/build-appicon.py
+  #    wantSourceSHA256 (and wantSourceWidth/Height if the size differs) in appicon_test.go
+  # 2. If the render is not 2816x1536, re-fit CROP_BOX and CORNER_RADIUS too.
   python scripts/build-appicon.py     # runs from any directory; rewrites build/appicon.png
   rm build/windows/icon.ico           # Wails only generates it when it is ABSENT
   wails build                         # regenerates icon.ico from the new master
+  python scripts/verify-asset-mutations.py   # re-derive the mutation evidence
   ```
 
-  **Commit both regenerated binaries.** `appicon.png` alone is not enough: leaving a stale
-  `icon.ico` beside a new master is the exact failure this whole section exists to prevent, and it
-  is what shipped the Wails placeholder through v1.0.0. `TestAppIconMasterMatchesIcoFreshness`
-  fails if the two disagree.
+  **Commit all three binaries** — `appicon-source.jpg`, `appicon.png` and `windows/icon.ico`.
+  Leaving a stale `icon.ico` beside a new master is the exact failure this whole section exists to
+  prevent, and it is what shipped the Wails placeholder through v1.0.0.
+  `TestAppIconMasterMatchesIcoFreshness` compares every `.ico` entry against the master and fails
+  if any disagrees; a uniform 1/255 tonal change is enough to trip it.
 
 ## Mac
 
