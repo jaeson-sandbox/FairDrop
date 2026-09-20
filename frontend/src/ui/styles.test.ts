@@ -77,27 +77,32 @@ describe('the stylesheet parser sees the whole file', () => {
     })
 })
 
-describe('the Terracotta Linen token layer', () => {
-    it('declares every authored light value as a Tailwind v4 theme variable', () => {
+describe('the Quartz token layer', () => {
+    it('declares every Quartz light value as a Tailwind v4 theme variable', () => {
         const light: Record<string, string> = {
-            canvas: '#F7F0E7',
-            surface: '#FFFAF4',
-            elevated: '#EFE2D4',
-            text: '#2C2723',
-            muted: '#70645B',
-            border: '#CDBDAE',
-            'control-border': '#8B7462',
-            primary: '#A94724',
+            canvas: '#F2F2F4',
+            surface: '#FFFFFF',
+            elevated: '#FFFFFF',
+            fill: '#F1F1F2',
+            'fill-strong': '#E8E8EA',
+            text: '#1A1A1C',
+            muted: '#65656B',
+            separator: '#D6D6D6',
+            'control-border': '#86868B',
+            primary: '#0A6CD8',
+            'primary-hi': '#2B86EE',
             'primary-ink': '#FFFFFF',
-            hover: '#873719',
-            drop: '#F1D0BD',
-            progress: '#B64B23',
-            focus: '#7E4B92',
-            success: '#2F7658',
-            warning: '#946000',
-            error: '#AB3932',
+            'primary-tint': '#E6EFFB',
+            track: '#E9E9EB',
+            focus: '#0A6CD8',
+            success: '#177A48',
+            'success-tint': '#E3F1EA',
+            warning: '#8A5300',
+            'warning-tint': '#F6EDE0',
+            error: '#C0362C',
+            'error-tint': '#F8E9E7',
             'qr-surface': '#FFFFFF',
-            'qr-ink': '#221F1C',
+            'qr-ink': '#1A1A1C',
         }
 
         for (const [role, value] of Object.entries(light)) {
@@ -107,22 +112,27 @@ describe('the Terracotta Linen token layer', () => {
 
     it('declares the authored dark half as exact values rather than an inversion', () => {
         const darkPair: Record<string, string> = {
-            canvas: '#1C1916',
-            surface: '#25211D',
-            elevated: '#312A24',
-            text: '#F7EFE5',
-            muted: '#BCAF9F',
-            border: '#55493F',
-            'control-border': '#89796A',
-            primary: '#FF986D',
-            'primary-ink': '#2B1309',
-            hover: '#FFB18F',
-            drop: '#4A2D23',
-            progress: '#FF8858',
-            focus: '#C5A1D3',
-            success: '#79D5AA',
-            warning: '#F2BD62',
-            error: '#FF8B83',
+            canvas: '#161618',
+            surface: '#1F1F22',
+            elevated: '#27272B',
+            fill: '#313135',
+            'fill-strong': '#3A3A3E',
+            text: '#F2F2F4',
+            muted: '#9C9CA4',
+            separator: '#47474A',
+            'control-border': '#7A7A82',
+            primary: '#4C9BFF',
+            'primary-hi': '#6FB0FF',
+            'primary-ink': '#06203F',
+            'primary-tint': '#23303F',
+            track: '#3A3A3E',
+            focus: '#6FB0FF',
+            success: '#4ED08B',
+            'success-tint': '#20342A',
+            warning: '#E7A33A',
+            'warning-tint': '#372E1D',
+            error: '#FF7A70',
+            'error-tint': '#3A2422',
         }
 
         for (const [role, value] of Object.entries(darkPair)) {
@@ -140,48 +150,28 @@ describe('the Terracotta Linen token layer', () => {
 
     it('declares the type ramp, radii and spacing steps DESIGN.md publishes', () => {
         for (const declaration of [
-            '--text-display: 24px;',
+            '--text-display: 26px;',
             '--text-headline: 20px;',
-            '--text-body: 14px;',
+            '--text-numeric: 30px;',
+            '--text-body: 13.5px;',
             '--text-label: 12px;',
             '--text-code: 12px;',
-            '--text-control: 13px;',
-            '--radius-xs: 4px;',
-            '--radius-sm: 8px;',
-            '--radius-md: 12px;',
-            '--radius-lg: 16px;',
+            '--text-control: 14px;',
+            '--font-weight-display: 650;',
+            '--font-weight-body: 400;',
+            '--font-weight-body-strong: 590;',
+            '--font-weight-control: 590;',
+            '--radius-xs: 6px;',
+            '--radius-sm: 9px;',
+            '--radius-md: 11px;',
+            '--radius-lg: 14px;',
+            '--radius-xl: 18px;',
+            '--radius-xxl: 24px;',
             '--radius-full: 9999px;',
-            '--spacing-window-gutter: 20px;',
+            '--spacing-window-gutter: 24px;',
             '--spacing-target-min: 44px;',
-            '--shadow-paper: 3px 3px 0 #CDBDAE;',
         ]) {
             expect(theme, declaration).toContain(declaration)
-        }
-    })
-
-    it('fetches no font over the network, and declares only the weight it ships', () => {
-        /*
-          The spine's rule was "system-safe stacks only, do not load a web
-          font", amended to allow one bundled face. What the rule was protecting
-          survives and is asserted here: nothing is fetched at runtime, so there
-          is no third party and no render-blocking request.
-
-          The weight matters as much as the source. Only Nunito 400 ships, so
-          asking for a heavier one would have the browser synthesise faux bold
-          -- smeared, and worse than the system face it replaced.
-        */
-        const face = block('@font-face {')
-        expect(face).toContain('font-weight: 400;')
-        expect(face).toMatch(/src: url\("assets\/fonts\/[^"]+\.woff2"\)/)
-        expect(stylesheet).not.toMatch(/@import url\(|https?:\/\//)
-
-        // Functional text stays on the system stack, which has real weights.
-        expect(theme).toContain('--font-body: system-ui,')
-        expect(theme).toContain('--font-display: "Nunito"')
-
-        for (const [, weight] of theme.matchAll(/--font-weight-[a-z-]+: (\d+);/g)) {
-            expect(Number(weight), 'no weight may exceed what a real face carries')
-                .toBeLessThanOrEqual(650)
         }
     })
 
@@ -197,7 +187,13 @@ describe('the Terracotta Linen token layer', () => {
             '(?<![-\\w])(?:red|blue|green|black|white|gray|grey|orange|purple|pink|brown|yellow|cyan|magenta)(?![-\\w])',
         ].join('|'), 'g')
 
-        expect(componentRules.match(colorLiteral) ?? []).toEqual([])
+        // The primary button's 1px inset highlight is the one authored literal
+        // this spine permits: DESIGN.md scopes it to that single gradient's top
+        // edge, and it is not a color role a token could carry -- it is a fixed
+        // white at a fixed opacity, unrelated to any theme color.
+        const withoutHighlight = componentRules.replace('rgb(255 255 255 / 0.4)', '')
+
+        expect(withoutHighlight.match(colorLiteral) ?? []).toEqual([])
     })
 })
 
@@ -234,24 +230,29 @@ describe('forced colors', () => {
       focus ring -- is restated as a system color rather than left to it.
     */
 
-    it('supersedes Terracotta Linen with system colors on every authored token', () => {
+    it('supersedes Quartz with system colors on every authored token', () => {
         const systemColors: Record<string, string> = {
             canvas: 'Canvas',
             surface: 'Canvas',
             elevated: 'Canvas',
+            fill: 'Canvas',
+            'fill-strong': 'Canvas',
             text: 'CanvasText',
             muted: 'CanvasText',
-            border: 'CanvasText',
+            separator: 'CanvasText',
             'control-border': 'CanvasText',
             primary: 'Highlight',
+            'primary-hi': 'Highlight',
             'primary-ink': 'HighlightText',
-            hover: 'Highlight',
-            drop: 'Canvas',
-            progress: 'Highlight',
+            'primary-tint': 'Canvas',
+            track: 'Canvas',
             focus: 'Highlight',
             success: 'CanvasText',
+            'success-tint': 'Canvas',
             warning: 'CanvasText',
+            'warning-tint': 'Canvas',
             error: 'CanvasText',
+            'error-tint': 'Canvas',
         }
 
         for (const [role, value] of Object.entries(systemColors)) {
@@ -259,7 +260,7 @@ describe('forced colors', () => {
         }
 
         // Every authored role is covered: a token added to @theme without a
-        // forced-colors answer keeps its Terracotta value in the system palette.
+        // forced-colors answer keeps its Quartz value in the system palette.
         const authored = [...theme.matchAll(/--color-([a-z-]+):/g)].map(([, role]) => role)
         const uncovered = authored.filter((role) => !(role in systemColors) && !role.startsWith('qr-'))
         expect(uncovered).toEqual([])
@@ -268,12 +269,12 @@ describe('forced colors', () => {
     it('keeps the progress fill distinguishable from its own track', () => {
         // Highlight on Canvas. Left to the user agent both would become Canvas
         // and a determinate meter would read as empty at every percentage.
-        expect(forcedColors).toContain('--color-progress: Highlight;')
-        expect(forcedColors).toContain('--color-drop: Canvas;')
+        expect(forcedColors).toContain('--color-primary: Highlight;')
+        expect(forcedColors).toContain('--color-track: Canvas;')
     })
 
-    it('drops the decorative paper offset, which has no system color', () => {
-        expect(forcedColors).toContain('--shadow-paper: none;')
+    it('drops the primary button gradient and its highlight, which have no system color', () => {
+        expect(forcedColors).toMatch(/\.fd-button--primary \{\s*background: Highlight;\s*box-shadow: none;\s*\}/)
     })
 })
 
@@ -429,12 +430,44 @@ describe('guarantees a stylesheet edit could silently undo', () => {
         )
     })
 
-    it('spends the one sanctioned paper offset on the packet and nowhere else', () => {
-        // DESIGN.md allows one decorative offset edge, names 3px 3px 0, scopes
-        // it to StagedView, and says every other surface stays flat.
-        const shadows = [...componentRules.matchAll(/box-shadow:\s*([^;]+);/g)].map(([, value]) => value.trim())
+    it('pins the three elevation tokens and the single-gradient rule', () => {
+        // The paper offset is gone; this is what replaces the assertion that
+        // pinned it. Three tokens, declared once each in @theme and again as
+        // exact dark values (proved above), plus exactly one gradient in the
+        // whole product.
+        for (const token of ['--shadow-sh-1:', '--shadow-sh-2:', '--shadow-sh-3:']) {
+            expect(theme.match(new RegExp(token.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'g')) ?? [], token)
+                .toHaveLength(1)
+        }
 
-        expect(shadows).toEqual(['var(--shadow-paper)'])
+        const gradients = [...componentRules.matchAll(/(?<!repeating-)linear-gradient\(/g)]
+        expect(gradients).toHaveLength(1)
+
+        const primaryButton = block('.fd-button--primary {')
+        expect(primaryButton).toContain('linear-gradient(var(--color-primary-hi), var(--color-primary))')
+
+        // Never behind text: the one gradient sits on a control's background,
+        // and nothing clips a gradient to text anywhere in the sheet.
+        expect(stylesheet).not.toContain('background-clip: text')
+        expect(stylesheet).not.toContain('-webkit-background-clip: text')
+
+        // No element carries more than three shadow layers. box-shadow layers
+        // are comma-separated, but rgba()/rgb() commas are not layer
+        // separators, so they are stripped before counting. This has to look
+        // at both a literal `box-shadow:` declaration and the `--shadow-sh-*`
+        // tokens it reads through var() -- a var() reference itself never has
+        // a top-level comma to split on, so a layer added inside the token
+        // definition would otherwise pass unseen.
+        const shadowDeclarations = [
+            ...stylesheet.matchAll(/box-shadow:\s*([^;]+);/g),
+            ...stylesheet.matchAll(/--shadow-sh-[123]:\s*([^;]+);/g),
+        ]
+        expect(shadowDeclarations.length).toBeGreaterThan(0)
+
+        for (const [, value] of shadowDeclarations) {
+            const layers = value.replace(/rgba?\([^)]*\)/g, 'rgb').split(',')
+            expect(layers.length, value.trim()).toBeLessThanOrEqual(3)
+        }
     })
 })
 
@@ -444,8 +477,8 @@ describe('forced colors beat the authored dark palette', () => {
           Both blocks redefine the same custom properties on bare `:root`, both
           match in a dark high-contrast theme, and their specificity is equal --
           so source order is the whole mechanism. Moving the dark block to the
-          end of the file restores Terracotta Linen for a Windows High Contrast
-          user with all 462 tests green.
+          end of the file restores Quartz for a Windows High Contrast user with
+          the whole suite green.
         */
         const darkAt = stylesheet.indexOf('@media (prefers-color-scheme: dark) {')
         const forcedAt = stylesheet.indexOf('@media (forced-colors: active) {')
@@ -534,12 +567,12 @@ describe('the unrounded contrast proof', () => {
 
     /** [foreground, background, minimum ratio, published as an exact figure]. */
     /*
-      `border` is absent on purpose. DESIGN.md calls it the decorative edge --
-      "paper offsets and nonessential dividers only; never the sole boundary for
-      a control, drop target, QR, progress track, or status" -- and at 1.76:1
-      against surface it would fail any load-bearing floor. The test below
-      keeps it out of the places that would make it load-bearing, which is the
-      guarantee that lets it stay out of this table.
+      `separator` is absent on purpose. DESIGN.md calls it the decorative edge
+      -- "dividers inside a surface, and nothing else... it deliberately does
+      not meet 3:1 -- it is not a boundary, it is a rule between paragraphs" --
+      and it would fail any load-bearing floor. The test below keeps it out of
+      the places that would make it load-bearing, which is the guarantee that
+      lets it stay out of this table.
     */
     const placed: Array<[string, string, number, boolean]> = [
         // Text: 4.5:1. Every one of these is body copy, a control label, or a
@@ -561,7 +594,7 @@ describe('the unrounded contrast proof', () => {
         ['control-border', 'canvas', 3, true],
         ['control-border', 'surface', 3, true],
         ['control-border', 'elevated', 3, true],
-        ['progress', 'drop', 3, true],
+        ['primary', 'track', 3, true],
         ['primary', 'surface', 3, true],
         ['primary', 'elevated', 3, true],
         ['warning', 'elevated', 3, true],
@@ -602,11 +635,11 @@ describe('the unrounded contrast proof', () => {
     })
 
     it('keeps the floor DESIGN.md publishes instead of a row for status on its panel', () => {
-        expect(designSpine).toContain('exceed 5.14:1 light and 7.05:1 dark')
+        expect(designSpine).toContain('exceed 5.36:1 light and 6.47:1 dark')
 
         for (const status of ['warning', 'success', 'error']) {
-            expect(contrast(lightTokens[status], lightTokens['surface']), status).toBeGreaterThan(5.14)
-            expect(contrast(darkTokens[status], darkTokens['surface']), status).toBeGreaterThan(7.05)
+            expect(contrast(lightTokens[status], lightTokens['surface']), status).toBeGreaterThan(5.36)
+            expect(contrast(darkTokens[status], darkTokens['surface']), status).toBeGreaterThan(6.47)
         }
     })
 
@@ -627,8 +660,66 @@ describe('the unrounded contrast proof', () => {
             ...['canvas', 'surface', 'elevated'].map((surface) => contrast(lightTokens['focus'], lightTokens[surface])),
         )
 
-        expect(weakest).toBe(contrast(lightTokens['focus'], lightTokens['elevated']))
+        // Quartz's focus token is identical to primary, so the weakest pairing
+        // is against canvas -- the lowest-contrast of the three surfaces it
+        // sits on -- unlike Terracotta Linen, where elevated was weakest.
+        expect(weakest).toBe(contrast(lightTokens['focus'], lightTokens['canvas']))
         expect(designSpine).toContain(weakest.toFixed(9))
+    })
+})
+
+describe('the decorative edge stays decorative', () => {
+    // DESIGN.md requires the functional boundary token on controls, the
+    // rest-state drop target, the QR frame, the URL field and the progress
+    // track. `--color-separator` deliberately fails 3:1 against every surface
+    // -- 1.45 light, 1.75 dark -- so using it on any of these would put an
+    // invisible boundary on something that needs a visible one, and it would
+    // still pass the contrast proof above, which does not look at that token
+    // at all.
+    const controls = ['.fd-button', '.fd-drop-zone', '.fd-qr-panel', '.fd-url', '.fd-meter', '.fd-browse-menu']
+
+    it.each(controls)('%s draws its boundary with the functional token, not the decorative one', (selector) => {
+        const rule = block(`${selector} {`)
+
+        expect(rule).toContain('var(--color-control-border)')
+        expect(rule).not.toContain('var(--color-separator)')
+    })
+
+    it('never uses the decorative edge as the sole boundary of a control anywhere in the sheet', () => {
+        // A stronger, sheet-wide version of the assertion above: every
+        // `border`/`border-*` declaration that names --color-separator sits
+        // outside the curated control list, and none of those declarations
+        // belongs to a selector this list names.
+        for (const selector of controls) {
+            expect(componentRules).not.toMatch(
+                new RegExp(`${selector.replace('.', '\\.')} \\{[^}]*var\\(--color-separator\\)`),
+            )
+        }
+    })
+})
+
+describe('no font ships and none is fetched', () => {
+    /*
+      Quartz retires Nunito. The platform's own display face carries the
+      voice -- SF Pro on macOS, Segoe UI Variable on Windows, system-ui behind
+      both -- so there is no local weight to protect and no faux-bold hazard
+      to legislate. What is left to assert is the structural guarantee: no
+      font file is bundled, and nothing in the stylesheet fetches one.
+    */
+    it('declares no @font-face and bundles no font file', () => {
+        expect(stylesheet).not.toContain('@font-face')
+        expect(stylesheet).not.toMatch(/url\(["']?assets\/fonts/)
+        expect(existsSync(resolve(projectRoot, 'src/assets/fonts'))).toBe(false)
+    })
+
+    it('fetches no font or any other asset over the network', () => {
+        expect(stylesheet).not.toMatch(/@import url\(|https?:\/\//)
+    })
+
+    it('names only system font stacks, never a bundled family', () => {
+        expect(theme).not.toContain('Nunito')
+        expect(theme).toContain('--font-display: -apple-system,')
+        expect(theme).toContain('--font-body: -apple-system,')
     })
 })
 
@@ -674,11 +765,10 @@ describe('rules the components can only reference by name', () => {
 
       It was not hypothetical: `.fd-button[aria-disabled='true']` carried
       `opacity: 0.7`, and the quiet Cancel button underneath it is muted on
-      elevated -- published at 4.504478335:1 and composited to 2.64:1 light,
-      4.01:1 dark. The light pair has four thousandths of headroom at full
-      strength, so no fraction could have cleared the floor. Found by the Blind
-      Hunter layer re-run (D-109); DESIGN.md had already said it in the palette
-      table: "Muted is readable copy, never disabled text."
+      elevated -- a pair this file's proof publishes unrounded. No fraction
+      below 1 could safely dim it either. Found by the Blind Hunter layer
+      re-run (D-109); DESIGN.md had already said it in the palette table:
+      "Muted is readable copy, never disabled text."
 
       A future design that genuinely needs to dim something has to delete this
       test and publish the composited pair, which is the point.
@@ -710,22 +800,6 @@ describe('a cancellation is a status, and never an error', () => {
     })
 })
 
-describe('the decorative edge stays decorative', () => {
-    // DESIGN.md requires the functional boundary token on controls, the
-    // rest-state drop target, the QR frame, the URL field and the progress
-    // track. --color-border is 1.76:1 against surface, so using it on any of
-    // them would put an invisible boundary on something that needs a visible
-    // one -- and it would still pass the contrast proof, which does not look
-    // at that token at all.
-    it.each(['.fd-button', '.fd-drop-zone', '.fd-qr-panel', '.fd-url', '.fd-meter', '.fd-browse-menu'])(
-        '%s draws its boundary with the functional token', (selector) => {
-            const rule = block(`${selector} {`)
-
-            expect(rule).not.toContain('var(--color-border)')
-        },
-    )
-})
-
 describe('declared weight nothing uses', () => {
     it('carries no animation library, since every animation one would serve is banned', () => {
         const manifest = JSON.parse(readFileSync(resolve(projectRoot, 'package.json'), 'utf8')) as {
@@ -734,15 +808,5 @@ describe('declared weight nothing uses', () => {
 
         expect(Object.keys(manifest.dependencies).sort()).toEqual(['react', 'react-dom'])
         expect(JSON.stringify(manifest)).not.toContain('framer-motion')
-    })
-
-    it('ships the face the stylesheet names, so the local reference resolves', () => {
-        const face = block('@font-face {')
-        const [, relative] = face.match(/src: url\("([^"]+)"\)/) ?? []
-
-        expect(relative, 'a local src in @font-face').toBeTruthy()
-        expect(existsSync(resolve(projectRoot, 'src', relative!))).toBe(true)
-        // The licence travels with the face it covers.
-        expect(existsSync(resolve(projectRoot, 'src/assets/fonts/OFL.txt'))).toBe(true)
     })
 })

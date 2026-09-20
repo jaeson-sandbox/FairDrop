@@ -81,8 +81,8 @@ func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
 		token string
 		want  options.RGBA
 	}{
-		{"light", false, "--color-canvas: #F7F0E7;", options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1}},
-		{"dark", true, "--color-canvas: #1C1916;", options.RGBA{R: 0x1C, G: 0x19, B: 0x16, A: 1}},
+		{"light", false, "--color-canvas: #F2F2F4;", options.RGBA{R: 0xF2, G: 0xF2, B: 0xF4, A: 1}},
+		{"dark", true, "--color-canvas: #161618;", options.RGBA{R: 0x16, G: 0x16, B: 0x18, A: 1}},
 	} {
 		t.Run(theme.name, func(t *testing.T) {
 			if !strings.Contains(declared, theme.token) {
@@ -106,7 +106,7 @@ func TestAppOptionsBackgroundTracksTheCanvasToken(t *testing.T) {
 	if !found {
 		t.Fatal("style.css has no dark-scheme block, so the dark token above is not the dark theme's")
 	}
-	if !strings.Contains(darkBlock, "--color-canvas: #1C1916;") {
+	if !strings.Contains(darkBlock, "--color-canvas: #161618;") {
 		t.Error("the dark canvas token is not declared inside the prefers-color-scheme block")
 	}
 }
@@ -369,7 +369,7 @@ func TestTheRegistryLiteralCoversEveryCodeTheDomainDefines(t *testing.T) {
 
 func TestTheCrossLanguageErrorRegistryPinsEveryCodeAndMessage(t *testing.T) {
 	registry, err := os.ReadFile(filepath.Join(
-		"_bmad-output", "planning-artifacts", "ux-designs", "ux-FairDrop-2026-08-23", "EXPERIENCE.md",
+		"_bmad-output", "planning-artifacts", "ux-designs", "ux-FairDrop-quartz-2026-09-20", "EXPERIENCE.md",
 	))
 	if err != nil {
 		t.Fatalf("read EXPERIENCE.md: %v", err)

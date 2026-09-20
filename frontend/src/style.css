@@ -1,97 +1,94 @@
 @import "tailwindcss";
 
 /*
-  Nunito carries the paper voice: a rounded humanist face, bundled as a local
-  woff2 rather than fetched, so there is no network request and no third party.
-  Only the 400 weight ships, so nothing below asks for more -- a heavier request
-  would be synthesised into smeared faux bold. Emphasis is carried by the system
-  stack instead, which has real weights.
-*/
-@font-face {
-    font-family: "Nunito";
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url("assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
-}
-
-/*
-  Terracotta Linen -- the DESIGN.md token set, declared once as Tailwind v4 theme
+  Quartz -- the DESIGN.md token set, declared once as Tailwind v4 theme
   variables. Every rule below reads a var() from here, so a color, radius, type
   step or spacing step can be traced to a row of DESIGN.md rather than to a
   literal buried in a component.
 
   DESIGN.md publishes an authored light/dark pair, not a tint recipe, so the dark
   half is a second set of exact values further down rather than a filter over
-  these. The bundled web face the Wails template shipped is deliberately gone:
-  the spine allows system-safe stacks only, and no view names one any more.
+  these. No font is bundled and none is fetched: the platform's own display face
+  carries the voice, so this stylesheet declares no local font source at all.
 */
 @theme {
-    --color-canvas: #F7F0E7;
-    --color-surface: #FFFAF4;
-    --color-elevated: #EFE2D4;
-    --color-text: #2C2723;
-    --color-muted: #70645B;
-    --color-border: #CDBDAE;
-    --color-control-border: #8B7462;
-    --color-primary: #A94724;
+    --color-canvas: #F2F2F4;
+    --color-surface: #FFFFFF;
+    --color-elevated: #FFFFFF;
+    --color-fill: #F1F1F2;
+    --color-fill-strong: #E8E8EA;
+    --color-text: #1A1A1C;
+    --color-muted: #65656B;
+    --color-separator: #D6D6D6;
+    --color-control-border: #86868B;
+    --color-primary: #0A6CD8;
+    --color-primary-hi: #2B86EE;
     --color-primary-ink: #FFFFFF;
-    --color-hover: #873719;
-    --color-drop: #F1D0BD;
-    --color-progress: #B64B23;
-    --color-focus: #7E4B92;
-    --color-success: #2F7658;
-    --color-warning: #946000;
-    --color-error: #AB3932;
+    --color-primary-tint: #E6EFFB;
+    --color-track: #E9E9EB;
+    --color-focus: #0A6CD8;
+    --color-success: #177A48;
+    --color-success-tint: #E3F1EA;
+    --color-warning: #8A5300;
+    --color-warning-tint: #F6EDE0;
+    --color-error: #C0362C;
+    --color-error-tint: #F8E9E7;
 
     /* Fixed in both modes: the QR substrate is never recolored or inverted. */
     --color-qr-surface: #FFFFFF;
-    --color-qr-ink: #221F1C;
+    --color-qr-ink: #1A1A1C;
 
-    --font-display: "Nunito", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-code: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --font-code: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", monospace;
 
-    --text-display: 24px;
-    --leading-display: 1.3;
-    --tracking-display: -0.005em;
-    --font-weight-display: 400;
+    --text-display: 26px;
+    --leading-display: 1.2;
+    --tracking-display: -0.022em;
+    --font-weight-display: 650;
 
     --text-headline: 20px;
-    --leading-headline: 1.35;
-    --tracking-headline: -0.005em;
-    --font-weight-headline: 400;
+    --leading-headline: 1.25;
+    --tracking-headline: -0.016em;
+    --font-weight-headline: 650;
 
-    --text-body: 14px;
-    --leading-body: 1.6;
+    --text-numeric: 30px;
+    --leading-numeric: 1.15;
+    --tracking-numeric: -0.022em;
+    --font-weight-numeric: 650;
+
+    --text-body: 13.5px;
+    --leading-body: 1.55;
     --font-weight-body: 400;
 
-    --text-body-strong: 14px;
+    --text-body-strong: 13.5px;
     --leading-body-strong: 1.5;
-    --font-weight-body-strong: 600;
+    --font-weight-body-strong: 590;
 
     --text-label: 12px;
     --leading-label: 1.3;
-    --tracking-label: 0.05em;
+    --tracking-label: 0.045em;
     --font-weight-label: 650;
 
-    --text-meta: 12px;
-    --leading-meta: 1.45;
+    --text-meta: 12.5px;
+    --leading-meta: 1.5;
     --font-weight-meta: 400;
 
     --text-code: 12px;
-    --leading-code: 1.4;
-    --font-weight-code: 500;
+    --leading-code: 1.45;
+    --font-weight-code: 400;
 
-    --text-control: 13px;
+    --text-control: 14px;
     --leading-control: 1.3;
-    --font-weight-control: 600;
+    --tracking-control: -0.005em;
+    --font-weight-control: 590;
 
-    --radius-xs: 4px;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
+    --radius-xs: 6px;
+    --radius-sm: 9px;
+    --radius-md: 11px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --radius-xxl: 24px;
     --radius-full: 9999px;
 
     --spacing-1: 4px;
@@ -102,12 +99,17 @@
     --spacing-6: 24px;
     --spacing-7: 32px;
     --spacing-8: 40px;
-    --spacing-window-gutter: 20px;
-    --spacing-control-height: 36px;
+    --spacing-window-gutter: 24px;
+    --spacing-control-height: 40px;
     --spacing-target-min: 44px;
 
-    /* Decorative paper offset, kept apart from any functional boundary. */
-    --shadow-paper: 3px 3px 0 #CDBDAE;
+    /*
+      Three elevation steps, declared once. Dark mode raises opacity rather
+      than deriving from the light values -- see the dark override below.
+    */
+    --shadow-sh-1: 0 0.5px 1px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.05);
+    --shadow-sh-2: 0 1px 2px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.07);
+    --shadow-sh-3: 0 2px 6px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.10);
 }
 
 /*
@@ -137,23 +139,32 @@
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --color-canvas: #1C1916;
-        --color-surface: #25211D;
-        --color-elevated: #312A24;
-        --color-text: #F7EFE5;
-        --color-muted: #BCAF9F;
-        --color-border: #55493F;
-        --color-control-border: #89796A;
-        --color-primary: #FF986D;
-        --color-primary-ink: #2B1309;
-        --color-hover: #FFB18F;
-        --color-drop: #4A2D23;
-        --color-progress: #FF8858;
-        --color-focus: #C5A1D3;
-        --color-success: #79D5AA;
-        --color-warning: #F2BD62;
-        --color-error: #FF8B83;
-        --shadow-paper: 3px 3px 0 #55493F;
+        --color-canvas: #161618;
+        --color-surface: #1F1F22;
+        --color-elevated: #27272B;
+        --color-fill: #313135;
+        --color-fill-strong: #3A3A3E;
+        --color-text: #F2F2F4;
+        --color-muted: #9C9CA4;
+        --color-separator: #47474A;
+        --color-control-border: #7A7A82;
+        --color-primary: #4C9BFF;
+        --color-primary-hi: #6FB0FF;
+        --color-primary-ink: #06203F;
+        --color-primary-tint: #23303F;
+        --color-track: #3A3A3E;
+        --color-focus: #6FB0FF;
+        --color-success: #4ED08B;
+        --color-success-tint: #20342A;
+        --color-warning: #E7A33A;
+        --color-warning-tint: #372E1D;
+        --color-error: #FF7A70;
+        --color-error-tint: #3A2422;
+
+        /* Dark mode raises opacity rather than lowering the light values. */
+        --shadow-sh-1: 0 0.5px 1px rgba(0,0,0,.4);
+        --shadow-sh-2: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.34);
+        --shadow-sh-3: 0 2px 8px rgba(0,0,0,.44), 0 16px 40px rgba(0,0,0,.5);
     }
 }
 
@@ -288,15 +299,22 @@ body {
     cursor: pointer;
 }
 
+/*
+  The one gradient the product ships: the primary button's primary-hi -> primary
+  vertical fill, plus a 1px inset top highlight. Forced colors overrides this
+  selector directly below, after the dark block, so no authored hue -- gradient
+  or otherwise -- survives into that mode.
+*/
 .fd-button--primary {
     border-color: var(--color-primary);
-    background: var(--color-primary);
+    background: linear-gradient(var(--color-primary-hi), var(--color-primary));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
     color: var(--color-primary-ink);
 }
 
 .fd-button--primary:hover {
-    background: var(--color-hover);
-    border-color: var(--color-hover);
+    background: var(--color-primary-hi);
+    border-color: var(--color-primary-hi);
 }
 
 /* Cancel and Dismiss: quiet text actions that still own a full target. */
@@ -359,12 +377,11 @@ body {
   It looks like it without dimming. This rule carried `opacity: 0.7`, which
   multiplied whichever text pair the control was already using and published no
   figure for the result: the quiet Cancel button is muted on elevated, a pair
-  the contrast table above publishes at 4.504478335:1 light, and at 0.7 that
-  composites to 2.6447:1 light and 4.0133:1 dark -- both under the 4.5:1 floor,
-  on the one label that says a cancellation is in progress. No opacity below 1
-  could have cleared it either: the light pair has four thousandths of headroom
-  at full strength. DESIGN.md's palette table settles it in one line -- "Muted
-  is readable copy, never disabled text."
+  the contrast table above publishes unrounded, and at 0.7 that composited
+  under the 4.5:1 floor on the one label that says a cancellation is in
+  progress. No opacity below 1 could have cleared it safely either. DESIGN.md's
+  palette table settles it in one line -- "Muted is readable copy, never
+  disabled text."
 
   What carries the state instead is already there and costs no contrast: the
   label itself changes (Cancel -> Canceling…, Cancel preparation -> Canceling
@@ -455,7 +472,7 @@ body {
 .fd-drop-zone.wails-drop-target-active {
     border-style: solid;
     border-color: var(--color-primary);
-    background: var(--color-drop);
+    background: var(--color-primary-tint);
 }
 
 .fd-drop-symbol {
@@ -486,8 +503,8 @@ body {
 
 /*
   The product's first floating surface (spec-4-1). A functional boundary, not
-  the decorative paper shadow StagedView alone is allowed -- see "spends the
-  one sanctioned paper offset" in styles.test.ts.
+  the decorative separator -- see "the decorative edge stays decorative" in
+  styles.test.ts.
 */
 .fd-browse-menu {
     position: absolute;
@@ -580,10 +597,10 @@ body {
     flex-direction: column;
     gap: var(--spacing-4);
     padding: var(--spacing-5);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-separator);
     border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg);
     background: var(--color-elevated);
-    box-shadow: var(--shadow-paper);
+    box-shadow: var(--shadow-sh-3);
 }
 
 .fd-hero {
@@ -612,7 +629,7 @@ body {
     display: grid;
     gap: var(--spacing-3);
     padding: var(--spacing-4);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-separator);
     border-radius: var(--radius-md);
     background: var(--color-surface);
     color: var(--color-text);
@@ -744,7 +761,7 @@ body {
     display: grid;
     gap: var(--spacing-2);
     padding-top: var(--spacing-4);
-    border-top: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-separator);
     color: var(--color-muted);
 }
 
@@ -786,7 +803,7 @@ body {
     overflow: hidden;
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-full);
-    background: var(--color-drop);
+    background: var(--color-track);
 }
 
 /*
@@ -797,7 +814,7 @@ body {
     background-image: repeating-linear-gradient(
         135deg,
         transparent 0 8px,
-        var(--color-progress) 8px 12px,
+        var(--color-primary) 8px 12px,
         transparent 12px 20px
     );
 }
@@ -805,7 +822,7 @@ body {
 .fd-meter__fill {
     display: block;
     height: 100%;
-    background: var(--color-progress);
+    background: var(--color-primary);
 }
 
 .fd-empty-status {
@@ -827,7 +844,7 @@ body {
 
 .fd-metric {
     padding: var(--spacing-3);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-separator);
     border-radius: var(--radius-sm);
     background: var(--color-surface);
 }
@@ -920,7 +937,7 @@ body {
 /* ------------------------------------------------- Forced colors and motion */
 
 /*
-  Forced colors supersede Terracotta Linen.
+  Forced colors supersede Quartz.
 
   The override is done on the tokens, not rule by rule, because every component
   rule already reads a var(): one block therefore reaches the whole app and no
@@ -933,28 +950,47 @@ body {
   state is left to color alone in either mode: the drop target's active state is
   a solid boundary against a dashed one, unknown progress is a static pattern
   plus its literal text, and every outcome carries a glyph and a heading.
+
+  Every shadow and every gradient is dropped here too. The three elevation
+  tokens have no system color and are reset to none; the primary button's
+  gradient stops (--color-primary-hi and --color-primary) both resolve to
+  Highlight in this block, so the declaration below strips the gradient
+  function and its inset highlight outright rather than leaving two identical
+  stops behind.
 */
 @media (forced-colors: active) {
     :root {
         --color-canvas: Canvas;
         --color-surface: Canvas;
         --color-elevated: Canvas;
+        --color-fill: Canvas;
+        --color-fill-strong: Canvas;
         --color-text: CanvasText;
         --color-muted: CanvasText;
-        --color-border: CanvasText;
+        --color-separator: CanvasText;
         --color-control-border: CanvasText;
         --color-primary: Highlight;
+        --color-primary-hi: Highlight;
         --color-primary-ink: HighlightText;
-        --color-hover: Highlight;
-        --color-drop: Canvas;
-        --color-progress: Highlight;
+        --color-primary-tint: Canvas;
+        --color-track: Canvas;
         --color-focus: Highlight;
         --color-success: CanvasText;
+        --color-success-tint: Canvas;
         --color-warning: CanvasText;
+        --color-warning-tint: Canvas;
         --color-error: CanvasText;
+        --color-error-tint: Canvas;
 
         /* Decorative depth has no meaning in this mode and no system color. */
-        --shadow-paper: none;
+        --shadow-sh-1: none;
+        --shadow-sh-2: none;
+        --shadow-sh-3: none;
+    }
+
+    .fd-button--primary {
+        background: Highlight;
+        box-shadow: none;
     }
 
     /*

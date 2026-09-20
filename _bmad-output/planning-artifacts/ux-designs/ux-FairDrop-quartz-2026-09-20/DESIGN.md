@@ -1,7 +1,7 @@
 ---
 name: FairDrop
 description: Quartz visual system — neutral materials, one signal colour, and real layered depth for an ephemeral LAN handoff utility.
-status: draft
+status: final
 created: '2026-09-20'
 updated: '2026-09-20'
 supersedes: 'ux-FairDrop-2026-08-23 (Paper Relay / Terracotta Linen)'
@@ -165,21 +165,55 @@ Every figure in the two tables below is **derived, not maintained**.
 A palette edit that quietly breaks a pair fails at that assertion, and a figure
 hand-edited here is rejected by the same test.
 
-> **Tables pending.** The token set above was validated against both floors before
-> being written down — every text pair clears 4.5:1 and every functional boundary
-> clears 3:1 in both modes — but the published figures must be **copied from the
-> test's own output**, not hand-computed, exactly as the Paper Relay spine required.
-> Story 7.1 lands the token layer and fills these two tables from the suite's
-> reported values. Until then this document is `status: draft` and must not be
-> cited as a verified contrast proof.
+Every figure below was copied verbatim from `styles.test.ts`'s own computed
+output (`frontend/src/ui/styles.test.ts`, "the unrounded contrast proof"), never
+hand-computed or hand-adjusted. `qr-ink` on `qr-surface` is fixed in both modes
+at **17.377657264**.
 
 | Text pair | Light ratio | Dark ratio |
 |---|---:|---:|
-| _populated by Story 7.1 from `styles.test.ts` output_ | | |
+| `text` on `canvas` | 15.542768731 | 16.163110010 |
+| `text` on `surface` | 17.377657264 | 14.704322177 |
+| `text` on `elevated` | 17.377657264 | 13.308196422 |
+| `muted` on `canvas` | 5.178387528 | 6.630453856 |
+| `muted` on `surface` | 5.789717726 | 6.032027848 |
+| `muted` on `elevated` | 5.789717726 | 5.459307165 |
+| `error` on `elevated` | 5.518575206 | 5.859450762 |
+| `primary-ink` on `primary` | 5.060845348 | 5.784694439 |
+
+Status text placed on its own panel (`.fd-button--quiet`'s muted/error on
+elevated is the row above; `warning`/`success`/`error` on `surface` is what the
+Warning Banner, a completed transfer's success copy, and the Error Panel place)
+is published as a floor rather than one row per status, because the row has to
+stay the weakest of the three as the palette moves: every one of the three is
+proven, unrounded, to exceed 5.36:1 light and 6.47:1 dark.
 
 | Load-bearing pair | Light ratio | Dark ratio |
 |---|---:|---:|
-| _populated by Story 7.1 from `styles.test.ts` output_ | | |
+| `control-border` on `canvas` | 3.240328251 | 4.245594789 |
+| `control-border` on `surface` | 3.622862486 | 3.862412220 |
+| `control-border` on `elevated` | 3.622862486 | 3.495689217 |
+| `primary` on `track` | 4.173974302 | 4.011363202 |
+| `primary` on `surface` | 5.060845348 | 5.824411172 |
+| `primary` on `elevated` | 5.060845348 | 5.271402992 |
+| `warning` on `elevated` | 6.329195349 | 6.871224941 |
+| `focus` on `elevated` | 5.060845348 | 6.610678352 |
+
+Status rules and the focus ring against the stronger surfaces (`canvas` and
+`surface`) are published as the weakest-of-the-set claim rather than one row
+each, for the same reason as the status-on-surface floor above. The weakest of
+`warning`/`success`/`error` on `canvas` is `success` at **4.799052371** light
+and `error` at **7.116437439** dark. The weakest of `focus` against
+`canvas`/`surface`/`elevated` is `focus` on `canvas` at **4.526476017** (light;
+Quartz's focus token equals primary, so canvas — not elevated — is the weakest
+adjacent surface).
+
+`separator` is excluded from both tables on purpose: it is the decorative edge,
+never a boundary, and it deliberately fails 3:1 against every surface it can sit
+on. Against `surface` (its most common adjacency) it is 1.453401544 light and
+1.775620130 dark; across `canvas`/`surface`/`elevated` it ranges 1.299938406 to
+1.453401544 light and 1.607030993 to 1.951776026 dark — never within reach of
+3:1. `styles.test.ts` asserts it is never the sole boundary of any control.
 
 When `forced-colors: active`, use system colours for text, surfaces, controls,
 borders, status rules, progress, and focus; retain text, glyph, length, and
