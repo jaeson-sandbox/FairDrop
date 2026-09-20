@@ -80,8 +80,28 @@ export type LifecycleEvent =
 
 export type PendingItemKind = 'file' | 'directory' | 'unknown'
 
+/**
+ * What the completion receipt needs, and nothing else `FileMetadata` carries.
+ *
+ * Deliberately not `FileMetadata`: that type also carries `url` (the one-shot
+ * capability download link) and `qrBase64` (a scannable PNG of that same
+ * link). This receipt lives on in `RetainedDoneOutcome`, in Idle, after the
+ * session has been reset and the server has stopped -- FairDrop's contract is
+ * that it persists nothing, and a sender-side surface that could re-present a
+ * dead capability link (or hold its QR code indefinitely) is exactly what
+ * that contract forbids. `bytesSent` comes from the terminal
+ * `ProgressSnapshot`, never from `FileMetadata.size` (Story 7.4 AC3).
+ */
+export interface CompletionReceipt {
+    readonly name: string
+    readonly isDir: boolean
+    readonly bytesSent: number
+}
+
 export interface RetainedDoneOutcome {
     readonly kind: 'done'
+    /** What was sent and how much, scrubbed of the capability link and its QR. */
+    readonly receipt: CompletionReceipt
 }
 
 export interface RetainedErrorOutcome {

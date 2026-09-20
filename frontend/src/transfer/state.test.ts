@@ -111,11 +111,15 @@ describe('authoritative lifecycle grammar', () => {
         expect(state).toEqual({
             phase: 'done',
             session: {sessionId, lastSeq: 3},
-            outcome: {kind: 'done'},
+            outcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
         })
 
         state = event(state, 'transfer-reset', {sessionId, seq: 4})
-        expect(state).toEqual({phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null})
+        expect(state).toEqual({
+            phase: 'idle',
+            retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
+            commandError: null,
+        })
     })
 
     it('accepts failure with or without final progress and uses fixed terminal copy', () => {
@@ -291,24 +295,150 @@ describe('authoritative lifecycle grammar', () => {
     })
 })
 
-describe('terminal scrubbing and retained outcome', () => {
-    it('discards metadata at terminal and all correlation data on reset', () => {
+describe('terminal receipt retention (Story 7.4)', () => {
+    /*
+      Reversed from the pre-7.4 behaviour this test used to pin: the reducer
+      used to discard `metadata` and the `transfer-complete` snapshot at this
+      exact transition, which is why the finished-transfer screen had nothing
+      left to draw (Epic 7's diagnosis). Both values are already in hand here
+      and are now retained on `DoneTransferState.outcome`, which is what lets
+      Story 7.5 render a receipt instead of an empty window.
+    */
+    it('retains a completion receipt (name, isDir, wire bytes sent) at transfer-complete', () => {
         let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
         state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: progress(100)})
-        expect(JSON.stringify(state)).not.toContain('fedcba9876543210fedcba9876543210')
-        expect(JSON.stringify(state)).not.toContain(
-            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        )
-        expect(JSON.stringify(state)).not.toContain('report.pdf')
+
+        expect(state).toEqual({
+            phase: 'done',
+            session: {sessionId, lastSeq: 2},
+            outcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
+        })
+        // *Mutation:* drop `receipt` from the outcome -> must fail here.
+        const outcome = state.phase === 'done' ? state.outcome : null
+        expect(outcome && 'receipt' in outcome, 'DoneTransferState.outcome must carry a receipt').toBe(true)
+    })
+
+    /*
+      Wire bytes, not logical size. A file's `progress.totalBytes` is forced
+      equal to `metadata.size` by `progressMatchesMetadata`, and a known-total
+      `transfer-complete` is refused unless `bytesSent === totalBytes` --
+      so for a plain file the two numbers coincide and cannot tell a correct
+      receipt from a broken one. An unknown-total directory transfer has no
+      such constraint: the wire bytes actually sent are unrelated to the
+      directory's `size` placeholder, which is what this test exploits.
+    */
+    it('shows the wire bytes actually sent, never metadata.size', () => {
+        let state = event(staged({name: 'papers', size: 0, isDir: true}), 'transfer-started', {sessionId, seq: 1})
+        const unknownFinal = {bytesSent: 4_096, totalBytes: 0, totalKnown: false, percent: 0, speedBytesPerSec: 512}
+        state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: unknownFinal})
+
+        const receiptBytes = state.phase === 'done' ? state.outcome.receipt.bytesSent : null
+        // *Mutation:* substitute `metadata.size` (0, for this directory fixture)
+        // for `progress.bytesSent` -> must fail: the receipt figure must be 4096.
+        expect(receiptBytes, 'the receipt must read progress.bytesSent, not metadata.size').toBe(4_096)
+    })
+
+    it('carries the same retained receipt into Idle after reset, so reset does not empty the panel', () => {
+        let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
+        state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        const doneOutcome = state.phase === 'done' ? state.outcome : null
+        expect(doneOutcome).not.toBeNull()
 
         state = event(state, 'transfer-reset', {sessionId, seq: 3})
+
+        expect(state).toEqual({
+            phase: 'idle',
+            retainedOutcome: {kind: 'done', receipt: doneOutcome!.receipt},
+            commandError: null,
+        })
+
+        // Session correlation (the sequence cursor) is still scrubbed on reset;
+        // only the receipt's retained values survive it.
         const serialized = JSON.stringify(state)
-        expect(serialized).toBe('{"phase":"idle","retainedOutcome":{"kind":"done"},"commandError":null}')
-        expect(serialized).not.toContain('session')
-        expect(serialized).not.toContain('seq')
-        expect(serialized).not.toContain('url')
-        expect(serialized).not.toContain('qr')
-        expect(serialized).not.toContain('timer')
+        expect(serialized).not.toContain('lastSeq')
+        expect(serialized).not.toContain('"session"')
+    })
+
+    /*
+      The product's own ephemerality contract, not a tidiness preference:
+      `RetainedDoneOutcome` lives on in Idle *after* the session has been
+      reset and the server has stopped. `FileMetadata.url` is the one-shot
+      capability download link and `qrBase64` is a scannable PNG of that same
+      link -- retaining either here would let a sender-side surface
+      re-present a dead capability link (or hold its QR indefinitely) well
+      past the point FairDrop claims to have forgotten it. `CompletionReceipt`
+      is a purpose-built projection that structurally cannot carry them; this
+      guards the reducer's construction site too, in case a future edit
+      widens the receipt back toward the full `FileMetadata`.
+
+      *Mutation:* retain the full `FileMetadata` on the outcome instead of
+      the narrow receipt -> this must fail and name the leak.
+    */
+    it('never retains the capability URL or its QR code -- both must not outlive the session', () => {
+        let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
+        state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        state = event(state, 'transfer-reset', {sessionId, seq: 3})
+
+        const serialized = JSON.stringify(state)
+        expect(
+            serialized,
+            'the retained Done outcome must not contain the one-shot capability URL',
+        ).not.toContain('fedcba9876543210fedcba9876543210')
+        expect(
+            serialized,
+            'the retained Done outcome must not contain the capability URL\'s QR code',
+        ).not.toContain(qrPNG)
+        expect(
+            state.phase === 'idle' && state.retainedOutcome?.kind === 'done'
+                ? Object.keys(state.retainedOutcome.receipt).sort()
+                : [],
+            'CompletionReceipt must carry exactly name/isDir/bytesSent -- no url, no qrBase64, no sessionId',
+        ).toEqual(['bytesSent', 'isDir', 'name'])
+    })
+
+    /*
+      *Mutation:* add an elapsed-time field anywhere on the Done outcome ->
+      this must fail and name the extra key. No clock is tracked anywhere in
+      this product and EXPERIENCE.md forbids frontend lifecycle timers, so a
+      duration shown on the receipt could only be invented.
+    */
+    it('never gains a duration, elapsed, or timer field on Done -- no clock exists to have measured one', () => {
+        let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
+        state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+
+        const outcomeKeys = state.phase === 'done' ? Object.keys(state.outcome).sort() : []
+        expect(
+            outcomeKeys,
+            'DoneTransferState.outcome must carry exactly kind/receipt -- any other key ' +
+            'is presumed to be an invented duration/elapsed/timer field, which EXPERIENCE.md bans',
+        ).toEqual(['kind', 'receipt'])
+
+        state = event(state, 'transfer-reset', {sessionId, seq: 3})
+        const retainedKeys = state.phase === 'idle' && state.retainedOutcome !== null
+            ? Object.keys(state.retainedOutcome).sort()
+            : []
+        expect(
+            retainedKeys,
+            'RetainedDoneOutcome must carry exactly kind/receipt -- no duration field is permitted',
+        ).toEqual(['kind', 'receipt'])
+
+        const receiptKeys = state.phase === 'idle' && state.retainedOutcome?.kind === 'done'
+            ? Object.keys(state.retainedOutcome.receipt).sort()
+            : []
+        expect(
+            receiptKeys,
+            'CompletionReceipt must carry exactly bytesSent/isDir/name -- no duration field is permitted',
+        ).toEqual(['bytesSent', 'isDir', 'name'])
+    })
+
+    it('adds nothing to the Error outcome shape: this story only retains a receipt for Done', () => {
+        let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
+        state = event(state, 'transfer-error', {
+            sessionId, seq: 2, error: {code: 'transfer_failed', message: 'x'},
+        })
+
+        const outcomeKeys = state.phase === 'error' ? Object.keys(state.outcome).sort() : []
+        expect(outcomeKeys).toEqual(['error', 'kind'])
     })
 
     it('keeps a scrubbed Error through reset until dismiss or the next Stage attempt', () => {
@@ -359,15 +489,15 @@ describe('terminal scrubbing and retained outcome', () => {
     })
 
     it('keeps retained terminal outcome when invalid selection supplies the visible command error', () => {
-        const retained = {
+        const retained: TransferState = {
             phase: 'idle',
-            retainedOutcome: {kind: 'done'},
+            retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
             commandError: null,
-        } as const
+        }
 
         expect(transferReducer(retained, {type: 'invalid-selection'})).toEqual({
             phase: 'idle',
-            retainedOutcome: {kind: 'done'},
+            retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
             commandError: {
                 code: 'invalid_selection',
                 message: 'Choose exactly one file or folder.',

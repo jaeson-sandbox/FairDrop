@@ -1,4 +1,5 @@
 import type {
+    CompletionReceipt,
     FileMetadata,
     PendingItemKind,
     ProgressSnapshot,
@@ -94,7 +95,12 @@ export function selectMetadata(state: TransferState): FileMetadata | null {
 
 /** The one terminal outcome a view may render, terminal or retained. */
 export type OutcomePresentation =
-    | {readonly kind: 'done'; readonly retained: boolean}
+    | {
+        readonly kind: 'done'
+        readonly retained: boolean
+        /** Scrubbed of the capability URL and its QR code -- see `CompletionReceipt`. */
+        readonly receipt: CompletionReceipt
+    }
     | {readonly kind: 'error'; readonly retained: boolean; readonly error: PublicError}
 
 /**
@@ -142,13 +148,15 @@ export function selectCommandError(state: TransferState): PublicError | null {
 export function selectOutcome(state: TransferState): OutcomePresentation | null {
     switch (state.phase) {
         case 'done':
-            return {kind: 'done', retained: false}
+            return {kind: 'done', retained: false, receipt: state.outcome.receipt}
         case 'error':
             return outcomeError(state.outcome.error, false)
         case 'idle': {
             const retained = state.retainedOutcome
             if (retained === null) return null
-            return retained.kind === 'done' ? {kind: 'done', retained: true} : outcomeError(retained.error, true)
+            return retained.kind === 'done'
+                ? {kind: 'done', retained: true, receipt: retained.receipt}
+                : outcomeError(retained.error, true)
         }
         default:
             return null
