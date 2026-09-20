@@ -1705,7 +1705,7 @@ So that the app reads as finished rather than as a prototype.
 
 **Acceptance Criteria:**
 
-- Given the primary control, then it carries the single permitted gradient, a 1px inset top highlight, `{elevation.sh-btn}`, `{rounded.md}`, `{typography.control}`, a 40px visible height and a 44px activation target, and scales to 0.975 on `:active`.
+- Given the primary control, then it carries the single permitted gradient, a 1px inset top highlight, `{elevation.sh-1}`, `{rounded.md}`, `{typography.control}`, a 40px visible height and a 44px activation target, and scales to 0.975 on `:active`.
 - Given the secondary control, then it carries a fill **and** a functional boundary, because the fill alone is 1.22:1 against surface and cannot be the cue that identifies a control. *Mutation:* remove the boundary and keep the fill -> must fail.
 - Given the focus ring, then it is a 3px `{colors.focus}` outline at 2px offset, painted on the Tab-reachable controls only and on no routed landing target. The existing assertion that no landing target paints a ring stays binding and must still pass unchanged.
 - Given the browse menu, then it is a `{rounded.lg}` surface at `{elevation.sh-3}` with a functional boundary, and the focused item is distinguished by the primary fill **and** a tint halo, not by the focus ring alone.
@@ -1729,6 +1729,7 @@ So that the thing I came to do is the most prominent thing on screen.
 - Given the recovery guidance, then every string `RecoveryHelp` renders today is still rendered, in a second disclosure, with none deleted. *Mutation:* drop any recovery string -> must fail naming it.
 - Given a command failure, then the outcome panel still renders between the drop zone and the preflight, and its focus target is unchanged.
 - Given the cancel-winning summary, then it still leads the region, still takes focus, and is still styled as a warning rather than an error.
+- Given the browse control, then it is the **full-width primary button** DESIGN.md's Components table specifies, and `IdleView.test.tsx`'s existing `expect(control.className).not.toContain('fd-button--primary')` is **inverted** rather than deleted. That assertion encodes Paper Relay's rule that the selection control stays "quieter than the drop zone"; Quartz deliberately reverses it, because the drop zone is no longer a control and the browse control is now the only action in Idle. Invert it with a comment naming this reversal, so the change reads as a decision rather than as a loosened test. *Mutation:* return the control to a non-primary class -> must fail.
 - Given reflow to 320 CSS pixels, then Idle is one column with no page-level horizontal scrolling and no clipped action; the browse control stays out of the pair-collapse media query.
 - Given the full gate, when it runs, then it passes, and `App.focus.test.tsx` passes unchanged.
 
