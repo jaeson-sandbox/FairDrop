@@ -1,0 +1,16 @@
+$ go run ./scripts/verify-exe-mutations.go hue-ico build/windows/icon.ico
+
+=== RUN   TestExeResourcesEmbedTheCommittedIcon
+    exe_resources_windows_test.go:230: 256x256: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 128x128: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 64x64: exe vs committed .ico distance 25.870
+    exe_resources_windows_test.go:244: build\bin\fairdrop.exe's embedded 64x64 icon differs from build\windows\icon.ico's matching entry by a mean 25.870 per channel, want exactly 0 -- winres copies these payloads verbatim, so any difference means the exe was built against a different icon.ico than the one committed. Delete build\windows\icon.ico, re-run `wails build`, and commit the result.
+    exe_resources_windows_test.go:230: 48x48: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 32x32: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 16x16: exe vs committed .ico distance 0.000
+--- FAIL: TestExeResourcesEmbedTheCommittedIcon (0.02s)
+=== RUN   TestExeResourcesCarryTheCommittedIdentity
+--- PASS: TestExeResourcesCarryTheCommittedIdentity (0.00s)
+FAIL
+FAIL	fairdrop	0.053s
+FAIL

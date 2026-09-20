@@ -229,6 +229,12 @@ A maintainer can find the code that owns a concern without reading a thousand-li
 
 **FRs covered:** none. This changes no behaviour and no contract; it moves code.
 
+### Epic 6: Replace the Placeholder App Icon
+
+A user launching FairDrop sees the FairDrop mark on the exe's own icon, in the Windows taskbar, in the NSIS installer, and in the macOS Dock -- not the stock Wails "W" scaffold default v1.0.0 shipped. Created 2026-09-19 from an owner-supplied candidate render.
+
+**FRs covered:** none. This changes a build asset, not application behaviour.
+
 > **Cross-cutting rule.** FR coverage identifies primary epic ownership, not the full acceptance surface. Every story also inherits the relevant NFRs, architecture requirements, binding contracts, and UX requirements. Unit, integration, race, and accessibility verification lands with the behavior it proves; Epic 3 owns native packaging, release automation, platform smoke tests, and single-instance release behavior rather than deferred testing debt.
 
 ## Epic 1: Share One File with a Nearby Device
@@ -1510,3 +1516,144 @@ each region inside `coordinator.go` moves with the code rather than being left b
 **When** it runs
 **Then** it produces a spec, three review layers and an evidence file, as AGENTS.md now requires of
 anything that changes what ships.
+
+## Epic 6: Replace the Placeholder App Icon
+
+A user launching FairDrop sees the FairDrop mark on the exe's own icon, in the Windows taskbar, in the NSIS installer, and in the macOS Dock. Created 2026-09-19: `build/appicon.png` and `build/windows/icon.ico` were still byte-identical to the Wails 2.15.0 scaffold defaults, so v1.0.0 shipped the stock placeholder -- a white field carrying a dark "W" -- everywhere the operating system shows the app an icon.
+
+**FRs covered:** none. This changes a build asset, not application behaviour.
+
+### Story 6.1: Replace the Placeholder App Icon
+
+As a user,
+I want to see FairDrop's own mark instead of the Wails scaffold's white field and dark "W",
+So that the app I launched is recognisably the one I meant to open.
+
+**Why logo 2 over logo 1, and why no small-size variant.** Three candidate renders were supplied and
+measured, not preferred: logo 2 carries 61-90% more edge energy (mean |gradient luminance| per opaque
+pixel) than logo 1 at every taskbar size -- 60.3 vs 37.5 at 16px. Logo 1 is copper-on-copper and its
+relief resolves to a featureless blob below ~48px; logo 2's mark and field differ in luminance, so the
+glyph survives down to 16px and no separate simplified small-size variant is needed. The revision
+(`fairdrop_logo2_revised.jpg`) was used over the unrevised render purely for extractability: its
+plaque is dark-on-light rather than brown-on-brown, so the silhouette fit lands at rms 1.74px instead
+of being eyeballed, and the crop lands on an exact 1024px width.
+
+**None of the three candidates carries an alpha channel** -- all are opaque JPEGs, including the one
+whose backdrop is drawn as a transparency checkerboard, which is decoration, not alpha. A naive
+format conversion would have shipped that checkerboard as an opaque grey backdrop.
+
+**Acceptance Criteria:** amended in review loop 3; the spec carries the authoritative
+wording and the derivation of every number.
+
+Each criterion names the mutation that must fail it. The freshness bound is a factor applied to
+a per-entry measured value; the remaining constants are absolutes, each bracketed by a measured
+mutation on its far side and logged on every run so drift is visible. An absolute with a probed
+boundary is honest; an absolute chosen for headroom is what loops 2 and 3 shipped -- loops 2 and 3
+both shipped an absolute that had never had its boundary measured. The mutation table is derived by
+`scripts/verify-asset-mutations.py`, not written by hand.
+
+- **Freshness, every entry.** Given the master and **each** `.ico` entry, when the master is
+  downsampled to that entry's size, then their mean per-channel distance is at most 1.5x the
+  distance measured for that size when they genuinely match (0.616 at 256 through 4.109 at 16).
+  *Mutations:* a hue-swapped master; a uniform **+1/255** brightening with the `.ico` left stale;
+  any single entry replaced by a flat coloured square **-> all must fail.** Measured boundary: +0
+  passes, +1 fails. Loop 3 found five of six entries could be flat squares with the suite green.
+- **No opaque backdrop.** Given the master and every `.ico` entry, when the border ring is measured
+  at a width scaled to that asset's resolution, then it holds no opaque near-white pixel; the
+  ring's transparent *fraction* is additionally checked where the ring is wide relative to the
+  corner radius (the master and the 256 entry), because at 16px a 1px ring is legitimately 93%
+  plaque. A coloured backdrop is caught by Freshness, not here. *Mutations:* re-derive with
+  `ERODE_PX = 0`; backdrop opaque except the four corners; a 16x16 entry of opaque white.
+- **Real colour.** Given the master and every `.ico` entry, when mean HSV saturation over the
+  central 40% is measured skipping transparent pixels, then it exceeds 0.25 and at least half that
+  region is opaque. *Mutation:* master alpha 0 with colour intact **-> must fail.**
+- **Alpha applied once.** Given the master, when partial-alpha pixels are compared with their local
+  opaque reference **on both the leading and trailing edge of every row**, then mean low-alpha
+  deviation is at most 8.0 **and** at most 2.0x the high-alpha deviation. Genuine: 3.172 / 2.621 =
+  1.21. *Mutations:* a full premultiply (27.96, trips the absolute bound); and a **20%** one
+  (6.946 / 3.001 = 2.31) which stays under the absolute bound and is caught only by the ratio
+  **-> both must fail.** Without the second, the ratio constant is decoration.
+- **Master geometry.** Given the master, then it is exactly 1024x1024, its PNG IHDR colour type
+  carries an alpha channel, its transparent bands are **12-40 rows** top and bottom (the genuine
+  master measures 21/22: the 15/16px centring band plus the erosion's own margin) and **1-12
+  columns** left and right (genuine 6/6, since the plaque spans the full width). *Mutations:*
+  stretch to fill; narrow the plaque 240px; a blank canvas; the scaffold placeholder; a master
+  saved without alpha **-> all must fail.** A floor with no ceiling passed the first three.
+- **Toolchain provenance.** Given the `.ico`, then its entry set **equals** {256,128,64,48,32,16},
+  the literal Wails passes to `winicon.GenerateIcon` at `packager.go:217`. *Mutations:* drop the
+  48; add a scaffold 24 **-> both must fail.**
+- **Source provenance.** Given `build/appicon-source.jpg`, then it decodes fully (not just its
+  header), is 2816x1536, and its sha256 equals the digest `scripts/build-appicon.py` pins.
+  *Mutations:* delete it; replace it with a different 2816x1536 render **-> both must fail.** Loop
+  3 found the whole suite passed with the file deleted, and again with it swapped.
+- Given the full gate on all three platforms, when it runs, then it passes.
+
+**Given** `build/appicon-source.jpg` and `scripts/build-appicon.py`
+**When** a future session needs to re-derive the master at higher fidelity
+**Then** both the original candidate JPEG and the derivation script are committed, so the master is
+reproducible rather than a one-off nobody can regenerate. Byte-identity across Pillow versions is not
+asserted -- that would pin the runner's Pillow build rather than this repo's code.
+
+### Story 6.2: Pin What Ships, Not the Template
+
+As a maintainer,
+I want the built exe's own resources asserted rather than the files it was built from,
+So that a regression in resource embedding fails the gate instead of shipping a default icon.
+
+**Closes:** D-128, D-129, D-130.
+
+**Why this is a story and not a footnote.** Every assertion Story 6.1 added reads the *input*
+assets under `build/`, never the *product* under `build/bin/`. If the resource-embedding path
+regressed, the exe would fall back to the shell's default icon and all eight tests would still
+pass. The sibling version-string resources are unverified at the same layer:
+`release_identity_test.go` pins ProductName, ProductVersion and CompanyName as they appear in
+`build/windows/info.json`'s **template** and passes, while nothing opens a built binary. The one
+time a person did look, during Story 6.1's manual pass, they reached a wrong conclusion (D-128)
+from a tool that cannot read a language-neutral string table -- which is the argument for an
+automated check, not against one.
+
+**The mechanism is verified, not assumed.** Walking the exe's PE resource directory with the
+standard library reaches `RT_ICON` (six PNG payloads decoding to 256/128/64/48/32/16 RGBA, the
+same set `icon.ico` carries), `RT_GROUP_ICON` and `RT_VERSION`. `debug/pe` supplies the section
+table; the three-level directory walk is manual, as no stdlib package exposes it. No new
+dependency.
+
+**Deliberately not in scope:** the artwork, the derivation, and anything Story 6.1 already pins
+about the committed assets. This story pins the exe.
+
+**Acceptance Criteria:**
+
+- **The exe's icon is the committed one.** Given a built exe, when its `RT_ICON` payloads are
+  decoded, then their sizes equal {256,128,64,48,32,16} and each matches the same-sized `icon.ico`
+  entry within the per-size tolerance Story 6.1 calibrated. *Mutations:* build with a stale `.ico`;
+  strip an `RT_ICON` entry -- both must fail, naming the exe.
+- **The exe's identity is the committed one.** Given a built exe, when `RT_VERSION`'s string table
+  is read through the resource block (not .NET's `FileVersionInfo`, which cannot see a
+  language-neutral table), then ProductName, CompanyName, ProductVersion and FileVersion match
+  `wails.json`. *Mutation:* change `wails.json`'s productVersion without rebuilding -- must fail.
+- **Absent build skips, never passes.** Given no `build/bin/fairdrop.exe`, when the suite runs,
+  then the test skips, gated as `TestDarwinBuiltAppSurvivesUnusableLock` is. *Mutation:* make it
+  fatal on a missing exe and confirm a bare local `go test ./...` then fails.
+- **A missing committed `.ico` cannot be manufactured by CI.** Given `icon.ico` deleted from git,
+  when the Windows job runs, then the post-build drift check fails naming `build/`. Today it is
+  scoped to `frontend/` only.
+- Given the full gate on all three platforms, when it runs, then it passes.
+
+### Story 6.3: Verify and Release 1.1.0
+
+As the release owner,
+I want every outstanding Epic 6 verification claim proved and the product metadata aligned,
+So that the FairDrop icon release can be accepted and published as 1.1.0 without overstating evidence.
+
+**Closes:** D-133, D-134, D-135.
+
+The canonical asset inventory derives its ICO sizes from `wantIcoSizes` and includes isolated
+mutations for the four late asset guards. The Windows product proof adds a structurally stripped
+RT_ICON and a real rebuild under the neutral version language key, while the build-asset drift
+check is directly executable outside the workflow. Documentation records the actual gate order,
+absence-based executable gating, `0409`/FileVersion behavior, calibration command, and
+Windows-targeted ICO regeneration. Product and package metadata agree on 1.1.0.
+
+Acceptance requires the complete mutation inventories, a successful native Windows/macOS gate
+and Linux adapter job at the exact merge candidate, a non-fast-forward merge, and downloaded
+artifact checksum verification before publication. D-131 and D-132 remain accepted limitations.

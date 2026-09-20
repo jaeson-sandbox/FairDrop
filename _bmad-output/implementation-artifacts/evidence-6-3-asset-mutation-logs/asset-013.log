@@ -1,0 +1,28 @@
+=== RUN   TestAppIconMasterGeometry
+--- PASS: TestAppIconMasterGeometry (0.05s)
+=== RUN   TestAppIconNoOpaqueBackdrop
+--- PASS: TestAppIconNoOpaqueBackdrop (0.04s)
+=== RUN   TestAppIconCarriesRealColour
+--- PASS: TestAppIconCarriesRealColour (0.03s)
+=== RUN   TestAppIconEveryIcoEntryCarriesTheArtwork
+--- PASS: TestAppIconEveryIcoEntryCarriesTheArtwork (0.00s)
+=== RUN   TestAppIconIcoCarriesTheFullWailsSizeSet
+--- PASS: TestAppIconIcoCarriesTheFullWailsSizeSet (0.00s)
+=== RUN   TestAppIconMasterMatchesIcoFreshness
+    appicon_test.go:938: 256x256: distance 0.833 (measured 0.616, bound 0.924)
+    appicon_test.go:938: 128x128: distance 1.129 (measured 1.031, bound 1.546)
+    appicon_test.go:938: 64x64: distance 1.636 (measured 1.512, bound 2.268)
+    appicon_test.go:938: 48x48: distance 2.131 (measured 2.140, bound 3.210)
+    appicon_test.go:938: 32x32: distance 2.741 (measured 2.552, bound 3.828)
+    appicon_test.go:938: 16x16: distance 4.222 (measured 4.109, bound 6.163)
+--- PASS: TestAppIconMasterMatchesIcoFreshness (0.07s)
+=== RUN   TestAppIconMasterAppliesAlphaOnce
+    appicon_test.go:1159: runs 1914 (leading 957, trailing 957); low-alpha mean 28.410 over 6450, high-alpha mean 4.076 over 5104
+    appicon_test.go:1172: build/appicon.png: partial-alpha pixels with alpha < 128 deviate from their transition run's local opaque reference pixel by a mean of 28.41 (0-255 scale, 6450 samples across 1914 runs); alpha >= 128 pixels deviate by only 4.08 (5104 samples) -- RGB drifting further from the true colour as alpha drops is what applying alpha twice (pasting an RGBA image using its own alpha as the paste mask) looks like, want <= 8.00
+    appicon_test.go:1185: build/appicon.png: low-alpha pixels deviate 28.410 from their local opaque reference while high-alpha pixels deviate only 4.076 -- a ratio of 6.97, want <= 2.00. Uniform photographic noise raises both buckets together; deviation that grows as alpha falls is the signature of alpha applied twice.
+--- FAIL: TestAppIconMasterAppliesAlphaOnce (0.05s)
+=== RUN   TestAppIconSourceRenderIsThePinnedGeometry
+--- PASS: TestAppIconSourceRenderIsThePinnedGeometry (0.06s)
+FAIL
+FAIL	fairdrop	0.563s
+FAIL

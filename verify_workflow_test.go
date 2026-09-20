@@ -246,6 +246,14 @@ func nativeProofGaps(workflow string) []string {
 	var gaps []string
 	for _, pin := range []struct{ job, step, command, condition string }{
 		{desktop, "Native macOS unusable-lock launch smoke", "run: bash scripts/smoke-darwin-unusable-lock.sh", "if: runner.os == 'macOS'"},
+		{desktop, "Built Windows exe embeds the committed resources", `out=$(go test -count=1 -run '^TestExeResources' -v ./...) || { echo "$out"; exit 1; }
+echo "$out"
+if echo "$out" | grep -q -- '--- SKIP'; then
+  echo 'TestExeResources skipped on CI: the built exe was not found, so this gate inspected nothing' >&2
+  exit 1
+fi`, "if: runner.os == 'Windows'"},
+		{desktop, "Prove Windows executable resource guards", `run: python scripts/verify-asset-mutations.py --exe --log-dir "$RUNNER_TEMP/fairdrop-exe-mutation-logs"`, "if: runner.os == 'Windows'"},
+		{desktop, "Prove a manufactured Windows icon is rejected", "run: bash scripts/verify-build-asset-drift.sh --prove-missing-ico", "if: runner.os == 'Windows'"},
 		{desktop, "Report native platform coverage and capability skips", "run: go test -count=1 -v -run 'Test(POSIX|Linux|Darwin|Native|StageTransferResolves|StageTransferRefusesSelected)' ./...", "if: always()"},
 		{desktop, "Prove native acceptance tests detect broken guards", "run: bash scripts/verify-native-mutations.sh", "if: always()"},
 		{linux, "Prove native acceptance tests detect broken guards", "run: bash scripts/verify-native-mutations.sh", ""},
@@ -271,12 +279,29 @@ func TestVerifyWorkflowPinsNativeProofGatesToTheirJobsAndPlatforms(t *testing.T)
 	}
 }
 
+func TestVerifyWorkflowRetainsCompleteWindowsMutationLogs(t *testing.T) {
+	step := verifyStep(verifyJob(executableWorkflow(readVerifyWorkflow(t)), "verify"),
+		"Retain Windows executable mutation logs")
+	for _, want := range []string{
+		"uses: actions/upload-artifact@v7",
+		"if: runner.os == 'Windows' && always()",
+		"path: ${{ runner.temp }}/fairdrop-exe-mutation-logs",
+		"if-no-files-found: error",
+	} {
+		if !strings.Contains(step, want) {
+			t.Errorf("Windows mutation-log retention step is missing %q", want)
+		}
+	}
+}
+
 func TestVerifyWorkflowNativeProofPinsRejectRemovalAndWrongPlatform(t *testing.T) {
 	workflow := readVerifyWorkflow(t)
 	for _, mutation := range []struct{ before, after string }{
 		{"run: bash scripts/smoke-darwin-unusable-lock.sh", "run: true"},
 		{"if: runner.os == 'macOS'", "if: runner.os == 'Windows'"},
 		{"run: bash scripts/verify-native-mutations.sh", "run: true"},
+		{`run: python scripts/verify-asset-mutations.py --exe --log-dir "$RUNNER_TEMP/fairdrop-exe-mutation-logs"`, "run: true"},
+		{"run: bash scripts/verify-build-asset-drift.sh --prove-missing-ico", "run: true"},
 		{"if: runner.os == 'Windows'", "if: runner.os == 'macOS'"},
 		{"  linux-adapters:", "  misplaced-adapters:"},
 		{"run: bash scripts/smoke-darwin-unusable-lock.sh", "run: true # run: bash scripts/smoke-darwin-unusable-lock.sh"},
@@ -305,7 +330,8 @@ if ! git -c core.fileMode=false diff --quiet -- frontend/wailsjs; then
   echo "wails build changed frontend/wailsjs -- the committed bindings are stale:" >&2
   git -c core.fileMode=false diff -- frontend/wailsjs >&2
   exit 1
-fi`, ""},
+fi
+bash scripts/verify-build-asset-drift.sh`, ""},
 		{"verify", "gofmt -l", `unformatted="$(gofmt -l .)"
 if [ -n "$unformatted" ]; then
   echo "gofmt found unformatted files:" >&2
@@ -527,6 +553,10 @@ func TestVerifyWorkflowRunsEveryStepInTheRequiredOrder(t *testing.T) {
 
 	steps := []string{
 		"- name: wails build",
+		"- name: Built Windows exe embeds the committed resources",
+		"- name: Prove Windows executable resource guards",
+		"- name: Retain Windows executable mutation logs",
+		"- name: Prove a manufactured Windows icon is rejected",
 		"- name: Check for bindings drift and a restored .gitkeep",
 		"- name: gofmt -l",
 		"- name: go vet",

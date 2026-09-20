@@ -1,0 +1,27 @@
+=== RUN   TestAppIconMasterGeometry
+--- PASS: TestAppIconMasterGeometry (0.04s)
+=== RUN   TestAppIconNoOpaqueBackdrop
+--- PASS: TestAppIconNoOpaqueBackdrop (0.04s)
+=== RUN   TestAppIconCarriesRealColour
+--- PASS: TestAppIconCarriesRealColour (0.03s)
+=== RUN   TestAppIconEveryIcoEntryCarriesTheArtwork
+--- PASS: TestAppIconEveryIcoEntryCarriesTheArtwork (0.00s)
+=== RUN   TestAppIconIcoCarriesTheFullWailsSizeSet
+--- PASS: TestAppIconIcoCarriesTheFullWailsSizeSet (0.00s)
+=== RUN   TestAppIconMasterMatchesIcoFreshness
+    appicon_test.go:938: 256x256: distance 0.616 (measured 0.616, bound 0.924)
+    appicon_test.go:938: 128x128: distance 1.031 (measured 1.031, bound 1.546)
+    appicon_test.go:938: 64x64: distance 1.512 (measured 1.512, bound 2.268)
+    appicon_test.go:938: 48x48: distance 2.140 (measured 2.140, bound 3.210)
+    appicon_test.go:938: 32x32: distance 2.552 (measured 2.552, bound 3.828)
+    appicon_test.go:938: 16x16: distance 4.109 (measured 4.109, bound 6.163)
+--- PASS: TestAppIconMasterMatchesIcoFreshness (0.06s)
+=== RUN   TestAppIconMasterAppliesAlphaOnce
+    appicon_test.go:1159: runs 1902 (leading 951, trailing 951); low-alpha mean 3.172 over 6758, high-alpha mean 2.621 over 6874
+--- PASS: TestAppIconMasterAppliesAlphaOnce (0.05s)
+=== RUN   TestAppIconSourceRenderIsThePinnedGeometry
+    appicon_test.go:1225: read build/appicon-source.jpg: open build/appicon-source.jpg: no such file or directory -- this is the only committed copy of the render the master is derived from, and scripts/build-appicon.py cannot run without it
+--- FAIL: TestAppIconSourceRenderIsThePinnedGeometry (0.00s)
+FAIL
+FAIL	fairdrop	0.485s
+FAIL

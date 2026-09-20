@@ -127,6 +127,42 @@ jobs:
         if: runner.os == 'macOS'
         run: bash scripts/smoke-darwin-unusable-lock.sh
 
+      # Everything else in this job checks the files the exe is built FROM.
+      # This checks the exe itself: that the icon and version resources
+      # actually landed in it. Story 6.1's eight assertions all pass on a
+      # binary whose resource embedding regressed, because none of them opens
+      # one. It runs here, right after the build, because the artifact only
+      # exists between this step and the end of the job.
+      # The test SKIPS when build/bin/fairdrop.exe is absent, which is right
+      # locally and wrong here: this job runs `wails build` first, so an absent
+      # exe means the build silently produced nothing and a skip would leave
+      # the only product-layer gate green having inspected no binary at all.
+      - name: Built Windows exe embeds the committed resources
+        if: runner.os == 'Windows'
+        run: |
+          out=$(go test -count=1 -run '^TestExeResources' -v ./...) || { echo "$out"; exit 1; }
+          echo "$out"
+          if echo "$out" | grep -q -- '--- SKIP'; then
+            echo 'TestExeResources skipped on CI: the built exe was not found, so this gate inspected nothing' >&2
+            exit 1
+          fi
+
+      - name: Prove Windows executable resource guards
+        if: runner.os == 'Windows'
+        run: python scripts/verify-asset-mutations.py --exe --log-dir "$RUNNER_TEMP/fairdrop-exe-mutation-logs"
+
+      - name: Retain Windows executable mutation logs
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fairdrop-exe-mutation-logs
+          path: ${{ runner.temp }}/fairdrop-exe-mutation-logs
+          if-no-files-found: error
+
+      - name: Prove a manufactured Windows icon is rejected
+        if: runner.os == 'Windows'
+        run: bash scripts/verify-build-asset-drift.sh --prove-missing-ico
+
       # A regenerated-but-uncommitted frontend/wailsjs means the committed
       # bindings are stale, and a missing frontend/dist/.gitkeep would break
       # embedding on the next clean clone.
@@ -134,6 +170,18 @@ jobs:
       # core.fileMode=false because the macOS generator writes the binding
       # files 0755 while they are committed 0644, so every macOS run reports
       # a mode-only diff. A permission bit is not stale bindings; content is.
+      #
+      # The build/ clause exists because wails build MANUFACTURES missing
+      # build assets. Two separate mechanisms do it: generateIcoFile
+      # (packager.go:204) writes icon.ico whenever it is absent, and
+      # buildassets.ReadFile (buildassets.go:49) falls back to the embedded
+      # default AND writes it to disk for appicon.png, info.json and
+      # wails.exe.manifest. So a committed asset missing from git is recreated
+      # by the runner -- as the Wails placeholder, the exact artwork Epic 6
+      # exists to remove -- and would then satisfy every assertion against a
+      # file the repository does not contain. Untracked counts here, unlike
+      # the bindings check above, precisely because that is the failure mode.
+      # build/bin/ is excluded: it is the build output and is gitignored.
       - name: Check for bindings drift and a restored .gitkeep
         run: |
           if [ ! -f frontend/dist/.gitkeep ]; then
@@ -145,6 +193,7 @@ jobs:
             git -c core.fileMode=false diff -- frontend/wailsjs >&2
             exit 1
           fi
+          bash scripts/verify-build-asset-drift.sh
 
       - name: gofmt -l
         run: |

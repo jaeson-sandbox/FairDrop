@@ -1,0 +1,28 @@
+=== RUN   TestAppIconMasterGeometry
+--- PASS: TestAppIconMasterGeometry (0.05s)
+=== RUN   TestAppIconNoOpaqueBackdrop
+--- PASS: TestAppIconNoOpaqueBackdrop (0.04s)
+=== RUN   TestAppIconCarriesRealColour
+--- PASS: TestAppIconCarriesRealColour (0.04s)
+=== RUN   TestAppIconEveryIcoEntryCarriesTheArtwork
+    appicon_test.go:837: build/windows/icon.ico (16x16 entry): only 1 of 49 central-40% pixels (2.0%) are non-transparent, want at least 50% -- a saturation mean over a nearly empty region proves nothing
+--- FAIL: TestAppIconEveryIcoEntryCarriesTheArtwork (0.00s)
+=== RUN   TestAppIconIcoCarriesTheFullWailsSizeSet
+--- PASS: TestAppIconIcoCarriesTheFullWailsSizeSet (0.00s)
+=== RUN   TestAppIconMasterMatchesIcoFreshness
+    appicon_test.go:938: 256x256: distance 0.616 (measured 0.616, bound 0.924)
+    appicon_test.go:938: 128x128: distance 1.031 (measured 1.031, bound 1.546)
+    appicon_test.go:938: 64x64: distance 1.512 (measured 1.512, bound 2.268)
+    appicon_test.go:938: 48x48: distance 2.140 (measured 2.140, bound 3.210)
+    appicon_test.go:938: 32x32: distance 2.552 (measured 2.552, bound 3.828)
+    appicon_test.go:938: 16x16: distance 101.844 (measured 4.109, bound 6.163)
+    appicon_test.go:955: build/appicon.png downsampled to 16x16 differs from build/windows/icon.ico's 16x16 entry by a mean 101.844 per channel (0-255 scale), want <= 6.163 (1.5x the 4.109 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+--- FAIL: TestAppIconMasterMatchesIcoFreshness (0.07s)
+=== RUN   TestAppIconMasterAppliesAlphaOnce
+    appicon_test.go:1159: runs 1902 (leading 951, trailing 951); low-alpha mean 3.172 over 6758, high-alpha mean 2.621 over 6874
+--- PASS: TestAppIconMasterAppliesAlphaOnce (0.05s)
+=== RUN   TestAppIconSourceRenderIsThePinnedGeometry
+--- PASS: TestAppIconSourceRenderIsThePinnedGeometry (0.07s)
+FAIL
+FAIL	fairdrop	0.564s
+FAIL

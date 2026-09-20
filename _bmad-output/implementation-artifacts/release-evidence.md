@@ -56,7 +56,13 @@ makes a named test fail. Everything a machine cannot observe is below.
 
 ## Artifact identity
 
-**v0.3.0 — published 2026-09-17, the current release.** Built by Release
+**v1.1.0 — candidate, not yet released.** Source metadata and the locally packaged
+Mac bundle identify as 1.1.0. The merge SHA, tag SHA, native Release workflow run,
+artifact sizes, post-transit SHA-256 values, and publication status must be inserted
+from observed remote results. Until then this paragraph is preparation, not release
+evidence; v1.0.0 remains the current published release.
+
+**v0.3.0 — published 2026-09-17, superseded by v1.0.0.** Built by Release
 [35169193793](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35169193793) from
 `0db16580` at tag `v0.3.0`, each artifact on its own native runner after the full gate passed on
 both. The gate is `verify.yml` reused by `workflow_call`, so it is the same gate every pull request
@@ -149,8 +155,8 @@ behaviour above is what Story 3.1 proved against fake runtime seams.
 ## Optional manual checks
 
 Optional under the release policy. Each row says what would have to be observed, so that anyone
-who does run one can fill it in, and against which build. `v0.2.0` is the current release and
-carries every story through 3.10; `v0.1.0` is still downloadable and predates most of them, so a
+who does run one can fill it in, and against which build. `v1.0.0` is the current published release;
+`v0.1.0` is still downloadable and predates most of the later work, so a
 row recorded against it says little about the code today.
 
 Three rows are worth more now than they were: rows 2, 4 and 12 exercise the theme read, the
@@ -217,4 +223,3 @@ history**, not the current tree: 269 commits and 3,099 objects across all refs.
 
 **Enabled the same day:** GitHub secret scanning and push protection, so a future accident is
 blocked at push rather than found by an audit. Dependabot security updates remain off.
-

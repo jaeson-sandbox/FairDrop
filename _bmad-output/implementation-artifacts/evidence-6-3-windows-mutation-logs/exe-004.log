@@ -1,0 +1,50 @@
+$ wails build
+[0;92mWails CLI[0m [0;31mv2.15.0[0m
+
+
+# [1;33m[1;33mBuild Options[0m
+[1;33m[0m[0m
+Platform(s)       [90m[90m | [0m[0mwindows/amd64                                      
+Compiler          [90m[90m | [0m[0mC:\hostedtoolcache\windows\go\1.26.7\x64\bin\go.exe
+Skip Bindings     [90m[90m | [0m[0mfalse                                              
+Build Mode        [90m[90m | [0m[0mproduction                                         
+Devtools          [90m[90m | [0m[0mfalse                                              
+Frontend Directory[90m[90m | [0m[0mD:\a\FairDrop\FairDrop\frontend                    
+Obfuscated        [90m[90m | [0m[0mfalse                                              
+Install Scope     [90m[90m | [0m[0mmachine                                            
+Skip Frontend     [90m[90m | [0m[0mfalse                                              
+Compress          [90m[90m | [0m[0mfalse                                              
+Package           [90m[90m | [0m[0mtrue                                               
+Clean Bin Dir     [90m[90m | [0m[0mfalse                                              
+LDFlags           [90m[90m | [0m[0m                                                   
+Tags              [90m[90m | [0m[0m[]                                                 
+Race Detector     [90m[90m | [0m[0mfalse                                              
+
+
+# [1;33m[1;33mBuilding target: windows/amd64[0m
+[1;33m[0m[0m
+  [90m[90mâ€¢[0m[0m [39m[39mGenerating bindings: [0m[0mDone.
+  [90m[90mâ€¢[0m[0m [39m[39mInstalling frontend dependencies: [0m[0mDone.
+  [90m[90mâ€¢[0m[0m [39m[39mCompiling frontend: [0m[0mDone.
+  [90m[90mâ€¢[0m[0m [39m[39mGenerating application assets: [0m[0mDone.
+  [90m[90mâ€¢[0m[0m [39m[39mCompiling application: [0m[0mDone.
+[30;46m[30;46m INFO [0m[0m [96m[96mWails is now using the new Go WebView2Loader. If you encounter any issues with it, please report them to https://github.com/wailsapp/wails/issues/2004. You could also use the old legacy loader with `-tags native_webview2loader`, but keep in mind this will be deprecated in the near future.[0m[0m
+Built 'D:\a\FairDrop\FairDrop\build\bin\fairdrop.exe' in 9.539s.
+
+[31;107m[31;107m â™¥  [0m[0m [92m[92mIf Wails is useful to you or your company, please consider sponsoring the project:[0m[0m
+https://github.com/sponsors/leaanthony
+
+=== RUN   TestExeResourcesEmbedTheCommittedIcon
+    exe_resources_windows_test.go:230: 256x256: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 128x128: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 64x64: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 48x48: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 32x32: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 16x16: exe vs committed .ico distance 0.000
+--- PASS: TestExeResourcesEmbedTheCommittedIcon (0.02s)
+=== RUN   TestExeResourcesCarryTheCommittedIdentity
+    exe_resources_windows_test.go:384: build\bin\fairdrop.exe's version string table is filed under "000004b0", want "040904b0" -- build/windows/info.json's language key has changed, and a language-neutral table is invisible to .NET's FileVersionInfo, Explorer's Properties tab and PowerShell
+--- FAIL: TestExeResourcesCarryTheCommittedIdentity (0.00s)
+FAIL
+FAIL	fairdrop	0.049s
+FAIL

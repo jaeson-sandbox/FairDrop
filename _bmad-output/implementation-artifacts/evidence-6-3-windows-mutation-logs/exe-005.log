@@ -1,0 +1,8 @@
+=== RUN   TestExeResourcesEmbedTheCommittedIcon
+    exe_resources_windows_test.go:190: build\bin\fairdrop.exe is absent, so there is no built artifact to inspect -- run `wails build` first (CI always does, before `go test`)
+--- SKIP: TestExeResourcesEmbedTheCommittedIcon (0.00s)
+=== RUN   TestExeResourcesCarryTheCommittedIdentity
+    exe_resources_windows_test.go:372: build\bin\fairdrop.exe is absent, so there is no built artifact to inspect -- run `wails build` first (CI always does, before `go test`)
+--- SKIP: TestExeResourcesCarryTheCommittedIdentity (0.00s)
+PASS
+ok  	fairdrop	0.048s

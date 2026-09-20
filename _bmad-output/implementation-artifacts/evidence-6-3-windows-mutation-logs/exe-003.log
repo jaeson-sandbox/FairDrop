@@ -1,0 +1,17 @@
+$ go run ./scripts/verify-exe-mutations.go strip-icon build/bin/fairdrop.exe
+
+=== RUN   TestExeResourcesEmbedTheCommittedIcon
+    exe_resources_windows_test.go:205: build\bin\fairdrop.exe embeds no 16x16 icon (has [256 128 64 48 32]), so Windows has nothing to draw at that size
+    exe_resources_windows_test.go:210: build\bin\fairdrop.exe embeds 5 distinct icon sizes, want exactly 6
+    exe_resources_windows_test.go:230: 256x256: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 128x128: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 64x64: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 48x48: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 32x32: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:253: compared 5 embedded icons against build\windows\icon.ico, want 6
+--- FAIL: TestExeResourcesEmbedTheCommittedIcon (0.02s)
+=== RUN   TestExeResourcesCarryTheCommittedIdentity
+--- PASS: TestExeResourcesCarryTheCommittedIdentity (0.00s)
+FAIL
+FAIL	fairdrop	0.047s
+FAIL

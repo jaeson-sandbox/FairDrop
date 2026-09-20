@@ -33,8 +33,9 @@ as historical narrative and apply all corrections and supersessions before using
 
 - `.github/workflows/verify.yml` is the canonical gate, run natively on
   `windows-latest` and `macos-latest` for every pull request and every push to
-  `main`/`epic-*`. It runs, in order: `wails build`, a bindings-drift and
-  `.gitkeep` check, `gofmt -l .`, `go vet ./...`, `go tool staticcheck ./...`,
+  `main`/`epic-*`. It runs, in order: `wails build`, the Windows built-resource
+  proof where applicable, a bindings/build-asset drift and `.gitkeep` check,
+  `gofmt -l .`, `go vet ./...`, `go tool staticcheck ./...`,
   `go test -count=1 ./...`, an explicit cgo check, `go test -count=1 -race
   ./...`, the frontend suite, and the line-ending check.
   `verify_workflow_test.go` pins every one of those lines and fails, naming
@@ -185,6 +186,11 @@ supported no-follow queries; preserve content-read separation and identity check
   returned flag. These do not snapshot contents or interrupt blocked OS reads.
 
 ## Subagent model budget
+
+- Owner instruction (2026-09-20): always delegate story implementation to a
+  `gpt-5.6-sol` subagent. Keep the main session as orchestrator for review,
+  verification, integration and release coordination. Do not repeatedly request
+  approval for work already authorized; raise only material scope changes or blockers.
 
 - Owner preference (2026-09-12): use `gpt-5.6-sol` for implementation subagents
   and `gpt-5.6-luna` for smaller bounded tasks. Keep review and integration with

@@ -1,0 +1,16 @@
+
+=== RUN   TestExeResourcesEmbedTheCommittedIcon
+    exe_resources_windows_test.go:230: 256x256: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 128x128: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 64x64: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 48x48: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 32x32: exe vs committed .ico distance 0.000
+    exe_resources_windows_test.go:230: 16x16: exe vs committed .ico distance 0.000
+--- PASS: TestExeResourcesEmbedTheCommittedIcon (0.02s)
+=== RUN   TestExeResourcesCarryTheCommittedIdentity
+    exe_resources_windows_test.go:420: build\bin\fairdrop.exe's version resource has ProductVersion = "1.1.0", want "9.9.9" from wails.json -- the built artifact disagrees with the source of truth every other file follows
+    exe_resources_windows_test.go:420: build\bin\fairdrop.exe's version resource has FileVersion = "1.1.0", want "9.9.9" from wails.json -- the built artifact disagrees with the source of truth every other file follows
+--- FAIL: TestExeResourcesCarryTheCommittedIdentity (0.00s)
+FAIL
+FAIL	fairdrop	0.066s
+FAIL
