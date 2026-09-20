@@ -1,6 +1,7 @@
 import {publicError} from './errors'
 import {parseLifecycleEvent} from './validation'
 import type {
+    CompletionReceipt,
     FileMetadata,
     LifecycleEvent,
     LifecycleEventName,
@@ -50,10 +51,12 @@ export interface DoneTransferState {
     readonly session: SessionCursor
     readonly outcome: {
         readonly kind: 'done'
-        /** The session's file/folder metadata, retained for the completion receipt. */
-        readonly metadata: FileMetadata
-        /** The `transfer-complete` event's final snapshot -- wire bytes actually sent, never `metadata.size`. */
-        readonly progress: ProgressSnapshot
+        /**
+         * What was sent and how much -- never the full `FileMetadata`. That
+         * type also carries the one-shot capability URL and its QR code,
+         * which must not outlive the session (see `CompletionReceipt`).
+         */
+        readonly receipt: CompletionReceipt
     }
 }
 
@@ -239,7 +242,14 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                 return {
                     phase: 'done',
                     session,
-                    outcome: {kind: 'done', metadata: state.metadata, progress: event.progress},
+                    outcome: {
+                        kind: 'done',
+                        receipt: {
+                            name: state.metadata.name,
+                            isDir: state.metadata.isDir,
+                            bytesSent: event.progress.bytesSent,
+                        },
+                    },
                 }
             }
             if (event.kind === 'transfer-error') {
@@ -261,8 +271,7 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                 phase: 'idle',
                 retainedOutcome: {
                     kind: 'done',
-                    metadata: state.outcome.metadata,
-                    progress: state.outcome.progress,
+                    receipt: state.outcome.receipt,
                 },
                 commandError: null,
             }

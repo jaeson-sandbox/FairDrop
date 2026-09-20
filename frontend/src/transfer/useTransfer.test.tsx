@@ -817,7 +817,7 @@ describe('a failed clipboard write reaches the reducer', () => {
   an isolated reducer call.
 */
 describe('the completion receipt reaches a live consumer (Story 7.4)', () => {
-    it('carries the retained metadata and final progress on a live Done outcome', async () => {
+    it('carries the retained receipt (name, isDir, wire bytes sent) on a live Done outcome', async () => {
         mocks.stageTransfer.mockResolvedValue(metadata({name: 'report.pdf'}))
         const hook = renderHook(() => useTransfer())
 
@@ -829,8 +829,9 @@ describe('the completion receipt reaches a live consumer (Story 7.4)', () => {
 
         const state = hook.result.current.state
         expect(state.phase).toBe('done')
-        expect(state.phase === 'done' ? state.outcome.metadata.name : null).toBe('report.pdf')
-        expect(state.phase === 'done' ? state.outcome.progress.bytesSent : null).toBe(100)
+        expect(state.phase === 'done' ? state.outcome.receipt : null).toEqual({
+            name: 'report.pdf', isDir: false, bytesSent: 100,
+        })
     })
 
     it('keeps the same receipt once transfer-reset retains the outcome in Idle', async () => {
@@ -844,21 +845,47 @@ describe('the completion receipt reaches a live consumer (Story 7.4)', () => {
         })
         const live = hook.result.current.state
         expect(live.phase).toBe('done')
-        const liveReceipt = live.phase === 'done'
-            ? {metadata: live.outcome.metadata, progress: live.outcome.progress}
-            : null
+        const liveReceipt = live.phase === 'done' ? live.outcome.receipt : null
 
         act(() => emit('transfer-reset', {sessionId, seq: 3}))
 
         const retained = hook.result.current.state
         expect(retained.phase).toBe('idle')
         const retainedReceipt = retained.phase === 'idle' && retained.retainedOutcome?.kind === 'done'
-            ? {metadata: retained.retainedOutcome.metadata, progress: retained.retainedOutcome.progress}
+            ? retained.retainedOutcome.receipt
             : null
 
-        // Given a retained Done outcome in Idle, it carries the same two
-        // values -- reset must not empty the panel the sender is looking at.
+        // Given a retained Done outcome in Idle, it carries the same receipt
+        // -- reset must not empty the panel the sender is looking at.
         expect(retainedReceipt).toEqual(liveReceipt)
         expect(retainedReceipt).not.toBeNull()
+    })
+
+    /*
+      The product's ephemerality contract, proven through the real hook: the
+      capability URL and its QR code must not survive into the retained Idle
+      outcome, even though the full FileMetadata the hook received from
+      StageTransfer (via the mocked wire) carried both.
+    */
+    it('never carries the capability URL or QR code into the retained outcome', async () => {
+        mocks.stageTransfer.mockResolvedValue(metadata({
+            name: 'report.pdf',
+            url: 'http://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210',
+            qrBase64: qrPNG,
+        }))
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.stage('C:\\report.pdf') })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+            emit('transfer-reset', {sessionId, seq: 3})
+        })
+
+        const serialized = JSON.stringify(hook.result.current.state)
+        expect(serialized, 'the capability URL must not outlive the session').not.toContain(
+            'fedcba9876543210fedcba9876543210',
+        )
+        expect(serialized, 'the QR code must not outlive the session').not.toContain(qrPNG)
     })
 })

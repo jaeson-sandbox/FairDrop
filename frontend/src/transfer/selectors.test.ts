@@ -26,6 +26,8 @@ const finalProgress = {
     bytesSent: 100, totalBytes: 100, totalKnown: true, percent: 100, speedBytesPerSec: 0,
 } as const
 
+const doneReceipt = {name: metadata.name, isDir: metadata.isDir, bytesSent: finalProgress.bytesSent} as const
+
 describe('progress presentation modes', () => {
     it('derives the determinate percentage from the authoritative byte pair', () => {
         expect(selectProgressSnapshot({
@@ -146,7 +148,7 @@ describe('state-aware selectors', () => {
         const done: TransferState = {
             phase: 'done',
             session: {sessionId: metadata.sessionId, lastSeq: 3},
-            outcome: {kind: 'done', metadata, progress: finalProgress},
+            outcome: {kind: 'done', receipt: doneReceipt},
         }
 
         expect(selectProgress(transferring)).toMatchObject({mode: 'known-positive', value: 25})
@@ -326,8 +328,8 @@ describe('terminal and retained outcomes', () => {
         expect(selectOutcome({
             phase: 'done',
             session: {sessionId: metadata.sessionId, lastSeq: 4},
-            outcome: {kind: 'done', metadata, progress: finalProgress},
-        })).toEqual({kind: 'done', retained: false, metadata, progress: finalProgress})
+            outcome: {kind: 'done', receipt: doneReceipt},
+        })).toEqual({kind: 'done', retained: false, receipt: doneReceipt})
 
         expect(selectOutcome({
             phase: 'error',
@@ -347,9 +349,9 @@ describe('terminal and retained outcomes', () => {
     it('presents the same outcome as retained once reset has cleared the session', () => {
         expect(selectOutcome({
             phase: 'idle',
-            retainedOutcome: {kind: 'done', metadata, progress: finalProgress},
+            retainedOutcome: {kind: 'done', receipt: doneReceipt},
             commandError: null,
-        })).toEqual({kind: 'done', retained: true, metadata, progress: finalProgress})
+        })).toEqual({kind: 'done', retained: true, receipt: doneReceipt})
         expect(selectOutcome({
             phase: 'idle',
             retainedOutcome: {kind: 'error', error: publicError('source_changed')},
@@ -358,47 +360,46 @@ describe('terminal and retained outcomes', () => {
     })
 
     /*
-      Given a retained Done outcome in Idle, it carries the same two retained
-      values a live Done carried -- so a reset does not empty the panel the
+      Given a retained Done outcome in Idle, it carries the same retained
+      receipt a live Done carried -- so a reset does not empty the panel the
       sender is still looking at.
     */
-    it('carries the same retained metadata and progress a live Done outcome carried', () => {
+    it('carries the same retained receipt a live Done outcome carried', () => {
         const live = selectOutcome({
             phase: 'done',
             session: {sessionId: metadata.sessionId, lastSeq: 4},
-            outcome: {kind: 'done', metadata, progress: finalProgress},
+            outcome: {kind: 'done', receipt: doneReceipt},
         })
         const retained = selectOutcome({
             phase: 'idle',
-            retainedOutcome: {kind: 'done', metadata, progress: finalProgress},
+            retainedOutcome: {kind: 'done', receipt: doneReceipt},
             commandError: null,
         })
 
         expect(live?.kind).toBe('done')
         expect(retained?.kind).toBe('done')
-        expect(live?.kind === 'done' && retained?.kind === 'done'
-            ? [live.metadata, live.progress]
-            : null).toEqual(retained?.kind === 'done' ? [retained.metadata, retained.progress] : null)
+        expect(live?.kind === 'done' ? live.receipt : null)
+            .toEqual(retained?.kind === 'done' ? retained.receipt : null)
     })
 
     /*
-      *Mutation:* substitute `metadata.size` for `progress.bytesSent` -> must
-      fail. Distinguishable because nothing forces them equal: this metadata
-      describes a directory (`size` is the logical placeholder, 0) while the
-      wire actually sent bytes for the ZIP it produced.
+      `selectOutcome` only forwards `CompletionReceipt`; it computes nothing.
+      The wire-bytes-vs-logical-size guarantee (Story 7.4 AC3) is proven once,
+      where the receipt is actually built, in state.test.ts -- there is no
+      `metadata.size` in scope at this layer for a selector to substitute.
+      This instead proves the pass-through is exact, for a directory outcome
+      Story 7.5 will need to phrase differently (`receipt.isDir`).
     */
-    it('reads bytes from the retained progress snapshot, never from metadata.size', () => {
-        const dirMetadata = {...metadata, isDir: true, size: 0}
-        const wireProgress = {bytesSent: 4_096, totalBytes: 0, totalKnown: false, percent: 0, speedBytesPerSec: 512}
+    it('forwards the receipt unchanged, including for a directory outcome', () => {
+        const dirReceipt = {name: 'papers', isDir: true, bytesSent: 4_096} as const
 
         const outcome = selectOutcome({
             phase: 'done',
             session: {sessionId: metadata.sessionId, lastSeq: 4},
-            outcome: {kind: 'done', metadata: dirMetadata, progress: wireProgress},
+            outcome: {kind: 'done', receipt: dirReceipt},
         })
 
-        expect(outcome?.kind === 'done' ? outcome.progress.bytesSent : null).toBe(4_096)
-        expect(outcome?.kind === 'done' ? outcome.metadata.size : null).toBe(0)
+        expect(outcome).toEqual({kind: 'done', retained: false, receipt: dirReceipt})
     })
 
     it('refuses to present a cancellation as an outcome panel', () => {

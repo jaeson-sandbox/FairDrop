@@ -2,42 +2,58 @@
 
 ## What changed
 
-`DoneTransferState.outcome` (`frontend/src/transfer/state.ts`) grew two
-fields: `metadata: FileMetadata` and `progress: ProgressSnapshot`, alongside
-the existing `kind: 'done'`. `RetainedDoneOutcome`
-(`frontend/src/transfer/types.ts`) grew the same two fields. Both were
-`{kind: 'done'}` and nothing else before this story -- the exact shape
-Epic 7's diagnosis named as the reason the finished-transfer screen renders
-"a small bit of text and a bunch of empty space."
+`DoneTransferState.outcome` (`frontend/src/transfer/state.ts`) grew one
+field: `receipt: CompletionReceipt`, alongside the existing `kind: 'done'`.
+`RetainedDoneOutcome` (`frontend/src/transfer/types.ts`) grew the same field.
+Both were `{kind: 'done'}` and nothing else before this story -- the exact
+shape Epic 7's diagnosis named as the reason the finished-transfer screen
+renders "a small bit of text and a bunch of empty space."
 
-The reducer's `transferring` -> `done` transition
-(`reduceLifecycle`'s `transfer-complete` branch) now builds the outcome from
-values already in hand at that exact line: `metadata: state.metadata` (the
+`CompletionReceipt` (`frontend/src/transfer/types.ts`) is new:
+
+```ts
+export interface CompletionReceipt {
+    readonly name: string
+    readonly isDir: boolean
+    readonly bytesSent: number
+}
+```
+
+It is a purpose-built projection, not `FileMetadata`. See "Narrowed to
+`CompletionReceipt`" below for why.
+
+The reducer's `transferring` -> `done` transition (`reduceLifecycle`'s
+`transfer-complete` branch) builds the receipt from values already in hand
+at that exact line: `name`/`isDir` from `state.metadata` (the
 `TransferringTransferState`'s own metadata, already validated at Stage) and
-`progress: event.progress` (the `TransferCompleteEvent`'s final snapshot,
-already validated by `parseLifecycleEvent`/`parseProgressSnapshot`). Neither
-value is refetched, recomputed, or newly validated -- they were already being
-discarded at this line, not missing.
+`bytesSent` from `event.progress.bytesSent` (the `TransferCompleteEvent`'s
+final snapshot, already validated by
+`parseLifecycleEvent`/`parseProgressSnapshot`). Neither source value is
+refetched, recomputed, or newly validated -- `name`/`isDir`/`bytesSent` were
+already in hand and being discarded at this line, not missing.
 
-The `done` -> `idle` transition (on a matching `transfer-reset`) now carries
-`state.outcome.metadata` and `state.outcome.progress` straight into the new
-`retainedOutcome`, unchanged. The session cursor (`sessionId`/`lastSeq`) is
-still scrubbed at this transition exactly as before -- only the receipt's two
-values survive reset, not the correlation data.
+The `done` -> `idle` transition (on a matching `transfer-reset`) carries
+`state.outcome.receipt` straight into the new `retainedOutcome`, unchanged.
+The session cursor (`sessionId`/`lastSeq`) is still scrubbed at this
+transition exactly as before -- only the receipt survives reset, not the
+correlation data, and the receipt itself carries no correlation data either
+(see below).
 
 `selectors.ts`'s `OutcomePresentation` (`kind: 'done'` branch) grew the same
-two fields, and `selectOutcome` now forwards `state.outcome.metadata`/
-`state.outcome.progress` (live Done) or `retained.metadata`/`retained.progress`
-(retained Done in Idle) into the presentation, so a view reads both from one
-place regardless of whether the outcome is live or retained.
+field, and `selectOutcome` forwards `state.outcome.receipt` (live Done) or
+`retained.receipt` (retained Done in Idle) into the presentation unchanged --
+it computes nothing, it only routes the one value that exists to one place a
+view can read regardless of whether the outcome is live or retained.
 
 `OutcomePanel.tsx` gained two non-visible attributes,
 `data-receipt-name`/`data-receipt-bytes-sent`, set from
-`outcome.metadata.name`/`outcome.progress.bytesSent` on the Done branch only.
+`outcome.receipt.name`/`outcome.receipt.bytesSent` on the Done branch only.
 This is the "minimum rendering change" the story explicitly allows to prove
 the retained values reach the view -- it is deliberately not the receipt's
 markup, layout, or styling, which is Story 7.5's job and out of this story's
-scope.
+scope. The diff to this file is two lines, on purpose: Story 7.2 is
+concurrently changing `OutcomePanel.tsx` on `epic-7-quartz`, and keeping this
+touch minimal keeps that merge conflict small.
 
 `ErrorTransferState` and `RetainedErrorOutcome` are byte-for-byte unchanged;
 this story does not touch the error path at all (verified by mutation M6
@@ -45,9 +61,12 @@ below).
 
 ### Files touched
 
-- `frontend/src/transfer/state.ts` -- the two type/transition changes above.
-- `frontend/src/transfer/types.ts` -- `RetainedDoneOutcome`.
-- `frontend/src/transfer/selectors.ts` -- `OutcomePresentation`, `selectOutcome`.
+- `frontend/src/transfer/types.ts` -- `CompletionReceipt` (new),
+  `RetainedDoneOutcome`.
+- `frontend/src/transfer/state.ts` -- `DoneTransferState`, the two
+  transitions above.
+- `frontend/src/transfer/selectors.ts` -- `OutcomePresentation`,
+  `selectOutcome`.
 - `frontend/src/ui/OutcomePanel.tsx` -- two proof-only `data-*` attributes.
 - `frontend/src/transfer/state.test.ts`, `frontend/src/transfer/selectors.test.ts`,
   `frontend/src/transfer/useTransfer.test.tsx` -- extended per the story's
@@ -57,72 +76,98 @@ below).
   `frontend/src/ui/announce.test.ts` -- mechanical fixture updates. Every one
   of these files constructs a `TransferState`/`OutcomePresentation` `'done'`
   literal directly (rather than through the reducer), so the new required
-  fields are compile errors there until supplied. No test's assertions were
-  weakened; each got a fixture `metadata`/`progress` (or a shared
-  `doneOutcome()`/`doneReceipt` helper) added to its existing literal.
+  field is a compile error there until supplied. No test's assertions were
+  weakened; each got a fixture `doneReceipt`/`doneOutcome()` helper added to
+  its existing literal.
 
-## A choice the story left implicit, flagged rather than guessed silently
+## Narrowed to `CompletionReceipt` -- a follow-up from review
 
-The acceptance criteria say `DoneTransferState` "retains the session's
-`FileMetadata`" -- the whole object, not a projection of it. I implemented
-that literally: the full `FileMetadata` (including `url` and `qrBase64`) is
-retained through Done and through reset into the retained Idle outcome, even
-though Story 7.5's two-cell receipt (DESIGN.md, "Completion Receipt") only
-ever reads `metadata.name` and `progress.bytesSent`. The alternative --
-retaining a narrower `{name}` projection -- would have been smaller and closer
-to "only what completion needs" (this story's own title), but the acceptance
-criteria's literal wording ("retains... `FileMetadata`", "carries the same
-two values") and the story's explicit scope ("`DoneTransferState`... and
-`RetainedDoneOutcome`", not a new narrower type) both point at the full type.
-Flagging this for the story owner: if a narrower projection was intended, the
-acceptance criteria should name it explicitly (e.g. "retains the item's
-name"), because "the session's `FileMetadata`" is the existing, already-named
-type that includes the capability URL and QR payload.
+The first pass of this story retained the full `FileMetadata` object (the
+acceptance criteria's literal wording: "retains the session's `FileMetadata`
+and the event's final `ProgressSnapshot`"), and flagged that as a possible
+tidiness concern for the story owner. Review correctly identified that this
+was understating it: it is the product's own premise, not a preference.
+
+`FileMetadata` carries `url` (the one-shot capability download link) and
+`qrBase64` (a scannable PNG of that same link). The retained value this story
+adds lives in `RetainedDoneOutcome`, which sits in **Idle** *after* the
+session has been reset and the server has stopped serving that URL.
+FairDrop's contract is that it is ephemeral and persists nothing; a
+sender-side surface that could re-present a dead capability link -- or hold a
+scannable QR of one indefinitely, for no reason -- is exactly what that
+contract exists to prevent. It is also a base64 PNG string retained
+indefinitely with no purpose once the Done receipt no longer needs it.
+
+The fix: `DoneTransferState.outcome` and `RetainedDoneOutcome` now carry
+`receipt: CompletionReceipt` (`name`, `isDir`, `bytesSent`) instead of
+`metadata: FileMetadata` plus `progress: ProgressSnapshot`. `isDir` is kept
+because Story 7.5 may need it to phrase the receipt differently for a folder.
+`url`, `qrBase64`, `size`, `sessionId`, and `warnings` are structurally
+absent -- not merely unused, but impossible to reach through this type, which
+guards the reducer's construction site against a future edit that widens the
+receipt back toward the full metadata. `bytesSent` still comes from
+`event.progress.bytesSent`, never `metadata.size` (unchanged from the first
+pass; see M-size below).
+
+Two consequences of the narrowing, both intentional: `selectOutcome` is now a
+pure pass-through with no computation of its own (it used to build the
+presentation's `metadata`/`progress` pair; now it forwards one already-built
+`receipt`), and the wire-bytes-vs-logical-size guarantee has exactly one
+place it can be broken -- the reducer's receipt construction -- rather than
+two (the reducer and the selector each used to independently carry both raw
+values). This is a smaller attack surface for the same guarantee, which is
+why the mutation table below is shorter than the first pass's, not weaker.
 
 ## Mutation table
 
 Each mutation was applied to the real working tree, run against the real
 suite, confirmed to fail and name the problem, then reverted before the next
 one (`diff` against a pre-mutation backup confirmed a clean revert after the
-whole pass).
+whole pass, for every one of `state.ts`, `selectors.ts`, and
+`OutcomePanel.tsx`).
 
 | # | Mutation | AC | Result |
 |---|---|---|---|
-| M1 | Dropped `metadata` from the `transfer-complete` reducer transition (`outcome: {kind: 'done', progress: event.progress}`) | AC1 | KILLED -- 4 failures in `state.test.ts`: `TypeError: Cannot read properties of undefined (reading 'size')` in `shows the wire bytes actually sent, never metadata.size`, plus the duration-guard test naming the missing key (`expected ['kind','progress'] to deeply equal ['kind','metadata','progress']`), plus the `toMatchObject` retention test and the reset-carries-the-same-values test |
-| M2 | Dropped `progress` from the same transition (`outcome: {kind: 'done', metadata: state.metadata}`) | AC1 | KILLED -- same 4 tests, this time `Cannot read properties of undefined (reading 'bytesSent')` and the duration-guard test reporting `expected ['kind','metadata'] to deeply equal ['kind','metadata','progress']` |
-| M3 | `selectOutcome`'s live-Done branch: `progress: {...state.outcome.progress, bytesSent: state.outcome.metadata.size}` (substitutes `metadata.size` for `progress.bytesSent`) | AC3 | KILLED -- `selectors.test.ts`, `reads bytes from the retained progress snapshot, never from metadata.size`: `expected +0 to be 4096` |
-| M4 | `OutcomePanel.tsx`'s `data-receipt-bytes-sent` set from `outcome.metadata.size` instead of `outcome.progress.bytesSent` | AC3 | KILLED -- `OutcomePanel.test.tsx`, `shows the wire bytes actually sent, never the logical file size`: `expected '999999' to be '100'` |
-| M5 | Added `elapsedMs` to both the live `outcome` and the retained `retainedOutcome` at the two reducer transitions | AC4 | KILLED -- 3 failures in `state.test.ts`, including the duration-guard test naming the exact field: `expected ['elapsedMs','kind','metadata','progress'] to deeply equal ['kind','metadata','progress']` |
-| M6 | Added `metadata: state.metadata` to the `transferring` -> `error` transition's outcome (both the disagreeing-snapshot and the `transfer-error`-event branches) | AC5 | KILLED -- `state.test.ts`, `adds nothing to the Error outcome shape: this story only retains a receipt for Done`: `expected ['error','kind','metadata'] to deeply equal ['error','kind']`, plus an existing `toEqual` in the failure-grammar test |
+| M-drop | Dropped `receipt` from the `transfer-complete` reducer transition (`outcome: {kind: 'done'} as never`) | AC1 | KILLED -- 5 failures in `state.test.ts`: the wire-bytes test (`Cannot read properties of undefined (reading 'bytesSent')`), the no-URL/no-QR test (`Cannot convert undefined or null to object`), the duration-guard test (`expected ['kind'] to deeply equal ['kind','receipt']`), the primary retention `toEqual`, and the reset-carries-the-same-receipt test |
+| M-size | `receipt.bytesSent` built from `state.metadata.size` instead of `event.progress.bytesSent` | AC3 | KILLED -- `state.test.ts`, `shows the wire bytes actually sent, never metadata.size`: `expected +0 to be 4096` (the directory fixture's `metadata.size` is 0, distinguishing it from the wire bytes the mutation should have used) |
+| M-duration | Added `elapsedMs: 0` to the receipt at construction | AC4 | KILLED -- 4 failures in `state.test.ts`, including the duration-guard test naming the exact field: `expected ['bytesSent','elapsedMs','isDir','name'] to deeply equal ['bytesSent','isDir','name']` |
+| M-leak | **The mutation review asked for.** `receipt` built as `{...state.metadata, bytesSent: event.progress.bytesSent}` -- the full `FileMetadata` spread back in, exactly the regression the narrowing exists to prevent | AC (ephemerality) | KILLED -- 6 failures across two files: `state.test.ts`'s key-shape guards name the leak directly (`expected {8 keys} to deeply equal {name, isDir, bytesSent}`), and `useTransfer.test.tsx`'s dedicated capability-leak test fails with the literal URL substring in its message: `the capability URL must not outlive the session: expected '...' not to contain 'fedcba9876543210fedcba9876543210'` |
+| M-error | Added `receipt: state.metadata` to the `transferring` -> `error` transition's outcome | AC5 | KILLED -- `state.test.ts`, `adds nothing to the Error outcome shape: this story only retains a receipt for Done`: `expected ['error','kind','receipt'] to deeply equal ['error','kind']`, plus an existing `toEqual` in the failure-grammar test |
+| M-panel | `OutcomePanel.tsx`'s `data-receipt-bytes-sent` set from `outcome.retained` instead of `outcome.receipt.bytesSent` | wiring proof | KILLED -- `OutcomePanel.test.tsx`, two tests: `expected 'true' to be '100'` and `expected 'false' to be '4096'` |
 
-M1-M2 prove the primary claim (AC1: both values are retained, not discarded).
-M3-M4 prove AC3 (wire bytes, not logical size) at both the selector layer and
-the view-wiring layer -- deliberately using an unknown-total directory
-transfer, where nothing forces `metadata.size` and `progress.bytesSent` to
-the same value the way a plain file's validation does (`progressMatchesMetadata`
-pins `progress.totalBytes === metadata.size` for a file, and
-`parseLifecycleEvent`'s `transfer-complete` branch pins `bytesSent ===
-totalBytes` whenever `totalKnown`, so for an ordinary file the two figures are
-mathematically forced equal and a size-for-bytes substitution would be
-invisible). M5 proves AC4 (the duration ban) by name. M6 proves AC5 (the
-error path is untouched).
+M-drop proves the primary claim (AC1: the receipt is retained, not
+discarded). M-size proves AC3 (wire bytes, not logical size), using an
+unknown-total directory transfer where nothing forces `metadata.size` and
+`progress.bytesSent` to the same value the way a plain file's validation does
+(`progressMatchesMetadata` pins `progress.totalBytes === metadata.size` for a
+file, and `parseLifecycleEvent`'s `transfer-complete` branch pins
+`bytesSent === totalBytes` whenever `totalKnown`, so for an ordinary file the
+two figures are mathematically forced equal and a size-for-bytes substitution
+would be invisible). M-duration proves AC4 (the duration ban) by name.
+M-leak is the mutation review specifically asked for, proving the
+ephemerality guarantee: putting the full metadata back on the retained
+outcome fails loudly, in two independent places, and the failure message
+names the actual leaked capability URL. M-error proves AC5 (the error path is
+untouched). M-panel proves the view-wiring attributes actually read the
+receipt rather than some other field that happens to be present.
 
 ## Gate transcripts (macOS arm64, native)
 
 Run in the order `.github/workflows/verify.yml` uses, after the mutation
 pass above and with the working tree back to its intended diff (confirmed
-identical to the pre-mutation-pass backup by `diff`).
+identical to the pre-mutation-pass backups by `diff`, for every mutated
+file).
 
-- `wails build`: **PASS**. `Built '.../fairdrop.app/Contents/MacOS/fairdrop' in 13.811s.` One pre-existing linker warning (`object file ... built for newer 'macOS' version (13.0) than being linked (11.0)`), unrelated to this change.
+- `wails build`: **PASS**. `Built '.../fairdrop.app/Contents/MacOS/fairdrop' in 9.315s.` One pre-existing linker warning (`object file ... built for newer 'macOS' version (13.0) than being linked (11.0)`), unrelated to this change.
 - Bindings drift / `.gitkeep` check: **PASS**. `frontend/dist/.gitkeep` present; `git -c core.fileMode=false diff --quiet -- frontend/wailsjs` exit 0 (no drift after `chmod 644` on the three regenerated bindings files, per the documented mode-churn pitfall); `scripts/verify-build-asset-drift.sh` exit 0, no output.
 - `gofmt -l .`: **PASS**, no output.
 - `go vet ./...`: **PASS**, no output.
 - `go tool staticcheck ./...`: **PASS**, no output.
 - `go test -count=1 ./...`: **PASS** -- `ok` for `fairdrop`, `internal/network`, `internal/qr`, `internal/server`, `internal/source`, `internal/stream`, `internal/transfer`, `scripts`, `scripts/mutationverdict`.
-- `CGO_ENABLED=1 go test -count=1 -race ./...`: **PASS** -- `ok` for all nine packages (`internal/stream` ~106s under the race detector, the rest a few seconds each). `go env CGO_ENABLED` confirmed `1` before trusting the result.
+- `CGO_ENABLED=1 go test -count=1 -race ./...`: **PASS** -- `ok` for all nine packages (`internal/stream` ~105s under the race detector, the rest a few seconds each). `go env CGO_ENABLED` confirmed `1` before trusting the result.
 - `GOOS=windows GOARCH=amd64 go build ./...`: **PASS**.
 - `GOOS=linux GOARCH=amd64 go build ./...`: **PASS** (pre-flight, per AGENTS.md; not part of the story's minimum gate but run anyway).
-- `cd frontend && npm test -- --run` (not concurrent with `wails build`): **PASS** -- 17 files, **560 tests** (549 pre-existing + 11 new: 5 in `state.test.ts`, 2 in `selectors.test.ts`, 2 in `useTransfer.test.tsx`, and the fixture updates in the other five test files added no new tests, only new required fields).
+- `cd frontend && npm test -- --run` (not concurrent with `wails build`): **PASS** -- 17 files, **562 tests** (549 baseline before this story + 13 net new across both review passes: the narrowing pass replaced a few metadata/progress-shaped tests with equivalent receipt-shaped ones and added the two dedicated capability-leak tests).
 - `cd frontend && npm run test:browser`: **PASS** -- 1 file, 17 tests, unchanged.
 - `git diff --check`: **PASS**, no output (no whitespace errors).
 - Line-ending check (`git ls-files --eol | grep -E '(i|w)/(crlf|mixed)'`): **PASS**, no matches.
@@ -136,16 +181,17 @@ and `frontend/src/ui` change); it was run in full anyway because the gate is
 All six Story 7.4 acceptance criteria are implemented and mutation-verified
 above:
 
-1. `DoneTransferState` retains `FileMetadata` and the final `ProgressSnapshot`
-   at the `transfer-complete` transition (M1, M2).
-2. A retained Done outcome in Idle carries the same two values
-   (`carries the same retained metadata and progress into Idle after reset`
-   in `state.test.ts`, and the live-vs-retained equality test in
+1. `DoneTransferState` retains a completion receipt (name, isDir, wire bytes
+   sent) at the `transfer-complete` transition (M-drop).
+2. A retained Done outcome in Idle carries the same receipt
+   (`carries the same retained receipt into Idle after reset` in
+   `state.test.ts`, and the live-vs-retained equality test in
    `selectors.test.ts`).
 3. The receipt's bytes are the wire bytes actually sent, never the logical
-   size (M3, M4).
-4. No duration/elapsed-time field exists anywhere on the retained shapes (M5).
-5. The error path's state shape is unchanged (M6).
+   size (M-size).
+4. No duration/elapsed-time field exists anywhere on the retained shapes
+   (M-duration).
+5. The error path's state shape is unchanged (M-error).
 6. The full gate passes, and `state.test.ts`, `selectors.test.ts`, and
    `useTransfer.test.tsx` were extended, not loosened -- no existing
    assertion was weakened or deleted; the one test whose premise the story
@@ -153,8 +199,16 @@ above:
    replaced with tests pinning the new, opposite, spec-mandated behavior,
    under a renamed `describe` block that says why.
 
+Additionally, following review: the retained Done outcome structurally
+cannot carry the one-shot capability URL or its QR code (M-leak), which is
+FairDrop's own ephemerality contract rather than an incidental tidiness
+choice -- both `state.test.ts` and `useTransfer.test.tsx` pin this with tests
+named so a failure states why, not just what.
+
 Deliberately out of scope, per the story text: `OutcomePanel.tsx`'s markup,
 layout, and visible styling were not touched beyond the two non-visible
-`data-*` proof attributes. Story 7.5 owns rebuilding the panel to actually
+`data-*` proof attributes, kept to a two-line diff so Story 7.2's concurrent
+change to the same file (on `epic-7-quartz`) stays a small conflict to
+resolve at integration. Story 7.5 owns rebuilding the panel to actually
 display the two-cell receipt (`DESIGN.md`'s "Completion Receipt" row) from
 the state this story now retains.

@@ -111,13 +111,13 @@ describe('authoritative lifecycle grammar', () => {
         expect(state).toEqual({
             phase: 'done',
             session: {sessionId, lastSeq: 3},
-            outcome: {kind: 'done', metadata: metadata(), progress: progress(100)},
+            outcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
         })
 
         state = event(state, 'transfer-reset', {sessionId, seq: 4})
         expect(state).toEqual({
             phase: 'idle',
-            retainedOutcome: {kind: 'done', metadata: metadata(), progress: progress(100)},
+            retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
             commandError: null,
         })
     })
@@ -304,18 +304,18 @@ describe('terminal receipt retention (Story 7.4)', () => {
       and are now retained on `DoneTransferState.outcome`, which is what lets
       Story 7.5 render a receipt instead of an empty window.
     */
-    it('retains the session metadata and the final progress snapshot at transfer-complete', () => {
+    it('retains a completion receipt (name, isDir, wire bytes sent) at transfer-complete', () => {
         let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
         state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: progress(100)})
 
-        expect(state).toMatchObject({
+        expect(state).toEqual({
             phase: 'done',
-            outcome: {kind: 'done', metadata: {name: 'report.pdf'}, progress: {bytesSent: 100}},
+            session: {sessionId, lastSeq: 2},
+            outcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
         })
-        // *Mutation:* drop `metadata` or `progress` from the outcome -> must fail here.
+        // *Mutation:* drop `receipt` from the outcome -> must fail here.
         const outcome = state.phase === 'done' ? state.outcome : null
-        expect(outcome && 'metadata' in outcome, 'DoneTransferState.outcome must carry metadata').toBe(true)
-        expect(outcome && 'progress' in outcome, 'DoneTransferState.outcome must carry progress').toBe(true)
+        expect(outcome && 'receipt' in outcome, 'DoneTransferState.outcome must carry a receipt').toBe(true)
     })
 
     /*
@@ -332,15 +332,13 @@ describe('terminal receipt retention (Story 7.4)', () => {
         const unknownFinal = {bytesSent: 4_096, totalBytes: 0, totalKnown: false, percent: 0, speedBytesPerSec: 512}
         state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: unknownFinal})
 
-        const receiptBytes = state.phase === 'done' ? state.outcome.progress.bytesSent : null
-        const logicalSize = state.phase === 'done' ? state.outcome.metadata.size : null
-        // *Mutation:* substitute `metadata.size` for `progress.bytesSent` -> must fail:
-        // logicalSize is 0 here while the receipt figure must be 4096.
-        expect(receiptBytes, 'the receipt must read progress.bytesSent').toBe(4_096)
-        expect(logicalSize).toBe(0)
+        const receiptBytes = state.phase === 'done' ? state.outcome.receipt.bytesSent : null
+        // *Mutation:* substitute `metadata.size` (0, for this directory fixture)
+        // for `progress.bytesSent` -> must fail: the receipt figure must be 4096.
+        expect(receiptBytes, 'the receipt must read progress.bytesSent, not metadata.size').toBe(4_096)
     })
 
-    it('carries the same retained metadata and progress into Idle after reset, so reset does not empty the panel', () => {
+    it('carries the same retained receipt into Idle after reset, so reset does not empty the panel', () => {
         let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
         state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: progress(100)})
         const doneOutcome = state.phase === 'done' ? state.outcome : null
@@ -350,15 +348,52 @@ describe('terminal receipt retention (Story 7.4)', () => {
 
         expect(state).toEqual({
             phase: 'idle',
-            retainedOutcome: {kind: 'done', metadata: doneOutcome!.metadata, progress: doneOutcome!.progress},
+            retainedOutcome: {kind: 'done', receipt: doneOutcome!.receipt},
             commandError: null,
         })
 
         // Session correlation (the sequence cursor) is still scrubbed on reset;
-        // only the receipt's two retained values survive it.
+        // only the receipt's retained values survive it.
         const serialized = JSON.stringify(state)
         expect(serialized).not.toContain('lastSeq')
         expect(serialized).not.toContain('"session"')
+    })
+
+    /*
+      The product's own ephemerality contract, not a tidiness preference:
+      `RetainedDoneOutcome` lives on in Idle *after* the session has been
+      reset and the server has stopped. `FileMetadata.url` is the one-shot
+      capability download link and `qrBase64` is a scannable PNG of that same
+      link -- retaining either here would let a sender-side surface
+      re-present a dead capability link (or hold its QR indefinitely) well
+      past the point FairDrop claims to have forgotten it. `CompletionReceipt`
+      is a purpose-built projection that structurally cannot carry them; this
+      guards the reducer's construction site too, in case a future edit
+      widens the receipt back toward the full `FileMetadata`.
+
+      *Mutation:* retain the full `FileMetadata` on the outcome instead of
+      the narrow receipt -> this must fail and name the leak.
+    */
+    it('never retains the capability URL or its QR code -- both must not outlive the session', () => {
+        let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
+        state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        state = event(state, 'transfer-reset', {sessionId, seq: 3})
+
+        const serialized = JSON.stringify(state)
+        expect(
+            serialized,
+            'the retained Done outcome must not contain the one-shot capability URL',
+        ).not.toContain('fedcba9876543210fedcba9876543210')
+        expect(
+            serialized,
+            'the retained Done outcome must not contain the capability URL\'s QR code',
+        ).not.toContain(qrPNG)
+        expect(
+            state.phase === 'idle' && state.retainedOutcome?.kind === 'done'
+                ? Object.keys(state.retainedOutcome.receipt).sort()
+                : [],
+            'CompletionReceipt must carry exactly name/isDir/bytesSent -- no url, no qrBase64, no sessionId',
+        ).toEqual(['bytesSent', 'isDir', 'name'])
     })
 
     /*
@@ -374,9 +409,9 @@ describe('terminal receipt retention (Story 7.4)', () => {
         const outcomeKeys = state.phase === 'done' ? Object.keys(state.outcome).sort() : []
         expect(
             outcomeKeys,
-            'DoneTransferState.outcome must carry exactly kind/metadata/progress -- any other key ' +
+            'DoneTransferState.outcome must carry exactly kind/receipt -- any other key ' +
             'is presumed to be an invented duration/elapsed/timer field, which EXPERIENCE.md bans',
-        ).toEqual(['kind', 'metadata', 'progress'])
+        ).toEqual(['kind', 'receipt'])
 
         state = event(state, 'transfer-reset', {sessionId, seq: 3})
         const retainedKeys = state.phase === 'idle' && state.retainedOutcome !== null
@@ -384,8 +419,16 @@ describe('terminal receipt retention (Story 7.4)', () => {
             : []
         expect(
             retainedKeys,
-            'RetainedDoneOutcome must carry exactly kind/metadata/progress -- no duration field is permitted',
-        ).toEqual(['kind', 'metadata', 'progress'])
+            'RetainedDoneOutcome must carry exactly kind/receipt -- no duration field is permitted',
+        ).toEqual(['kind', 'receipt'])
+
+        const receiptKeys = state.phase === 'idle' && state.retainedOutcome?.kind === 'done'
+            ? Object.keys(state.retainedOutcome.receipt).sort()
+            : []
+        expect(
+            receiptKeys,
+            'CompletionReceipt must carry exactly bytesSent/isDir/name -- no duration field is permitted',
+        ).toEqual(['bytesSent', 'isDir', 'name'])
     })
 
     it('adds nothing to the Error outcome shape: this story only retains a receipt for Done', () => {
@@ -446,15 +489,15 @@ describe('terminal receipt retention (Story 7.4)', () => {
     })
 
     it('keeps retained terminal outcome when invalid selection supplies the visible command error', () => {
-        const retained = {
+        const retained: TransferState = {
             phase: 'idle',
-            retainedOutcome: {kind: 'done', metadata: metadata(), progress: progress(100)},
+            retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
             commandError: null,
-        } as unknown as TransferState
+        }
 
         expect(transferReducer(retained, {type: 'invalid-selection'})).toEqual({
             phase: 'idle',
-            retainedOutcome: {kind: 'done', metadata: metadata(), progress: progress(100)},
+            retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
             commandError: {
                 code: 'invalid_selection',
                 message: 'Choose exactly one file or folder.',

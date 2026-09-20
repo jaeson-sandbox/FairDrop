@@ -59,10 +59,12 @@ const finalProgress: ProgressSnapshot = {
     bytesSent: 8_400_000, totalBytes: 8_400_000, totalKnown: true, percent: 100, speedBytesPerSec: 0,
 }
 
+const doneReceipt = {name: 'report.pdf', isDir: false, bytesSent: finalProgress.bytesSent}
+
 const done: TransferState = {
     phase: 'done',
     session: {sessionId, lastSeq: 5},
-    outcome: {kind: 'done', metadata: metadata(), progress: finalProgress},
+    outcome: {kind: 'done', receipt: doneReceipt},
 }
 
 const terminalError: TransferState = {
@@ -161,7 +163,7 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
     [
         'Reset after terminal Done',
         done,
-        idle({retainedOutcome: {kind: 'done', metadata: metadata(), progress: finalProgress}}),
+        idle({retainedOutcome: {kind: 'done', receipt: doneReceipt}}),
         null,
     ],
     [
@@ -172,7 +174,7 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
     ],
     [
         'Dismiss retained outcome',
-        idle({retainedOutcome: {kind: 'done', metadata: metadata(), progress: finalProgress}}),
+        idle({retainedOutcome: {kind: 'done', receipt: doneReceipt}}),
         createInitialTransferState(),
         {row: 'dismiss-retained', owner: 'focus', target: 'idle-instruction'},
     ],
@@ -353,7 +355,7 @@ describe('rows the table names but a reducer transition cannot produce', () => {
     })
 
     it('says nothing when a reset lands on Idle with a retained outcome still attached', () => {
-        expect(routeTransition(staged(), idle({retainedOutcome: {kind: 'done', metadata: metadata(), progress: finalProgress}}))).toBeNull()
+        expect(routeTransition(staged(), idle({retainedOutcome: {kind: 'done', receipt: doneReceipt}}))).toBeNull()
     })
 
     it('refuses to treat a `cancelled` command error as a failure worth focusing', () => {

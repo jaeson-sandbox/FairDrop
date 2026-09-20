@@ -1,4 +1,5 @@
 import type {
+    CompletionReceipt,
     FileMetadata,
     PendingItemKind,
     ProgressSnapshot,
@@ -97,10 +98,8 @@ export type OutcomePresentation =
     | {
         readonly kind: 'done'
         readonly retained: boolean
-        /** The session's file/folder metadata, for the completion receipt's item-name cell. */
-        readonly metadata: FileMetadata
-        /** The final snapshot -- the receipt's bytes cell is `progress.bytesSent`, never `metadata.size`. */
-        readonly progress: ProgressSnapshot
+        /** Scrubbed of the capability URL and its QR code -- see `CompletionReceipt`. */
+        readonly receipt: CompletionReceipt
     }
     | {readonly kind: 'error'; readonly retained: boolean; readonly error: PublicError}
 
@@ -149,19 +148,14 @@ export function selectCommandError(state: TransferState): PublicError | null {
 export function selectOutcome(state: TransferState): OutcomePresentation | null {
     switch (state.phase) {
         case 'done':
-            return {
-                kind: 'done',
-                retained: false,
-                metadata: state.outcome.metadata,
-                progress: state.outcome.progress,
-            }
+            return {kind: 'done', retained: false, receipt: state.outcome.receipt}
         case 'error':
             return outcomeError(state.outcome.error, false)
         case 'idle': {
             const retained = state.retainedOutcome
             if (retained === null) return null
             return retained.kind === 'done'
-                ? {kind: 'done', retained: true, metadata: retained.metadata, progress: retained.progress}
+                ? {kind: 'done', retained: true, receipt: retained.receipt}
                 : outcomeError(retained.error, true)
         }
         default:

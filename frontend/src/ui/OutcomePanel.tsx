@@ -75,8 +75,8 @@ export function OutcomePanel({
             // Proves the retained receipt values (Story 7.4) reach the view. The
             // receipt itself -- markup, layout, styling -- is Story 7.5's job;
             // this is deliberately not user-visible rendering.
-            data-receipt-name={done ? outcome.metadata.name : undefined}
-            data-receipt-bytes-sent={done ? outcome.progress.bytesSent : undefined}
+            data-receipt-name={done ? outcome.receipt.name : undefined}
+            data-receipt-bytes-sent={done ? outcome.receipt.bytesSent : undefined}
             data-focus-target={focusTarget}
             aria-labelledby={headingId}
             tabIndex={-1}

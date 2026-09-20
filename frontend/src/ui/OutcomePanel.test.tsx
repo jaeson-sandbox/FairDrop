@@ -1,6 +1,6 @@
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, describe, expect, it, vi} from 'vitest'
-import type {FileMetadata, ProgressSnapshot, PublicError} from '../transfer/types'
+import type {CompletionReceipt, PublicError} from '../transfer/types'
 import {OutcomePanel} from './OutcomePanel'
 
 afterEach(cleanup)
@@ -11,26 +11,14 @@ function panel(): HTMLElement {
     return found as HTMLElement
 }
 
-const doneMetadata: FileMetadata = {
-    sessionId: '0123456789abcdef0123456789abcdef',
+const doneReceipt: CompletionReceipt = {
     name: 'report.pdf',
-    size: 100,
     isDir: false,
-    url: 'http://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210',
-    qrBase64: 'iVBORw0KGgo=',
-    warnings: [],
-}
-
-const doneProgress: ProgressSnapshot = {
     bytesSent: 100,
-    totalBytes: 100,
-    totalKnown: true,
-    percent: 100,
-    speedBytesPerSec: 10,
 }
 
 function doneOutcome(retained: boolean) {
-    return {kind: 'done', retained, metadata: doneMetadata, progress: doneProgress} as const
+    return {kind: 'done', retained, receipt: doneReceipt} as const
 }
 
 describe('the Done panel', () => {
@@ -219,16 +207,19 @@ describe('completion receipt values (Story 7.4 wiring)', () => {
         expect(panel().getAttribute('data-receipt-bytes-sent')).toBe('100')
     })
 
-    it('shows the wire bytes actually sent, never the logical file size', () => {
-        const outcome = {
-            kind: 'done',
-            retained: false,
-            metadata: {...doneMetadata, size: 999_999},
-            progress: {...doneProgress, bytesSent: 100},
-        } as const
-        render(<OutcomePanel outcome={outcome}/>)
+    /*
+      `OutcomePresentation`'s 'done' branch carries `CompletionReceipt`, not
+      `FileMetadata` -- there is no `metadata.size` in scope here for this
+      panel to read by mistake. The wire-bytes-vs-logical-size guarantee
+      (Story 7.4 AC3) is proven where the receipt is actually built, in
+      state.test.ts and selectors.test.ts; this only confirms the panel
+      renders whatever the receipt says, including for a directory.
+    */
+    it('renders whatever the receipt carries, including a directory outcome', () => {
+        const dirReceipt: CompletionReceipt = {name: 'papers', isDir: true, bytesSent: 4_096}
+        render(<OutcomePanel outcome={{kind: 'done', retained: false, receipt: dirReceipt}}/>)
 
-        expect(panel().getAttribute('data-receipt-bytes-sent')).toBe('100')
-        expect(panel().getAttribute('data-receipt-bytes-sent')).not.toBe('999999')
+        expect(panel().getAttribute('data-receipt-name')).toBe('papers')
+        expect(panel().getAttribute('data-receipt-bytes-sent')).toBe('4096')
     })
 })
