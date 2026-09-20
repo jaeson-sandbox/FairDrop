@@ -133,9 +133,19 @@ jobs:
       # binary whose resource embedding regressed, because none of them opens
       # one. It runs here, right after the build, because the artifact only
       # exists between this step and the end of the job.
+      # The test SKIPS when build/bin/fairdrop.exe is absent, which is right
+      # locally and wrong here: this job runs `wails build` first, so an absent
+      # exe means the build silently produced nothing and a skip would leave
+      # the only product-layer gate green having inspected no binary at all.
       - name: Built Windows exe embeds the committed resources
         if: runner.os == 'Windows'
-        run: go test -count=1 -run '^TestExeResources' -v ./...
+        run: |
+          out=$(go test -count=1 -run '^TestExeResources' -v ./...) || { echo "$out"; exit 1; }
+          echo "$out"
+          if echo "$out" | grep -q -- '--- SKIP'; then
+            echo 'TestExeResources skipped on CI: the built exe was not found, so this gate inspected nothing' >&2
+            exit 1
+          fi
 
       # A regenerated-but-uncommitted frontend/wailsjs means the committed
       # bindings are stale, and a missing frontend/dist/.gitkeep would break
@@ -145,12 +155,17 @@ jobs:
       # files 0755 while they are committed 0644, so every macOS run reports
       # a mode-only diff. A permission bit is not stale bindings; content is.
       #
-      # The icon.ico clause exists because wails build GENERATES that file
-      # whenever it is absent (packager.go:204), so an .ico missing from git
-      # would be manufactured by the runner and then satisfy every icon
-      # assertion against a file the repository does not contain. Untracked
-      # counts here, unlike the bindings check above, precisely because that
-      # is the failure mode.
+      # The build/ clause exists because wails build MANUFACTURES missing
+      # build assets. Two separate mechanisms do it: generateIcoFile
+      # (packager.go:204) writes icon.ico whenever it is absent, and
+      # buildassets.ReadFile (buildassets.go:49) falls back to the embedded
+      # default AND writes it to disk for appicon.png, info.json and
+      # wails.exe.manifest. So a committed asset missing from git is recreated
+      # by the runner -- as the Wails placeholder, the exact artwork Epic 6
+      # exists to remove -- and would then satisfy every assertion against a
+      # file the repository does not contain. Untracked counts here, unlike
+      # the bindings check above, precisely because that is the failure mode.
+      # build/bin/ is excluded: it is the build output and is gitignored.
       - name: Check for bindings drift and a restored .gitkeep
         run: |
           if [ ! -f frontend/dist/.gitkeep ]; then
@@ -162,9 +177,10 @@ jobs:
             git -c core.fileMode=false diff -- frontend/wailsjs >&2
             exit 1
           fi
-          if [ -n "$(git status --porcelain -- build/windows/icon.ico)" ]; then
-            echo "build/windows/icon.ico is missing from git or was changed by wails build:" >&2
-            git status --porcelain -- build/windows/icon.ico >&2
+          drifted="$(git status --porcelain -- build/ | grep -v " build/bin/" || true)"
+          if [ -n "$drifted" ]; then
+            echo "wails build changed or manufactured a committed build asset:" >&2
+            echo "$drifted" >&2
             exit 1
           fi
 

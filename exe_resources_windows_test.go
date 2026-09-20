@@ -226,23 +226,26 @@ func TestExeResourcesEmbedTheCommittedIcon(t *testing.T) {
 			t.Errorf("%s: embedded %dx%d icon decoded at %dx%d", builtExePath, entry.width, entry.height, got.w, got.h)
 			continue
 		}
-		measured, known := measuredEntryDistance255[entry.width]
-		if !known {
-			t.Errorf("no measured distance for %dx%d -- add one to measuredEntryDistance255", entry.width, entry.width)
-			continue
-		}
 		dist := meanChannelDistance255(want, got)
 		t.Logf("%dx%d: exe vs committed .ico distance %.3f", entry.width, entry.width, dist)
-		// winres copies the .ico's payloads verbatim, so this should be 0. The
-		// tolerance is Story 6.1's per-size measurement rather than an exact
-		// match so a future resource compiler that re-encodes is diagnosed as
-		// drift rather than treated as a wholesale mismatch.
-		if dist > measured*freshnessToleranceFactor {
+		// EXACT, not a tolerance. winres copies the .ico's payloads into the
+		// resource section verbatim, so the honest value here is 0 at every
+		// size -- this is not a resampling comparison and has no filter
+		// disagreement to absorb. An earlier version borrowed Story 6.1's
+		// per-size measurement, which is the master-vs-Catmull-Rom figure for
+		// a different comparison entirely; at 16x16 that admitted a mean
+		// deviation of 6.16 for a quantity whose true value is 0.
+		//
+		// If a future resource compiler re-encodes rather than copies, this
+		// fails loudly and the right response is to measure THAT compiler's
+		// distance and say so here -- not to widen the bound to whatever makes
+		// it pass.
+		if dist != 0 {
 			t.Errorf("%s's embedded %dx%d icon differs from %s's matching entry by a mean %.3f per "+
-				"channel, want <= %.3f -- the exe was built against a different icon.ico than the "+
-				"one committed. Delete %s, re-run `wails build`, and commit the result.",
-				builtExePath, entry.width, entry.width, windowsIcoPath, dist,
-				measured*freshnessToleranceFactor, windowsIcoPath)
+				"channel, want exactly 0 -- winres copies these payloads verbatim, so any difference "+
+				"means the exe was built against a different icon.ico than the one committed. Delete "+
+				"%s, re-run `wails build`, and commit the result.",
+				builtExePath, entry.width, entry.width, windowsIcoPath, dist, windowsIcoPath)
 		}
 		checked++
 	}
@@ -257,9 +260,11 @@ func TestExeResourcesEmbedTheCommittedIcon(t *testing.T) {
 // Every node is: wLength, wValueLength, wType (3 WORDs), a NUL-terminated
 // UTF-16 key, padding to a 4-byte boundary, the value, padding, then children.
 // wValueLength counts WCHARs when wType is 1 (text) and bytes when it is 0.
-func versionStrings(t *testing.T, blob []byte) map[string]string {
+func versionStrings(t *testing.T, blob []byte) (map[string]string, string) {
 	t.Helper()
 	out := map[string]string{}
+	tableKey := ""
+	tables := 0
 
 	align4 := func(n int) int { return (n + 3) &^ 3 }
 
@@ -327,10 +332,17 @@ func versionStrings(t *testing.T, blob []byte) map[string]string {
 		}
 		if key == "StringFileInfo" {
 			for tableOff := child; tableOff < end; {
-				_, _, stringOff, tableEnd := readNode(tableOff)
+				name, _, stringOff, tableEnd := readNode(tableOff)
 				if tableEnd <= tableOff {
 					break
 				}
+				// The table's own key is the langID+codepage. Story 6.2 moved
+				// it off the language-neutral 0000 precisely so .NET readers
+				// can see it, and that was the story's only change to the
+				// shipped artifact -- so it is the one thing that most needs
+				// pinning, and an earlier version of this function discarded it.
+				tables++
+				tableKey = name
 				for sOff := stringOff; sOff < tableEnd; {
 					sKey, sValue, _, sEnd := readNode(sOff)
 					if sEnd <= sOff {
@@ -346,7 +358,11 @@ func versionStrings(t *testing.T, blob []byte) map[string]string {
 		}
 		off = align4(end)
 	}
-	return out
+	if tables > 1 {
+		t.Errorf("%s carries %d StringFileInfo tables; which one a reader resolves is ambiguous, "+
+			"and a wrong-language table would be masked by a correct one", builtExePath, tables)
+	}
+	return out, tableKey
 }
 
 // TestExeResourcesCarryTheCommittedIdentity pins the "exe's identity is the
@@ -357,7 +373,19 @@ func TestExeResourcesCarryTheCommittedIdentity(t *testing.T) {
 	if len(resources[rtVersion]) != 1 {
 		t.Fatalf("%s carries %d RT_VERSION resources, want exactly 1", builtExePath, len(resources[rtVersion]))
 	}
-	strings := versionStrings(t, resources[rtVersion][0].data)
+	strings, tableKey := versionStrings(t, resources[rtVersion][0].data)
+
+	// wantVersionTableKey is US English (0x0409) + UTF-16 (0x04b0). Reverting
+	// build/windows/info.json to the language-neutral "0000" re-ships D-128's
+	// symptom -- every .NET-based reader goes blank again -- and every string
+	// assertion below would still pass, because they never look at the key.
+	const wantVersionTableKey = "040904b0"
+	if tableKey != wantVersionTableKey {
+		t.Errorf("%s's version string table is filed under %q, want %q -- build/windows/info.json's "+
+			"language key has changed, and a language-neutral table is invisible to .NET's "+
+			"FileVersionInfo, Explorer's Properties tab and PowerShell",
+			builtExePath, tableKey, wantVersionTableKey)
+	}
 
 	raw, err := os.ReadFile("wails.json")
 	if err != nil {
