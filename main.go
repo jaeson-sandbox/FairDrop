@@ -15,6 +15,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 //go:embed all:frontend/dist
@@ -166,6 +167,23 @@ func appOptionsWith(app *App, usable func() bool, prefersDark func() bool) *opti
 		// Without this, a rejected command carries err.Error() -- raw adapter
 		// text -- and the frontend has no stable code to switch on.
 		ErrorFormatter: formatCommandError,
+
+		// WebKit's macOS default leaves tabFocusesLinks NO, which is not a
+		// cosmetic gap: without this, Tab never moves focus onto the "Choose a
+		// file or folder" browse control at all, so the documented keyboard
+		// path -- Tab to the control, then ArrowDown to open the File/Folder
+		// menu -- is dead, and ArrowDown scrolls the document instead.
+		// Reproduced on the built binary: before this option, four Tab
+		// presses painted no focus ring; after it, one Tab press painted the
+		// ring and ArrowDown opened the menu on "File". Windows/WebView2 has
+		// no such default and is unaffected; main_test.go pins this exact
+		// option so it cannot regress silently the way EnableFileDrop nearly
+		// did.
+		Mac: &mac.Options{
+			Preferences: &mac.Preferences{
+				TabFocusesLinks: mac.Enabled,
+			},
+		},
 
 		// Exactly one FairDrop process runs. A second launch hands Wails a
 		// SecondInstanceData carrying its own Args and WorkingDirectory; the

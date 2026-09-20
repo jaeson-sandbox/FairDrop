@@ -14,6 +14,7 @@ import (
 	"fairdrop/internal/transfer"
 
 	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 func TestCoordinatorCleanupOutlastsServerTeardown(t *testing.T) {
@@ -41,6 +42,28 @@ func TestAppOptionsEnablesNativeFileDrop(t *testing.T) {
 	}
 	if !opts.DragAndDrop.EnableFileDrop {
 		t.Error("DragAndDrop.EnableFileDrop = false, want true: dropped files would be silently discarded")
+	}
+}
+
+// TestAppOptionsEnablesMacTabFocus pins the fix for the dead Tab-then-ArrowDown
+// path: WebKit's macOS default leaves WKPreferences.tabFocusesLinks NO, so
+// without an explicit Mac.Preferences block, Tab never reaches the "Choose a
+// file or folder" browse control and the documented keyboard path never opens
+// the File/Folder menu. Reproduced on the built binary: before this option,
+// four Tab presses painted no focus ring and ArrowDown scrolled the page;
+// after it, one Tab press focused the control and ArrowDown opened the menu.
+// Windows/WebView2 is unaffected -- this is a macOS-only default.
+func TestAppOptionsEnablesMacTabFocus(t *testing.T) {
+	opts := appOptionsWithLockProbe(NewApp(), func() bool { return true })
+
+	if opts.Mac == nil {
+		t.Fatal("Mac is nil: WebKit keeps its default tabFocusesLinks=NO, so Tab never reaches the browse control")
+	}
+	if opts.Mac.Preferences == nil {
+		t.Fatal("Mac.Preferences is nil: WebKit keeps its default tabFocusesLinks=NO, so Tab never reaches the browse control")
+	}
+	if opts.Mac.Preferences.TabFocusesLinks != mac.Enabled {
+		t.Errorf("Mac.Preferences.TabFocusesLinks = %v, want mac.Enabled: Tab would not reach the browse control", opts.Mac.Preferences.TabFocusesLinks)
 	}
 }
 
