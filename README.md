@@ -6,11 +6,10 @@ Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged cop
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**v1.0.0.** The planned scope is complete — FR1–FR24 across five epics, each with a
-retrospective. What makes it a 1 rather than another 0.x is that the product's success signal
-was *observed* on 2026-09-18 rather than inferred: a file and a folder sent from the desktop,
-downloaded by a phone on the same Wi-Fi, contents read and matched. Earlier releases rested on
-the sender-side log and an automated gate alone.
+**v1.1.0 candidate.** FairDrop now ships its own app icon on Windows and macOS, with automated checks
+against the resources embedded in the Windows executable. The transfer behavior remains the
+same complete FR1–FR24 scope proven for v1.0.0, including the observed file and folder transfer
+from desktop to a phone on the same Wi-Fi on 2026-09-18.
 
 ## Using it
 

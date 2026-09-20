@@ -1,0 +1,39 @@
+=== RUN   TestAppIconMasterGeometry
+    appicon_test.go:717: build/appicon.png: PNG colour type is 2, want 6 (truecolour with alpha) or 4 (greyscale with alpha) -- the master must carry a real alpha channel, and types 0/2/3 do not
+    appicon_test.go:723: build/appicon.png: only 0 contiguous fully-transparent row(s) from the top edge, want >= 12 -- the master must carry a real transparent band top and bottom from centring the non-square plaque in the square canvas, not the plaque stretched to fill it (which leaves only the erosion's own few-pixel margin)
+    appicon_test.go:724: build/appicon.png: only 0 contiguous fully-transparent row(s) from the bottom edge, want >= 12 -- the master must carry a real transparent band top and bottom from centring the non-square plaque in the square canvas, not the plaque stretched to fill it (which leaves only the erosion's own few-pixel margin)
+    appicon_test.go:741: build/appicon.png: 0 contiguous fully-transparent column(s) from the left edge, want 1-12 -- the plaque spans the canvas's full width, leaving only the erosion's own ~6px margin, so a wider band means the artwork is narrower than it should be and a narrower one means it is being clipped
+    appicon_test.go:741: build/appicon.png: 0 contiguous fully-transparent column(s) from the right edge, want 1-12 -- the plaque spans the canvas's full width, leaving only the erosion's own ~6px margin, so a wider band means the artwork is narrower than it should be and a narrower one means it is being clipped
+--- FAIL: TestAppIconMasterGeometry (0.04s)
+=== RUN   TestAppIconNoOpaqueBackdrop
+    appicon_test.go:795: build/appicon.png: the outer 12px border ring has 9740 near-white pixel(s) (R,G,B all > 200), e.g. (0,15) rgba=(232,232,232,255) -- a baked backdrop (checkerboard or background bloom) survived the derivation
+    appicon_test.go:795: build/appicon.png: only 0.0% of the outer 12px border ring is fully transparent, want at least 75% -- the ring is not overwhelmingly transparent, so an opaque backdrop likely survived
+--- FAIL: TestAppIconNoOpaqueBackdrop (0.04s)
+=== RUN   TestAppIconCarriesRealColour
+--- PASS: TestAppIconCarriesRealColour (0.03s)
+=== RUN   TestAppIconEveryIcoEntryCarriesTheArtwork
+--- PASS: TestAppIconEveryIcoEntryCarriesTheArtwork (0.00s)
+=== RUN   TestAppIconIcoCarriesTheFullWailsSizeSet
+--- PASS: TestAppIconIcoCarriesTheFullWailsSizeSet (0.00s)
+=== RUN   TestAppIconMasterMatchesIcoFreshness
+    appicon_test.go:938: 256x256: distance 15.912 (measured 0.616, bound 0.924)
+    appicon_test.go:955: build/appicon.png downsampled to 256x256 differs from build/windows/icon.ico's 256x256 entry by a mean 15.912 per channel (0-255 scale), want <= 0.924 (1.5x the 0.616 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 128x128: distance 16.249 (measured 1.031, bound 1.546)
+    appicon_test.go:955: build/appicon.png downsampled to 128x128 differs from build/windows/icon.ico's 128x128 entry by a mean 16.249 per channel (0-255 scale), want <= 1.546 (1.5x the 1.031 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 64x64: distance 16.669 (measured 1.512, bound 2.268)
+    appicon_test.go:955: build/appicon.png downsampled to 64x64 differs from build/windows/icon.ico's 64x64 entry by a mean 16.669 per channel (0-255 scale), want <= 2.268 (1.5x the 1.512 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 48x48: distance 17.063 (measured 2.140, bound 3.210)
+    appicon_test.go:955: build/appicon.png downsampled to 48x48 differs from build/windows/icon.ico's 48x48 entry by a mean 17.063 per channel (0-255 scale), want <= 3.210 (1.5x the 2.140 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 32x32: distance 16.661 (measured 2.552, bound 3.828)
+    appicon_test.go:955: build/appicon.png downsampled to 32x32 differs from build/windows/icon.ico's 32x32 entry by a mean 16.661 per channel (0-255 scale), want <= 3.828 (1.5x the 2.552 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 16x16: distance 17.650 (measured 4.109, bound 6.163)
+    appicon_test.go:955: build/appicon.png downsampled to 16x16 differs from build/windows/icon.ico's 16x16 entry by a mean 17.650 per channel (0-255 scale), want <= 6.163 (1.5x the 4.109 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+--- FAIL: TestAppIconMasterMatchesIcoFreshness (0.06s)
+=== RUN   TestAppIconMasterAppliesAlphaOnce
+    appicon_test.go:1142: build/appicon.png: 0 leading-edge and 0 trailing-edge transition runs, want at least 400 of each -- the master's own edges yield about 951 of each, and a collapse in either direction means half the alpha boundary is going unmeasured, which is exactly the defect this test was rewritten to fix
+--- FAIL: TestAppIconMasterAppliesAlphaOnce (0.05s)
+=== RUN   TestAppIconSourceRenderIsThePinnedGeometry
+--- PASS: TestAppIconSourceRenderIsThePinnedGeometry (0.06s)
+FAIL
+FAIL	fairdrop	0.560s
+FAIL

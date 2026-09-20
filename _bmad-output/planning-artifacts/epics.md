@@ -1639,3 +1639,21 @@ about the committed assets. This story pins the exe.
   scoped to `frontend/` only.
 - Given the full gate on all three platforms, when it runs, then it passes.
 
+### Story 6.3: Verify and Release 1.1.0
+
+As the release owner,
+I want every outstanding Epic 6 verification claim proved and the product metadata aligned,
+So that the FairDrop icon release can be accepted and published as 1.1.0 without overstating evidence.
+
+**Closes:** D-133, D-134, D-135.
+
+The canonical asset inventory derives its ICO sizes from `wantIcoSizes` and includes isolated
+mutations for the four late asset guards. The Windows product proof adds a structurally stripped
+RT_ICON and a real rebuild under the neutral version language key, while the build-asset drift
+check is directly executable outside the workflow. Documentation records the actual gate order,
+absence-based executable gating, `0409`/FileVersion behavior, calibration command, and
+Windows-targeted ICO regeneration. Product and package metadata agree on 1.1.0.
+
+Acceptance requires the complete mutation inventories, a successful native Windows/macOS gate
+and Linux adapter job at the exact merge candidate, a non-fast-forward merge, and downloaded
+artifact checksum verification before publication. D-131 and D-132 remain accepted limitations.

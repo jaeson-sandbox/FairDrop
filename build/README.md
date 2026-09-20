@@ -34,13 +34,14 @@ The structure is:
   # 2. If the render is not 2816x1536, re-fit CROP_BOX and CORNER_RADIUS too.
   python scripts/build-appicon.py     # runs from any directory; rewrites build/appicon.png
   rm build/windows/icon.ico           # Wails only generates it when it is ABSENT
-  wails build                         # regenerates icon.ico from the new master
+  wails build                         # Windows: regenerates icon.ico from the new master
+  # On macOS/Linux use this instead; a native Mac build only regenerates iconfile.icns:
+  wails build -platform windows/amd64 # macOS/Linux: target the Windows packager
   # 3. Re-measure measuredEntryDistance255 in appicon_test.go: new artwork moves
-  #    all six same-artwork distances, and until they are updated the first
-  #    `go test` reports a correct tree as a stale-icon bug.
+  #    all six same-artwork distances. This prints every measured distance:
+  go test -count=1 -run '^TestAppIconMasterMatchesIcoFreshness$' -v .
   # 4. COMMIT all three binaries, THEN re-derive the evidence. The driver
-  #    restores assets from HEAD between cases, so running it against
-  #    uncommitted work would discard exactly what you just produced.
+  #    snapshots and restores the clean implemented baseline between cases.
   python scripts/verify-asset-mutations.py   # after committing, never before
   ```
 

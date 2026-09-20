@@ -1,0 +1,32 @@
+=== RUN   TestAppIconMasterGeometry
+--- PASS: TestAppIconMasterGeometry (0.05s)
+=== RUN   TestAppIconNoOpaqueBackdrop
+--- PASS: TestAppIconNoOpaqueBackdrop (0.04s)
+=== RUN   TestAppIconCarriesRealColour
+--- PASS: TestAppIconCarriesRealColour (0.03s)
+=== RUN   TestAppIconEveryIcoEntryCarriesTheArtwork
+--- PASS: TestAppIconEveryIcoEntryCarriesTheArtwork (0.00s)
+=== RUN   TestAppIconIcoCarriesTheFullWailsSizeSet
+--- PASS: TestAppIconIcoCarriesTheFullWailsSizeSet (0.00s)
+=== RUN   TestAppIconMasterMatchesIcoFreshness
+    appicon_test.go:938: 256x256: distance 25.861 (measured 0.616, bound 0.924)
+    appicon_test.go:955: build/appicon.png downsampled to 256x256 differs from build/windows/icon.ico's 256x256 entry by a mean 25.861 per channel (0-255 scale), want <= 0.924 (1.5x the 0.616 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 128x128: distance 25.923 (measured 1.031, bound 1.546)
+    appicon_test.go:955: build/appicon.png downsampled to 128x128 differs from build/windows/icon.ico's 128x128 entry by a mean 25.923 per channel (0-255 scale), want <= 1.546 (1.5x the 1.031 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 64x64: distance 25.941 (measured 1.512, bound 2.268)
+    appicon_test.go:955: build/appicon.png downsampled to 64x64 differs from build/windows/icon.ico's 64x64 entry by a mean 25.941 per channel (0-255 scale), want <= 2.268 (1.5x the 1.512 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 48x48: distance 26.053 (measured 2.140, bound 3.210)
+    appicon_test.go:955: build/appicon.png downsampled to 48x48 differs from build/windows/icon.ico's 48x48 entry by a mean 26.053 per channel (0-255 scale), want <= 3.210 (1.5x the 2.140 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 32x32: distance 26.208 (measured 2.552, bound 3.828)
+    appicon_test.go:955: build/appicon.png downsampled to 32x32 differs from build/windows/icon.ico's 32x32 entry by a mean 26.208 per channel (0-255 scale), want <= 3.828 (1.5x the 2.552 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+    appicon_test.go:938: 16x16: distance 26.588 (measured 4.109, bound 6.163)
+    appicon_test.go:955: build/appicon.png downsampled to 16x16 differs from build/windows/icon.ico's 16x16 entry by a mean 26.588 per channel (0-255 scale), want <= 6.163 (1.5x the 4.109 these assets measure when they genuinely match) -- the .ico was not generated from this master. If you changed the artwork, delete build/windows/icon.ico and re-run `wails build`: Wails only generates it when absent.
+--- FAIL: TestAppIconMasterMatchesIcoFreshness (0.06s)
+=== RUN   TestAppIconMasterAppliesAlphaOnce
+    appicon_test.go:1159: runs 1902 (leading 951, trailing 951); low-alpha mean 3.172 over 6758, high-alpha mean 2.621 over 6874
+--- PASS: TestAppIconMasterAppliesAlphaOnce (0.05s)
+=== RUN   TestAppIconSourceRenderIsThePinnedGeometry
+--- PASS: TestAppIconSourceRenderIsThePinnedGeometry (0.07s)
+FAIL
+FAIL	fairdrop	0.570s
+FAIL

@@ -1052,18 +1052,17 @@ line.
 - source_spec: `spec-6-1-replace-the-placeholder-app-icon.md`
   id: D-133
   summary: Four assertions added in review loop 4 have no case in the canonical mutation driver, so by this repo's own standard they are unproven.
-  owner: accepted
+  owner: 6-3-verify-and-release-1-1-0
   evidence: Raised by Story 6.1's loop-4 verification-gap layer on 2026-09-20 and confirmed by reading the driver's case list. The four are the transparent-band symmetry check, the non-square `.ico` entry refusal, the `dist < measured/2` stale-measurement floor, and the cross-file `EXPECTED_SOURCE_SHA256` agreement pin. The driver scores a case by whether the named test appears in the failure list, so an extra assertion inside an already-failing test is invisible to it: deleting all four blocks leaves the derived table byte-identical. Each needs a case that fails its named test *only* through that guard -- an off-centre paste, a non-square entry, an inflated `measuredEntryDistance255`, and a digest edit in `scripts/build-appicon.py` (which is not in the driver's ASSETS tuple and so is neither mutated nor restored today). Recorded rather than fixed because the guards themselves are correct and were each added in response to a measured finding; what is missing is their proof, and adding four cases plus an ASSETS entry is a focused piece of work rather than a line in another story.
 
 - source_spec: `spec-6-2-pin-what-ships-not-the-template.md`
   id: D-134
   summary: The canonical driver hand-copies the icon size set it claims to derive, and its --exe table omits the mutations the test's own doc comment promises.
-  owner: accepted
+  owner: 6-3-verify-and-release-1-1-0
   evidence: Raised by Story 6.2's review on 2026-09-20. `scripts/verify-asset-mutations.py` generates six flat-entry cases from a literal `(256, 128, 64, 48, 32, 16)` under a comment saying they are "Generated from wantIcoSizes rather than a hand-picked subset" -- nothing keeps the two in step, which is the hand-copied-case-list hazard AGENTS.md records under Story 3.8 and which this driver exists to prevent. Separately, `TestExeResourcesEmbedTheCommittedIcon`'s doc comment names "strip an RT_ICON entry" as one of its mutations and no such case exists; nor is there a case that reverts `info.json` to the neutral `0000` key and rebuilds, so the language-key assertion added at the end of Story 6.2's review is itself unexercised by the canonical table. The printed "3 of 3 exe mutations behaved as required" can therefore never be anything but 3 of 3. Taking this means parsing `wantIcoSizes` out of `appicon_test.go` and adding two rebuild-based cases, which are slower than the rest of the table because each needs a `wails build`.
 
 - source_spec: `spec-6-2-pin-what-ships-not-the-template.md`
   id: D-135
   summary: Documentation drift left by Epic 6: AGENTS.md's gate enumeration, Story 6.2's I/O matrix, and build/README.md's re-measurement step.
-  owner: accepted
+  owner: 6-3-verify-and-release-1-1-0
   evidence: Raised by Story 6.2's review on 2026-09-20. Three items, all prose. `AGENTS.md`'s "Running and verifying" section enumerates the verify job as "`wails build`, a bindings-drift and `.gitkeep` check, `gofmt -l .` ..." and Story 6.2 inserted a step between the first two, pinned in `verify_workflow_test.go`; the repo's own rule is to grep the tree when a pinned contract changes. Story 6.2's I/O matrix still carries the row "Version strings read by .NET | language-neutral table | PowerShell reads blank (D-128)", which describes the behaviour *before* the change that story made, and has no row for the `FileVersion`/language-key change itself -- the one shipped-behaviour change the story makes and the one its evidence flags for owner visibility. Note the matrix sits inside the frozen block, so amending it is an owner renegotiation rather than an edit. And `build/README.md`'s re-derivation recipe says to "re-measure `measuredEntryDistance255`" without naming a command, in the same change that narrowed `--measure`'s documented purpose to the freshness boundary; the values are currently obtainable only from the failing test's log output.
-

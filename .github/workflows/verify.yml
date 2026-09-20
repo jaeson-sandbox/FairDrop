@@ -147,6 +147,22 @@ jobs:
             exit 1
           fi
 
+      - name: Prove Windows executable resource guards
+        if: runner.os == 'Windows'
+        run: python scripts/verify-asset-mutations.py --exe --log-dir "$RUNNER_TEMP/fairdrop-exe-mutation-logs"
+
+      - name: Retain Windows executable mutation logs
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fairdrop-exe-mutation-logs
+          path: ${{ runner.temp }}/fairdrop-exe-mutation-logs
+          if-no-files-found: error
+
+      - name: Prove a manufactured Windows icon is rejected
+        if: runner.os == 'Windows'
+        run: bash scripts/verify-build-asset-drift.sh --prove-missing-ico
+
       # A regenerated-but-uncommitted frontend/wailsjs means the committed
       # bindings are stale, and a missing frontend/dist/.gitkeep would break
       # embedding on the next clean clone.
@@ -177,12 +193,7 @@ jobs:
             git -c core.fileMode=false diff -- frontend/wailsjs >&2
             exit 1
           fi
-          drifted="$(git status --porcelain -- build/ | grep -v " build/bin/" || true)"
-          if [ -n "$drifted" ]; then
-            echo "wails build changed or manufactured a committed build asset:" >&2
-            echo "$drifted" >&2
-            exit 1
-          fi
+          bash scripts/verify-build-asset-drift.sh
 
       - name: gofmt -l
         run: |

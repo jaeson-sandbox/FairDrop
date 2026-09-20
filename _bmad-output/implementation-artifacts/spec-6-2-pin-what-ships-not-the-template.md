@@ -62,6 +62,15 @@ actually lives; the macOS half is a separate deferred entry, not an unstated omi
 
 </frozen-after-approval>
 
+## Superseded by Story 6.3
+
+The approved Story 6.3 reconciles two historical statements above without rewriting
+the frozen record. The built-resource tests intentionally gate on artifact absence:
+they skip on a source-only local run, while the Windows CI step refuses any skip after
+`wails build`. The shipped version string table is now filed under language key `0409`,
+so its embedded key is `040904b0`; PowerShell and .NET read ProductVersion and the added
+FileVersion from that table. Story 6.3 supplies the missing neutral-key rebuild proof.
+
 ## Code Map
 
 **The resource walk is verified, not assumed** — prototyped against the current
