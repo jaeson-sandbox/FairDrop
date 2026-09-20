@@ -42,8 +42,39 @@ process was quit, the rebuilt bundle launched to the normal idle window with its
 heading and choose control. This is a native launch observation, not a transfer,
 Dock-icon, signing-identity or notarization claim.
 
-The exact final-head CI conclusions, merge/tag SHA, release artifact sizes, downloaded
-checksums, and publication status remain externally gated and are intentionally unclaimed.
+Final candidate `54a5f87223f34647aed40344296d79824a33d4bd` passed the complete native gate twice.
+PR run [35499365200](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35499365200)
+concluded **success**: macOS job `106048506575`, Linux adapter job `106048506728`, and
+Windows job `106048506738` each concluded **success**. Push run
+[35499362706](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35499362706) independently
+concluded **success** at the same SHA: Linux adapter job `106048342426`, Windows job
+`106048342511`, and macOS job `106048342522` each concluded **success**. The candidate was
+then merged by merge commit `cb40879764a31c512ba835f9c638c959ffa7adfd`, and annotated tag
+`v1.1.0` was pushed at that exact merge commit.
+
+Release run [35500351435](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35500351435)
+concluded **success** at tag commit `cb40879764a31c512ba835f9c638c959ffa7adfd`: Linux gate job
+`106050918775`, macOS gate job `106050918841`, Windows gate job `106050918926`, Windows build
+job `106052726162`, macOS build job `106052726659`, and release job `106053084898` all
+concluded **success**. The non-draft, non-prerelease
+[v1.1.0 release](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.1.0) was published
+at 2026-09-20 09:03:07 UTC and is the latest release.
+
+Both published binaries and their checksum files were downloaded from the release. The checksum
+files passed `shasum -c`, and the downloads were byte-identical to the inspected CI artifacts:
+`fairdrop.exe` is 13,819,904 bytes with SHA-256
+`79b12f642728e09d59600d88c8d36a615b1e1106c26e07e9f5c7d373538f0a98`; `fairdrop-macos.zip`
+is 6,256,840 bytes with SHA-256
+`128de947600e6c7485c7dfb1fee57f609e585e987fb097dc33041464d77abecc`.
+
+The downloaded macOS bundle reports both plist versions as 1.1.0, passes
+`codesign --verify --deep --strict`, and decodes through `iconutil` to the exact 1024px RGBA
+master. The Mac was locked, so an additional downloaded-artifact GUI launch was not attempted;
+the earlier local 1.1.0 native launch observation remains recorded above. A portable copy of the
+existing Windows PE byte parser, copied under a platform-neutral test filename with only its Windows build constraint removed, passed both
+resource tests against the downloaded executable: all six icon distances were zero and product
+identity/version was 1.1.0. This inspects the actual Windows artifact bytes; it is not a claim that
+the executable was launched on Windows.
 
 Native Windows PR run **35499106925**, job **106047534078**, executed the built-resource
 baseline and all five executable probes successfully: stale committed ICO, stale product
@@ -63,8 +94,8 @@ A regression test now reproduces that input and the helper repacks every payload
 rewrites all offsets. Review also required process-exit/result agreement, diagnostics
 scoped to the intended test block, stable inventory pins, fresh log directories,
 explicit regenerated-ICO proof, catchable-interrupt wording, and candidate-aware release
-documentation. The actionable fixes are implemented; a green native gate at the final
-reviewed head remains unclaimed.
+documentation. The actionable fixes are implemented, and the final reviewed head's two
+successful native gates are recorded above.
 The driver now refuses mutation mode outside GitHub Actions unless the caller explicitly
 marks the checkout disposable. CI runs in a fresh checkout that is discarded with the job;
 local evidence runs in a detached disposable worktree. Catchable SIGINT/SIGTERM paths restore
