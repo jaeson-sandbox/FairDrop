@@ -1061,31 +1061,121 @@ body {
   under 200% text a single-line field shows a fraction of the capability URL,
   and that URL is the fallback when the QR cannot be scanned.
 
+  Story 7.9: the field's height used to be set from JavaScript (a
+  `useLayoutEffect` measuring `scrollHeight`, kept live across a window resize
+  by a `ResizeObserver` whose write was deferred a frame through
+  `requestAnimationFrame` to satisfy Chromium's loop detector). That deferral
+  meant the field was always one frame behind its own width during a live
+  drag, while everything else on screen re-wrapped in the same frame -- the
+  seam this story removes.
+
+  `.fd-url-wrap` replaces that with the CSS grid + hidden-mirror technique:
+  the wrapper is `display: grid`, and it and `.fd-url-mirror` occupy the same
+  grid cell (`grid-area: 1 / 1`). The mirror replicates the URL as plain text
+  and wraps exactly as the textarea's own text would, so the grid cell's
+  height comes from *its* layout, not from `rows` or a JS measurement.
+  `.fd-url` then stretches to fill that cell -- the default behaviour for a
+  grid item with no explicit block size, which form controls participate in
+  like any other item. A width change re-wraps the mirror and resizes the
+  cell inside the same layout pass everything else re-wraps in: no observer,
+  no `requestAnimationFrame`, no width-change bookkeeping.
+
+  `field-sizing: content` would do this with no wrapper at all, but it is
+  Chromium-only and DESIGN.md's cross-platform constraint is binding: this
+  product ships identically in WKWebView (macOS) and WebView2 (Windows), and a
+  rule that auto-sizes on one engine and clips on the other is not a fix.
+  Plain grid, and a hidden sibling element, are implemented identically in
+  both.
+
+  The mirror is a real element (`StagedView.tsx` renders it as a sibling
+  `<div>`, not a `::after` reading `attr(data-*)`). That is what this story
+  originally specified, and it works for any author-level styling -- but not
+  for WCAG 1.4.12's *reader*-level override, which `accessibility.test.tsx`
+  applies the way the standard text-spacing bookmarklet does: a bare
+  `* { line-height: ... !important }` rule. A bare universal selector does not
+  match generated pseudo-element content, so a `::after` mirror would silently
+  stop tracking the textarea's line-height, letter-spacing and word-spacing
+  the moment such an override was in effect, and the field would clip --
+  caught by the existing `accessibility.test.tsx` cases, not a new one. A
+  genuine sibling element is matched by that same `*` rule exactly like the
+  textarea is, so the two never desync under it.
+*/
+.fd-url-wrap {
+    display: grid;
+    min-inline-size: 0;
+}
+
+/*
+  `visibility: hidden` -- not `opacity: 0`, not off-screen positioning -- is
+  what removes the mirror from the accessibility tree; either of those
+  alternatives leaves it readable, and the sender would hear the capability
+  URL twice. `aria-hidden="true"` on the element in `StagedView.tsx` is a
+  second, redundant guard for the same guarantee. The trailing space appended
+  to its text content in `StagedView.tsx` mirrors the standard technique for
+  this trick: it keeps a value ending in whitespace from having its last line
+  collapse away.
+
+  Every box-model and text property below is a design token (`var(--...)`),
+  the same ones `.fd-url` reads below it, rather than a restated literal --
+  that is what "the same tokens" means here: both rules draw from one
+  definition in `@theme`, so a token change can never desync them the way two
+  independently chosen literals could. The two rules stay textually separate
+  (rather than one comma-joined selector) on purpose: it is what lets a
+  mutation change *only* the mirror's padding or line-height, which is
+  exactly the load-bearing case named in Story 7.9's acceptance criteria.
+*/
+.fd-url-mirror {
+    visibility: hidden;
+    white-space: pre-wrap;
+    grid-area: 1 / 1;
+    padding: var(--spacing-3);
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-md);
+    font-family: var(--font-code);
+    font-size: var(--text-code);
+    font-weight: var(--font-weight-code);
+    line-height: var(--leading-code);
+    overflow-wrap: anywhere;
+}
+
+/*
+  A readonly <textarea>, not a div wearing a textbox role: assistive technology
+  reads the value of a real form control reliably and disagrees about the other.
+  A textarea rather than an input because the value has to wrap -- at 320px
+  under 200% text a single-line field shows a fraction of the capability URL,
+  and that URL is the fallback when the QR cannot be scanned.
+
   Its activation floor comes from the shared .fd-target rule rather than a
-  duplicated size here, and it fills its grid column so the field can never set
-  the row's width.
+  duplicated size here. `grid-area: 1 / 1` places it in the same cell as
+  `.fd-url-mirror` above; `block-size: 100%` is what lets it stretch to fill
+  that cell -- the grid default for a block-axis-auto item, which the cell's
+  own height (set by the mirror's wrapped text) then drives. `overflow:
+  hidden` replaces `resize: none`'s old job of hiding any sub-pixel rounding
+  remainder between the two; there is nothing to scroll once the cell is
+  correctly sized.
 */
 .fd-url {
     inline-size: 100%;
+    block-size: 100%;
     resize: none;
+    overflow: hidden;
     /*
       This is what actually holds the 320px reflow floor, measured in Chromium
       (D-068's rendered suite): `anywhere` lets the field's min-content width
       fall to a single character, so the capability URL -- one unbroken token --
       cannot widen the grid track.
 
-      `min-inline-size: 0` below and `minmax(0, 1fr)` on .fd-direct-row are the
-      two standard floors for a grid item that would otherwise refuse to shrink.
-      Removing either one, or both, changes no measurement today, because this
-      declaration already got there first. They stay as depth: an edit that
-      narrows the wrapping -- to `break-word`, say, which leaves an unbreakable
-      token intrinsically wide -- lands on them rather than on a horizontal
-      scrollbar. An earlier comment here claimed min-inline-size was itself
-      load-bearing and named a scrollbar it would prevent; the rendered suite
-      disagreed, and the rule stays while the claim does not.
+      `min-inline-size: 0` below and on `.fd-url-wrap` above, plus `minmax(0,
+      1fr)` on .fd-direct-row, are the standard floors for a grid item that
+      would otherwise refuse to shrink. Removing any of them changes no
+      measurement today, because this declaration already got there first.
+      They stay as depth: an edit that narrows the wrapping -- to
+      `break-word`, say, which leaves an unbreakable token intrinsically wide
+      -- lands on them rather than on a horizontal scrollbar.
     */
     overflow-wrap: anywhere;
     min-inline-size: 0;
+    grid-area: 1 / 1;
     padding: var(--spacing-3);
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-md);

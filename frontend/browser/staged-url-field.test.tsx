@@ -250,3 +250,115 @@ describe('Staged direct URL field re-sizes on a live window resize, not just at 
         ).toEqual([])
     })
 })
+
+/*
+  Story 7.9: the seam it removes -- a one-frame lag between the URL field's
+  own width and its height during a live resize -- cannot be seen by any test
+  above. Those all settle after a resize and then assert; a lag that is gone
+  by the time the assertion runs is invisible to them. What is measurable
+  instead is "at every width the field is sized correctly, right now, with no
+  transient extra arrangement anywhere in between" -- a continuous sweep
+  replacing "looks smooth" with a per-step assertion, exactly as the story
+  asks for. jsdom cannot evaluate any of this; it performs no layout.
+*/
+
+/** Bounding rects that intersect indicate two elements are drawn on top of each other. */
+function rectsOverlap(a: DOMRect, b: DOMRect): boolean {
+    return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+}
+
+/**
+ * The two reflow pairs `.fd-hero` and `.fd-direct-row` fold at 759px
+ * (style.css, "Reflow"): side-by-side above it, stacked at or below it. Their
+ * track *count* -- not the fluid pixel sizes of a `minmax(0, 1fr)` track,
+ * which legitimately differ at every width -- is what identifies which of
+ * the two arrangements the sweep is currently in.
+ */
+function currentArrangement(container: HTMLElement): string {
+    const hero = container.querySelector('.fd-hero')
+    const row = container.querySelector('.fd-direct-row')
+    if (hero === null || row === null) throw new Error('.fd-hero or .fd-direct-row did not render')
+
+    const heroTracks = getComputedStyle(hero).gridTemplateColumns.split(' ').length
+    const rowTracks = getComputedStyle(row).gridTemplateColumns.split(' ').length
+    return `hero:${heroTracks}/row:${rowTracks}`
+}
+
+describe('Staged view resizes seamlessly across a continuous width sweep (Story 7.9)', () => {
+    it('never clips the URL field, never opens a page scrollbar, and never overlaps content from 1200px down to 320px', async () => {
+        // The deliberately longer IPv6-host URL: the case most likely to clip
+        // if the CSS box-model tokens the mirror and the field share ever
+        // drift apart (see assertURLFieldFitsItsContent's caller comment
+        // above and the "mismatch" mutation this proves).
+        const url = `http://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:63367/download/${token}`
+        const container = renderStagedWithURL(url)
+
+        const heroDetails = container.querySelector('.fd-hero__details')
+        const qrPanel = container.querySelector('.fd-qr-panel')
+        const urlWrap = container.querySelector('.fd-url-wrap')
+        const copyButton = container.querySelector('.fd-direct-row > .fd-button')
+        if (heroDetails === null || qrPanel === null || urlWrap === null || copyButton === null) {
+            throw new Error('.fd-hero__details, .fd-qr-panel, .fd-url-wrap or its copy button did not render')
+        }
+
+        const arrangements: string[] = []
+
+        // 1200 down to 320 in steps of 40 (at most the step the acceptance
+        // criterion allows): 23 widths, covering the 759px reflow breakpoint
+        // and the 320px reflow floor from both directions.
+        for (let width = 1200; width >= 320; width -= 40) {
+            await page.viewport(width, 900)
+
+            // Re-thrown with the sweep's own current width in the message: the
+            // acceptance criterion asks the sweep to "fail and name the first
+            // width at which it clips", and assertURLFieldFitsItsContent's own
+            // message (shared with the non-sweep cases above, which each know
+            // their one fixed width already) does not carry that context.
+            try {
+                assertURLFieldFitsItsContent(container)
+            } catch (error) {
+                const reason = error instanceof Error ? error.message : String(error)
+                throw new Error(`at ${width}px, ${reason}`)
+            }
+
+            expect(
+                document.documentElement.scrollWidth,
+                `a page-level horizontal scrollbar appeared at ${width}px: ` +
+                    `scrollWidth (${document.documentElement.scrollWidth}px) exceeds ` +
+                    `clientWidth (${document.documentElement.clientWidth}px)`,
+            ).toBeLessThanOrEqual(document.documentElement.clientWidth + 0.5)
+
+            expect(
+                rectsOverlap(heroDetails.getBoundingClientRect(), qrPanel.getBoundingClientRect()),
+                `.fd-hero__details overlaps .fd-qr-panel at ${width}px`,
+            ).toBe(false)
+
+            expect(
+                rectsOverlap(urlWrap.getBoundingClientRect(), copyButton.getBoundingClientRect()),
+                `the URL field overlaps its copy button at ${width}px`,
+            ).toBe(false)
+
+            arrangements.push(currentArrangement(container))
+        }
+
+        // Exactly the arrangements the CSS defines (one 759px breakpoint ->
+        // two arrangements: side-by-side above it, stacked at or below it),
+        // and no more -- a transient third arrangement at some width in
+        // between would mean something briefly mis-lays-out mid-sweep.
+        expect(new Set(arrangements).size).toBe(2)
+
+        // No flapping: once the sweep crosses into the stacked arrangement it
+        // stays there for the rest of the (narrowing) sweep -- exactly one
+        // transition, at the 759px boundary, never a width that reverts to
+        // the wider arrangement or bounces between the two.
+        let transitions = 0
+        for (let i = 1; i < arrangements.length; i++) {
+            if (arrangements[i] !== arrangements[i - 1]) transitions++
+        }
+        expect(
+            transitions,
+            `expected exactly one arrangement transition across the sweep, saw ${transitions}: ` +
+                arrangements.join(' -> '),
+        ).toBe(1)
+    })
+})

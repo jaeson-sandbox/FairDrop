@@ -1301,6 +1301,47 @@ describe('rules the components can only reference by name', () => {
         expect(url).toContain('resize: none;')
     })
 
+    /*
+      Story 7.9: the URL field's height comes from a CSS grid + hidden-mirror
+      technique (`.fd-url-wrap`/`.fd-url-mirror`), not a JS ResizeObserver.
+      `.fd-url-mirror` replicates the URL as text so its wrapped height can
+      size the grid cell -- and it must never be exposed as a second,
+      duplicate reading of the capability URL. Only `visibility: hidden`
+      removes generated/replicated content from the accessibility tree;
+      `opacity` and off-screen positioning both leave it readable.
+    */
+    it('hides the URL field sizing mirror from assistive technology with visibility, not opacity or position', () => {
+        const mirror = block('.fd-url-mirror {')
+        expect(mirror).toContain('visibility: hidden;')
+        expect(mirror).not.toMatch(/opacity:\s*0/)
+        expect(mirror).not.toContain('position: absolute')
+        expect(mirror).not.toMatch(/left:\s*-\d/)
+    })
+
+    /*
+      The mirror and the field must share font, padding, border and wrapping
+      rules exactly, or the mirror silently mis-sizes the box (Story 7.9
+      acceptance criteria). Both are driven from the same design tokens
+      declared once in `@theme`, so this checks token names rather than
+      resolved literals -- the guarantee the tokens exist to provide.
+    */
+    it.each([
+        'padding: var(--spacing-3);',
+        'border: 1px solid var(--color-control-border);',
+        'border-radius: var(--radius-md);',
+        'font-family: var(--font-code);',
+        'font-size: var(--text-code);',
+        'font-weight: var(--font-weight-code);',
+        'line-height: var(--leading-code);',
+        'overflow-wrap: anywhere;',
+        'grid-area: 1 / 1;',
+    ])('shares %s between the URL field and its sizing mirror', (declaration) => {
+        const field = block('.fd-url {')
+        const mirror = block('.fd-url-mirror {')
+        expect(field, '.fd-url').toContain(declaration)
+        expect(mirror, '.fd-url-mirror').toContain(declaration)
+    })
+
     it('shows an aria-disabled control as inert rather than merely saying so', () => {
         expect(componentRules).toMatch(/\.fd-button\[aria-disabled='true'\] \{[^}]*cursor: default;/)
     })

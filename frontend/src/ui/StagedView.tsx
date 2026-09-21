@@ -1,4 +1,4 @@
-import {useLayoutEffect, useRef, useState} from 'react'
+import {useRef, useState} from 'react'
 import {CopyToClipboard} from '../../wailsjs/go/main/App'
 import {selectCommandError, selectWarnings} from '../transfer/selectors'
 import type {StagedTransferState} from '../transfer/state'
@@ -49,115 +49,6 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
     // render that set it, and re-rendering on focus would buy nothing.
     const focusedRef = useRef(false)
     const [showFullName, setShowFullName] = useState(false)
-    const urlFieldRef = useRef<HTMLTextAreaElement>(null)
-    // The inline (width) size last measured by the resize observer below,
-    // read back to guard against the observer re-triggering on its own
-    // height writes. Not React state: writing it must never cause a render.
-    const lastFieldWidthRef = useRef<number | null>(null)
-
-    /*
-     * Sizes the readonly URL field to whatever it is actually holding, instead
-     * of a fixed `rows` count -- and keeps it sized as the field's own width
-     * changes, not only at mount.
-     *
-     * The capability URL's length is variable -- host (IPv4 or IPv6), port,
-     * and a 32-hex token -- so it can wrap to two lines, three, or more
-     * depending on the sender's network and the field's own width. A fixed
-     * `rows` picks one line count and clips every URL that needs more (the
-     * originally observed defect: a `rows={2}` box clipping a URL that
-     * wrapped to three lines).
-     *
-     * The field's width is not fixed either: `.fd-hero` is a two-column grid
-     * sharing width with the QR panel, and the FairDrop window is
-     * user-resizable from 1024x768 down to the 640x480 minimum main.go sets.
-     * Dragging the window narrower re-wraps the URL to more lines without
-     * ever re-rendering `StagedView` -- React does not re-render on a resize
-     * -- so a fix that only measures once at mount (keyed to `metadata.url`,
-     * which never changes while Staged is on screen) clips again the moment
-     * the sender resizes. A `ResizeObserver` on the field itself is what
-     * catches that.
-     *
-     * `field-sizing: content` would do this in CSS alone, but it is
-     * Chromium-only and DESIGN.md's cross-platform constraint is binding:
-     * this product ships identically in WKWebView (macOS) and WebView2
-     * (Windows), and a rule that auto-sizes on one and clips on the other is
-     * not a fix. `scrollHeight`, inline `style.height`, and `ResizeObserver`,
-     * by contrast, are plain DOM/CSSOM/web-platform APIs implemented
-     * identically by both engines -- so this measures and sets the box in
-     * JavaScript instead of trusting an engine-specific CSS feature to do it
-     * for us.
-     */
-    useLayoutEffect(() => {
-        const field = urlFieldRef.current
-        if (field === null) return
-
-        function resize() {
-            if (field === null) return
-            field.style.height = 'auto'
-            // `.fd-url` is border-box (Tailwind's preflight default), so its
-            // `scrollHeight` -- padding plus content, no border -- is short
-            // of the border-box height this sets by exactly the vertical
-            // border width. Left uncompensated, every resize undershoots by
-            // that much and the bottom of the border clips the last line
-            // again, just by ~2px instead of a whole line -- the same
-            // defect this effect exists to remove.
-            const borderY = field.offsetHeight - field.clientHeight
-            field.style.height = `${field.scrollHeight + borderY}px`
-        }
-
-        // Initial sizing: mount, and whenever the URL text itself changes.
-        resize()
-        lastFieldWidthRef.current = field.getBoundingClientRect().width
-
-        if (typeof ResizeObserver === 'undefined') return
-
-        /*
-         * The trap, in two parts:
-         *
-         * 1. `resize()` writes `field.style.height`, and a `ResizeObserver`
-         *    observing the border-box (the default) fires on a height change
-         *    too, not only a width change. Calling `resize()`
-         *    unconditionally from inside this callback would make every
-         *    write queue another notification for the same element, which
-         *    can recurse without bound. The guard below re-runs the
-         *    measurement only when the field's own **inline (width) size**
-         *    has actually changed since the last time this callback ran,
-         *    which `resize()` never changes -- so a notification caused
-         *    purely by our own height write is a no-op here, and the
-         *    recursion cannot start.
-         *
-         * 2. Even with that guard, calling `resize()` *synchronously* from
-         *    inside the callback still trips Chromium's "ResizeObserver loop
-         *    completed with undelivered notifications" -- confirmed by hand,
-         *    with the guard already in place, before this comment was
-         *    written. The warning does not require an application-level
-         *    infinite loop; Chromium's own loop-detector flags *any*
-         *    same-cycle DOM write from inside a RO callback, because it
-         *    queues one more resize check the browser cannot deliver before
-         *    the next paint. Deferring the write to `requestAnimationFrame`
-         *    moves it out of the notification cycle Chromium is already
-         *    processing, which is what actually silences it -- the width
-         *    guard alone bounds the recursion but does not, by itself, stop
-         *    this warning from firing once.
-         */
-        const observer = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                // contentBoxSize is an array per spec; some WebKit versions
-                // historically exposed a single object instead of an array,
-                // so both shapes are handled rather than assuming the array
-                // form. contentRect.width is the fallback either way covers.
-                const boxSizeEntry = entry.contentBoxSize
-                const boxSize = Array.isArray(boxSizeEntry) ? boxSizeEntry[0] : boxSizeEntry
-                const width = boxSize ? boxSize.inlineSize : entry.contentRect.width
-
-                if (width === lastFieldWidthRef.current) continue
-                lastFieldWidthRef.current = width
-                requestAnimationFrame(resize)
-            }
-        })
-        observer.observe(field)
-        return () => observer.disconnect()
-    }, [metadata.url])
 
     const size = metadata.isDir
         ? `${formatBytes(metadata.size)} ${copy.label.logicalSize}`
@@ -311,25 +202,60 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                       a textbox role: assistive technology reads
                                       the value of one reliably and disagrees
                                       about the other. It is still not a link.
+
+                                      The field's height comes entirely from CSS: this
+                                      wrapper is `display: grid`, and it and the hidden
+                                      `.fd-url-mirror` below carry the same URL in the same
+                                      grid cell, `1 / 1`. The mirror is a plain block that
+                                      wraps like any other text, so it -- not the textarea's
+                                      own `rows` -- is what the grid cell's height comes
+                                      from; the textarea then stretches to fill that cell,
+                                      which is the grid default for a block-axis-auto item.
+                                      A width change re-wraps the mirror and resizes the
+                                      cell in the same layout pass that re-wraps everything
+                                      else on the page -- no observer, no
+                                      `requestAnimationFrame`, no JavaScript at all.
+
+                                      The mirror is a real element carrying the text as its
+                                      own content, not a `::after` reading it back from a
+                                      `data-*` attribute with `attr()`. That is what the spec
+                                      for this story originally proposed, and it works for an
+                                      author's own overrides -- but WCAG 1.4.12 (`.fd-url`
+                                      case of `accessibility.test.tsx`) simulates a *reader's*
+                                      text-spacing override the way the standard bookmarklet
+                                      does, with a bare `* { line-height: ... !important }`
+                                      rule, and a bare universal selector does not match
+                                      generated pseudo-element content -- so a `::after` mirror
+                                      would silently stop tracking the textarea's line-height
+                                      the moment such an override was in effect, and the field
+                                      would clip. A genuine sibling element is matched by that
+                                      same `*` rule exactly like the textarea is, so the two
+                                      stay in sync under it. See
+                                      `_bmad-output/implementation-artifacts/evidence-7-9-make-resizing-seamless.md`
+                                      for the failing-test evidence this was found with.
                                     */}
-                                    <textarea
-                                        ref={urlFieldRef}
-                                        className="fd-url fd-target"
-                                        readOnly
-                                        rows={2}
-                                        value={metadata.url}
-                                        aria-labelledby="fd-direct-link-heading"
-                                        onFocus={(event) => event.currentTarget.select()}
-                                        onMouseDown={(event) => {
-                                            // Without this the mouseup that follows collapses the
-                                            // selection to a caret, and select-on-focus becomes a
-                                            // call that happens and a selection nobody gets.
-                                            if (document.activeElement !== event.currentTarget) {
-                                                event.preventDefault()
-                                                event.currentTarget.focus()
-                                            }
-                                        }}
-                                    />
+                                    <div className="fd-url-wrap">
+                                        <div className="fd-url-mirror" aria-hidden="true">
+                                            {metadata.url + ' '}
+                                        </div>
+                                        <textarea
+                                            className="fd-url fd-target"
+                                            readOnly
+                                            rows={1}
+                                            value={metadata.url}
+                                            aria-labelledby="fd-direct-link-heading"
+                                            onFocus={(event) => event.currentTarget.select()}
+                                            onMouseDown={(event) => {
+                                                // Without this the mouseup that follows collapses the
+                                                // selection to a caret, and select-on-focus becomes a
+                                                // call that happens and a selection nobody gets.
+                                                if (document.activeElement !== event.currentTarget) {
+                                                    event.preventDefault()
+                                                    event.currentTarget.focus()
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                     <button
                                         type="button"
                                         className={`fd-button fd-target ${copied ? 'fd-button--copied' : 'fd-button--primary'}`}
