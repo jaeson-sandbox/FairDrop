@@ -40,12 +40,7 @@ export function TransferringView({state, onCancel}: TransferringViewProps) {
                         {metadata.isDir ? <p className="fd-subheading">{copy.folder.note}</p> : null}
                     </div>
 
-                    {progress === null ? null : (
-                        <>
-                            <ProgressPresentation progress={progress}/>
-                            <TransferMetrics progress={progress}/>
-                        </>
-                    )}
+                    {progress === null ? null : <ProgressPresentation progress={progress}/>}
 
                     {/*
                       A pending cancellation keeps this control focused and
@@ -76,6 +71,14 @@ export function TransferringView({state, onCancel}: TransferringViewProps) {
     )
 }
 
+/**
+ * The three presentations, each with its head -- the percentage or literal
+ * status, and the wire-bytes/throughput readout beside it -- sitting above
+ * the track, per DESIGN.md's Progress Card row. The track's own fill is
+ * solid `{colors.primary}`: the single-gradient rule is absolute and the
+ * primary button already spends the product's one gradient (`styles.test.ts`
+ * counts it).
+ */
 function ProgressPresentation({progress}: {readonly progress: ProgressSelection}) {
     if (progress.mode === 'known-empty') {
         // No percentage-bearing progressbar exists for a known-empty payload.
@@ -83,6 +86,7 @@ function ProgressPresentation({progress}: {readonly progress: ProgressSelection}
         return (
             <div data-progress-mode="known-empty">
                 <p className="fd-empty-status">{copy.progress.knownEmpty}</p>
+                <TransferMetrics progress={progress}/>
                 <div className="fd-meter" aria-hidden="true"/>
             </div>
         )
@@ -91,8 +95,11 @@ function ProgressPresentation({progress}: {readonly progress: ProgressSelection}
     if (progress.mode === 'unknown') {
         return (
             <div data-progress-mode="unknown">
-                <div id="fd-meter-label" className="fd-meter-label">
-                    <span>{copy.progress.unknown}</span>
+                <div className="fd-progress-head">
+                    <div id="fd-meter-label" className="fd-meter-label">
+                        <span>{copy.progress.unknown}</span>
+                    </div>
+                    <TransferMetrics progress={progress}/>
                 </div>
                 <div
                     className="fd-meter fd-meter--unknown"
@@ -106,11 +113,14 @@ function ProgressPresentation({progress}: {readonly progress: ProgressSelection}
     const percent = Math.round(progress.value)
     return (
         <div data-progress-mode="known-positive">
-            <div id="fd-meter-label" className="fd-meter-label">
-                <span>
-                    {`${formatBytes(progress.bytesSent)} ${copy.label.of} ${formatBytes(progress.totalBytes)}`}
-                </span>
-                <span>{`${percent}%`}</span>
+            <div className="fd-progress-head">
+                <div id="fd-meter-label" className="fd-meter-label">
+                    <span>
+                        {`${formatBytes(progress.bytesSent)} ${copy.label.of} ${formatBytes(progress.totalBytes)}`}
+                    </span>
+                    <span className="fd-progress-percent">{`${percent}%`}</span>
+                </div>
+                <TransferMetrics progress={progress}/>
             </div>
             <div
                 className="fd-meter"

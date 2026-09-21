@@ -782,8 +782,7 @@ body {
     text-transform: uppercase;
 }
 
-.fd-pending-card,
-.fd-transfer-view {
+.fd-pending-card {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-4);
@@ -791,6 +790,48 @@ body {
     border-radius: var(--radius-lg);
     background: var(--color-elevated);
     color: var(--color-text);
+}
+
+/*
+  Progress Card (Story 7.5): rounded.xxl at sh-3, the focal object of the
+  Transferring state alongside the packet and the open browse menu -- see
+  DESIGN.md's Elevation table.
+*/
+.fd-transfer-view {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
+    padding: var(--spacing-5);
+    border-radius: var(--radius-xxl);
+    background: var(--color-elevated);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sh-3);
+}
+
+/*
+  The head above the track: the percentage or literal status on the left,
+  wire bytes and throughput beside it on the right. Both sit above the 8px
+  track per DESIGN.md's Progress Card row.
+*/
+.fd-progress-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--spacing-3) var(--spacing-4);
+}
+
+/*
+  {typography.numeric}: the transfer percentage. Tabular numerals so a
+  changing value does not reflow its own row (DESIGN.md, Typography).
+*/
+.fd-progress-percent {
+    font-family: var(--font-display);
+    font-size: var(--text-numeric);
+    font-weight: var(--font-weight-numeric);
+    letter-spacing: var(--tracking-numeric);
+    line-height: var(--leading-numeric);
+    font-variant-numeric: tabular-nums;
 }
 
 .fd-packet {
@@ -1009,7 +1050,7 @@ body {
 
 .fd-meter {
     position: relative;
-    height: 10px;
+    height: 8px;
     overflow: hidden;
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-full);
@@ -1075,39 +1116,131 @@ body {
 
 /* ---------------------------------------------------------------- Outcomes */
 
+/*
+  Outcome Panel (Story 7.5): a centred composition at rounded.xxl / sh-3, the
+  same elevation step as the progress card and the packet -- the focal object
+  of the Done/Error lifecycle state.
+*/
 .fd-outcome {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-2);
-    align-items: start;
-    padding: var(--spacing-5);
-    border: 1px solid currentColor;
-    border-radius: var(--radius-lg);
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-6) var(--spacing-5);
+    border-radius: var(--radius-xxl);
     background: var(--color-surface);
+    box-shadow: var(--shadow-sh-3);
+    color: var(--color-text);
+    text-align: center;
 }
 
-.fd-outcome--done {
+/*
+  The 74px tinted disc. Color is never the only cue: the done disc also
+  carries the stroke-drawn check, the error disc the literal "!" glyph, and
+  both panels additionally differ by heading and body text.
+*/
+.fd-outcome__icon {
+    display: grid;
+    width: 74px;
+    height: 74px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: var(--radius-full);
+    font-size: 32px;
+    font-weight: var(--font-weight-label);
+}
+
+.fd-outcome__icon--done {
+    background: var(--color-success-tint);
     color: var(--color-success);
 }
 
-.fd-outcome--error {
+.fd-outcome__icon--error {
+    background: var(--color-error-tint);
     color: var(--color-error);
 }
 
-.fd-outcome__icon {
-    display: grid;
-    width: 30px;
-    height: 30px;
-    place-items: center;
-    border: 2px solid currentColor;
-    border-radius: var(--radius-full);
-    font-size: var(--text-headline);
-    font-weight: var(--font-weight-label);
+/*
+  The stroke-drawn check. `pathLength={32}` on the JSX path normalizes the
+  path's own length to exactly 32 units, so `stroke-dasharray: 32` always
+  means "the whole stroke" and `stroke-dashoffset: 32` always means "none of
+  it drawn yet", independent of the coordinates chosen there.
+
+  The draw is a plain CSS transition, never a keyframe-based one -- this
+  sheet declares no keyframe rule and paints no motion through the CSS
+  property the "progress presentation" tests below refuse, on purpose --
+  triggered once by OutcomePanel adding the `--drawn` modifier after mount.
+  That happens unconditionally, so `prefers-reduced-motion` never has to
+  decide whether the check gets drawn, only how fast: the universal
+  `transition-duration: 1ms !important` rule already collapses this
+  transition like every other one in the sheet, landing on the same fully
+  drawn `stroke-dashoffset: 0` this rule pins as the resting value.
+*/
+.fd-outcome__check {
+    width: 36px;
+    height: 36px;
+}
+
+.fd-outcome__check-path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 32;
+    stroke-dashoffset: 32;
+    transition: stroke-dashoffset 500ms var(--ease-decelerate);
+}
+
+.fd-outcome__check--drawn .fd-outcome__check-path {
+    stroke-dashoffset: 0;
 }
 
 .fd-outcome__body {
     margin: 0;
-    color: var(--color-text);
+    max-width: 44ch;
+    color: var(--color-muted);
+}
+
+/*
+  Completion Receipt (Story 7.5): two cells on {colors.fill}, divided by a
+  separator. Two cells, not three -- no elapsed-time cell exists here or
+  anywhere else, because no clock is tracked in the frontend and
+  EXPERIENCE.md forbids a frontend lifecycle timer. Both values are read out
+  of `CompletionReceipt`, never recomputed.
+*/
+.fd-receipt {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    margin: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-fill);
+    text-align: start;
+}
+
+.fd-receipt__cell {
+    min-inline-size: 0;
+    padding: var(--spacing-3) var(--spacing-4);
+}
+
+.fd-receipt__cell + .fd-receipt__cell {
+    border-inline-start: 1px solid var(--color-separator);
+}
+
+.fd-receipt__caption {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+}
+
+.fd-receipt__value {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--text-body-strong);
+    font-weight: var(--font-weight-body-strong);
+    font-variant-numeric: tabular-nums;
 }
 
 /* ---------------------------------------------------------------- Reflow */

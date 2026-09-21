@@ -623,6 +623,128 @@ describe('the copy control takes the success tint (Story 7.2)', () => {
     })
 })
 
+describe('the progress card and meter (Story 7.5)', () => {
+    it('is a rounded.xxl surface at sh-3, the same step as the packet and the browse menu', () => {
+        const card = block('.fd-transfer-view {')
+        expect(card).toContain('border-radius: var(--radius-xxl);')
+        expect(card).toContain('box-shadow: var(--shadow-sh-3);')
+    })
+
+    it('keeps the pending card at its own radius, unaffected by the progress card split', () => {
+        // The two selectors shared one rule before this story; splitting them
+        // is what lets the progress card take sh-3/xxl without moving the
+        // stage-pending card, which Story 7.5 does not own.
+        const pending = block('.fd-pending-card {')
+        expect(pending).toContain('border-radius: var(--radius-lg);')
+        expect(pending).not.toContain('box-shadow')
+    })
+
+    it('is an 8px rounded.full track with a functional boundary', () => {
+        const meter = block('.fd-meter {')
+        expect(meter).toContain('height: 8px;')
+        expect(meter).toContain('border-radius: var(--radius-full);')
+        expect(meter).toContain('var(--color-control-border)')
+    })
+
+    it('fills the track solid -- the single-gradient rule is absolute and the button already spends it', () => {
+        const fill = block('.fd-meter__fill {')
+        expect(fill).toContain('background: var(--color-primary);')
+        expect(fill).not.toContain('gradient')
+    })
+
+    it('renders the percentage in {typography.numeric} with tabular numerals', () => {
+        const percent = block('.fd-progress-percent {')
+        expect(percent).toContain('font-size: var(--text-numeric);')
+        expect(percent).toContain('font-variant-numeric: tabular-nums;')
+    })
+})
+
+describe('progress presentation', () => {
+    it('keeps the unknown pattern static: no sweep, shimmer, or blink', () => {
+        expect(stylesheet).toMatch(/\.fd-meter--unknown \{[^}]*repeating-linear-gradient\(/)
+        expect(stylesheet).not.toContain('@keyframes')
+        expect(stylesheet).not.toContain('animation:')
+    })
+})
+
+describe('the outcome panel (Story 7.5)', () => {
+    it('is a centred rounded.xxl surface at sh-3', () => {
+        const outcome = block('.fd-outcome {')
+        expect(outcome).toContain('border-radius: var(--radius-xxl);')
+        expect(outcome).toContain('box-shadow: var(--shadow-sh-3);')
+        expect(outcome).toMatch(/align-items:\s*center;/)
+    })
+
+    it('gives the done and error discs their own tint, at the 74px DESIGN.md size', () => {
+        const icon = block('.fd-outcome__icon {')
+        expect(icon).toContain('width: 74px;')
+        expect(icon).toContain('height: 74px;')
+        expect(icon).toContain('border-radius: var(--radius-full);')
+
+        const done = block('.fd-outcome__icon--done {')
+        expect(done).toContain('background: var(--color-success-tint);')
+        expect(done).toContain('color: var(--color-success);')
+
+        const error = block('.fd-outcome__icon--error {')
+        expect(error).toContain('background: var(--color-error-tint);')
+        expect(error).toContain('color: var(--color-error);')
+    })
+
+    it('mutes the body copy', () => {
+        const body = block('.fd-outcome__body {')
+        expect(body).toContain('color: var(--color-muted);')
+    })
+
+    /*
+      Mutation named in the acceptance criterion: leave the check at
+      `stroke-dashoffset: 32` under reduced motion -> must fail, because the
+      check is a state cue and removing it removes meaning. The resting rule
+      below is what the reduced-motion universal transition-duration
+      collapse resolves to -- nothing inside the reduced-motion block may
+      override it back to 32.
+    */
+    it('draws the check via a transition, never a keyframe animation, and leaves it fully drawn under reduced motion', () => {
+        const path = block('.fd-outcome__check-path {')
+        expect(path).toContain('stroke-dasharray: 32;')
+        expect(path).toContain('stroke-dashoffset: 32;')
+        expect(path).toContain('transition: stroke-dashoffset 500ms var(--ease-decelerate);')
+        expect(path).not.toContain('@keyframes')
+
+        const drawn = block('.fd-outcome__check--drawn .fd-outcome__check-path {')
+        expect(drawn).toContain('stroke-dashoffset: 0;')
+
+        // Reduced motion must not re-hide the check by overriding its
+        // resting value back to the undrawn offset -- the literal mutation
+        // the acceptance criterion names.
+        expect(reducedMotion).not.toContain('stroke-dashoffset: 32')
+        expect(reducedMotion).not.toMatch(/\.fd-outcome__check/)
+    })
+})
+
+describe('the completion receipt (Story 7.5)', () => {
+    it('is two cells on {colors.fill}, divided by a separator', () => {
+        const receipt = block('.fd-receipt {')
+        expect(receipt).toContain('background: var(--color-fill);')
+        expect(receipt).toContain('grid-template-columns: 1fr 1fr;')
+
+        const divider = block('.fd-receipt__cell + .fd-receipt__cell {')
+        expect(divider).toContain('var(--color-separator)')
+    })
+
+    it('carries no duration cell and no third column', () => {
+        // The mutation this guards against is the worst possible outcome of
+        // this story: inventing a displayed duration. Nothing in the sheet
+        // may name a third receipt cell or a duration/elapsed rule.
+        expect(stylesheet).not.toMatch(/\.fd-receipt__cell--(duration|elapsed|time)/)
+        expect(stylesheet).not.toContain('grid-template-columns: 1fr 1fr 1fr')
+    })
+
+    it('renders the receipt figures with tabular numerals, like the percentage', () => {
+        const value = block('.fd-receipt__value {')
+        expect(value).toContain('font-variant-numeric: tabular-nums;')
+    })
+})
+
 describe('forced colors beat the authored dark palette', () => {
     it('declares the forced-colors block after the dark one, which is the only reason it wins', () => {
         /*
@@ -658,14 +780,6 @@ describe('the Tailwind v4 setup', () => {
         ]) {
             expect(existsSync(resolve(repositoryRoot, relative)), relative).toBe(false)
         }
-    })
-})
-
-describe('progress presentation', () => {
-    it('keeps the unknown pattern static: no sweep, shimmer, or blink', () => {
-        expect(stylesheet).toMatch(/\.fd-meter--unknown \{[^}]*repeating-linear-gradient\(/)
-        expect(stylesheet).not.toContain('@keyframes')
-        expect(stylesheet).not.toContain('animation:')
     })
 })
 
