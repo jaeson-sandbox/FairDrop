@@ -127,7 +127,7 @@ Constraints preserved and re-checked directly against the diff:
   `frontend/browser/accessibility.test.tsx`, still green (see full suite run
   below), plus the new suite's own 320px case.
 
-## Mutation table
+## Mutation table (initial mount-time fix)
 
 | Mutation | Command | Result |
 |---|---|---|
@@ -138,7 +138,143 @@ Constraints preserved and re-checked directly against the diff:
 Both mutations reproduce and are named by the test; the test was restored to
 the fixed state afterward and reconfirmed green.
 
-## Full gate, run locally in `verify.yml` order
+## Review follow-up: the field never re-sizes on a live window resize
+
+The first pass above measures once, keyed to `metadata.url`. That value never
+changes while Staged is on screen, but the field's **width** does: `.fd-hero`
+is a two-column grid sharing width with the QR panel, and the FairDrop window
+is user-resizable from 1024×768 down to the 640×480 minimum `main.go` sets.
+Dragging the window narrower re-wraps the URL to more lines without ever
+re-rendering `StagedView` — React does not re-render on a resize — so the
+mount-time-only fix clips again the moment the sender resizes: the same
+defect, reachable by a gesture the product explicitly supports. There was no
+`ResizeObserver` or `resize` listener anywhere in `frontend/src/` before this
+follow-up.
+
+### New failing-test cases, captured before the follow-up fix
+
+Two cases were added to `frontend/browser/staged-url-field.test.tsx`: one
+narrows the field's own container directly (isolating "the box itself got
+smaller" from any viewport media query), the other narrows the whole
+`page.viewport` to the 640×480 minimum. Run against the *already-committed*
+mount-time-only fix:
+
+```
+ ❯ |chromium| browser/staged-url-field.test.tsx (5 tests | 1 failed) 180ms
+     × keeps the field unclipped when its container narrows after mount, with no re-render 50ms
+
+ FAIL  … keeps the field unclipped when its container narrows after mount, with no re-render
+AssertionError: .fd-url clips its value: scrollHeight (1207px) exceeds its own clientHeight (76px) for a 68-character URL: expected 1207 to be less than or equal to 76.5
+ ❯ assertURLFieldFitsItsContent browser/staged-url-field.test.tsx:76:6
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+```
+
+(The full-`page.viewport`-narrowing case happened to pass at this
+width/string combination — see the same caveat as mutation B above: a single
+passing case does not clear the general claim, which is exactly why the
+container-narrowing case, isolated from any breakpoint, is also in the suite
+and it did fail, decisively — 1207px of unrendered content against a 76px
+box.)
+
+### The follow-up fix: a `ResizeObserver` on the field, with two guards
+
+```tsx
+const urlFieldRef = useRef<HTMLTextAreaElement>(null)
+const lastFieldWidthRef = useRef<number | null>(null)
+
+useLayoutEffect(() => {
+    const field = urlFieldRef.current
+    if (field === null) return
+
+    function resize() {
+        if (field === null) return
+        field.style.height = 'auto'
+        const borderY = field.offsetHeight - field.clientHeight
+        field.style.height = `${field.scrollHeight + borderY}px`
+    }
+
+    resize()
+    lastFieldWidthRef.current = field.getBoundingClientRect().width
+
+    if (typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+            const boxSizeEntry = entry.contentBoxSize
+            const boxSize = Array.isArray(boxSizeEntry) ? boxSizeEntry[0] : boxSizeEntry
+            const width = boxSize ? boxSize.inlineSize : entry.contentRect.width
+
+            if (width === lastFieldWidthRef.current) continue
+            lastFieldWidthRef.current = width
+            requestAnimationFrame(resize)
+        }
+    })
+    observer.observe(field)
+    return () => observer.disconnect()
+}, [metadata.url])
+```
+
+`ResizeObserver` is implemented identically in WebKit and Blink, so it does
+not reopen the cross-platform question the mount-time fix already settled.
+
+**The trap named in the review, confirmed by hand exactly as warned, plus one
+more turn:**
+
+1. `resize()` writes `field.style.height`, and a `ResizeObserver` observing
+   the border-box (the default) fires on a height change too, not only a
+   width change. Calling `resize()` unconditionally from inside the callback
+   would make every write queue another notification for the same element.
+   The width-change guard (`lastFieldWidthRef`) re-runs the measurement only
+   when the field's own inline (width) size has actually changed since the
+   last time the callback ran — `resize()` never changes that — so a
+   notification caused purely by the effect's own height write is a no-op.
+2. **This alone was not enough.** With the guard in place but the write still
+   synchronous, a manual probe (a temporary test listening for `window`
+   `error` events during the container-narrow scenario) caught Chromium
+   dispatching exactly the warned-about error:
+
+   ```
+   stderr | … keeps the field unclipped when its container narrows after mount, with no re-render
+   [Error: ResizeObserver loop completed with undelivered notifications.]
+   ```
+
+   in a run whose *final* layout still happened to end up correctly sized —
+   so the content-only (`scrollHeight` vs `clientHeight`) assertion alone
+   would not have caught this regression; only the error-tracking assertion
+   added below does. The guard bounds the recursion; it does not, by itself,
+   stop Chromium's loop-detector from flagging a same-cycle DOM write from
+   inside the observer's own callback. Deferring the write to
+   `requestAnimationFrame` moves it out of the notification cycle Chromium is
+   already processing, which is what actually silences the warning.
+
+Both are now in the shipped code: the width-change guard, and the
+`requestAnimationFrame` deferral. `frontend/browser/staged-url-field.test.tsx`
+gained a `trackWindowErrors()` helper (a `window` `error`-event listener,
+asserted empty) on both live-resize tests, and a `countStyleMutations()`
+helper on the container-narrow test, asserting the field is resized at most
+once (two `style.height` writes) per genuine width change.
+
+### Mutation table (live-resize follow-up)
+
+| Mutation | Command | Result |
+|---|---|---|
+| None (both fixes in place) | `npm run test:browser` | 22/22 pass (20 previous + 2 new live-resize cases) |
+| C: remove the `ResizeObserver` entirely (mount-time sizing only, guard code unreachable) | `npm run test:browser -- staged-url-field` | **1/5 fails**, naming the exact clipping: `scrollHeight (1207px) exceeds ... clientHeight (76px)` |
+| D: remove the width-change guard (`if (width === lastFieldWidthRef.current) continue` deleted; `requestAnimationFrame(resize)` still runs unconditionally, deferral kept) | `npm run test:browser -- staged-url-field` | **1/5 fails** — not the loop error or clipping (the `requestAnimationFrame` deferral, needed independently to silence Chromium's loop-detector, also happens to make the sizing idempotent-convergent within a couple of frames regardless of the guard), but the **redundant-write count**: `expected 4 to be less than or equal to 2` — one width change now costs two full `resize()` runs (4 `style.height` writes) instead of one (2 writes), because the guard is what discards the echo notification the first run's own height write produces. This is the "redundant-write failure" named as the acceptable alternative to a loop/clipping failure, and it is what the guard is now actually being kept for under the deferred design — reported plainly rather than claiming the loop error still reproduces once deferral is added, which it does not. |
+
+Mutation D's result is reported honestly rather than forced: before the
+`requestAnimationFrame` deferral was added, removing the guard alone did
+reproduce the literal loop error (this was checked by hand, mirroring the
+probe used to find the trap in the first place). After the deferral — which
+was required regardless, to silence the warning even *with* the guard — the
+guard's effect moved from "prevents a user-visible warning" to "prevents
+doubled, unnecessary DOM writes on every resize," which is what mutation D
+now demonstrates. All mutations were reverted and the suite reconfirmed
+green (22/22) before committing.
+
+## Full gate, run locally in `verify.yml` order (after both fixes)
 
 All commands run from `/Users/jaesonmartin/Projects/FairDrop` (Go) or
 `/Users/jaesonmartin/Projects/FairDrop/frontend` (npm), one after another,
@@ -158,9 +294,8 @@ never `wails build` concurrent with a frontend suite.
 6. `CGO_ENABLED=1 go test -count=1 -race ./...` — confirmed `go env
    CGO_ENABLED` prints `1` first; all packages `ok` under the race detector.
 7. `npm test -- --run` (jsdom suite) — **622/622 pass**, 17 files.
-8. `npm run test:browser` — **20/20 pass**, 2 files (18 pre-existing minus
-   nothing removed — accessibility.test.tsx's own count is unchanged at 17;
-   the new file adds 3).
+8. `npm run test:browser` — **22/22 pass**, 2 files (accessibility.test.tsx
+   unchanged at 17; staged-url-field.test.tsx now has 5).
 9. `GOOS=windows GOARCH=amd64 go build ./...` — succeeded, no output.
 
 Pre-flight (not part of the CI matrix, but named in AGENTS.md "Running and
@@ -175,6 +310,7 @@ nothing that capture proves.
 
 ## Files changed
 
-- `frontend/src/ui/StagedView.tsx` — the fix (see above).
+- `frontend/src/ui/StagedView.tsx` — the fix: mount-time sizing plus the
+  live-resize `ResizeObserver` follow-up (see above).
 - `frontend/browser/staged-url-field.test.tsx` — new, the failing-test-first
-  evidence for this defect.
+  evidence for both the original defect and the live-resize follow-up.
