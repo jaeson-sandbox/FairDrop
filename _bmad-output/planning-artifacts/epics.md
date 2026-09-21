@@ -1872,3 +1872,28 @@ This story removes code. That is the point: the most reliable way to make a Java
 - Given the full gate on both platforms, when it runs, then it passes.
 
 **Out of scope:** animating the breakpoint transitions. A `grid-template-columns` change between one-column and two-column layouts is discrete by nature and cannot be interpolated; pretending otherwise with a transition produces a worse artifact than the honest snap. If the snap itself is judged too abrupt later, that is a separate design decision about where the breakpoints sit, not a resize-smoothness fix.
+
+### Story 7.10: Make Focus Visible Where the App Moves It
+
+As a keyboard sender on macOS,
+I want to see which menu item I am on,
+So that the browse menu is operable rather than merely navigable.
+
+Created 2026-09-21, observed on the built binary during Story 7.6's verification pass. **Every automated suite is green and this is broken in the shipped app**, which is the repo's oldest recorded scar class: "a green test can pin a behaviour that is dead on a platform you never ran."
+
+**What was observed.** Open the browse menu with the keyboard (Tab to the control, ArrowDown). The menu opens and ArrowDown/ArrowUp move focus between File and Folder -- but **no item shows any focus indication at all**: no primary fill, no tint halo, no ring. Pressing Escape returns focus to the trigger, and the trigger shows no ring either. A real Tab onto the trigger *does* paint the violet ring, which is what isolates the cause.
+
+**Why.** WebKit's `:focus-visible` heuristic does not match an element focused by script. The menu items carry `tabIndex={-1}` by design (roving tabindex: the menu is one tab stop, arrows move within it), so they are *only ever* focused programmatically -- by the open effect and by the arrow handler. `:focus-visible` therefore never matches them on macOS, and every rule keyed to it is dead. The same applies to the trigger when `closeAndReturnFocus` moves focus back to it.
+
+Chromium propagates the keyboard modality through a programmatic `focus()`, so the fill and halo appear correctly on WebView2 and in the rendered Chromium suite. That is precisely why nothing caught it: **the rendered suite proves Chromium, and this product also ships WKWebView.**
+
+This is a WCAG 2.4.7 failure on a keyboard-operable component, and it defeats Story 7.2's acceptance criterion that the focused item be distinguished by the primary fill and a tint halo.
+
+**Acceptance Criteria:**
+
+- Given the browse menu's items, then their focused appearance is keyed to `:focus`, not `:focus-visible`, with a comment naming the WebKit behaviour that forces it. This is safe for these elements specifically: they are reachable only from an open menu, and a pointer press on one activates it and closes the menu, so the lingering-ring problem `:focus-visible` exists to solve cannot arise here. *Mutation:* return the rule to `:focus-visible` -> a test must fail naming the macOS consequence.
+- Given the trigger after `closeAndReturnFocus` (Escape, or an item chosen by keyboard), then it carries a visible focus indicator. **The trigger may NOT simply switch to `:focus`** -- that reintroduces a documented scar, a ring left painted after a mouse click. Use a marker the component sets when it moves focus itself and clears on blur, styled alongside `:focus-visible`. If that cannot be made to work cleanly, record it as a residual gap with reasoning rather than shipping a half-fix.
+- Given the routed landing targets -- state headings, the cancel summary, the outcome panel -- then they still paint **no** ring. They are focused by script too, but they are not keyboard-operable, and the 2026-09-08 amendment that removed their ring stands: a completed transfer once read as stuck "selected" because a shared rule rang every scripted focus move. This story must not undo that. *Mutation:* give a landing target a ring -> the existing assertion must fail.
+- Given the rendered browser suite, then it runs against **WebKit as well as Chromium** if that can be made to work (Playwright ships a WebKit build). Every rendered assertion in this repo currently proves one engine for a product that ships two, and this defect is the second macOS-only escape of this epic after `TabFocusesLinks`. If a WebKit project cannot be made reliable here, say so explicitly and record what manual macOS observation replaces it -- do not leave the gap unstated.
+- Given `docs/release-policy.md`, then the manual macOS observation that closes this defect is recorded honestly as observed, with what was done and seen. It is not fabricated and not implied.
+- Given the full gate on both platforms, when it runs, then it passes.
