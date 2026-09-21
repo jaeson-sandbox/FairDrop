@@ -42,7 +42,19 @@
     */
     --color-primary-hover: #7F4428;
     --color-primary-ink: #FFFFFF;
-    --color-primary-tint: #E6EFFB;
+    /*
+      Story 7.8 review follow-up: the original story's five-token table did
+      not name primary-tint, but the owner's actual intent -- replace the
+      blue accents with the logo's mocha -- did not stop at those five.
+      primary-tint was still a blue wash (#E6EFFB), and it sits directly
+      against the mocha border on the drag-active drop zone and the mocha
+      fill on the focused browse-menu item. #F5EEEB is mocha at 10% on
+      --color-surface, checked against every pair the drag-active fill
+      actually creates -- it carries text (the drop zone's heading and meta
+      line render on it while a drag is over it), not only a decorative
+      wash.
+    */
+    --color-primary-tint: #F5EEEB;
     --color-track: #E9E9EB;
     /*
       Story 7.8: focus moves off the action colour entirely. With a mocha
@@ -195,7 +207,15 @@
         */
         --color-primary-hover: #F0B694;
         --color-primary-ink: #2B1206;
-        --color-primary-tint: #23303F;
+        /*
+          Story 7.8 review follow-up: #372E2B is mocha at 12%, not 16%, on
+          --color-surface-dark. 16% was checked first and put muted at
+          4.49:1 on the drag-active fill -- just under the 4.5:1 text
+          floor the drop zone's heading and meta line need there -- so 12%
+          is deliberate. Do not lighten this toward the accent for punch
+          without re-checking muted/primary-tint in the contrast proof.
+        */
+        --color-primary-tint: #372E2B;
         --color-track: #3A3A3E;
         /* Story 7.8: dark half of the violet focus token -- see the light block above. */
         --color-focus: #B79BE0;

@@ -24,7 +24,7 @@ colors:
   primary-hi: '#B06A45'
   primary-hover: '#7F4428'
   primary-ink: '#FFFFFF'
-  primary-tint: '#E6EFFB'
+  primary-tint: '#F5EEEB'
   track: '#E9E9EB'
   focus: '#6B4E9E'
   success: '#177A48'
@@ -46,7 +46,7 @@ colors:
   primary-hi-dark: '#EBAA82'
   primary-hover-dark: '#F0B694'
   primary-ink-dark: '#2B1206'
-  primary-tint-dark: '#23303F'
+  primary-tint-dark: '#372E2B'
   track-dark: '#3A3A3E'
   focus-dark: '#B79BE0'
   success-dark: '#4ED08B'
@@ -186,6 +186,8 @@ at **17.377657264**.
 | `error` on `elevated` | 5.518575206 | 5.859450762 |
 | `primary-ink` on `primary` | 5.529272927 | 7.709467487 |
 | `primary-ink` on `primary-hover` | 7.608987041 | 9.920419953 |
+| `text` on `primary-tint` | 15.153268673 | 11.826910776 |
+| `muted` on `primary-tint` | 5.048617711 | 4.851652072 |
 
 **The hover row above is a review finding, added after ship.** An interactive
 state's own fill is a text background like any other, and belongs in this
@@ -197,6 +199,17 @@ mode, under the 4.5:1 floor, unmeasured because no published pair covered it.
 `{colors.primary-hover}` is the fix: a token dedicated to the hover fill,
 independent of the gradient stop, so the two responsibilities cannot collide
 again.
+
+**The `primary-tint` rows above are a Story 7.8 review finding, added the same
+way.** `{colors.primary-tint}` is a text background too -- the drop zone's
+drag-active fill, which the heading and meta line render on while a drag is
+over it -- and it went unmeasured through the whole mocha-accent change
+because the story's token table named only five tokens. `primary-tint` moved
+from a leftover blue wash (`#E6EFFB` / `#23303F`) to mocha at 10% light / 12%
+dark on `{colors.surface}` / `{colors.surface-dark}`. The dark fraction is
+deliberately 12%, not 16%: 16% was checked first and put `muted` on it at
+4.49:1, under the 4.5:1 floor: `text`/`primary-tint` and `muted`/`primary-tint`
+must both be re-checked before this token moves again.
 
 Status text placed on its own panel (`.fd-button--quiet`'s muted/error on
 elevated is the row above; `warning`/`success`/`error` on `surface` is what the
@@ -215,6 +228,7 @@ proven, unrounded, to exceed 5.36:1 light and 6.47:1 dark.
 | `primary` on `elevated` | 5.529272927 | 6.510527964 |
 | `warning` on `elevated` | 6.329195349 | 6.871224941 |
 | `focus` on `elevated` | 6.544828832 | 6.219794189 |
+| `primary` on `primary-tint` | 4.821510572 | 5.785865409 |
 
 Status rules and the focus ring against the stronger surfaces (`canvas` and
 `surface`) are published as the weakest-of-the-set claim rather than one row

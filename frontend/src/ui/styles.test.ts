@@ -98,7 +98,11 @@ describe('the Quartz token layer', () => {
             // direction from primary-hi's lighter gradient top stop.
             'primary-hover': '#7F4428',
             'primary-ink': '#FFFFFF',
-            'primary-tint': '#E6EFFB',
+            // Story 7.8 review follow-up: mocha at 10% on --color-surface,
+            // replacing the leftover blue wash. Carries text (the drop
+            // zone's heading and meta line, drag-active) -- see the
+            // 'primary-tint carries text' describe block below.
+            'primary-tint': '#F5EEEB',
             track: '#E9E9EB',
             // Story 7.8: focus moves off the action colour to a dedicated
             // violet, distinct from primary -- see the "focus indicator is
@@ -140,7 +144,11 @@ describe('the Quartz token layer', () => {
             // 7.8 gives it its own mocha value rather than reusing primary-hi.
             'primary-hover': '#F0B694',
             'primary-ink': '#2B1206',
-            'primary-tint': '#23303F',
+            // Story 7.8 review follow-up: mocha at 12%, not 16%, on
+            // --color-surface-dark -- 16% put muted under the 4.5:1 floor
+            // on this fill. See the CSS comment beside the real
+            // declaration.
+            'primary-tint': '#372E2B',
             track: '#3A3A3E',
             focus: '#B79BE0',
             success: '#4ED08B',
@@ -376,6 +384,53 @@ describe('the focus indicator is distinct from the action colour (Story 7.8)', (
         expect(dark).toContain('--color-primary-hover: #F0B694;')
         expect(dark).toContain('--color-primary-ink: #2B1206;')
         expect(dark).toContain('--color-focus: #B79BE0;')
+    })
+})
+
+describe('primary-tint carries text (Story 7.8 review follow-up)', () => {
+    it('is mocha, not the leftover blue wash, in both modes', () => {
+        // Mutation named in the review follow-up: revert primary-tint to a
+        // blue value -> must fail, naming the pair. Checked here directly
+        // against the published tokens, and again below via the recomputed
+        // contrast pairs that would actually catch a bad fraction, not only
+        // a wrong hue.
+        expect(theme).toContain('--color-primary-tint: #F5EEEB;')
+        expect(theme).not.toContain('--color-primary-tint: #E6EFFB;')
+
+        expect(dark).toContain('--color-primary-tint: #372E2B;')
+        expect(dark).not.toContain('--color-primary-tint: #23303F;')
+    })
+
+    it('keeps muted readable on the drag-active fill, which is why the dark fraction is 12%, not 16%', () => {
+        // Mutation named in the review follow-up: a mocha fraction that
+        // puts muted under 4.5:1 -> must fail, naming the pair. #2E2621 is
+        // the 16% fraction the review rejected for exactly this reason
+        // (muted measured 4.49:1 there); resolved by luminance formula
+        // here, not by re-typing the rejected hex, so this test would catch
+        // any future fraction that repeats the same mistake, not only this
+        // one hex.
+        function channel(value: number): number {
+            const c = value / 255
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+        }
+        function luminance(hex: string): number {
+            const digits = hex.replace('#', '')
+            return 0.2126 * channel(Number.parseInt(digits.slice(0, 2), 16)) +
+                0.7152 * channel(Number.parseInt(digits.slice(2, 4), 16)) +
+                0.0722 * channel(Number.parseInt(digits.slice(4, 6), 16))
+        }
+        function contrast(foreground: string, background: string): number {
+            const a = luminance(foreground)
+            const b = luminance(background)
+            return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+        }
+
+        const darkMuted = dark.match(/--color-muted:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+        const darkTint = dark.match(/--color-primary-tint:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+        expect(darkMuted, '--color-muted (dark)').toBeTruthy()
+        expect(darkTint, '--color-primary-tint (dark)').toBeTruthy()
+
+        expect(contrast(darkMuted!, darkTint!), 'muted on primary-tint (dark)').toBeGreaterThan(4.5)
     })
 })
 
@@ -1004,6 +1059,14 @@ describe('the unrounded contrast proof', () => {
         // lighter top stop, wrong direction for light mode) and land at
         // 3.654:1 in light mode, unmeasured, under the 4.5:1 floor.
         ['primary-ink', 'primary-hover', 4.5, true],
+        // Story 7.8 review follow-up: primary-tint is a text background too
+        // -- the drop zone's drag-active fill, which the heading and meta
+        // line render on while a drag is over it. Its absence here is
+        // exactly the kind of gap that hid the hover-fill bug in Story 7.7:
+        // primary-tint moved from a leftover blue wash to mocha alongside
+        // the rest of the accent, unmeasured, until this review pass.
+        ['text', 'primary-tint', 4.5, true],
+        ['muted', 'primary-tint', 4.5, true],
         // Status text on its own panel: published as a floor, checked below.
         ['warning', 'surface', 4.5, false],
         ['success', 'surface', 4.5, false],
@@ -1018,6 +1081,9 @@ describe('the unrounded contrast proof', () => {
         ['primary', 'elevated', 3, true],
         ['warning', 'elevated', 3, true],
         ['focus', 'elevated', 3, true],
+        // Story 7.8 review follow-up: the drag-active rule and the
+        // solid-primary border sit directly on the primary-tint fill.
+        ['primary', 'primary-tint', 3, true],
         // Status rules and focus against the stronger surfaces are published as
         // the weakest-adjacent claim rather than one row each.
         ['warning', 'canvas', 3, false],
