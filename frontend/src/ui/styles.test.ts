@@ -89,16 +89,21 @@ describe('the Quartz token layer', () => {
             muted: '#65656B',
             separator: '#D6D6D6',
             'control-border': '#86868B',
-            primary: '#0A6CD8',
-            'primary-hi': '#2B86EE',
+            // Story 7.8: the accent returns to the logo's mocha, sampled
+            // from build/appicon.png rather than invented.
+            primary: '#9C5636',
+            'primary-hi': '#B06A45',
             // Owner review, Story 7.7 follow-up: the dedicated hover-fill
             // token. Darkens on hover in light mode -- the opposite
             // direction from primary-hi's lighter gradient top stop.
-            'primary-hover': '#0959B4',
+            'primary-hover': '#7F4428',
             'primary-ink': '#FFFFFF',
             'primary-tint': '#E6EFFB',
             track: '#E9E9EB',
-            focus: '#0A6CD8',
+            // Story 7.8: focus moves off the action colour to a dedicated
+            // violet, distinct from primary -- see the "focus indicator is
+            // distinct from the action colour" describe block below.
+            focus: '#6B4E9E',
             success: '#177A48',
             'success-tint': '#E3F1EA',
             warning: '#8A5300',
@@ -125,27 +130,19 @@ describe('the Quartz token layer', () => {
             muted: '#9C9CA4',
             separator: '#47474A',
             'control-border': '#7A7A82',
-            primary: '#4C9BFF',
-            // Narrowed (Story 7.7) from #6FB0FF to half its original delta
-            // above --color-primary: the gradient read hot on the dark
-            // canvas. primary-hi now feeds only the button's gradient top
-            // stop (primary-hover, below, is the dedicated hover-fill token
-            // added by the owner-review follow-up), and it is still never
-            // one of the `placed` pairs the unrounded contrast proof below
-            // checks, so it remains a token that can move without
-            // re-deriving any published figure.
-            'primary-hi': '#5EA6FF',
+            // Story 7.8: dark half of the mocha accent -- see the light
+            // block above.
+            primary: '#E39B70',
+            'primary-hi': '#EBAA82',
             // Owner review, Story 7.7 follow-up: the dedicated hover-fill
             // token, distinct from primary-hi above. Dark mode lightens on
-            // hover, the same direction primary-hi already moved in, so this
-            // repo reuses that figure here as a literal -- see the CSS
-            // comment beside the real declaration for why that is not the
-            // same thing as reusing the token.
-            'primary-hover': '#5EA6FF',
-            'primary-ink': '#06203F',
+            // hover, the same direction primary-hi already moves in. Story
+            // 7.8 gives it its own mocha value rather than reusing primary-hi.
+            'primary-hover': '#F0B694',
+            'primary-ink': '#2B1206',
             'primary-tint': '#23303F',
             track: '#3A3A3E',
-            focus: '#6FB0FF',
+            focus: '#B79BE0',
             success: '#4ED08B',
             'success-tint': '#20342A',
             warning: '#E7A33A',
@@ -344,6 +341,41 @@ describe('the focus indicator', () => {
         // Not folded into the controls' ring rule: a shared selector list is
         // exactly the regression this pins.
         expect(stylesheet).not.toMatch(/\.fd-button:focus-visible,[^{]*\[data-focus-target\]/)
+    })
+})
+
+describe('the focus indicator is distinct from the action colour (Story 7.8)', () => {
+    it('never lets focus collapse onto primary in either mode', () => {
+        // Mutation named in the acceptance criteria: set --color-focus equal
+        // to --color-primary -> this must fail, naming the collapse. A ring
+        // in the accent hue on a control filled with the accent hue is not
+        // an indicator; Paper Relay separated these for the same reason.
+        const lightFocus = theme.match(/--color-focus:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+        const lightPrimary = theme.match(/--color-primary:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+        const darkFocus = dark.match(/--color-focus:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+        const darkPrimary = dark.match(/--color-primary:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+
+        expect(lightFocus, '--color-focus (light)').toBeTruthy()
+        expect(lightPrimary, '--color-primary (light)').toBeTruthy()
+        expect(darkFocus, '--color-focus (dark)').toBeTruthy()
+        expect(darkPrimary, '--color-primary (dark)').toBeTruthy()
+
+        expect(lightFocus, 'focus must not collapse onto primary in light mode').not.toBe(lightPrimary)
+        expect(darkFocus, 'focus must not collapse onto primary in dark mode').not.toBe(darkPrimary)
+    })
+
+    it('declares the published Story 7.8 mocha and violet values exactly', () => {
+        expect(theme).toContain('--color-primary: #9C5636;')
+        expect(theme).toContain('--color-primary-hi: #B06A45;')
+        expect(theme).toContain('--color-primary-hover: #7F4428;')
+        expect(theme).toContain('--color-primary-ink: #FFFFFF;')
+        expect(theme).toContain('--color-focus: #6B4E9E;')
+
+        expect(dark).toContain('--color-primary: #E39B70;')
+        expect(dark).toContain('--color-primary-hi: #EBAA82;')
+        expect(dark).toContain('--color-primary-hover: #F0B694;')
+        expect(dark).toContain('--color-primary-ink: #2B1206;')
+        expect(dark).toContain('--color-focus: #B79BE0;')
     })
 })
 
@@ -559,11 +591,17 @@ describe('Story 7.7: compose the lifecycle region vertically', () => {
     })
 
     it('narrows the dark primary-hi delta without disturbing any published contrast figure', () => {
-        expect(dark).toContain('--color-primary-hi: #5EA6FF;')
+        // The original blue-palette narrowing this test pinned (Story 7.7:
+        // #6FB0FF -> #5EA6FF) was superseded by Story 7.8's mocha palette;
+        // primary-hi-dark is now #EBAA82 per that story's token table. The
+        // property this test guards -- that primary-hi never silently drifts
+        // out of sync with the published DESIGN.md value -- still holds.
+        expect(dark).toContain('--color-primary-hi: #EBAA82;')
         expect(dark).not.toContain('--color-primary-hi: #6FB0FF;')
+        expect(dark).not.toContain('--color-primary-hi: #5EA6FF;')
 
         const designSpine = readFileSync(designSpinePath(), 'utf8')
-        expect(designSpine).toContain("primary-hi-dark: '#5EA6FF'")
+        expect(designSpine).toContain("primary-hi-dark: '#EBAA82'")
     })
 })
 

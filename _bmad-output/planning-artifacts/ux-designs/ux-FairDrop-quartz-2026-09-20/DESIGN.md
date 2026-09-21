@@ -20,13 +20,13 @@ colors:
   muted: '#65656B'
   separator: '#D6D6D6'
   control-border: '#86868B'
-  primary: '#0A6CD8'
-  primary-hi: '#2B86EE'
-  primary-hover: '#0959B4'
+  primary: '#9C5636'
+  primary-hi: '#B06A45'
+  primary-hover: '#7F4428'
   primary-ink: '#FFFFFF'
   primary-tint: '#E6EFFB'
   track: '#E9E9EB'
-  focus: '#0A6CD8'
+  focus: '#6B4E9E'
   success: '#177A48'
   success-tint: '#E3F1EA'
   warning: '#8A5300'
@@ -42,13 +42,13 @@ colors:
   muted-dark: '#9C9CA4'
   separator-dark: '#47474A'
   control-border-dark: '#7A7A82'
-  primary-dark: '#4C9BFF'
-  primary-hi-dark: '#5EA6FF'
-  primary-hover-dark: '#5EA6FF'
-  primary-ink-dark: '#06203F'
+  primary-dark: '#E39B70'
+  primary-hi-dark: '#EBAA82'
+  primary-hover-dark: '#F0B694'
+  primary-ink-dark: '#2B1206'
   primary-tint-dark: '#23303F'
   track-dark: '#3A3A3E'
-  focus-dark: '#6FB0FF'
+  focus-dark: '#B79BE0'
   success-dark: '#4ED08B'
   success-tint-dark: '#20342A'
   warning-dark: '#E7A33A'
@@ -119,8 +119,11 @@ is unchanged by this spine except where a row below names it.
 Quartz is a neutral-material system with a single signal colour. FairDrop is a
 compact utility that does one thing between two devices, and the interface should
 read as part of the operating system rather than as a branded destination: a
-near-neutral canvas, surfaces that lift rather than outline, one blue reserved for
-the next action, and type that resolves to the platform's own display face.
+near-neutral canvas, surfaces that lift rather than outline, one accent colour
+reserved for the next action, and type that resolves to the platform's own
+display face. **Story 7.8** returned that accent from Quartz's first-cut system
+blue to the mocha of FairDrop's own icon (`build/appicon.png`) — see the Colors
+section below for the exact values.
 
 The hierarchy is unchanged from Paper Relay: one current item, one next action, one
 honest status. What changed is the material. Paper Relay carried identity in a warm
@@ -181,8 +184,8 @@ at **17.377657264**.
 | `muted` on `surface` | 5.789717726 | 6.032027848 |
 | `muted` on `elevated` | 5.789717726 | 5.459307165 |
 | `error` on `elevated` | 5.518575206 | 5.859450762 |
-| `primary-ink` on `primary` | 5.060845348 | 5.784694439 |
-| `primary-ink` on `primary-hover` | 6.775014643 | 6.511362855 |
+| `primary-ink` on `primary` | 5.529272927 | 7.709467487 |
+| `primary-ink` on `primary-hover` | 7.608987041 | 9.920419953 |
 
 **The hover row above is a review finding, added after ship.** An interactive
 state's own fill is a text background like any other, and belongs in this
@@ -207,20 +210,24 @@ proven, unrounded, to exceed 5.36:1 light and 6.47:1 dark.
 | `control-border` on `canvas` | 3.240328251 | 4.245594789 |
 | `control-border` on `surface` | 3.622862486 | 3.862412220 |
 | `control-border` on `elevated` | 3.622862486 | 3.495689217 |
-| `primary` on `track` | 4.173974302 | 4.011363202 |
-| `primary` on `surface` | 5.060845348 | 5.824411172 |
-| `primary` on `elevated` | 5.060845348 | 5.271402992 |
+| `primary` on `track` | 4.560313844 | 4.954296293 |
+| `primary` on `surface` | 5.529272927 | 7.193529288 |
+| `primary` on `elevated` | 5.529272927 | 6.510527964 |
 | `warning` on `elevated` | 6.329195349 | 6.871224941 |
-| `focus` on `elevated` | 5.060845348 | 6.610678352 |
+| `focus` on `elevated` | 6.544828832 | 6.219794189 |
 
 Status rules and the focus ring against the stronger surfaces (`canvas` and
 `surface`) are published as the weakest-of-the-set claim rather than one row
 each, for the same reason as the status-on-surface floor above. The weakest of
 `warning`/`success`/`error` on `canvas` is `success` at **4.799052371** light
 and `error` at **7.116437439** dark. The weakest of `focus` against
-`canvas`/`surface`/`elevated` is `focus` on `canvas` at **4.526476017** (light;
-Quartz's focus token equals primary, so canvas — not elevated — is the weakest
-adjacent surface).
+`canvas`/`surface`/`elevated` is `focus` on `canvas` at **5.853767247** (light).
+**Story 7.8 moves focus off the action colour**, to a dedicated violet
+(`{colors.focus}` / `{colors.focus-dark}`) distinct from `{colors.primary}` —
+a mocha focus ring on a button already filled with mocha was not an
+indicator, the same reasoning Paper Relay applied. `canvas` remains the
+weakest adjacent surface in light mode with the new token, the same as it was
+when focus equalled primary.
 
 `separator` is excluded from both tables on purpose: it is the decorative edge,
 never a boundary, and it deliberately fails 3:1 against every surface it can sit
@@ -318,7 +325,7 @@ state it is:
 - **Idle** distributes it by growing, not by centering: the drop zone absorbs
   the slack below the column's natural height, bounded by a maximum so a
   maximised window does not produce an absurd target, while the controls
-  beneath it -- the disclosures, the browse control -- keep their natural
+  beneath it -- the browse control, the disclosures (Story 7.8 order) -- keep their natural
   height and spacing. The drop zone is the actual target a sender drags onto,
   so a larger one is a real improvement, not only a visual one.
 - **Pending, Transferring, and a terminal Done or Error rendered as the phase
@@ -436,19 +443,31 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 ### FR23 and the disclosures
 
 `SPEC.md` FR23 requires the firewall preflight to precede the selection control.
-Under Quartz the preflight is still rendered above the browse control and is still
-present on first paint — but it is **collapsed by default** inside a disclosure
-rather than fully expanded. Idle previously opened with roughly two hundred words
-of firewall and recovery copy above and below one button, which is why the state
-read as a document rather than a tool.
+Story 7.3 first amended this: the preflight moved from "expanded and preceding the
+selection control" to "present and preceding", collapsed by default inside a
+disclosure rather than fully expanded. Idle previously opened with roughly two
+hundred words of firewall and recovery copy above and below one button, which is
+why the state read as a document rather than a tool.
 
-This is a spine amendment, not a CSS change, and it is the one place Quartz weakens
-a written requirement rather than restating it. Recording the trade honestly: the
-guidance is one keyboard-reachable control away instead of zero, and the summary
-line still names the topic ("Local network access") so the sender can see that the
-answer exists before they need it. If acceptance decides FR23 means *visible*
-rather than *present and preceding*, the disclosure ships `open` by default and the
-rest of the treatment is unaffected.
+**Story 7.8 amends it again, and this is the second weakening.** Idle's document
+order is now drop zone, command-failure panel (if any), the browse control,
+firewall preflight disclosure, recovery disclosure — the one control that acts
+leads, and the two informational rows sit below it. The preflight no longer
+precedes the selection control at all.
+
+This is a spine amendment, not a CSS change, and it is the second place Quartz
+weakens a written requirement rather than restating it. Recording the trade
+honestly: a first-time sender can now reach the picker without having passed the
+firewall guidance, which is what FR23 existed to prevent. What survives is that
+the guidance is still present in Idle, still one keyboard-reachable control away,
+still named by its summary line ("Local network access"), and still reachable
+before the OS firewall prompt appears — and the preflight was already collapsed
+by the Story 7.3 amendment, so a sender who did not expand it was never reading it
+in the first place regardless of its position. If acceptance decides FR23 means
+*visible* rather than merely *present*, the disclosure ships `open` by default and
+the rest of the treatment is unaffected; if acceptance decides FR23 means the
+preflight must again *precede* the selection control, the fix is to restore the
+document order above it and nothing else in this spine depends on that ordering.
 
 ## Motion
 

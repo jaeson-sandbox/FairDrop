@@ -8,13 +8,12 @@ import {RecoveryHelpContent} from './RecoveryHelp'
 import {copy} from './copy'
 
 /**
- * DESIGN.md's stated fallback for the FR23 amendment ("Rebuild Idle", Story
- * 7.3): FR23 requires the firewall preflight to precede the selection
- * control, and Quartz still renders it there -- collapsed by default inside a
- * keyboard-operable disclosure rather than fully expanded. If acceptance
- * later decides FR23 means the preflight must be *visible*, not merely
- * *present and preceding*, this is the one flag that restores that: flip it
- * to `true` and nothing else about the treatment changes.
+ * DESIGN.md's stated fallback for the FR23 amendments ("Rebuild Idle", Story
+ * 7.3; reordered again by Story 7.8): the firewall preflight is collapsed by
+ * default inside a keyboard-operable disclosure rather than fully expanded.
+ * If acceptance later decides FR23 means the preflight must be *visible*,
+ * not merely *present*, this is the one flag that restores that: flip it to
+ * `true` and nothing else about the treatment changes.
  */
 const FIREWALL_DISCLOSURE_DEFAULT_OPEN = false
 
@@ -35,13 +34,16 @@ interface IdleViewProps {
 }
 
 /**
- * Idle: the drop target, the cancellation summary, a command failure, the
- * firewall preflight, the one browse control, and recovery help, in that
- * document order.
+ * Idle: the drop target, the cancellation summary, a command failure, the one
+ * browse control, the firewall preflight, and recovery help, in that document
+ * order.
  *
- * The drop instruction leads because it is this region's `h1`. The spine's one
- * binding ordering rule is that firewall guidance precedes the selection
- * controls, which it does.
+ * The drop instruction leads because it is this region's `h1`. Story 7.8 put
+ * the browse control -- the one control that does something -- ahead of both
+ * informational disclosures: FR23 no longer binds the preflight to precede
+ * the selection control (see DESIGN.md's "FR23 and the disclosures", second
+ * amendment), so the ordering rule here is "the control that acts leads",
+ * not "firewall guidance leads".
  *
  * A retained terminal outcome is not rendered here. App owns it, above this
  * region, so that reset keeps the identical DOM node rather than rebuilding one
@@ -96,10 +98,10 @@ export function IdleView({
                   -- by opening a picker that can only choose a file, and a live
                   run went straight into it. A native chooser is one kind or the
                   other, so the honest click target is the one labelled control,
-                  which opens a menu rather than assuming a kind itself. It
-                  stays below the firewall preflight, not inside this zone,
-                  because FR23 requires the preflight ahead of the selection
-                  control.
+                  which opens a menu rather than assuming a kind itself. It is
+                  not inside this zone; it renders below it, ahead of both
+                  disclosures (Story 7.8) -- the useful control leads, not the
+                  firewall preflight.
                 */}
                 <div
                     className="fd-drop-zone"
@@ -133,11 +135,22 @@ export function IdleView({
                 )}
 
                 {/*
-                  FR23 amendment (Story 7.3): the preflight still renders
-                  above the browse control and is still present on first
-                  paint, but collapsed by default inside a keyboard-operable
-                  disclosure whose summary names the topic. See
-                  FIREWALL_DISCLOSURE_DEFAULT_OPEN above for the fallback.
+                  Story 7.8: the browse control -- the one control in Idle
+                  that does something -- is now the first control in document
+                  (and tab) order, ahead of both informational disclosures
+                  below. Previously the firewall preflight preceded it per
+                  FR23; that requirement is amended a second time in
+                  DESIGN.md's "FR23 and the disclosures" section.
+                */}
+                <BrowseControl onSelectFile={onSelectFile} onSelectDirectory={onSelectDirectory}/>
+
+                {/*
+                  FR23 amendment (Story 7.3, reordered by Story 7.8): still
+                  present on first paint, but collapsed by default inside a
+                  keyboard-operable disclosure whose summary names the topic,
+                  and now rendered after the browse control rather than
+                  before it. See FIREWALL_DISCLOSURE_DEFAULT_OPEN above for
+                  the visibility fallback.
                 */}
                 <Disclosure
                     className="fd-preflight"
@@ -157,8 +170,6 @@ export function IdleView({
                         </div>
                     </dl>
                 </Disclosure>
-
-                <BrowseControl onSelectFile={onSelectFile} onSelectDirectory={onSelectDirectory}/>
 
                 {/*
                   The second disclosure (Story 7.3). Every string

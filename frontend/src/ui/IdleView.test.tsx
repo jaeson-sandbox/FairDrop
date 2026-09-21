@@ -87,14 +87,14 @@ describe('the drop target is only a drop target', () => {
 })
 
 describe('Idle at rest', () => {
-    it('leads with the drop target, keeps the preflight ahead of the browse controls, and closes with recovery', () => {
+    it('leads with the drop target, puts the browse control ahead of both disclosures, and closes with recovery (Story 7.8)', () => {
         const {view} = show()
 
         const regions = [...view.container.querySelectorAll(
             '.fd-preflight, .fd-drop-zone, .fd-selection, .fd-help',
         )]
         expect(regions.map((element) => element.className.split(' ')[0]))
-            .toEqual(['fd-drop-zone', 'fd-preflight', 'fd-selection', 'fd-help'])
+            .toEqual(['fd-drop-zone', 'fd-selection', 'fd-preflight', 'fd-help'])
     })
 
     it('opens the outline on the h1, not on the preflight or a command failure', () => {
@@ -213,11 +213,11 @@ describe('the firewall preflight is a collapsed disclosure (Story 7.3, FR23 amen
         expect(summary.tagName).toBe('SUMMARY')
     })
 
-    it('precedes the browse control, same as the always-open preflight did', () => {
+    it('follows the browse control (Story 7.8), unlike the always-open preflight, which preceded it', () => {
         const {view} = show()
 
         const order = [...view.container.querySelectorAll('.fd-preflight, .fd-selection')]
-        expect(order.map((el) => el.className.split(' ')[0])).toEqual(['fd-preflight', 'fd-selection'])
+        expect(order.map((el) => el.className.split(' ')[0])).toEqual(['fd-selection', 'fd-preflight'])
     })
 })
 
