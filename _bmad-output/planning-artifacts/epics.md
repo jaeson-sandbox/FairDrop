@@ -1846,3 +1846,29 @@ Created 2026-09-20 from two owner observations on the built Quartz binary. Quart
 - Given `main.go`'s `canvasFor` and `main_test.go`, then `BackgroundColour` still matches `--color-canvas`. The canvas is unchanged by this story, so this should need no edit -- **verify rather than assume**, since the same assumption was wrong in Story 7.1.
 - Given `forced-colors: active`, then every new token has its system-colour override and the gradient and shadows are still dropped.
 - Given the full gate on both platforms, when it runs, then it passes.
+
+### Story 7.9: Make Resizing Seamless
+
+As a sender,
+I want the window to resize without anything lagging, jumping or re-wrapping a beat late,
+So that the app feels as solid while it is being resized as it does while it is still.
+
+Created 2026-09-21 from an owner observation -- "a polished app handles resizing seamlessly regardless" -- and from driving the built binary across several widths while Staged. Nothing clips at any width, so this is not a correctness story; it is about the one place where the layout is driven by JavaScript instead of by the layout engine, and about proving smoothness mechanically rather than by eye.
+
+**The seam.** The Staged direct-URL field is sized by a `useLayoutEffect` that measures `scrollHeight`, plus a `ResizeObserver` whose write is deferred through `requestAnimationFrame`. The deferral is not optional -- writing synchronously from inside the observer callback trips Chromium's loop detector even when recursion is bounded -- but it means that during a continuous drag the field's height is always one frame behind its width. Everything else on screen re-wraps in the same frame the resize happens; this one element does not.
+
+**The fix is to delete the JavaScript, not to tune it.** A grid wrapper with a hidden replicated-content mirror sizes a textarea from its own text in pure CSS: the wrapper is `display: grid`, the textarea and a `::after` carrying the same string occupy the same grid cell, and the cell takes the height of the taller one. The width changes, the mirror re-wraps, the cell re-sizes -- all inside one layout pass, in the same frame, with no observer, no `requestAnimationFrame`, no loop guard, and no width-change bookkeeping. It is plain grid, `::after` and `attr()`, implemented identically in WebKit and Blink, so it does not reopen the cross-platform question that ruled out `field-sizing: content`.
+
+This story removes code. That is the point: the most reliable way to make a JavaScript-driven layout seamless is to stop driving it with JavaScript.
+
+**Acceptance Criteria:**
+
+- Given the Staged direct-URL field, then its height is determined entirely by CSS layout, and `StagedView.tsx` contains no `ResizeObserver`, no `requestAnimationFrame`, and no height measurement for this field. *Mutation:* reintroduce a fixed `rows` with no CSS sizing -> the existing clipping tests must fail.
+- Given the mirror, then it is hidden from assistive technology -- `visibility: hidden` rather than `opacity: 0` or off-screen positioning, so it leaves the accessibility tree rather than being read as a duplicate URL. *Mutation:* make the mirror visible to AT -> must fail.
+- Given the mirror and the textarea, then they share font family, size, weight, line-height, padding, border width and wrapping rules through the same tokens, because any mismatch silently mis-sizes the box. *Mutation:* change the mirror's padding or line-height alone -> a clipping assertion must fail.
+- Given every behaviour the field already has -- readonly, real `<textarea>`, select-on-focus and its `onMouseDown` guard, the `fd-target` 44px floor, `overflow-wrap: anywhere`, `min-inline-size: 0` -- then all of it is preserved. The existing `frontend/browser/staged-url-field.test.tsx` cases must pass **unchanged**; if one needs editing, that is a signal the replacement is not equivalent, and it should be reported rather than edited.
+- **Given a continuous width sweep from 1200 CSS pixels down to 320 in steps of at most 40**, when the Staged view is rendered at each step, then at no step does any field clip (`scrollHeight <= clientHeight`), no page-level horizontal scrollbar appears, and no content overlaps. This is what replaces "looks smooth" with a measurement. It belongs in the rendered Chromium suite; jsdom performs no layout and cannot evaluate any of it. *Mutation:* pin the field to a fixed height -> the sweep must fail and name the width at which it first clips.
+- Given the same sweep, then the number of distinct layout arrangements it passes through is the number the breakpoints define and no more -- no width produces a transient arrangement that neither neighbouring width does.
+- Given the full gate on both platforms, when it runs, then it passes.
+
+**Out of scope:** animating the breakpoint transitions. A `grid-template-columns` change between one-column and two-column layouts is discrete by nature and cannot be interpolated; pretending otherwise with a transition produces a worse artifact than the honest snap. If the snap itself is judged too abrupt later, that is a separate design decision about where the breakpoints sit, not a resize-smoothness fix.
