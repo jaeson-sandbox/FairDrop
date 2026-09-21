@@ -1774,6 +1774,9 @@ So that the moments I actually watch are the ones that feel finished.
 
 ### Story 7.6: Prove the Rebuild on Both Platforms
 
+**Sequenced last.** Story 7.7 changes the vertical composition of every state, so evidence captured before it lands would document a layout already known to need changing.
+
+
 As a maintainer,
 I want the epic's visual and behavioural claims verified rather than asserted,
 So that "looks finished" is evidence rather than an opinion.
@@ -1786,3 +1789,26 @@ So that "looks finished" is evidence rather than an opinion.
 - Given the 640x480 native minimum and a 320 CSS pixel content width, then no action is clipped and no page-level horizontal scrollbar appears in any state.
 - Given `docs/release-policy.md`, then manual observations are recorded honestly as observed or not observed, and none is fabricated. Automated checks remain mandatory.
 - Given the full gate on both platforms, when it runs, then it passes.
+
+### Story 7.7: Compose the Lifecycle Region Vertically
+
+As a sender,
+I want each state to use the height of the window it was given,
+So that the app reads as composed rather than as a column that ran out of content.
+
+Created 2026-09-20, after Stories 7.1-7.5 were merged and the built binary was driven on macOS. Collapsing Idle's ~200 words of firewall and recovery copy into two disclosures (Story 7.3) shortened that column so much that at the default 1024x768 window its content ends around two-thirds of the way down and the bottom third is empty. **That is the owner's original complaint about the success screen, reintroduced in a different state by the fix for the first one.** DESIGN.md constrains the region's *width* (620px, 800px for the staged hero) and says nothing about vertical distribution, so nothing in the spine caught it.
+
+This story adds the missing rule and applies it. It is a layout story: no new copy, no new components, no state-shape change.
+
+**Acceptance Criteria:**
+
+- Given DESIGN.md, then **Layout & Spacing** gains a vertical-composition rule stating how each lifecycle state distributes height, and that rule is what the stylesheet implements. The spine is amended first, not retrofitted afterwards.
+- Given the lifecycle region at any window height, then it fills the available height rather than hugging its content.
+- Given **Idle**, then the drop zone absorbs the slack: it grows into the space below the column's natural height, bounded by a maximum so a maximised window does not produce an absurd target, and the controls below it keep their natural height and spacing. The drop zone is the target, so a larger one is a real improvement and not only a visual one. *Mutation:* remove the growth and restore the hugging column -> must fail.
+- Given the short states (**Pending**, **Transferring**, and a terminal **Done** or **Error** rendered as the phase view), then the region is centred vertically rather than top-aligned. *Mutation:* top-align any of them -> must fail.
+- Given **Staged**, then it stays top-aligned, because it is content-rich and centring a tall column moves the QR off-screen first at small heights. This exception is stated in DESIGN.md, not left as an accident of the CSS.
+- Given the 640x480 native minimum, a 320 CSS pixel content width, a 200% text zoom, and the WCAG text-spacing overrides, then **the drop zone's growth yields first**: no action is clipped, no content overlaps, no fixed height traps content, and vertical scrolling is permitted rather than squeezing. Every existing reflow assertion continues to pass unchanged. *Mutation:* give the drop zone a fixed height instead of a bounded flexible one -> must fail at the minimum window size.
+- Given a retained outcome above Idle, then the two compose without the retained panel being pushed off-screen or the drop zone collapsing to nothing.
+- Given the disclosure summary glyphs, then each is rendered at a size where its shape is legible, **or it is removed**. At their current size they resolve to featureless coloured dots that read as bullets; a decorative dot is worse than no glyph, and Apple's own disclosure rows frequently carry none. Either resolution is acceptable; a dot is not.
+- Given the primary control on the dark canvas, then its fill reads less hot than it does today. Prefer narrowing the gradient's top-stop delta over changing `{colors.primary}` itself, so the load-bearing contrast pairs are disturbed as little as possible. **Any token change re-derives every published figure from `styles.test.ts`'s own output** -- never by hand -- and every text pair must still clear 4.5:1 and every functional boundary 3:1, unrounded, in both modes. If no adjustment holds the floors, leave the token alone and say so.
+- Given the full gate on both platforms, when it runs, then it passes, and the existing `IdleView`, `StagedView`, `TransferringView`, `OutcomePanel` and focus-routing suites pass unchanged except where an assertion pins a literal that this story deliberately changes.
