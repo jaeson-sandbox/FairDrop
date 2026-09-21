@@ -512,19 +512,30 @@ body {
   {rounded.xl} (18px) -- the parent's radius minus that inset, not a value
   chosen on its own (DESIGN.md, Shapes: "Nested radii are concentric").
 
-  Rest state reads --color-separator, the decorative token, because this
-  boundary identifies nothing operable -- see the comment on .fd-drop-zone.
-  Under forced-colors both --color-separator and --color-control-border
-  resolve to CanvasText, so the rule still reads as DESIGN.md's "rest-state
-  boundary uses {colors.control-border} in forced colors" without a
-  forced-colors-specific override here.
+  Rest state reads --color-control-border, the FUNCTIONAL token, even though
+  the zone carries no click handler and no tab stop. It was briefly authored
+  with the decorative --color-separator on the reasoning that the boundary
+  identifies nothing operable. It identifies the drop target, and nothing
+  else does: the card is --color-surface on --color-canvas, which is 1.09:1
+  in light mode, and DESIGN.md's own elevation rule says shadow is decorative
+  and that anything a shadow separates must also be separable without it. At
+  1.45:1 the app's primary affordance would have had no perceivable edge.
+  DESIGN.md's Colors table already required the functional token here --
+  "Required on controls, the rest-state drop target, ..." -- and its Drop Zone
+  component row contradicted it; the row was the error and has been corrected.
+
+  This also makes the forced-colors behaviour stated rather than emergent.
+  The previous pairing only satisfied DESIGN.md's "rest-state boundary uses
+  {colors.control-border} in forced colors" because --color-separator and
+  --color-control-border happen to resolve to the same CanvasText today, which
+  would break silently if either were ever given a different system color.
 */
 .fd-drop-zone__inner {
     display: grid;
     min-block-size: 200px;
     place-items: center;
     padding: var(--spacing-6);
-    border: 2px dashed var(--color-separator);
+    border: 2px dashed var(--color-control-border);
     border-radius: var(--radius-xl);
     text-align: center;
     transition: border-color 150ms var(--ease-decelerate),

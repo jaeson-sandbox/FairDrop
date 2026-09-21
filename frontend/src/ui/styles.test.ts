@@ -419,7 +419,10 @@ describe('Story 7.3: rebuilding Idle', () => {
 
         const inner = block('.fd-drop-zone__inner {')
         expect(inner).toContain('border-radius: var(--radius-xl);')
-        expect(inner).toContain('border: 2px dashed var(--color-separator);')
+        // The functional token, not the decorative one -- this dashed rule is
+        // the only thing that identifies the drop target. See the controls
+        // list below, which now includes .fd-drop-zone__inner.
+        expect(inner).toContain('border: 2px dashed var(--color-control-border);')
     })
 
     it('goes solid primary with a tinted fill on drag-active, and lifts the glyph -- never fill alone', () => {
@@ -828,11 +831,23 @@ describe('the decorative edge stays decorative', () => {
     // .fd-drop-zone is deliberately absent (Story 7.3): its outer surface
     // carries no boundary of its own any more, only the sh-2 shadow, and its
     // dashed inner rule (.fd-drop-zone__inner) is checked separately below --
-    // it is authored with --color-separator on purpose, because it identifies
-    // nothing operable (the zone carries no click handler and no tab stop).
-    // Keeping .fd-drop-zone in this list would fail on that intentional
-    // choice; see "the drop zone's concentric shape" below for its own proof.
-    const controls = ['.fd-button', '.fd-qr-panel', '.fd-url', '.fd-meter', '.fd-browse-menu']
+    // .fd-drop-zone__inner is in this list, not exempt from it. The zone
+    // carries no click handler and no tab stop, but its dashed rule is the
+    // only thing that identifies the drop target: the card is
+    // --color-surface on --color-canvas at 1.09:1 in light mode, and the
+    // spine forbids shadow from carrying a boundary. DESIGN.md's Colors
+    // table requires the functional token on "the rest-state drop target"
+    // in as many words. An earlier revision exempted it here and authored
+    // the rule with --color-separator at 1.45:1, which left the product's
+    // primary affordance with no perceivable edge.
+    const controls = [
+        '.fd-button',
+        '.fd-qr-panel',
+        '.fd-url',
+        '.fd-meter',
+        '.fd-browse-menu',
+        '.fd-drop-zone__inner',
+    ]
 
     it.each(controls)('%s draws its boundary with the functional token, not the decorative one', (selector) => {
         const rule = block(`${selector} {`)
