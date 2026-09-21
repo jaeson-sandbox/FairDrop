@@ -114,6 +114,15 @@ as historical narrative and apply all corrections and supersessions before using
   verification.
 - Preserve complete failing-test output. Truncated logs destroyed the only
   evidence for an unreproduced Epic 1 failure.
+- `npm run test:browser` rewrites `frontend/browser/captures/qr-panel-forced-colors.capture.png`
+  on every run, and PNG encoding is not byte-deterministic -- a run that changed nothing
+  still leaves a 1-byte diff in `git status`. The file is **deliberately tracked** as the
+  accessibility evidence Story 3.12 committed, referenced by `deferred-work.md` and three
+  evidence files, so do not gitignore or delete it. After a verification run, either
+  `git checkout -- frontend/browser/captures/` or commit the regeneration on purpose.
+  Never sweep it up in a `git add -A`: a capture that changed because the palette changed
+  is evidence, and one that changed because a PNG encoder felt different is noise, and a
+  commit cannot tell you which it was.
 - Browser-unit tests do not prove native interaction. Manual nearby-device smoke
   observations are optional under the owner-approved personal-project policy below;
   record unverified behavior honestly and keep automated native checks mandatory.
