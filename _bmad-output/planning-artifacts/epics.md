@@ -1812,3 +1812,37 @@ This story adds the missing rule and applies it. It is a layout story: no new co
 - Given the disclosure summary glyphs, then each is rendered at a size where its shape is legible, **or it is removed**. At their current size they resolve to featureless coloured dots that read as bullets; a decorative dot is worse than no glyph, and Apple's own disclosure rows frequently carry none. Either resolution is acceptable; a dot is not.
 - Given the primary control on the dark canvas, then its fill reads less hot than it does today. Prefer narrowing the gradient's top-stop delta over changing `{colors.primary}` itself, so the load-bearing contrast pairs are disturbed as little as possible. **Any token change re-derives every published figure from `styles.test.ts`'s own output** -- never by hand -- and every text pair must still clear 4.5:1 and every functional boundary 3:1, unrounded, in both modes. If no adjustment holds the floors, leave the token alone and say so.
 - Given the full gate on both platforms, when it runs, then it passes, and the existing `IdleView`, `StagedView`, `TransferringView`, `OutcomePanel` and focus-routing suites pass unchanged except where an assertion pins a literal that this story deliberately changes.
+
+### Story 7.8: Return the Action Colour to the Logo, and Put the Action First
+
+As the owner,
+I want FairDrop's accent to be the mocha of its own icon, and the control that does something to sit above the two that only explain things,
+So that the app looks like the product it ships as, and the useful control is the one you reach first.
+
+Created 2026-09-20 from two owner observations on the built Quartz binary. Quartz took the accent to system blue on the reasoning that blue reads native on both platforms; the owner keeps the logo's mocha identity and wants it back. Separately, Idle now presents three full-width rows -- two informational disclosures and the browse control -- and the browse control sits between them.
+
+**The accent values are derived from `build/appicon.png`, not invented.** Sampling the shipped icon gives a copper-mocha chroma clustered at `#B06040` / `#A06040` / `#B07050`. Every value below was validated against both WCAG floors before this story was written; the published figures must still be copied from `styles.test.ts`'s own output.
+
+| Token | Light | Dark |
+|---|---|---|
+| `primary` | `#9C5636` | `#E39B70` |
+| `primary-hi` (gradient top stop only) | `#B06A45` | `#EBAA82` |
+| `primary-hover` | `#7F4428` (darker) | `#F0B694` (lighter) |
+| `primary-ink` | `#FFFFFF` | `#2B1206` |
+| `focus` | `#6B4E9E` | `#B79BE0` |
+
+**FR23 is amended again, and this is the second weakening.** Story 7.3 moved the firewall preflight from "expanded and preceding the selection control" to "present and preceding". This story moves it *below* the selection control, so it no longer precedes it at all. The owner made this call deliberately on 2026-09-20. Recording the trade honestly: a first-time sender can now reach the picker without having passed the firewall guidance, which is what FR23 existed to prevent. What survives is that the guidance is still present in Idle, still one keyboard-reachable control away, still named by its summary, and still reachable before the OS prompt appears -- and the preflight was already collapsed, so a sender who did not expand it was never reading it in the first place. If a future acceptance disagrees, the fix is to restore the order; nothing else depends on it.
+
+**Acceptance Criteria:**
+
+- Given the `@theme` block and its dark override, then the five action tokens above carry exactly the published values in both modes, and DESIGN.md's frontmatter matches.
+- Given the focus indicator, then it is violet and **distinct from the action colour**, because a ring in the accent hue on a control filled with the accent hue is not an indicator. Paper Relay separated these for the same reason. *Mutation:* set `focus` equal to `primary` -> must fail, naming the collapse.
+- Given every published contrast figure, then it is **re-derived from `styles.test.ts`'s own output** and DESIGN.md republishes each unrounded. Every text pair clears 4.5:1 and every functional boundary 3:1 in both modes, including the `primary-ink`/`primary-hover` pair added by the Story 7.7 review. *Mutation:* hand-edit any figure by one digit -> must fail.
+- Given the hover direction rule, then light still darkens and dark still lightens. *Mutation:* swap either direction -> must fail.
+- Given Idle's document order, then it is: drop zone, command-failure panel if any, **browse control**, firewall preflight disclosure, recovery disclosure. The two informational rows sit below the one that acts.
+- Given the focus order, then it follows the new document order -- the browse control is the first tab stop in Idle, ahead of both disclosures. *Mutation:* leave a disclosure ahead of the control in the DOM -> must fail.
+- Given `App.focus.test.tsx` and the routing table, then every routed landing target keeps its target, its `tabIndex={-1}` and its ringless treatment; the cancel-winning summary still leads the region.
+- Given `BrowseControl`, then its Escape, Tab, arrow and blur handling is unchanged. The reorder moves nodes, not behaviour.
+- Given `main.go`'s `canvasFor` and `main_test.go`, then `BackgroundColour` still matches `--color-canvas`. The canvas is unchanged by this story, so this should need no edit -- **verify rather than assume**, since the same assumption was wrong in Story 7.1.
+- Given `forced-colors: active`, then every new token has its system-colour override and the gradient and shadows are still dropped.
+- Given the full gate on both platforms, when it runs, then it passes.
