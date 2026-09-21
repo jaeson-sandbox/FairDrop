@@ -1,4 +1,4 @@
-import {useRef, useState} from 'react'
+import {useLayoutEffect, useRef, useState} from 'react'
 import {CopyToClipboard} from '../../wailsjs/go/main/App'
 import {selectCommandError, selectWarnings} from '../transfer/selectors'
 import type {StagedTransferState} from '../transfer/state'
@@ -49,6 +49,55 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
     // render that set it, and re-rendering on focus would buy nothing.
     const focusedRef = useRef(false)
     const [showFullName, setShowFullName] = useState(false)
+    const urlFieldRef = useRef<HTMLTextAreaElement>(null)
+
+    /*
+     * Sizes the readonly URL field to whatever it is actually holding, instead
+     * of a fixed `rows` count.
+     *
+     * The capability URL's length is variable -- host (IPv4 or IPv6), port,
+     * and a 32-hex token -- so it can wrap to two lines, three, or more
+     * depending on the sender's network and the field's own width at the
+     * current viewport. A fixed `rows` picks one line count and clips every
+     * URL that needs more (the observed defect: a `rows={2}` box clipping a
+     * URL that wrapped to three lines).
+     *
+     * `field-sizing: content` would do this in CSS alone, but it is
+     * Chromium-only and DESIGN.md's cross-platform constraint is binding:
+     * this product ships identically in WKWebView (macOS) and WebView2
+     * (Windows), and a rule that auto-sizes on one and clips on the other is
+     * not a fix. `scrollHeight` and inline `style.height`, by contrast, are
+     * plain DOM/CSSOM -- supported identically by both engines -- so this
+     * measures and sets the box in JavaScript instead of trusting an engine
+     * to do it for us.
+     *
+     * `useLayoutEffect` rather than `useEffect`: it runs synchronously after
+     * DOM mutation and before the browser paints, so the field is measured
+     * and resized before the sender ever sees the pre-resize frame. This is a
+     * one-shot measurement tied to the value that can change the required
+     * height, not a lifecycle timer -- `EXPERIENCE.md`'s ban on
+     * `setTimeout`/`setInterval` polling loops does not reach it.
+     *
+     * The height is reset to `auto` before measuring `scrollHeight`, which is
+     * the standard textarea-autosize technique: `scrollHeight` reports the
+     * content's height *given the current box*, so a box left taller than the
+     * content from a previous (longer) URL would under-report and never
+     * shrink back down.
+     */
+    useLayoutEffect(() => {
+        const field = urlFieldRef.current
+        if (field === null) return
+        field.style.height = 'auto'
+        // `.fd-url` is border-box (Tailwind's preflight default), so its
+        // `scrollHeight` -- padding plus content, no border -- is short of
+        // the border-box height this sets by exactly the vertical border
+        // width. Left uncompensated, every resize undershoots by that much
+        // and the bottom of the border clips the last line again, just by
+        // ~2px instead of a whole line -- the same defect this effect exists
+        // to remove.
+        const borderY = field.offsetHeight - field.clientHeight
+        field.style.height = `${field.scrollHeight + borderY}px`
+    }, [metadata.url])
 
     const size = metadata.isDir
         ? `${formatBytes(metadata.size)} ${copy.label.logicalSize}`
@@ -204,6 +253,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                       about the other. It is still not a link.
                                     */}
                                     <textarea
+                                        ref={urlFieldRef}
                                         className="fd-url fd-target"
                                         readOnly
                                         rows={2}
