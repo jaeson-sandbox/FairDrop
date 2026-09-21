@@ -42,7 +42,7 @@ colors:
   separator-dark: '#47474A'
   control-border-dark: '#7A7A82'
   primary-dark: '#4C9BFF'
-  primary-hi-dark: '#6FB0FF'
+  primary-hi-dark: '#5EA6FF'
   primary-ink-dark: '#06203F'
   primary-tint-dark: '#23303F'
   track-dark: '#3A3A3E'
@@ -288,6 +288,47 @@ overlap, and no clipped actions. The single browse control stays out of the
 pair-collapse query. Containers grow under 200% text and WCAG text-spacing
 overrides; no fixed height may clip content.
 
+### Vertical composition (Story 7.7)
+
+Width was the only axis this section constrained until Idle's content shrank
+enough (Story 7.3's disclosures) to expose the gap: nothing here said how a
+lifecycle state should use the *height* the window actually gives it, so a
+state could hug its own content and leave the remainder of a tall window
+empty -- the owner's original complaint about the success screen, reborn in
+Idle once the fix for the first one shortened its column.
+
+**The lifecycle region fills the available window height rather than hugging
+its content.** How each state spends that height depends on what kind of
+state it is:
+
+- **Idle** distributes it by growing, not by centering: the drop zone absorbs
+  the slack below the column's natural height, bounded by a maximum so a
+  maximised window does not produce an absurd target, while the controls
+  beneath it -- the disclosures, the browse control -- keep their natural
+  height and spacing. The drop zone is the actual target a sender drags onto,
+  so a larger one is a real improvement, not only a visual one.
+- **Pending, Transferring, and a terminal Done or Error rendered as the phase
+  view** are short, single-purpose states with no reason to anchor to the top
+  edge, so the region is centred vertically instead.
+- **Staged is the one exception, and stays top-aligned.** It is content-rich --
+  packet, hero, QR, direct-link row, disclosures -- and centring a tall column
+  moves content upward as the window shortens; the QR is the first thing that
+  leaves the viewport when it does, because it sits nearest the vertical
+  centre of a hero-heavy layout. Top alignment keeps the loss monotonic: content
+  is lost from the bottom, through the permitted vertical scroll, rather than
+  from wherever centring happens to put the QR.
+- A retained outcome rendered above Idle keeps its natural height regardless of
+  the rule above; only the phase's own region grows or centres. The drop zone's
+  minimum height is a floor the retained panel cannot push it under.
+
+At the 640×480 native minimum, a 320 CSS pixel content width, 200% text zoom,
+and the WCAG text-spacing overrides, the drop zone's growth is the first thing
+to yield: it has a *bounded flexible* height -- a flex-grow with a maximum,
+never a fixed one -- so once the window is smaller than its natural size,
+vertical scrolling takes over rather than clipping, overlapping, or forcing the
+zone below its floor. Every existing reflow guarantee in the section above
+continues to hold unchanged; this rule only governs the block axis.
+
 ## Elevation & Depth
 
 **This section replaces the Paper Relay elevation rule outright.** The previous
@@ -312,6 +353,14 @@ Rules, all enforceable:
   `{colors.primary-hi}` → `{colors.primary}` vertical fill, plus its 1px inset top
   highlight. No other gradient is permitted, and none may sit behind text. The
   progress fill is therefore solid, not a gradient.
+  **Story 7.7 narrows `{colors.primary-hi-dark}`** from `#6FB0FF` to
+  `#5EA6FF` -- half the original delta above `{colors.primary-dark}` -- because
+  the fill read hot on the dark canvas. `primary-hi` feeds only this gradient
+  and the primary button's hover fill; it is not one of the tokens the
+  unrounded contrast proof publishes a figure for, so narrowing it changes no
+  published ratio and required no re-derivation. `{colors.primary}` itself is
+  unchanged, so every load-bearing pair that does depend on it keeps its
+  published figure exactly.
 - **One `repeating-linear-gradient` is exempt** and is not a gradient in this
   rule's sense: the unknown-total meter's static diagonal pattern, which carries
   a state distinction rather than decoration and never moves.
@@ -352,7 +401,7 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 | **Drop Zone** | `{rounded.xxl}` surface at `{elevation.sh-2}` with a 2px dashed inner rule at `{colors.control-border}` inset 7px (concentric, so `{rounded.xl}`). The **functional** token, not the decorative one: the zone carries no click handler and no tab stop, but that rule is the only thing identifying the drop target -- the card is `{colors.surface}` on `{colors.canvas}` at 1.09:1 in light mode, and shadow may not carry a boundary. This row previously said `{colors.separator}` and contradicted the Colors table above it, which already required the functional token on the rest-state drop target; the row was the error. Drag-active: the rule goes solid `{colors.primary}`, the fill goes `{colors.primary-tint}`, and the glyph lifts 3px. Fill is never the only state cue. The rest-state boundary uses `{colors.control-border}` in forced colors. |
 | **Browse Control** | Full-width primary button with a trailing chevron and `aria-haspopup="menu"`. Opens the menu; the label never changes. |
 | **Browse Menu** | `{rounded.lg}` raised surface at `{elevation.sh-3}` with a functional boundary, 5px padding, `{rounded.sm}` items. The focused item takes the primary fill plus a tint halo, not only the focus ring. |
-| **Disclosure** | `{rounded.xl}` surface at `{elevation.sh-1}` with a leading tinted icon, a 12px chevron that rotates 90° when open, and a hover fill. **Replaces the always-open firewall and recovery blocks** — see the FR23 note below. |
+| **Disclosure** | `{rounded.xl}` surface at `{elevation.sh-1}` with a 12px chevron that rotates 90° when open, and a hover fill. **No leading icon**: Story 7.7 removed it after finding that a tinted circle small enough to sit beside a one-line summary resolves to a featureless coloured dot, which reads as a bullet rather than as an icon. A dot is not an acceptable outcome per that story's acceptance criteria, and a shape legible at this size does not fit the row without crowding the summary text, so the row ships with no glyph at all -- consistent with the platform's own disclosure rows, which frequently carry none either. **Replaces the always-open firewall and recovery blocks** — see the FR23 note below. |
 | **Packet** | `{rounded.xxl}` surface at `{elevation.sh-3}`. Holds the warning banner, hero, disclosures and cancel. Replaces the folder-tab silhouette and the paper offset. |
 | **Item Kind Pill** | `{rounded.full}`, `{colors.primary-tint}` on `{colors.primary}`, `{typography.label}`, with a leading glyph. Says File or Folder. Never an authoritative-state badge. |
 | **Item Summary** | `{typography.headline}` name in a bidi isolate with the full-name control beside it; kind, logical size and the ZIP note in `{typography.meta}`. |

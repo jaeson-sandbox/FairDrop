@@ -158,7 +158,15 @@
         --color-separator: #47474A;
         --color-control-border: #7A7A82;
         --color-primary: #4C9BFF;
-        --color-primary-hi: #6FB0FF;
+        /*
+          Narrowed (Story 7.7) from #6FB0FF to half its original delta above
+          --color-primary: the gradient read hot on the dark canvas.
+          primary-hi feeds only this button's gradient and hover fill, never a
+          pair the unrounded contrast proof publishes a figure for, so this is
+          the one token in the palette that can move without re-deriving
+          anything in DESIGN.md's contrast tables.
+        */
+        --color-primary-hi: #5EA6FF;
         --color-primary-ink: #06203F;
         --color-primary-tint: #23303F;
         --color-track: #3A3A3E;
@@ -205,15 +213,57 @@ body {
     color: var(--color-text);
 }
 
-/* One centered readable column at the default window; it only ever shrinks. */
+/*
+  One centered readable column at the default window; it only ever shrinks.
+
+  flex: 1 1 auto (Story 7.7) is the vertical-composition rule DESIGN.md's
+  Layout & Spacing section now states: the region fills whatever height
+  .fd-app has left after an optional retained outcome above it, rather than
+  sizing to its own content and leaving the remainder of a tall window empty.
+  A retained outcome is a sibling of this element, not a child, and keeps the
+  default flex: 0 1 auto every .fd-app child gets when this rule does not
+  apply to it -- see the comment on .fd-app > .fd-outcome below.
+
+  How the extra height gets spent is a per-phase decision, not this rule's:
+  the default justify-content (flex-start) keeps Idle and Staged top-aligned;
+  the centering rule below opts Pending, Transferring and the terminal
+  outcome-as-phase-view into the alternative.
+*/
 .fd-region {
     display: flex;
     width: 100%;
     max-width: 720px;
     min-inline-size: 0;
     margin-inline: auto;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: var(--spacing-6);
+}
+
+/*
+  Pending, Transferring, and a terminal Done/Error rendered as the phase view
+  (DESIGN.md, Vertical composition): short, single-purpose states with no
+  reason to anchor to the top edge, so the region centres vertically instead
+  of hugging its content from the top.
+
+  The terminal outcome panel is not wrapped in .fd-region -- App.tsx renders
+  it directly as .fd-app's child, sharing the growth rule above so the same
+  centering can apply to it. The attribute selector below excludes a
+  *retained* outcome (data-phase-view is undefined on that one, per
+  OutcomePanel.tsx's phaseView prop) on purpose: a retained panel keeps its
+  natural height and never grows or centres.
+*/
+.fd-region[data-phase-view='pending'],
+.fd-region[data-phase-view='transferring'],
+.fd-app > .fd-outcome[data-phase-view='outcome'] {
+    flex: 1 1 auto;
+    justify-content: center;
+}
+
+.fd-app > .fd-outcome[data-phase-view='outcome'] {
+    width: 100%;
+    max-width: 720px;
+    margin-inline: auto;
 }
 
 .fd-state-heading {
@@ -471,8 +521,16 @@ body {
 
 /* --------------------------------------------------------------------- Idle */
 
+/*
+  flex: 1 1 auto (Story 7.7) makes .fd-idle consume the full height
+  .fd-region grows to, which is what gives the drop zone below something to
+  grow into. The other children here -- the cancel summary, the command-error
+  panel, the two disclosures, the browse control -- keep their default
+  flex: 0 1 auto, so only the drop zone actually grows.
+*/
 .fd-idle {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: var(--spacing-6);
 }
@@ -499,8 +557,26 @@ body {
   "the decorative edge stays decorative" holds to --color-control-border.
   Separation from canvas comes from the shadow, the same way .fd-packet's
   does.
+
+  Story 7.7's vertical-composition rule: the drop zone is what absorbs Idle's
+  slack, so it is a flex item that grows (flex: 1 1 auto) rather than a block
+  box sized to its content. min-block-size is the floor it already had --
+  matched on .fd-drop-zone__inner below, since that inner box is what actually
+  reports the 200px minimum a sender sees. max-block-size is the bound the
+  acceptance criteria require, so a maximised window does not turn the target
+  into an absurd expanse: both are declared here, never a plain block-size or
+  height, which is what keeps this a *bounded flexible* height rather than a
+  fixed one. At the 640x480 native minimum this is the first thing to give
+  way -- the flex item shrinks toward its min-block-size floor and the window
+  scrolls rather than clipping, the same floor a retained outcome panel above
+  Idle cannot push it under.
 */
 .fd-drop-zone {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: 200px;
+    max-block-size: 420px;
     padding: 7px;
     border-radius: var(--radius-xxl);
     background: var(--color-surface);
@@ -532,6 +608,7 @@ body {
 */
 .fd-drop-zone__inner {
     display: grid;
+    flex: 1 1 auto;
     min-block-size: 200px;
     place-items: center;
     padding: var(--spacing-6);
@@ -607,25 +684,6 @@ body {
 .fd-disclosure__summary:focus-visible {
     outline: var(--focus-ring-width) solid var(--color-focus);
     outline-offset: var(--focus-ring-offset);
-}
-
-.fd-disclosure__icon {
-    display: grid;
-    flex: none;
-    width: 26px;
-    height: 26px;
-    place-items: center;
-    border-radius: var(--radius-full);
-    background: var(--color-primary-tint);
-}
-
-.fd-disclosure__icon::before {
-    content: '';
-    display: block;
-    width: 10px;
-    height: 10px;
-    border-radius: var(--radius-full);
-    background: var(--color-primary);
 }
 
 .fd-disclosure__heading {

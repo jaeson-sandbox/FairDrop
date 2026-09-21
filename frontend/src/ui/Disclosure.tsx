@@ -22,9 +22,13 @@ interface DisclosureProps {
 }
 
 /**
- * `{rounded.xl}` surface at `{elevation.sh-1}` with a leading tinted icon, a
- * chevron that rotates when open, and a hover fill -- DESIGN.md's Disclosure
- * row. Built on native `<details>`/`<summary>` rather than a button-plus-div
+ * `{rounded.xl}` surface at `{elevation.sh-1}` with a chevron that rotates
+ * when open and a hover fill -- DESIGN.md's Disclosure row. No leading icon:
+ * Story 7.7 removed the tinted dot that used to sit before the heading after
+ * finding it resolved, at its rendered size, to a featureless coloured circle
+ * that read as a bullet rather than a glyph -- DESIGN.md's Components table
+ * records the removal. Built on native `<details>`/`<summary>` rather than a
+ * button-plus-div
  * pair: the browser already gives that element pair keyboard operability
  * (Enter and Space toggle a focused summary, and it is a native Tab stop) and
  * an implicit accessible name/state, so there is no ARIA to hand-roll and no
@@ -43,7 +47,6 @@ export function Disclosure({className, headingId, summary, children, defaultOpen
     return (
         <details className={`${className} fd-disclosure`} open={defaultOpen || undefined}>
             <summary className="fd-disclosure__summary">
-                <span className="fd-disclosure__icon" aria-hidden="true"/>
                 <h2 id={headingId} className="fd-disclosure__heading">{summary}</h2>
                 <span className="fd-disclosure__chevron" aria-hidden="true"/>
             </summary>
