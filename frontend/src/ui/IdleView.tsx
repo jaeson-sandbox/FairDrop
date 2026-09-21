@@ -2,9 +2,21 @@ import type {CSSProperties, FocusEvent, KeyboardEvent} from 'react'
 import {useEffect, useId, useRef, useState} from 'react'
 import {selectCommandError} from '../transfer/selectors'
 import type {IdleTransferState} from '../transfer/state'
+import {Disclosure} from './Disclosure'
 import {OutcomePanel} from './OutcomePanel'
-import {RecoveryHelp} from './RecoveryHelp'
+import {RecoveryHelpContent} from './RecoveryHelp'
 import {copy} from './copy'
+
+/**
+ * DESIGN.md's stated fallback for the FR23 amendment ("Rebuild Idle", Story
+ * 7.3): FR23 requires the firewall preflight to precede the selection
+ * control, and Quartz still renders it there -- collapsed by default inside a
+ * keyboard-operable disclosure rather than fully expanded. If acceptance
+ * later decides FR23 means the preflight must be *visible*, not merely
+ * *present and preceding*, this is the one flag that restores that: flip it
+ * to `true` and nothing else about the treatment changes.
+ */
+const FIREWALL_DISCLOSURE_DEFAULT_OPEN = false
 
 interface IdleViewProps {
     readonly state: IdleTransferState
@@ -93,7 +105,14 @@ export function IdleView({
                     className="fd-drop-zone"
                     style={dropTargetStyle}
                 >
-                    <div>
+                    {/*
+                      The concentric inner rule (DESIGN.md, Shapes): a 24px
+                      card ({rounded.xxl}) padded 7px in, so the inner dashed
+                      boundary resolves to an 18px radius ({rounded.xl}) --
+                      the parent's radius minus the inset between them, not an
+                      independently chosen value.
+                    */}
+                    <div className="fd-drop-zone__inner">
                         <div className="fd-drop-symbol" aria-hidden="true">↓</div>
                         <h1
                             className="fd-state-heading"
@@ -113,10 +132,19 @@ export function IdleView({
                     />
                 )}
 
-                <aside className="fd-preflight" aria-labelledby="fd-firewall-heading">
-                    <h2 id="fd-firewall-heading" className="fd-preflight__heading">
-                        {copy.label.firewallHeading}
-                    </h2>
+                {/*
+                  FR23 amendment (Story 7.3): the preflight still renders
+                  above the browse control and is still present on first
+                  paint, but collapsed by default inside a keyboard-operable
+                  disclosure whose summary names the topic. See
+                  FIREWALL_DISCLOSURE_DEFAULT_OPEN above for the fallback.
+                */}
+                <Disclosure
+                    className="fd-preflight"
+                    headingId="fd-firewall-heading"
+                    summary={copy.label.firewallHeading}
+                    defaultOpen={FIREWALL_DISCLOSURE_DEFAULT_OPEN}
+                >
                     <p className="fd-body">{copy.firewall.preflight}</p>
                     <dl>
                         <div>
@@ -128,11 +156,23 @@ export function IdleView({
                             <dd>{copy.firewall.macos}</dd>
                         </div>
                     </dl>
-                </aside>
+                </Disclosure>
 
                 <BrowseControl onSelectFile={onSelectFile} onSelectDirectory={onSelectDirectory}/>
 
-                <RecoveryHelp/>
+                {/*
+                  The second disclosure (Story 7.3). Every string
+                  RecoveryHelpContent rendered when this block was always
+                  open is still rendered here -- none dropped, only collapsed
+                  behind a keyboard-operable summary.
+                */}
+                <Disclosure
+                    className="fd-help"
+                    headingId="fd-recovery-heading"
+                    summary={copy.label.recoveryHeading}
+                >
+                    <RecoveryHelpContent/>
+                </Disclosure>
             </section>
         </div>
     )
@@ -295,7 +335,15 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                 type="button"
                 id={triggerId}
                 ref={triggerRef}
-                className="fd-button fd-target"
+                // Quartz reverses Paper Relay's rule that the selection
+                // control stays quieter than the drop zone: the drop zone is
+                // no longer a control at all (it carries no click handler and
+                // no tab stop, above), so the browse control is the one
+                // action in Idle and DESIGN.md's Components table specifies
+                // it as the full-width primary button. See
+                // `IdleView.test.tsx`'s inverted assertion, which names this
+                // reversal explicitly rather than merely deleting the old one.
+                className="fd-button fd-button--primary fd-target"
                 aria-haspopup="menu"
                 aria-expanded={open}
                 // Only while the menu exists: aria-controls names an element by
@@ -306,6 +354,9 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                 onKeyDown={handleTriggerKeyDown}
             >
                 {copy.label.chooseFileOrFolder}
+                {/* Decorative only: aria-haspopup already tells assistive
+                    technology this opens a menu. */}
+                <span className="fd-browse-trigger__chevron" aria-hidden="true">⌄</span>
             </button>
             {open ? (
                 <div

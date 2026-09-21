@@ -477,22 +477,6 @@ body {
     gap: var(--spacing-6);
 }
 
-.fd-preflight {
-    margin: 0;
-    padding: var(--spacing-4);
-    border-left: 4px solid var(--color-warning);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-}
-
-.fd-preflight__heading {
-    margin: 0 0 var(--spacing-2);
-    color: var(--color-warning);
-    font-size: var(--text-body-strong);
-    font-weight: var(--font-weight-body-strong);
-    line-height: var(--leading-body-strong);
-}
-
 .fd-preflight dl {
     display: grid;
     gap: var(--spacing-2);
@@ -508,25 +492,59 @@ body {
     color: var(--color-muted);
 }
 
+/*
+  The drop zone: a {rounded.xxl} surface at {elevation.sh-2}, unchanged shape
+  from a functional-boundary standpoint -- it carries no click handler and no
+  tab stop (IdleView.tsx), so it is not one of the operable controls
+  "the decorative edge stays decorative" holds to --color-control-border.
+  Separation from canvas comes from the shadow, the same way .fd-packet's
+  does.
+*/
 .fd-drop-zone {
+    padding: 7px;
+    border-radius: var(--radius-xxl);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sh-2);
+}
+
+/*
+  The dashed inner rule, inset 7px inside the 24px card above and therefore
+  {rounded.xl} (18px) -- the parent's radius minus that inset, not a value
+  chosen on its own (DESIGN.md, Shapes: "Nested radii are concentric").
+
+  Rest state reads --color-separator, the decorative token, because this
+  boundary identifies nothing operable -- see the comment on .fd-drop-zone.
+  Under forced-colors both --color-separator and --color-control-border
+  resolve to CanvasText, so the rule still reads as DESIGN.md's "rest-state
+  boundary uses {colors.control-border} in forced colors" without a
+  forced-colors-specific override here.
+*/
+.fd-drop-zone__inner {
     display: grid;
     min-block-size: 200px;
     place-items: center;
     padding: var(--spacing-6);
-    border: 2px dashed var(--color-control-border);
-    border-radius: var(--radius-lg);
-    background: var(--color-surface);
+    border: 2px dashed var(--color-separator);
+    border-radius: var(--radius-xl);
     text-align: center;
+    transition: border-color 150ms var(--ease-decelerate),
+        background-color 150ms var(--ease-decelerate);
 }
 
 /*
-  Wails adds this class while a native drag is over the gated element. The solid
-  action-colored boundary is the state cue; the fill is decoration on top of it.
+  Wails adds this class to the gated element -- .fd-drop-zone, the outer card
+  -- while a native drag is over it. The solid action-colored boundary on the
+  inner rule is the state cue; the fill is decoration on top of it, never the
+  only one, and the glyph lifts as a third.
 */
-.fd-drop-zone.wails-drop-target-active {
+.fd-drop-zone.wails-drop-target-active .fd-drop-zone__inner {
     border-style: solid;
     border-color: var(--color-primary);
     background: var(--color-primary-tint);
+}
+
+.fd-drop-zone.wails-drop-target-active .fd-drop-symbol {
+    transform: translateY(-3px);
 }
 
 .fd-drop-symbol {
@@ -539,6 +557,91 @@ body {
     border-radius: var(--radius-xs);
     color: var(--color-primary);
     font-size: var(--text-display);
+    transition: transform 150ms var(--ease-decelerate);
+}
+
+/*
+  DESIGN.md's Disclosure component: a {rounded.xl} surface at {elevation.sh-1}
+  with a leading tinted icon, a chevron that rotates when open, and a hover
+  fill. Native <details>/<summary> supplies the keyboard operability and the
+  open/closed state; this only paints it. `list-style: none` plus the
+  `::-webkit-details-marker` rule below remove the browser's own default
+  disclosure triangle so the authored chevron is the only one.
+*/
+.fd-disclosure {
+    border-radius: var(--radius-xl);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sh-1);
+}
+
+.fd-disclosure__summary {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-4);
+    list-style: none;
+    cursor: pointer;
+    border-radius: var(--radius-xl);
+    transition: background-color 150ms var(--ease-decelerate);
+}
+
+.fd-disclosure__summary::-webkit-details-marker {
+    display: none;
+}
+
+.fd-disclosure__summary:hover {
+    background: var(--color-fill);
+}
+
+.fd-disclosure__summary:focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.fd-disclosure__icon {
+    display: grid;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-tint);
+}
+
+.fd-disclosure__icon::before {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+}
+
+.fd-disclosure__heading {
+    flex: 1;
+    margin: 0;
+    color: var(--color-text);
+    font-size: var(--text-body-strong);
+    font-weight: var(--font-weight-body-strong);
+    line-height: var(--leading-body-strong);
+}
+
+.fd-disclosure__chevron {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border-right: 2px solid var(--color-muted);
+    border-bottom: 2px solid var(--color-muted);
+    transform: rotate(-45deg);
+    transition: transform 200ms var(--ease-decelerate);
+}
+
+.fd-disclosure[open] > .fd-disclosure__summary .fd-disclosure__chevron {
+    transform: rotate(45deg);
+}
+
+.fd-disclosure__body {
+    padding: 0 var(--spacing-4) var(--spacing-4);
 }
 
 /*
@@ -553,6 +656,14 @@ body {
 
 .fd-selection > .fd-button {
     width: 100%;
+}
+
+/*
+  Browse Control's trailing chevron (DESIGN.md, Components). Decorative only
+  -- aria-haspopup already names the button as a menu trigger.
+*/
+.fd-browse-trigger__chevron {
+    margin-inline-start: auto;
 }
 
 /*
@@ -704,7 +815,16 @@ body {
 
 /* ----------------------------------------- Recovery help (Idle and Staged) */
 
-.fd-help {
+/*
+  :not(.fd-disclosure) scopes this to the always-open form StagedView renders
+  (a plain <div>, RecoveryHelp's own wrapper). Idle's form is the same class
+  on a <details> that also carries .fd-disclosure (IdleView.tsx), and takes
+  its surface styling from the shared .fd-disclosure rule above instead --
+  DESIGN.md's Disclosure component "replaces the always-open firewall and
+  recovery blocks", but only where Story 7.3 actually rebuilt them, which is
+  Idle. Staged is unchanged.
+*/
+.fd-help:not(.fd-disclosure) {
     display: grid;
     gap: var(--spacing-3);
     padding: var(--spacing-4);

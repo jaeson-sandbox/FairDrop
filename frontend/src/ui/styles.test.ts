@@ -399,6 +399,63 @@ describe('reflow to 320 CSS pixels', () => {
     })
 })
 
+describe('Story 7.3: rebuilding Idle', () => {
+    it('gives the drop zone the xxl radius and sh-2 elevation, with no boundary of its own', () => {
+        const zone = block('.fd-drop-zone {')
+        expect(zone).toContain('border-radius: var(--radius-xxl);')
+        expect(zone).toContain('box-shadow: var(--shadow-sh-2);')
+        expect(zone).not.toMatch(/\bborder(-color|-style)?\s*:/)
+    })
+
+    it('insets the dashed inner rule 7px so its radius is concentric with the card', () => {
+        // DESIGN.md, Shapes: "A 24px card with 7px inset padding takes a
+        // 17-18px inner radius." --radius-xxl is 24px and --radius-xl is
+        // 18px (both pinned above), so the inner rule has to read the xl
+        // token, not a value chosen on its own -- a hand-picked radius here
+        // would drift silently the next time --radius-xxl or --radius-xl
+        // moved.
+        const zone = block('.fd-drop-zone {')
+        expect(zone).toContain('padding: 7px;')
+
+        const inner = block('.fd-drop-zone__inner {')
+        expect(inner).toContain('border-radius: var(--radius-xl);')
+        expect(inner).toContain('border: 2px dashed var(--color-separator);')
+    })
+
+    it('goes solid primary with a tinted fill on drag-active, and lifts the glyph -- never fill alone', () => {
+        const active = block('.fd-drop-zone.wails-drop-target-active .fd-drop-zone__inner {')
+        expect(active).toContain('border-style: solid;')
+        expect(active).toContain('border-color: var(--color-primary);')
+        expect(active).toContain('background: var(--color-primary-tint);')
+
+        const lift = block('.fd-drop-zone.wails-drop-target-active .fd-drop-symbol {')
+        expect(lift).toContain('transform: translateY(-3px);')
+    })
+
+    it('gives the disclosure family the xl radius, sh-1 elevation, a hover fill and a rotating chevron', () => {
+        const disclosure = block('.fd-disclosure {')
+        expect(disclosure).toContain('border-radius: var(--radius-xl);')
+        expect(disclosure).toContain('box-shadow: var(--shadow-sh-1);')
+
+        const summary = block('.fd-disclosure__summary {')
+        expect(summary).toContain('list-style: none;')
+
+        expect(stylesheet).toContain('.fd-disclosure__summary:hover {')
+
+        expect(stylesheet).toMatch(
+            /\.fd-disclosure\[open\] > \.fd-disclosure__summary \.fd-disclosure__chevron \{\s*transform: rotate\(45deg\);\s*\}/,
+        )
+    })
+
+    it('keeps the always-open recovery block styled separately from the Idle disclosure form', () => {
+        // Both share the fd-help class name -- StagedView's plain <div> and
+        // IdleView's <details> -- so the box styling has to be scoped away
+        // from the disclosure form, or Idle would paint both a card and a
+        // disclosure surface on the same element.
+        expect(stylesheet).toContain('.fd-help:not(.fd-disclosure) {')
+    })
+})
+
 describe('guarantees a stylesheet edit could silently undo', () => {
     /*
       These four were each applied during review and each survived mutation
@@ -768,7 +825,14 @@ describe('the decorative edge stays decorative', () => {
     // invisible boundary on something that needs a visible one, and it would
     // still pass the contrast proof above, which does not look at that token
     // at all.
-    const controls = ['.fd-button', '.fd-drop-zone', '.fd-qr-panel', '.fd-url', '.fd-meter', '.fd-browse-menu']
+    // .fd-drop-zone is deliberately absent (Story 7.3): its outer surface
+    // carries no boundary of its own any more, only the sh-2 shadow, and its
+    // dashed inner rule (.fd-drop-zone__inner) is checked separately below --
+    // it is authored with --color-separator on purpose, because it identifies
+    // nothing operable (the zone carries no click handler and no tab stop).
+    // Keeping .fd-drop-zone in this list would fail on that intentional
+    // choice; see "the drop zone's concentric shape" below for its own proof.
+    const controls = ['.fd-button', '.fd-qr-panel', '.fd-url', '.fd-meter', '.fd-browse-menu']
 
     it.each(controls)('%s draws its boundary with the functional token, not the decorative one', (selector) => {
         const rule = block(`${selector} {`)

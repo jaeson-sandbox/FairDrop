@@ -154,7 +154,14 @@ describe('Idle at rest', () => {
 
         const control = screen.getByRole('button', {name: 'Choose a file or folder'})
         expect(control.className).toContain('fd-target')
-        expect(control.className).not.toContain('fd-button--primary')
+        // Inverted for Story 7.3, not deleted: this used to assert the
+        // opposite, encoding Paper Relay's rule that the selection control
+        // stays "quieter than the drop zone". Quartz deliberately reverses
+        // that -- the drop zone carries no click handler and no tab stop, so
+        // it is no longer a control at all, and the browse control is now
+        // the one action in Idle. DESIGN.md's Components table specifies it
+        // as the full-width primary button.
+        expect(control.className).toContain('fd-button--primary')
         expect(view.container.querySelectorAll('.fd-selection button')).toHaveLength(1)
     })
 
@@ -166,6 +173,92 @@ describe('Idle at rest', () => {
         expect(screen.queryByRole('textbox')).toBeNull()
         expect(screen.queryByRole('button', {name: 'Cancel'})).toBeNull()
         expect(document.querySelector('.fd-outcome')).toBeNull()
+    })
+})
+
+describe('the drop zone carries the concentric inner rule', () => {
+    it('wraps the instruction in an inner element, distinct from the outer card', () => {
+        show()
+
+        const zone = document.querySelector('.fd-drop-zone')!
+        const inner = zone.querySelector('.fd-drop-zone__inner')
+        expect(inner).toBeTruthy()
+        expect(inner?.contains(screen.getByRole('heading', {name: 'Drop one file or folder.'}))).toBe(true)
+        // Still no click handler and no tab stop on the outer card -- the
+        // inner wrapper does not reintroduce either.
+        expect(zone.getAttribute('tabindex')).toBeNull()
+    })
+})
+
+describe('the firewall preflight is a collapsed disclosure (Story 7.3, FR23 amendment)', () => {
+    it('renders as a <details> that is present but not open on first paint', () => {
+        show()
+
+        const preflight = document.querySelector('.fd-preflight')!
+        expect(preflight.tagName).toBe('DETAILS')
+        expect(preflight.hasAttribute('open')).toBe(false)
+        // Present on first paint, per FR23 amended to "present and preceding"
+        // rather than "expanded and preceding": the guidance text exists in
+        // the document even while the disclosure reads as closed.
+        expect(screen.getByText('Your first transfer may ask to allow FairDrop on this local network.')).toBeTruthy()
+    })
+
+    it('names the topic in a keyboard-operable summary', () => {
+        show()
+
+        const summary = document.querySelector('.fd-preflight > summary')!
+        expect(summary.textContent).toContain('Local network access')
+        // Native <summary> is a Tab stop and answers Enter/Space by itself --
+        // no keydown handler is wired here, which is the point.
+        expect(summary.tagName).toBe('SUMMARY')
+    })
+
+    it('precedes the browse control, same as the always-open preflight did', () => {
+        const {view} = show()
+
+        const order = [...view.container.querySelectorAll('.fd-preflight, .fd-selection')]
+        expect(order.map((el) => el.className.split(' ')[0])).toEqual(['fd-preflight', 'fd-selection'])
+    })
+})
+
+describe('recovery guidance is a second collapsed disclosure', () => {
+    it('renders as a <details>, closed by default, distinct from the preflight disclosure', () => {
+        show()
+
+        const help = document.querySelector('.fd-help')!
+        expect(help.tagName).toBe('DETAILS')
+        expect(help.hasAttribute('open')).toBe(false)
+        expect(document.querySelector('.fd-help > summary')?.textContent).toContain('Recovery help')
+    })
+
+    /*
+      Every string RecoveryHelpContent renders must still be rendered here --
+      an acceptance criterion names this explicitly. Each assertion below
+      fails, naming its own string, if that one line is dropped -- a single
+      combined assertion would not say which string went missing.
+    */
+    it.each([
+        ['the Windows recovery instruction', 'Open Windows Firewall settings and allow FairDrop on Private ' +
+            'networks only, then prepare the item again.'],
+        ['the macOS recovery instruction', 'Open System Settings → Network → Firewall → Options, allow ' +
+            'incoming connections for FairDrop, then prepare the item again.'],
+        ['the different-network guidance', 'Not downloading? Make sure both devices use the same local Wi-Fi. ' +
+            'Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item ' +
+            'again for a fresh link.'],
+        ['the receiver-error guidance', 'Browser says Not Found: the link may be wrong or expired. Locked: ' +
+            'another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for ' +
+            'a fresh link.'],
+    ])('still renders %s', (_label, text) => {
+        show()
+
+        expect(screen.getByText(text)).toBeTruthy()
+    })
+
+    it('labels the Windows and macOS recovery terms, in document order', () => {
+        show()
+
+        const terms = [...document.querySelectorAll('.fd-help dt')].map((node) => node.textContent)
+        expect(terms).toEqual(['Windows recovery', 'macOS recovery'])
     })
 })
 
@@ -293,6 +386,23 @@ describe('Idle with a command failure', () => {
 
         expect(document.querySelector('.fd-outcome')).toBeNull()
         expect(screen.queryByText('Transfer canceled.')).toBeNull()
+    })
+
+    it('renders the outcome panel between the drop zone and the preflight disclosure', () => {
+        const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
+        const {view} = show(idle({commandError: error}))
+
+        const order = [...view.container.querySelectorAll('.fd-drop-zone, .fd-outcome, .fd-preflight')]
+        expect(order.map((el) => el.className.split(' ')[0])).toEqual(['fd-drop-zone', 'fd-outcome', 'fd-preflight'])
+    })
+
+    it('keeps the command-error focus target unchanged', () => {
+        const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
+        show(idle({commandError: error}))
+
+        const target = document.querySelector('[data-focus-target="command-error"]')
+        expect(target).toBeTruthy()
+        expect(target?.getAttribute('tabindex')).toBe('-1')
     })
 })
 

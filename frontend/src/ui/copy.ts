@@ -120,6 +120,14 @@ export const copy = {
         /* The recovery block's own labels, which the spine writes out. */
         windowsRecovery: 'Windows recovery',
         macosRecovery: 'macOS recovery',
+        /**
+         * The second Idle disclosure's summary (Story 7.3). `RecoveryHelp`
+         * itself registers no heading of its own -- the disclosure that wraps
+         * it is what needs a name, the same way `firewallHeading` names the
+         * first one, so this is a structural label rather than approved body
+         * copy.
+         */
+        recoveryHeading: 'Recovery help',
         /** The approved item vocabulary: file, folder. */
         file: 'File',
         folder: 'Folder',
