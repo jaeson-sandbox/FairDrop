@@ -318,7 +318,14 @@ describe('the browse menu', () => {
 
         fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
 
-        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+        expect(document.activeElement).toBe(trigger)
+        // Story 7.10: this is the scripted return -- the marker style.css's
+        // `[data-focus-return]` rule keys off, kept alive because
+        // `:focus-visible` never matches a script-focused element on WebKit.
+        // See "the trigger keeps its ring after closeAndReturnFocus" below
+        // for the CSS-mutation proof of the consequence.
+        expect(trigger.getAttribute('data-focus-return')).toBe('')
     })
 
     it('closes on Escape, returns focus to the control, and announces nothing', () => {
@@ -328,13 +335,42 @@ describe('the browse menu', () => {
         fireEvent.keyDown(screen.getByRole('menu'), {key: 'Escape'})
 
         expect(screen.queryByRole('menu')).toBeNull()
-        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+        expect(document.activeElement).toBe(trigger)
+        expect(trigger.getAttribute('data-focus-return')).toBe('')
         // Not asserted here: that nothing was announced. IdleView renders no
         // live region in any state, so querying for one passes whatever the
         // menu does -- the announcer belongs to App, and the one-owner rule is
         // pinned there against the routing table. What this can honestly say
         // is that the menu raised no error surface of its own.
         expect(document.querySelector('[role="alert"]')).toBeNull()
+    })
+
+    it('never marks the trigger scripted-return for its own plain mouse-click toggle', () => {
+        // The trigger's onClick just flips `open` -- it never calls
+        // `closeAndReturnFocus`, so a mouse press on it must never carry the
+        // marker. If it did, `[data-focus-return]` would repaint the ring
+        // after every mouse click on the trigger, the exact stale-ring
+        // regression `:focus-visible` was introduced to fix in Epic 1 -- the
+        // scar the story text says this marker must not reintroduce.
+        show()
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+
+        fireEvent.click(trigger)
+
+        expect(trigger.getAttribute('data-focus-return')).toBeNull()
+    })
+
+    it('clears the trigger scripted-return marker on blur', () => {
+        show()
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'Escape'})
+        expect(trigger.getAttribute('data-focus-return')).toBe('')
+
+        fireEvent.blur(trigger)
+
+        expect(trigger.getAttribute('data-focus-return')).toBeNull()
     })
 
     it('closes quietly when focus leaves the menu on its own, without recapturing it', () => {

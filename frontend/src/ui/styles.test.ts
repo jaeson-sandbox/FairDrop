@@ -323,11 +323,24 @@ describe('reduced motion', () => {
 describe('the focus indicator', () => {
     it('draws one ring from the focus token for the two Tab-reachable controls', () => {
         expect(stylesheet).toMatch(
-            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible \{\s*/,
+            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\.fd-button\[data-focus-return\] \{\s*/,
         )
         expect(stylesheet).toContain('outline: var(--focus-ring-width) solid var(--color-focus);')
         expect(stylesheet).toContain('outline-offset: var(--focus-ring-offset);')
         expect(stylesheet).toContain('--focus-ring-width: 3px;')
+    })
+
+    it('rings the browse trigger on its scripted-return marker (Story 7.10), alongside :focus-visible rather than replacing it', () => {
+        // `BrowseControl` sets `[data-focus-return]` only on the two returns
+        // it makes itself (Escape, or an item chosen by keyboard) and clears
+        // it on blur -- see `frontend/src/ui/IdleView.tsx`. This CANNOT
+        // become a bare `.fd-button:focus` rule: the trigger sits in the
+        // ordinary tab order and a mouse click focuses it too, so a plain
+        // `:focus` rule would repaint the ring after every click on it --
+        // the stale-ring regression `:focus-visible` exists to prevent.
+        const ring = block('.fd-button:focus-visible,')
+        expect(ring).toContain('[data-focus-return]')
+        expect(ring).not.toMatch(/\.fd-button:focus\b(?!-visible)/)
     })
 
     it('never rings a routed landing target, even when focus on it is visible', () => {
@@ -804,15 +817,46 @@ describe('the browse menu surface (Story 7.2)', () => {
         expect(items).toContain('border-radius: var(--radius-sm);')
     })
 
-    it('distinguishes the focused item by primary fill and a tint halo, not the ring alone', () => {
-        const focused = block('.fd-browse-menu .fd-button:focus-visible {')
+    it('distinguishes the focused item by primary fill, a tint halo, and its own ring -- keyed to :focus (Story 7.10)', () => {
+        const focused = block('.fd-browse-menu .fd-button:focus {')
         expect(focused).toContain('background: var(--color-primary);')
         expect(focused).toMatch(/box-shadow:\s*0 0 0 4px var\(--color-primary-tint\);/)
+        // The ring is drawn here too, not only inherited from the shared
+        // `.fd-button:focus-visible` rule: that rule never matches these
+        // items on WebKit (see the mechanism test below), so the outline has
+        // to live in this rule for macOS to paint one at all.
+        expect(focused).toContain('outline: var(--focus-ring-width) solid var(--color-focus);')
+        expect(focused).toContain('outline-offset: var(--focus-ring-offset);')
+    })
 
-        // The shared ring rule still applies to these items -- they are plain
-        // .fd-button elements -- so the fill and halo above sit alongside it
-        // rather than replacing it.
-        expect(stylesheet).toMatch(/\.fd-button:focus-visible,\s*\.fd-url:focus-visible \{/)
+    it('keys the menu item focus rule to :focus, never :focus-visible, because WebKit never matches :focus-visible on a script-focused element', () => {
+        /*
+          Mechanism pin for Story 7.10. `BrowseControl`'s menu items carry
+          `tabIndex={-1}` (roving tabindex), so they are only ever focused by
+          `element.focus()` -- the open effect, and the arrow-key handler --
+          never by a real Tab keypress. Confirmed directly against a real
+          engine: a `tabindex="-1"` button given `.focus()` from a keydown
+          handler matches `:focus-visible` in Chromium but never in WebKit
+          (Playwright's bundled build; see
+          `_bmad-output/implementation-artifacts/evidence-7-10-make-focus-visible.md`
+          for the probe). A `:focus-visible`-keyed rule here is therefore dead
+          on macOS specifically: the browse menu opens and Arrow keys move
+          between items with **no visible focus indication at all** on the
+          shipped app, even though every suite proving Chromium stays green.
+          If this assertion starts failing, whoever changed the rule back to
+          `:focus-visible` has just reintroduced that macOS defect.
+        */
+        expect(stylesheet).toContain('.fd-browse-menu .fd-button:focus {')
+        expect(stylesheet).not.toContain('.fd-browse-menu .fd-button:focus-visible {')
+    })
+
+    it('leaves the shared ring rule scoped to the ordinary controls, not folded in with the menu items', () => {
+        // The shared rule still exists for the trigger, the URL field, and
+        // every other plain .fd-button -- it is simply no longer what paints
+        // the browse menu items' ring (the test above pins that split).
+        expect(stylesheet).toMatch(
+            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\.fd-button\[data-focus-return\] \{/,
+        )
     })
 })
 

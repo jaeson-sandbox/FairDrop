@@ -212,6 +212,19 @@ interface BrowseControlProps {
  */
 function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     const [open, setOpen] = useState(false)
+    // Story 7.10: WebKit does not match `:focus-visible` for an element
+    // focused by script (see the CSS comment above `.fd-button:focus-visible,
+    // .fd-url:focus-visible` in style.css), so `closeAndReturnFocus` handing
+    // focus back to the trigger paints no ring at all on macOS. This flag is
+    // the marker `[data-focus-return]` keys off of: set on the two moves this
+    // component makes itself (Escape, or an item chosen by keyboard), cleared
+    // the moment focus leaves the trigger for any reason. It deliberately
+    // does not cover the plain mouse-click toggle below (`onClick`), which
+    // never touches it -- a bare `:focus` rule on the trigger would repaint
+    // the ring after that click, the regression `:focus-visible` exists to
+    // prevent, so the trigger stays on `:focus-visible` for every focus path
+    // except this one script-driven return.
+    const [triggerFocusReturned, setTriggerFocusReturned] = useState(false)
     const triggerRef = useRef<HTMLButtonElement | null>(null)
     const menuRef = useRef<HTMLDivElement | null>(null)
     const firstItemRef = useRef<HTMLButtonElement | null>(null)
@@ -244,6 +257,10 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     function closeAndReturnFocus(): void {
         setOpen(false)
         triggerRef.current?.focus()
+        // The scripted return this component makes itself, distinct from the
+        // trigger's plain mouse-click toggle -- see the flag's declaration
+        // above and the CSS `[data-focus-return]` rule it feeds.
+        setTriggerFocusReturned(true)
     }
 
     function choose(action: () => void): void {
@@ -361,8 +378,15 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                 // id, and pointing at one that is not rendered is a dangling
                 // reference for anything that resolves it.
                 aria-controls={open ? menuId : undefined}
+                // Present only while a script-driven return is the reason
+                // this element is focused; cleared the instant focus leaves
+                // it for any reason, so a later Tab or click starts clean.
+                // See the flag's declaration above and the CSS rule in
+                // style.css that keys off this attribute.
+                data-focus-return={triggerFocusReturned ? '' : undefined}
                 onClick={() => setOpen((was) => !was)}
                 onKeyDown={handleTriggerKeyDown}
+                onBlur={() => setTriggerFocusReturned(false)}
             >
                 {copy.label.chooseFileOrFolder}
                 {/* Decorative only: aria-haspopup already tells assistive

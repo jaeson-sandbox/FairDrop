@@ -497,9 +497,26 @@ body {
 
   The routed landing targets below (`[data-focus-target]`) are deliberately not
   in this rule any more -- see the comment there.
+
+  Story 7.10 adds `[data-focus-return]` alongside `:focus-visible`, never in
+  place of it. It is the browse control trigger's own case: `BrowseControl`
+  sets this attribute only on the two moves it makes itself --
+  `closeAndReturnFocus`, called from Escape and from choosing an item -- and
+  clears it on blur (`frontend/src/ui/IdleView.tsx`). WebKit does not match
+  `:focus-visible` for a script-focused element (see the browse-menu-item
+  rule below for the full explanation), so without this the trigger would go
+  dark exactly when `closeAndReturnFocus` hands it focus back on macOS. The
+  trigger cannot simply switch to a bare `:focus` rule the way the menu items
+  do: it sits in the ordinary tab order and a pointer press focuses it too
+  (mousedown fires before click), so a plain `:focus` rule would repaint the
+  ring after every mouse click on it -- the exact "ring stays painted after a
+  mouse click" regression `:focus-visible` was introduced to fix in Epic 1.
+  The attribute is the narrower substitute: it fires only for the two
+  script-driven returns, never for a pointer press.
 */
 .fd-button:focus-visible,
-.fd-url:focus-visible {
+.fd-url:focus-visible,
+.fd-button[data-focus-return] {
     outline: var(--focus-ring-width) solid var(--color-focus);
     outline-offset: var(--focus-ring-offset);
 }
@@ -831,14 +848,43 @@ body {
 }
 
 /*
-  The focused item is distinguished by the primary fill plus a tint halo, not
-  by the shared focus ring alone -- DESIGN.md's Browse Menu row, restated
-  because the ring by itself repeats the same cue every other Tab-reachable
-  control already carries. The ring stays too, painted by the shared
-  `.fd-button:focus-visible` rule above; this adds the fill and the halo on
-  top of it rather than instead of it.
+  Story 7.10: keyed to `:focus`, not `:focus-visible` -- deliberately, and
+  only for these elements.
+
+  Menu items carry `tabIndex={-1}` by design (roving tabindex: the menu is
+  one tab stop, arrows move within it -- see `BrowseControl` in
+  `frontend/src/ui/IdleView.tsx`), so they are *only ever* focused
+  programmatically: by the open effect when the menu appears, and by the
+  arrow-key handler while it is open. WebKit's `:focus-visible` heuristic
+  does not match an element focused by script (confirmed against Playwright's
+  WebKit build: a `tabindex="-1"` element given `.focus()` from a keydown
+  handler never matches `:focus-visible` there, where Chromium's does) --
+  so on macOS every rule keyed to `:focus-visible` was dead for these
+  buttons, and the menu opened with no visible focus at all: no fill, no
+  halo, no ring, confirmed on the shipped app. `:focus` fires regardless of
+  input-modality heuristics, so it is unconditionally correct here.
+
+  This is safe for exactly these elements, not a general license to swap
+  `:focus-visible` for `:focus` elsewhere: a menu item is reachable only from
+  an open menu, never a bare Tab stop, and a pointer press on one activates
+  it and immediately closes the menu (see `choose` in `BrowseControl`), so
+  the "ring stays painted after a mouse click" problem `:focus-visible`
+  exists to solve cannot arise here -- there is no closed, still-focused
+  state left behind to look stale in. Do not revert this to
+  `:focus-visible`: styles.test.ts's mutation for this rule fails naming the
+  WebKit consequence, precisely so the next edit here does not re-break it.
+
+  The ring itself has to live here too, not only the fill and the halo,
+  because the shared `.fd-button:focus-visible` rule above is exactly the
+  dead rule this comment describes for these buttons on macOS -- it still
+  applies to every other `.fd-button` (the trigger, the retry/copy/cancel
+  controls), where a real Tab always precedes their focus, so it stays put
+  there. DESIGN.md's Browse Menu row asks for fill and halo distinct from
+  the ring alone; this rule now supplies all three together.
 */
-.fd-browse-menu .fd-button:focus-visible {
+.fd-browse-menu .fd-button:focus {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
     background: var(--color-primary);
     border-color: var(--color-primary);
     color: var(--color-primary-ink);
