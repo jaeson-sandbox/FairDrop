@@ -25,7 +25,9 @@ as historical narrative and apply all corrections and supersessions before using
   `NetworkManager`, `Streamer`, `TransferServer`, or `TransferStats` contracts.
 - `frontend/src/App.tsx` owns drop, focus, and announcement routing;
   `frontend/src/transfer` owns validation and session state; `frontend/src/ui`
-  owns the Paper Relay views and accessibility behavior.
+  owns the Quartz views and accessibility behavior (Paper Relay / Terracotta
+  Linen was retired by Epic 7; the spine is
+  `_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-quartz-2026-09-20/`).
 - Current story specs, sprint state, retrospectives, and routed findings live in
   `_bmad-output/implementation-artifacts/`.
 
@@ -187,16 +189,27 @@ supported no-follow queries; preserve content-read separation and identity check
 
 ## Subagent model budget
 
-- Owner instruction (2026-09-20): always delegate story implementation to a
-  `gpt-5.6-sol` subagent. Keep the main session as orchestrator for review,
+- **Owner instruction (2026-09-20, current): delegate story implementation to
+  `sonnet` subagents.** Keep the main session as orchestrator for review,
   verification, integration and release coordination. Do not repeatedly request
-  approval for work already authorized; raise only material scope changes or blockers.
+  approval for work already authorized; raise only material scope changes or
+  blockers.
 
-- Owner preference (2026-09-12): use `gpt-5.6-sol` for implementation subagents
-  and `gpt-5.6-luna` for smaller bounded tasks. Keep review and integration with
-  the main agent; when a BMAD workflow requires independent review subagents,
-  use Sol or Luna for those too. Do not inherit the main agent's more expensive
-  model by default.
+- Superseded, kept for the record: an earlier 2026-09-20 instruction named
+  `gpt-5.6-sol` for story implementation, and a 2026-09-12 preference paired
+  `gpt-5.6-sol` with `gpt-5.6-luna` for smaller bounded tasks. **Do not follow
+  either.** They are listed only because three Epic 7 subagents in a row read
+  the stale text, noticed it contradicted their actual assignment, and spent
+  part of their run reasoning about it -- one concluded the file was not a
+  valid instruction source at all. It is: standing repo guidance is
+  authoritative. It was simply out of date, which is a different failure and
+  has a different fix, namely this edit.
+
+- The general rule this incident illustrates: repo instruction files are
+  authoritative but supersedable. A more recent instruction from the owner
+  wins over a written one, and whoever receives that instruction is
+  responsible for chasing it into this file -- otherwise every future agent
+  re-litigates it.
 
 ## Git workflow
 
