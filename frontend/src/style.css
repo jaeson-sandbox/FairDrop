@@ -23,6 +23,16 @@
     --color-control-border: #86868B;
     --color-primary: #0A6CD8;
     --color-primary-hi: #2B86EE;
+    /*
+      The hover fill, distinct from --color-primary-hi above (owner review,
+      Story 7.7 follow-up). One token cannot do both jobs: the gradient's top
+      stop and the hover fill want opposite directions -- light mode darkens
+      on hover, dark mode lightens -- and #2B86EE, lighter than
+      --color-primary, put white-on-hover at 3.654:1, under the 4.5:1 text
+      floor. #0959B4 clears it at 6.775:1 and also holds as a boundary
+      against canvas at 6.060:1.
+    */
+    --color-primary-hover: #0959B4;
     --color-primary-ink: #FFFFFF;
     --color-primary-tint: #E6EFFB;
     --color-track: #E9E9EB;
@@ -161,12 +171,23 @@
         /*
           Narrowed (Story 7.7) from #6FB0FF to half its original delta above
           --color-primary: the gradient read hot on the dark canvas.
-          primary-hi feeds only this button's gradient and hover fill, never a
-          pair the unrounded contrast proof publishes a figure for, so this is
-          the one token in the palette that can move without re-deriving
-          anything in DESIGN.md's contrast tables.
+          primary-hi feeds only this button's gradient top stop now (see
+          primary-hover below for the hover fill), never a pair the unrounded
+          contrast proof publishes a figure for, so this is a token that can
+          move without re-deriving anything in DESIGN.md's contrast tables.
         */
         --color-primary-hi: #5EA6FF;
+        /*
+          The hover fill (owner review, Story 7.7 follow-up): dark mode
+          lightens on hover, the opposite direction from light mode's
+          --color-primary-hover above, so this is a distinct value rather
+          than a re-derivation of one rule. #5EA6FF -- the same figure
+          primary-hi was narrowed to above -- already clears the ink pair at
+          6.511:1, so it is reused here as a literal rather than introducing
+          a fourth blue; the two tokens still mean different things and
+          either can move independently.
+        */
+        --color-primary-hover: #5EA6FF;
         --color-primary-ink: #06203F;
         --color-primary-tint: #23303F;
         --color-track: #3A3A3E;
@@ -395,9 +416,20 @@ body {
     color: var(--color-primary-ink);
 }
 
+/*
+  Owner review, Story 7.7 follow-up: this used to read --color-primary-hi,
+  the gradient's top stop, which is a lighter value in both modes -- correct
+  for dark mode's hover direction, wrong for light's. In light mode that put
+  --color-primary-ink on --color-primary-hi at 3.654:1, under the 4.5:1 text
+  floor the contrast proof never caught because it only measured the resting
+  primary-ink/primary pair. --color-primary-hover is
+  direction-correct in both modes -- darkens in light, lightens in dark --
+  and is never read by the gradient, so the two jobs no longer share one
+  token.
+*/
 .fd-button--primary:hover {
-    background: var(--color-primary-hi);
-    border-color: var(--color-primary-hi);
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
 
 /*
@@ -1372,6 +1404,7 @@ body {
         --color-control-border: CanvasText;
         --color-primary: Highlight;
         --color-primary-hi: Highlight;
+        --color-primary-hover: Highlight;
         --color-primary-ink: HighlightText;
         --color-primary-tint: Canvas;
         --color-track: Canvas;

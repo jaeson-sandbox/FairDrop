@@ -22,6 +22,7 @@ colors:
   control-border: '#86868B'
   primary: '#0A6CD8'
   primary-hi: '#2B86EE'
+  primary-hover: '#0959B4'
   primary-ink: '#FFFFFF'
   primary-tint: '#E6EFFB'
   track: '#E9E9EB'
@@ -43,6 +44,7 @@ colors:
   control-border-dark: '#7A7A82'
   primary-dark: '#4C9BFF'
   primary-hi-dark: '#5EA6FF'
+  primary-hover-dark: '#5EA6FF'
   primary-ink-dark: '#06203F'
   primary-tint-dark: '#23303F'
   track-dark: '#3A3A3E'
@@ -150,7 +152,7 @@ the frontmatter in ordinary colour modes.
 | Text | `{colors.text}` / `{colors.text-dark}`; `{colors.muted}` / `{colors.muted-dark}` | Muted is readable secondary copy, never disabled text. |
 | Decorative edge | `{colors.separator}` / `{colors.separator-dark}` | Dividers inside a surface, and nothing else. Never the sole boundary for a control, drop target, QR, progress track, or status. It deliberately does **not** meet 3:1 — it is not a boundary, it is a rule between paragraphs. |
 | Functional boundary | `{colors.control-border}` / `{colors.control-border-dark}` | Required on controls, the rest-state drop target, the QR frame, the URL field, and the progress-track outline. These values were chosen as the lightest greys that still clear 3:1 against every surface they touch. |
-| Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, and `{colors.primary-hi}` / `{colors.primary-hi-dark}` as the gradient's top stop | The single strongest action, the (solid) progress fill, and the item-kind pill. Never status decoration. |
+| Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, `{colors.primary-hi}` / `{colors.primary-hi-dark}` as the gradient's top stop, and `{colors.primary-hover}` / `{colors.primary-hover-dark}` as the hover fill | The single strongest action, the (solid) progress fill, and the item-kind pill. Never status decoration. **The hover fill is a separate token from the gradient's top stop, and the two move in opposite directions: light darkens on hover, dark lightens.** A single shared lighter value once put light mode's hover label under the 4.5:1 text floor — see the hover-pair row below. |
 | Focus | `{colors.focus}` / `{colors.focus-dark}` | A 3px outline at 2px offset. Scoped to keyboard-operable controls only — see the amendment carried forward below. |
 | Outcomes | Success, warning, error, each with a tint | Always pair colour with outline, glyph, or literal text. |
 | QR | `{colors.qr-surface}` / `{colors.qr-ink}` in both modes | Fixed high-contrast substrate; never recolour, invert, texture, rotate, round modules, or overlay a logo. Unchanged from Paper Relay and non-negotiable — it is a scan-reliability constraint, not a style choice. |
@@ -180,6 +182,18 @@ at **17.377657264**.
 | `muted` on `elevated` | 5.789717726 | 5.459307165 |
 | `error` on `elevated` | 5.518575206 | 5.859450762 |
 | `primary-ink` on `primary` | 5.060845348 | 5.784694439 |
+| `primary-ink` on `primary-hover` | 6.775014643 | 6.511362855 |
+
+**The hover row above is a review finding, added after ship.** An interactive
+state's own fill is a text background like any other, and belongs in this
+table -- the resting `primary-ink`/`primary` pair does not stand in for it.
+Before this row existed, `.fd-button--primary:hover` read `{colors.primary-hi}`
+-- the gradient's top stop, correct for dark mode's lighten-on-hover direction
+but wrong for light's -- and put `primary-ink` on `#2B86EE` at 3.654:1 in light
+mode, under the 4.5:1 floor, unmeasured because no published pair covered it.
+`{colors.primary-hover}` is the fix: a token dedicated to the hover fill,
+independent of the gradient stop, so the two responsibilities cannot collide
+again.
 
 Status text placed on its own panel (`.fd-button--quiet`'s muted/error on
 elevated is the row above; `warning`/`success`/`error` on `surface` is what the

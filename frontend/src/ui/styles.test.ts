@@ -91,6 +91,10 @@ describe('the Quartz token layer', () => {
             'control-border': '#86868B',
             primary: '#0A6CD8',
             'primary-hi': '#2B86EE',
+            // Owner review, Story 7.7 follow-up: the dedicated hover-fill
+            // token. Darkens on hover in light mode -- the opposite
+            // direction from primary-hi's lighter gradient top stop.
+            'primary-hover': '#0959B4',
             'primary-ink': '#FFFFFF',
             'primary-tint': '#E6EFFB',
             track: '#E9E9EB',
@@ -124,11 +128,20 @@ describe('the Quartz token layer', () => {
             primary: '#4C9BFF',
             // Narrowed (Story 7.7) from #6FB0FF to half its original delta
             // above --color-primary: the gradient read hot on the dark
-            // canvas. primary-hi feeds only the button's gradient and hover
-            // fill, never one of the `placed` pairs the unrounded contrast
-            // proof below checks, so this is the one token that can move
-            // without re-deriving any published figure.
+            // canvas. primary-hi now feeds only the button's gradient top
+            // stop (primary-hover, below, is the dedicated hover-fill token
+            // added by the owner-review follow-up), and it is still never
+            // one of the `placed` pairs the unrounded contrast proof below
+            // checks, so it remains a token that can move without
+            // re-deriving any published figure.
             'primary-hi': '#5EA6FF',
+            // Owner review, Story 7.7 follow-up: the dedicated hover-fill
+            // token, distinct from primary-hi above. Dark mode lightens on
+            // hover, the same direction primary-hi already moved in, so this
+            // repo reuses that figure here as a literal -- see the CSS
+            // comment beside the real declaration for why that is not the
+            // same thing as reusing the token.
+            'primary-hover': '#5EA6FF',
             'primary-ink': '#06203F',
             'primary-tint': '#23303F',
             track: '#3A3A3E',
@@ -249,6 +262,7 @@ describe('forced colors', () => {
             'control-border': 'CanvasText',
             primary: 'Highlight',
             'primary-hi': 'Highlight',
+            'primary-hover': 'Highlight',
             'primary-ink': 'HighlightText',
             'primary-tint': 'Canvas',
             track: 'Canvas',
@@ -945,6 +959,13 @@ describe('the unrounded contrast proof', () => {
         ['muted', 'elevated', 4.5, true],
         ['error', 'elevated', 4.5, true],
         ['primary-ink', 'primary', 4.5, true],
+        // Owner review, Story 7.7 follow-up: the hover fill is its own text
+        // background, not a stand-in covered by the resting primary-ink/
+        // primary row above. Its absence here is exactly what let
+        // .fd-button--primary:hover read --color-primary-hi (the gradient's
+        // lighter top stop, wrong direction for light mode) and land at
+        // 3.654:1 in light mode, unmeasured, under the 4.5:1 floor.
+        ['primary-ink', 'primary-hover', 4.5, true],
         // Status text on its own panel: published as a floor, checked below.
         ['warning', 'surface', 4.5, false],
         ['success', 'surface', 4.5, false],
@@ -974,6 +995,53 @@ describe('the unrounded contrast proof', () => {
 
         expect(contrast(lightTokens[foreground], lightTokens[background])).toBeGreaterThan(minimum)
         expect(contrast(darkTokens[foreground], darkTokens[background])).toBeGreaterThan(minimum)
+    })
+
+    it('gives the hover fill its own direction-correct token, distinct from the gradient top stop', () => {
+        // Owner review, Story 7.7 follow-up. Resolves whichever --color-*
+        // var() the hover rule actually reads, then recomputes its own
+        // contrast against primary-ink -- rather than only string-matching
+        // the token name -- so a regression is reported as a failed ratio
+        // for that pair, not just a text mismatch.
+        const hover = block('.fd-button--primary:hover {')
+        const hoverVar = hover.match(/background:\s*var\((--color-[a-z-]+)\);/)?.[1]
+        expect(hoverVar, 'the var() the hover background reads').toBeTruthy()
+        const hoverRole = hoverVar!.replace('--color-', '')
+
+        expect(hover).toContain(`border-color: var(--color-${hoverRole});`)
+        expect(lightTokens[hoverRole], hoverRole).toBeTruthy()
+        expect(darkTokens[hoverRole], hoverRole).toBeTruthy()
+
+        // Mutation 1 (owner review, the current-at-time-of-review bug):
+        // point the hover at --color-primary-hi again -> hoverRole resolves
+        // to 'primary-hi' and its light-mode ratio (3.654...) fails this
+        // floor by name, not merely by a token-string mismatch.
+        expect(
+            contrast(lightTokens['primary-ink'], lightTokens[hoverRole]),
+            `primary-ink on ${hoverRole} (light)`,
+        ).toBeGreaterThan(4.5)
+        expect(
+            contrast(darkTokens['primary-ink'], darkTokens[hoverRole]),
+            `primary-ink on ${hoverRole} (dark)`,
+        ).toBeGreaterThan(4.5)
+
+        // The resolved token must actually be the dedicated one, not merely
+        // one that happens to clear the floor.
+        expect(hoverRole).toBe('primary-hover')
+
+        // Mutation 2: swap the light hover for a value lighter than
+        // --color-primary -> caught on luminance direction, not a hex
+        // compare, so any lighter replacement is caught, not only the one
+        // hex this repo happened to pick. Dark mode is checked the opposite
+        // direction: it is supposed to lighten on hover.
+        expect(luminance(lightTokens['primary-hover'])).toBeLessThan(luminance(lightTokens['primary']))
+        expect(luminance(darkTokens['primary-hover'])).toBeGreaterThan(luminance(darkTokens['primary']))
+
+        // The gradient's own top stop keeps lightening in both modes --
+        // unaffected by the hover fix, still the value the single-gradient
+        // assertion elsewhere in this file pins.
+        expect(luminance(lightTokens['primary-hi'])).toBeGreaterThan(luminance(lightTokens['primary']))
+        expect(luminance(darkTokens['primary-hi'])).toBeGreaterThan(luminance(darkTokens['primary']))
     })
 
     it('keeps the fixed QR substrate at its published ratio in both modes', () => {
