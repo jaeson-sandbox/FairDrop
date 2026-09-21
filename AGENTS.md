@@ -78,6 +78,16 @@ as historical narrative and apply all corrections and supersessions before using
   does nothing on POSIX, so an unsafe archive entry name was refused from a Windows sender and
   accepted from a macOS one, while the risk was receiver-side. Prefer a check whose behaviour does
   not depend on the host when the consequence does not either.
+- `verify.yml` sets `cancel-in-progress: true` on a per-ref concurrency group, so **every
+  push cancels the branch's in-flight run**. During rapid iteration the newest *completed*
+  run is often several commits behind the tip, and `verify (windows-latest)` -- the slowest
+  job -- is the one most often cancelled part-way. "This branch has a green run" can
+  therefore be true while the tip has never been built on Windows at all. Before citing CI
+  as release evidence, read the conclusion of the run whose `headSha` **is** the tip, job by
+  job, and if the Windows job says `cancelled` then Windows is unproven: push nothing and
+  let a run finish, or re-run it. A cancelled job is not a passed job, and it is not a
+  failure either -- it is an absence, which is the easiest of the three to misread as
+  success.
 - `gh run watch --exit-status` exited **0** on a run whose macOS job failed, after
   printing the failure. Never take a watch's exit code as the verdict: read the
   conclusion with `gh run view <id> --json conclusion,jobs`.
