@@ -1764,7 +1764,7 @@ So that the moments I actually watch are the ones that feel finished.
 
 **Acceptance Criteria:**
 
-- Given a determinate transfer, then the percentage renders in `{typography.numeric}` with tabular numerals, wire bytes first and throughput second beside it, above an 8px `{rounded.full}` track with a functional boundary and a gradient fill.
+- Given a determinate transfer, then the percentage renders in `{typography.numeric}` with tabular numerals, wire bytes first and throughput second beside it, above an 8px `{rounded.full}` track with a functional boundary and a **solid** `{colors.primary}` fill -- not a gradient. The single-gradient rule is absolute and the primary button already spends it; this criterion said "gradient fill" until Story 7.5 flagged it against DESIGN.md, which says solid in two places and is enforced by the gradient-count assertion Story 7.1 added.
 - Given an unknown total or a known-empty file, then the existing presentations are preserved exactly: a static unknown pattern with no sweep, shimmer or blink, and a decorative known-empty track. No fake ZIP or empty-file percentage.
 - Given a Done outcome, then the panel renders the success disc with a stroke-drawn check, the display heading, the body, the **two-cell** receipt from Story 7.4's retained state, a primary next action, and Dismiss where the caller supplies it. Every outcome still carries a control, including a live one (D-059).
 - Given `prefers-reduced-motion: reduce`, then the check is **fully drawn and not animated**. *Mutation:* leave it at `stroke-dashoffset: 32` under reduced motion -> must fail, because the check is a state cue and removing it removes meaning.
