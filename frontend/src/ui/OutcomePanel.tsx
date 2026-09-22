@@ -1,6 +1,9 @@
+import {useEffect, useState} from 'react'
 import type {OutcomePresentation} from '../transfer/selectors'
+import type {CompletionReceipt as CompletionReceiptData} from '../transfer/types'
 import type {FocusTarget} from './announce'
 import {copy, errorHeadings, errorMessages} from './copy'
+import {formatBytes} from './format'
 
 interface OutcomePanelProps {
     readonly outcome: OutcomePresentation
@@ -51,6 +54,14 @@ interface OutcomePanelProps {
  * arrived left the window with no way forward at all, and the coordinator
  * drops an event it cannot deliver (D-059). The caller decides what the
  * control does; this only guarantees one is offered whenever it is given.
+ *
+ * DESIGN.md's Done/Error rows both describe "the primary next action and a
+ * quiet Dismiss", but only one handler ever reaches this component
+ * (`onDismiss`): a live terminal outcome has nothing else on screen to be a
+ * next action, and a retained one already sits above Idle's own browse
+ * control, which *is* the next action. So the single control this panel owns
+ * plays both parts -- primary weight, same label, when it is the only way
+ * forward; quiet weight, "Dismiss", once Idle's control exists beneath it.
  */
 export function OutcomePanel({
     outcome,
@@ -76,18 +87,98 @@ export function OutcomePanel({
             aria-labelledby={headingId}
             tabIndex={-1}
         >
-            <span className="fd-outcome__icon" aria-hidden="true">{done ? '✓' : '!'}</span>
+            <OutcomeIcon done={done}/>
             <Heading className="fd-state-heading" id={headingId}>
                 {done ? copy.done.heading : errorHeadings[outcome.error.code]}
             </Heading>
             <p className="fd-outcome__body">
                 {done ? copy.done.body : errorMessages[outcome.error.code]}
             </p>
+            {done ? <CompletionReceipt receipt={outcome.receipt}/> : null}
             {onDismiss === undefined ? null : (
-                <button type="button" className="fd-button fd-target" onClick={onDismiss}>
+                <button
+                    type="button"
+                    className={
+                        outcome.retained
+                            ? 'fd-button fd-button--quiet fd-target'
+                            : 'fd-button fd-button--primary fd-target'
+                    }
+                    onClick={onDismiss}
+                >
                     {copy.outcome.dismiss}
                 </button>
             )}
         </section>
+    )
+}
+
+/**
+ * The Done/Error glyph, painted inside a 74px tinted disc.
+ *
+ * The check is a stroke-drawn path, not a text glyph: `pathLength={32}`
+ * normalizes the path's own length to exactly 32 units regardless of its
+ * geometry, so `stroke-dasharray: 32` / `stroke-dashoffset: 32` in style.css
+ * always describes "fully hidden" and `stroke-dashoffset: 0` always describes
+ * "fully drawn", independent of the coordinates chosen here.
+ *
+ * The draw is a CSS *transition*, never `@keyframes`/`animation` --
+ * `styles.test.ts` refuses either anywhere in the sheet -- triggered by adding
+ * a class once after mount. That happens unconditionally, on every mount,
+ * regardless of `prefers-reduced-motion`: gating it on a reduced-motion check
+ * would leave the class never added and the check permanently undrawn, which
+ * is exactly the meaning-carrying state `prefers-reduced-motion` is not
+ * allowed to remove. What reduced motion changes instead is speed, through
+ * the sheet's existing universal `transition-duration: 1ms !important` rule --
+ * the same seam every other transition in the product already relies on.
+ */
+function OutcomeIcon({done}: {readonly done: boolean}) {
+    const [drawn, setDrawn] = useState(false)
+
+    useEffect(() => {
+        if (!done) return
+        setDrawn(true)
+    }, [done])
+
+    return (
+        <span
+            className={`fd-outcome__icon ${done ? 'fd-outcome__icon--done' : 'fd-outcome__icon--error'}`}
+            aria-hidden="true"
+        >
+            {done ? (
+                <svg
+                    className={`fd-outcome__check${drawn ? ' fd-outcome__check--drawn' : ''}`}
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                >
+                    <path className="fd-outcome__check-path" d="M5 12.5l4.3 4.3L19 7.5" pathLength={32}/>
+                </svg>
+            ) : '!'}
+        </span>
+    )
+}
+
+/**
+ * Two cells, not three. DESIGN.md's Completion Receipt row is explicit: the
+ * item name and the wire bytes actually sent, and nothing else -- there is no
+ * elapsed-time cell because no clock is tracked anywhere in the frontend and
+ * EXPERIENCE.md forbids a frontend lifecycle timer. Both figures come from
+ * `CompletionReceipt`, Story 7.4's retained state, never from `FileMetadata`:
+ * `receipt.bytesSent` is the wire count the terminal `ProgressSnapshot`
+ * reported, and it must never be read as `metadata.size` here or anywhere
+ * else that could re-derive it.
+ */
+function CompletionReceipt({receipt}: {readonly receipt: CompletionReceiptData}) {
+    return (
+        <dl className="fd-receipt">
+            <div className="fd-receipt__cell">
+                <dt className="fd-receipt__caption">{receipt.isDir ? copy.label.folder : copy.label.file}</dt>
+                <dd className="fd-receipt__value"><bdi dir="auto">{receipt.name}</bdi></dd>
+            </div>
+            <div className="fd-receipt__cell">
+                <dt className="fd-receipt__caption">{copy.label.wireBytes}</dt>
+                <dd className="fd-receipt__value">{formatBytes(receipt.bytesSent)}</dd>
+            </div>
+        </dl>
     )
 }

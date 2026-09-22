@@ -13,6 +13,8 @@ function idle(overrides: Partial<IdleTransferState> = {}): IdleTransferState {
     return {phase: 'idle', retainedOutcome: null, commandError: null, ...overrides}
 }
 
+const doneReceipt = {name: 'report.pdf', isDir: false, bytesSent: 100}
+
 function show(
     state: IdleTransferState = idle(),
     handlers: Record<string, () => void> = {},
@@ -85,14 +87,14 @@ describe('the drop target is only a drop target', () => {
 })
 
 describe('Idle at rest', () => {
-    it('leads with the drop target, keeps the preflight ahead of the browse controls, and closes with recovery', () => {
+    it('leads with the drop target, puts the browse control ahead of both disclosures, and closes with recovery (Story 7.8)', () => {
         const {view} = show()
 
         const regions = [...view.container.querySelectorAll(
             '.fd-preflight, .fd-drop-zone, .fd-selection, .fd-help',
         )]
         expect(regions.map((element) => element.className.split(' ')[0]))
-            .toEqual(['fd-drop-zone', 'fd-preflight', 'fd-selection', 'fd-help'])
+            .toEqual(['fd-drop-zone', 'fd-selection', 'fd-preflight', 'fd-help'])
     })
 
     it('opens the outline on the h1, not on the preflight or a command failure', () => {
@@ -152,7 +154,14 @@ describe('Idle at rest', () => {
 
         const control = screen.getByRole('button', {name: 'Choose a file or folder'})
         expect(control.className).toContain('fd-target')
-        expect(control.className).not.toContain('fd-button--primary')
+        // Inverted for Story 7.3, not deleted: this used to assert the
+        // opposite, encoding Paper Relay's rule that the selection control
+        // stays "quieter than the drop zone". Quartz deliberately reverses
+        // that -- the drop zone carries no click handler and no tab stop, so
+        // it is no longer a control at all, and the browse control is now
+        // the one action in Idle. DESIGN.md's Components table specifies it
+        // as the full-width primary button.
+        expect(control.className).toContain('fd-button--primary')
         expect(view.container.querySelectorAll('.fd-selection button')).toHaveLength(1)
     })
 
@@ -164,6 +173,148 @@ describe('Idle at rest', () => {
         expect(screen.queryByRole('textbox')).toBeNull()
         expect(screen.queryByRole('button', {name: 'Cancel'})).toBeNull()
         expect(document.querySelector('.fd-outcome')).toBeNull()
+    })
+})
+
+describe('the browse trigger chevron matches the disclosure chevron family (defect fix)', () => {
+    // Owner-observed defect: the trigger's chevron looked "tiny and thin"
+    // next to the disclosure chevrons. Cause: the disclosure marker is the
+    // shared CSS border-chevron mechanism (`.fd-disclosure__chevron`, a
+    // 12x12 box with a rotated 2px border), while the trigger rendered a
+    // bare text glyph (U+2304) that inherits the control's font size and
+    // renders small and hairline-thin. The fix drops the glyph and gives
+    // the trigger the same border-chevron element the disclosures use.
+    it('renders the chevron as the shared border-chevron element, not a text glyph', () => {
+        show()
+
+        const control = screen.getByRole('button', {name: 'Choose a file or folder'})
+        const chevron = control.querySelector('.fd-browse-trigger__chevron')!
+        expect(chevron).toBeTruthy()
+        // A text glyph has visible text content; the shared border-chevron
+        // mechanism is an empty decorative box with no text node at all.
+        expect(chevron.textContent).toBe('')
+        expect(chevron.getAttribute('aria-hidden')).toBe('true')
+    })
+})
+
+describe('the drop zone carries the concentric inner rule', () => {
+    it('wraps the instruction in an inner element, distinct from the outer card', () => {
+        show()
+
+        const zone = document.querySelector('.fd-drop-zone')!
+        const inner = zone.querySelector('.fd-drop-zone__inner')
+        expect(inner).toBeTruthy()
+        expect(inner?.contains(screen.getByRole('heading', {name: 'Drop one file or folder.'}))).toBe(true)
+        // Still no click handler and no tab stop on the outer card -- the
+        // inner wrapper does not reintroduce either.
+        expect(zone.getAttribute('tabindex')).toBeNull()
+    })
+})
+
+describe('the firewall preflight is a collapsed disclosure (Story 7.3, FR23 amendment)', () => {
+    it('renders as a <details> that is present but not open on first paint', () => {
+        show()
+
+        const preflight = document.querySelector('.fd-preflight')!
+        expect(preflight.tagName).toBe('DETAILS')
+        expect(preflight.hasAttribute('open')).toBe(false)
+        // Present on first paint, per FR23 amended to "present and preceding"
+        // rather than "expanded and preceding": the guidance text exists in
+        // the document even while the disclosure reads as closed.
+        expect(screen.getByText('Your first transfer may ask to allow FairDrop on this local network.')).toBeTruthy()
+    })
+
+    it('names the topic in a keyboard-operable summary', () => {
+        show()
+
+        const summary = document.querySelector('.fd-preflight > summary')!
+        expect(summary.textContent).toContain('Local network access')
+        // Native <summary> is a Tab stop and answers Enter/Space by itself --
+        // no keydown handler is wired here, which is the point.
+        expect(summary.tagName).toBe('SUMMARY')
+    })
+
+    it('follows the browse control (Story 7.8), unlike the always-open preflight, which preceded it', () => {
+        const {view} = show()
+
+        const order = [...view.container.querySelectorAll('.fd-preflight, .fd-selection')]
+        expect(order.map((el) => el.className.split(' ')[0])).toEqual(['fd-selection', 'fd-preflight'])
+    })
+})
+
+/*
+  Change 1's second Escape path: a keyboard-operable control with no menu
+  open at all. `<details>`/`<summary>` has no native Escape behaviour to
+  preserve -- there is nothing to dismiss -- so this is purely "Escape
+  clears focus" in isolation, proving the fix is not merely an accident of
+  BrowseControl's own dismissal logic.
+*/
+describe('Escape clears focus on a focused disclosure summary, with no menu open', () => {
+    it('blurs the firewall summary on Escape', () => {
+        show()
+        const summary = document.querySelector('.fd-preflight > summary') as HTMLElement
+        summary.focus()
+        expect(document.activeElement).toBe(summary)
+
+        fireEvent.keyDown(summary, {key: 'Escape'})
+
+        expect(document.activeElement).not.toBe(summary)
+    })
+
+    it('never blurs a routed landing target, which this path never touches', () => {
+        // Sanity check for the scoping rule: a landing target is never given
+        // an Escape handler at all, so pressing Escape while one is focused
+        // (the state heading, focused by script to route an announcement)
+        // must leave it exactly as focused as it was.
+        show()
+        const heading = document.querySelector('[data-focus-target="idle-instruction"]') as HTMLElement
+        heading.focus()
+        expect(document.activeElement).toBe(heading)
+
+        fireEvent.keyDown(heading, {key: 'Escape'})
+
+        expect(document.activeElement).toBe(heading)
+    })
+})
+
+describe('recovery guidance is a second collapsed disclosure', () => {
+    it('renders as a <details>, closed by default, distinct from the preflight disclosure', () => {
+        show()
+
+        const help = document.querySelector('.fd-help')!
+        expect(help.tagName).toBe('DETAILS')
+        expect(help.hasAttribute('open')).toBe(false)
+        expect(document.querySelector('.fd-help > summary')?.textContent).toContain('Recovery help')
+    })
+
+    /*
+      Every string RecoveryHelpContent renders must still be rendered here --
+      an acceptance criterion names this explicitly. Each assertion below
+      fails, naming its own string, if that one line is dropped -- a single
+      combined assertion would not say which string went missing.
+    */
+    it.each([
+        ['the Windows recovery instruction', 'Open Windows Firewall settings and allow FairDrop on Private ' +
+            'networks only, then prepare the item again.'],
+        ['the macOS recovery instruction', 'Open System Settings → Network → Firewall → Options, allow ' +
+            'incoming connections for FairDrop, then prepare the item again.'],
+        ['the different-network guidance', 'Not downloading? Make sure both devices use the same local Wi-Fi. ' +
+            'Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item ' +
+            'again for a fresh link.'],
+        ['the receiver-error guidance', 'Browser says Not Found: the link may be wrong or expired. Locked: ' +
+            'another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for ' +
+            'a fresh link.'],
+    ])('still renders %s', (_label, text) => {
+        show()
+
+        expect(screen.getByText(text)).toBeTruthy()
+    })
+
+    it('labels the Windows and macOS recovery terms, in document order', () => {
+        show()
+
+        const terms = [...document.querySelectorAll('.fd-help dt')].map((node) => node.textContent)
+        expect(terms).toEqual(['Windows recovery', 'macOS recovery'])
     })
 })
 
@@ -223,23 +374,68 @@ describe('the browse menu', () => {
 
         fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
 
-        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+        expect(document.activeElement).toBe(trigger)
+        // Story 7.10: this is the scripted return -- the marker style.css's
+        // `[data-focus-return]` rule keys off, kept alive because
+        // `:focus-visible` never matches a script-focused element on WebKit.
+        // See "the trigger keeps its ring after closeAndReturnFocus" below
+        // for the CSS-mutation proof of the consequence.
+        expect(trigger.getAttribute('data-focus-return')).toBe('')
     })
 
-    it('closes on Escape, returns focus to the control, and announces nothing', () => {
+    it('closes on Escape, clears focus rather than returning it, and announces nothing', () => {
+        // Owner: "I feel like escape should remove ANY highlighting of the
+        // tabs, not add it in." Escape is a distinct dismissal path from
+        // choosing an item by keyboard (below): it ends with nothing focused,
+        // not with the trigger re-focused and ringed. See the trade-off this
+        // records in BrowseControl's `closeAndBlur` doc comment.
         show()
         fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
 
         fireEvent.keyDown(screen.getByRole('menu'), {key: 'Escape'})
 
         expect(screen.queryByRole('menu')).toBeNull()
-        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        expect(document.activeElement).not.toBe(trigger)
+        expect(trigger.getAttribute('data-focus-return')).toBeNull()
         // Not asserted here: that nothing was announced. IdleView renders no
         // live region in any state, so querying for one passes whatever the
         // menu does -- the announcer belongs to App, and the one-owner rule is
         // pinned there against the routing table. What this can honestly say
         // is that the menu raised no error surface of its own.
         expect(document.querySelector('[role="alert"]')).toBeNull()
+    })
+
+    it('never marks the trigger scripted-return for its own plain mouse-click toggle', () => {
+        // The trigger's onClick just flips `open` -- it never calls
+        // `closeAndReturnFocus`, so a mouse press on it must never carry the
+        // marker. If it did, `[data-focus-return]` would repaint the ring
+        // after every mouse click on the trigger, the exact stale-ring
+        // regression `:focus-visible` was introduced to fix in Epic 1 -- the
+        // scar the story text says this marker must not reintroduce.
+        show()
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+
+        fireEvent.click(trigger)
+
+        expect(trigger.getAttribute('data-focus-return')).toBeNull()
+    })
+
+    it('clears the trigger scripted-return marker on blur', () => {
+        // The marker is now set by only one path -- choosing an item by
+        // keyboard (`closeAndReturnFocus`, via `choose`) -- since Escape
+        // (`closeAndBlur`) never sets it at all. See "closes on Escape,
+        // clears focus rather than returning it" above for that half.
+        show()
+        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+        fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
+        expect(trigger.getAttribute('data-focus-return')).toBe('')
+
+        fireEvent.blur(trigger)
+
+        expect(trigger.getAttribute('data-focus-return')).toBeNull()
     })
 
     it('closes quietly when focus leaves the menu on its own, without recapturing it', () => {
@@ -274,6 +470,265 @@ describe('the browse menu', () => {
     })
 })
 
+/*
+  Story 7.11: the menu has one active item, owned by focus, driven by
+  whichever input last acted. A pointer open pre-selects nothing; a keyboard
+  open focuses the first item as before; hovering an item moves focus to it,
+  so hover and keyboard share one appearance and one code path; and the
+  dead-key gap (ArrowDown/ArrowUp on a pointer-opened trigger) now moves
+  focus into the menu instead of doing nothing.
+
+  `event.detail` is how the trigger's single onClick handler tells a real
+  pointer click (detail >= 1) apart from a click synthesized from a keyboard
+  activation (detail === 0, the default `fireEvent.click` already uses
+  everywhere else in this file, which is why every other test above keeps
+  passing unchanged: it reads exactly like a keyboard-style activation, which
+  is what it always meant here).
+*/
+describe('the browse menu has one active item (Story 7.11)', () => {
+    function control(): HTMLElement {
+        return screen.getByRole('button', {name: 'Choose a file or folder'})
+    }
+
+    it('pre-selects nothing when opened by a real pointer click', () => {
+        show()
+
+        // No manual .focus() staged beforehand: a bare fireEvent.click, like
+        // a real pointer click on WebKit, moves no focus by itself. Whatever
+        // BrowseControl does with focus after this has to be something the
+        // component does on purpose, not something the test manufactured.
+        fireEvent.click(control(), {detail: 1})
+
+        expect(screen.getByRole('menu')).toBeTruthy()
+        expect(control().getAttribute('aria-expanded')).toBe('true')
+        for (const item of screen.getAllByRole('menuitem')) {
+            expect(document.activeElement).not.toBe(item)
+        }
+    })
+
+    it('still focuses the first item when opened by keyboard activation (Enter/Space, detail 0)', () => {
+        show()
+
+        fireEvent.click(control(), {detail: 0})
+
+        const items = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(items[0])
+    })
+
+    it('still focuses the first item when opened by ArrowDown or ArrowUp on the trigger', () => {
+        for (const key of ['ArrowDown', 'ArrowUp']) {
+            cleanup()
+            show()
+            fireEvent.keyDown(control(), {key})
+
+            const items = screen.getAllByRole('menuitem')
+            expect(document.activeElement).toBe(items[0])
+        }
+    })
+
+    it('moves focus to an item on hover, and only that item', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        const [file, folder] = screen.getAllByRole('menuitem')
+        expect(document.activeElement).not.toBe(file)
+        expect(document.activeElement).not.toBe(folder)
+
+        fireEvent.mouseEnter(folder)
+
+        expect(document.activeElement).toBe(folder)
+        expect(document.activeElement).not.toBe(file)
+
+        fireEvent.mouseEnter(file)
+
+        expect(document.activeElement).toBe(file)
+        expect(document.activeElement).not.toBe(folder)
+    })
+
+    it('hands off from keyboard focus to hover focus cleanly -- never two items marked at once', () => {
+        show()
+        fireEvent.click(control())
+        const [file, folder] = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(file)
+
+        fireEvent.mouseEnter(folder)
+
+        // document.activeElement can only ever be one node, but the point of
+        // this story is the single *rule*, not merely the single DOM API --
+        // assert both sides explicitly rather than trusting the API's shape.
+        expect(document.activeElement).toBe(folder)
+        expect(document.activeElement).not.toBe(file)
+    })
+
+})
+
+/*
+  Owner regression, found by hand on the built macOS binary after the tests
+  above first shipped green: after a pointer-open, Escape did nothing, the
+  arrow keys did nothing, and clicking outside the menu did not close it --
+  the only way to dismiss it was a second click on the trigger. All three
+  worked before Story 7.11.
+
+  Root cause: WebKit does not focus a <button> when it is clicked (it
+  mirrors the native platform, where a pointer click on a button moves no
+  keyboard focus at all). The first version of the pointer-open fix removed
+  the old unconditional "focus the first item on every open," which fixed
+  the visual defect (File no longer pre-selected) but never put anything
+  else in its place -- so a pointer-open left focus on neither the trigger
+  nor any item, on document.body, and:
+  - `handleTriggerKeyDown` never fires, because the trigger never has focus.
+    That is what killed Escape and the arrow keys.
+  - `handleMenuBlur` never fires, because focus was never inside the menu to
+    begin with, so there is nothing for a later blur to report. That is
+    what killed click-outside dismissal.
+
+  jsdom cannot see this on its own -- a bare fireEvent.click moves no focus
+  in jsdom either, which is exactly why it was invisible: the first version
+  of these tests staged `control().focus()` by hand before the click, an
+  assumption about what a pointer press leaves focused that turned out to be
+  false on the one platform that matters here. The tests below do not stage
+  any focus: they dispatch every key on `document.activeElement` (or
+  document.body, its default), exactly where a real keypress would land,
+  never on `control()` directly -- dispatching straight at a specific node
+  would keep passing even with the underlying focus bug still present, which
+  is how the first version of this story shipped a green suite over three
+  dead interactions.
+
+  The fix keeps every one of `BrowseControl`'s own handlers live by giving
+  the menu container itself real focus on a pointer-open (`tabIndex={-1}` on
+  `.fd-browse-menu`, focused from the open effect) rather than the trigger:
+  the container already carries `onKeyDown={handleMenuKeyDown}` and
+  `onBlur={handleMenuBlur}`, so Escape, the arrows, and click-outside are
+  all live the instant the menu opens, and nothing is visually marked
+  because `.fd-browse-menu .fd-button:focus` only ever matches an item, not
+  the container div.
+*/
+describe('a pointer-open keeps Escape, the arrows and click-outside alive (owner regression, confirmed on the macOS binary)', () => {
+    function control(): HTMLElement {
+        return screen.getByRole('button', {name: 'Choose a file or folder'})
+    }
+
+    function whereverFocusIs(): Element {
+        return (document.activeElement ?? document.body) as Element
+    }
+
+    it('Escape still closes a pointer-opened menu', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        expect(screen.getByRole('menu')).toBeTruthy()
+
+        fireEvent.keyDown(whereverFocusIs(), {key: 'Escape'})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('ArrowDown still moves focus into a pointer-opened menu', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+
+        fireEvent.keyDown(whereverFocusIs(), {key: 'ArrowDown'})
+
+        const items = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(items[0])
+    })
+
+    it('ArrowUp still moves focus into a pointer-opened menu', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+
+        fireEvent.keyDown(whereverFocusIs(), {key: 'ArrowUp'})
+
+        const items = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(items[0])
+    })
+
+    it('a focus move to an element outside the control closes a pointer-opened menu', () => {
+        const {view} = show()
+        fireEvent.click(control(), {detail: 1})
+        const outside = document.createElement('button')
+        view.container.append(outside)
+
+        // What a real click outside the control does: it moves focus away
+        // from wherever the pointer-open fix put it. Dispatched on
+        // whichever element that turns out to be, not a hardcoded node, so
+        // this does not presuppose which element the fix chose to focus.
+        fireEvent.blur(whereverFocusIs(), {relatedTarget: outside})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+})
+
+/*
+  Second owner finding, same session, same component: "when I move my mouse
+  OFF of any option they don't both unhighlight, but when I click on the
+  expander again they both unhighlight." Hovering an item moves *focus* to
+  it (above), and moving the pointer away does not itself remove focus, so
+  the item stayed marked after the mouse left. A native menu clears the
+  highlight when the pointer leaves it -- but only when the pointer is what
+  put it there: a keyboard user's place in the menu must survive the mouse
+  merely passing over it and leaving.
+*/
+describe('the pointer-marked item unmarks when the pointer leaves the menu (owner regression)', () => {
+    function control(): HTMLElement {
+        return screen.getByRole('button', {name: 'Choose a file or folder'})
+    }
+
+    it('clears a hover-marked item when the pointer leaves the whole menu', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        const [file, folder] = screen.getAllByRole('menuitem')
+        fireEvent.mouseEnter(folder)
+        expect(document.activeElement).toBe(folder)
+
+        fireEvent.mouseLeave(screen.getByRole('menu'))
+
+        expect(document.activeElement).not.toBe(folder)
+        expect(document.activeElement).not.toBe(file)
+    })
+
+    it('keeps every interaction live after the pointer leaves and unmarks the item (same focus target as the click-outside fix)', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        fireEvent.mouseEnter(screen.getAllByRole('menuitem')[0])
+        fireEvent.mouseLeave(screen.getByRole('menu'))
+
+        fireEvent.keyDown(document.activeElement ?? document.body, {key: 'Escape'})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('leaves a keyboard-marked item alone when the pointer merely passes over the menu and leaves', () => {
+        show()
+        // Keyboard-open: the first item is keyboard-marked.
+        fireEvent.click(control(), {detail: 0})
+        const [file] = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(file)
+
+        // The mouse happening to be over the menu and then leaving must not
+        // steal a keyboard user's place -- only a pointer-sourced mark is
+        // cleared on leave.
+        fireEvent.mouseLeave(screen.getByRole('menu'))
+
+        expect(document.activeElement).toBe(file)
+    })
+
+    it('leaves a keyboard-marked item alone even after the mouse had previously marked a different one', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        const [file, folder] = screen.getAllByRole('menuitem')
+        fireEvent.mouseEnter(folder)
+        expect(document.activeElement).toBe(folder)
+
+        // Keyboard takes back over: the arrow key re-marks the item it
+        // lands on as keyboard-sourced, superseding the hover.
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'ArrowUp'})
+        expect(document.activeElement).toBe(file)
+
+        fireEvent.mouseLeave(screen.getByRole('menu'))
+
+        expect(document.activeElement).toBe(file)
+    })
+})
+
 describe('Idle with a command failure', () => {
     it('renders the fixed invalid-selection panel and stages nothing', () => {
         const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
@@ -292,6 +747,23 @@ describe('Idle with a command failure', () => {
         expect(document.querySelector('.fd-outcome')).toBeNull()
         expect(screen.queryByText('Transfer canceled.')).toBeNull()
     })
+
+    it('renders the outcome panel between the drop zone and the preflight disclosure', () => {
+        const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
+        const {view} = show(idle({commandError: error}))
+
+        const order = [...view.container.querySelectorAll('.fd-drop-zone, .fd-outcome, .fd-preflight')]
+        expect(order.map((el) => el.className.split(' ')[0])).toEqual(['fd-drop-zone', 'fd-outcome', 'fd-preflight'])
+    })
+
+    it('keeps the command-error focus target unchanged', () => {
+        const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
+        show(idle({commandError: error}))
+
+        const target = document.querySelector('[data-focus-target="command-error"]')
+        expect(target).toBeTruthy()
+        expect(target?.getAttribute('tabindex')).toBe('-1')
+    })
 })
 
 describe('what Idle no longer owns', () => {
@@ -299,14 +771,14 @@ describe('what Idle no longer owns', () => {
     // keeps across the reset. Rebuilding it here would drop the focus that is
     // sitting on it -- see App.test.tsx, "reset after a terminal outcome".
     it('renders no outcome panel for a retained outcome', () => {
-        show(idle({retainedOutcome: {kind: 'done'}}))
+        show(idle({retainedOutcome: {kind: 'done', receipt: doneReceipt}}))
 
         expect(document.querySelector('.fd-outcome')).toBeNull()
         expect(screen.queryByRole('button', {name: 'Dismiss'})).toBeNull()
     })
 
     it('renders exactly one Idle phase view whatever it carries', () => {
-        show(idle({retainedOutcome: {kind: 'done'}}))
+        show(idle({retainedOutcome: {kind: 'done', receipt: doneReceipt}}))
 
         expect(document.querySelectorAll('[data-phase-view]')).toHaveLength(1)
         expect(document.querySelector('[data-phase-view]')?.getAttribute('data-phase-view')).toBe('idle')
@@ -413,17 +885,31 @@ describe('the browse menu follows the menu-button pattern', () => {
         }
     })
 
-    it('closes on Escape while focus is still on the control', () => {
+    it('closes on Escape while focus is still on the control, and clears focus rather than leaving the trigger ringed', () => {
         show()
         fireEvent.click(control())
         // What a pointer press leaves behind: the menu open, focus on the
         // trigger rather than inside the menu.
         fireEvent.blur(screen.getByRole('menu'), {relatedTarget: control()})
+        // `fireEvent.blur`/`fireEvent.click` dispatch events without moving
+        // real jsdom focus, so this is staged explicitly -- the scenario
+        // `handleTriggerKeyDown`'s own Escape branch defends is a real Tab
+        // landing on the trigger while the menu is open, and the assertions
+        // below are meaningless unless the trigger is genuinely focused
+        // first.
+        control().focus()
+        expect(document.activeElement).toBe(control())
 
         fireEvent.keyDown(control(), {key: 'Escape'})
 
         expect(screen.queryByRole('menu')).toBeNull()
         expect(control().getAttribute('aria-expanded')).toBe('false')
+        // This is the defensive fallback branch (`handleTriggerKeyDown`'s own
+        // Escape case, focus already on the trigger rather than routed
+        // through `handleMenuKeyDown`) -- it must clear focus exactly like
+        // the primary path does, not leave the trigger focused and ringed.
+        expect(document.activeElement).not.toBe(control())
+        expect(control().getAttribute('data-focus-return')).toBeNull()
     })
 
     it('is one tab stop, with the items reachable by arrow rather than by Tab', () => {

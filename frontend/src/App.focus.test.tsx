@@ -48,6 +48,8 @@ function idle(): TransferState {
     return {phase: 'idle', retainedOutcome: null, commandError: null}
 }
 
+const doneReceipt = {name: 'report.pdf', isDir: false, bytesSent: 100}
+
 // The mock functions live here; App.harness.tsx only shapes and mounts
 // whatever controller it is handed, typed so a new TransferController member
 // is a type error in that one shared place rather than a silent gap here.
@@ -108,7 +110,11 @@ describe('a focus target the screen does not carry', () => {
 
         transitionTo(
             view,
-            {phase: 'done', session: {sessionId: '0'.repeat(32), lastSeq: 4}, outcome: {kind: 'done'}},
+            {
+                phase: 'done',
+                session: {sessionId: '0'.repeat(32), lastSeq: 4},
+                outcome: {kind: 'done', receipt: doneReceipt},
+            },
             {row: 'terminal-outcome', owner: 'focus', target: 'outcome'},
         )
 

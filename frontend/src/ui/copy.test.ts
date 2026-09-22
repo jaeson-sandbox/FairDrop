@@ -167,6 +167,7 @@ describe('approved product copy', () => {
             'label.macosRecovery',
             'label.metaSeparator',
             'label.of',
+            'label.recoveryHeading',
             'label.sending',
             'label.sent',
             'label.throughput',

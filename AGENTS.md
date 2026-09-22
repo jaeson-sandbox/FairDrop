@@ -25,7 +25,9 @@ as historical narrative and apply all corrections and supersessions before using
   `NetworkManager`, `Streamer`, `TransferServer`, or `TransferStats` contracts.
 - `frontend/src/App.tsx` owns drop, focus, and announcement routing;
   `frontend/src/transfer` owns validation and session state; `frontend/src/ui`
-  owns the Paper Relay views and accessibility behavior.
+  owns the Quartz views and accessibility behavior (Paper Relay / Terracotta
+  Linen was retired by Epic 7; the spine is
+  `_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-quartz-2026-09-20/`).
 - Current story specs, sprint state, retrospectives, and routed findings live in
   `_bmad-output/implementation-artifacts/`.
 
@@ -76,6 +78,16 @@ as historical narrative and apply all corrections and supersessions before using
   does nothing on POSIX, so an unsafe archive entry name was refused from a Windows sender and
   accepted from a macOS one, while the risk was receiver-side. Prefer a check whose behaviour does
   not depend on the host when the consequence does not either.
+- `verify.yml` sets `cancel-in-progress: true` on a per-ref concurrency group, so **every
+  push cancels the branch's in-flight run**. During rapid iteration the newest *completed*
+  run is often several commits behind the tip, and `verify (windows-latest)` -- the slowest
+  job -- is the one most often cancelled part-way. "This branch has a green run" can
+  therefore be true while the tip has never been built on Windows at all. Before citing CI
+  as release evidence, read the conclusion of the run whose `headSha` **is** the tip, job by
+  job, and if the Windows job says `cancelled` then Windows is unproven: push nothing and
+  let a run finish, or re-run it. A cancelled job is not a passed job, and it is not a
+  failure either -- it is an absence, which is the easiest of the three to misread as
+  success.
 - `gh run watch --exit-status` exited **0** on a run whose macOS job failed, after
   printing the failure. Never take a watch's exit code as the verdict: read the
   conclusion with `gh run view <id> --json conclusion,jobs`.
@@ -112,6 +124,15 @@ as historical narrative and apply all corrections and supersessions before using
   verification.
 - Preserve complete failing-test output. Truncated logs destroyed the only
   evidence for an unreproduced Epic 1 failure.
+- `npm run test:browser` rewrites `frontend/browser/captures/qr-panel-forced-colors.capture.png`
+  on every run, and PNG encoding is not byte-deterministic -- a run that changed nothing
+  still leaves a 1-byte diff in `git status`. The file is **deliberately tracked** as the
+  accessibility evidence Story 3.12 committed, referenced by `deferred-work.md` and three
+  evidence files, so do not gitignore or delete it. After a verification run, either
+  `git checkout -- frontend/browser/captures/` or commit the regeneration on purpose.
+  Never sweep it up in a `git add -A`: a capture that changed because the palette changed
+  is evidence, and one that changed because a PNG encoder felt different is noise, and a
+  commit cannot tell you which it was.
 - Browser-unit tests do not prove native interaction. Manual nearby-device smoke
   observations are optional under the owner-approved personal-project policy below;
   record unverified behavior honestly and keep automated native checks mandatory.
@@ -187,16 +208,95 @@ supported no-follow queries; preserve content-read separation and identity check
 
 ## Subagent model budget
 
-- Owner instruction (2026-09-20): always delegate story implementation to a
-  `gpt-5.6-sol` subagent. Keep the main session as orchestrator for review,
+- **Owner instruction (2026-09-20, current): delegate story implementation to
+  `sonnet` subagents.** Keep the main session as orchestrator for review,
   verification, integration and release coordination. Do not repeatedly request
-  approval for work already authorized; raise only material scope changes or blockers.
+  approval for work already authorized; raise only material scope changes or
+  blockers.
 
-- Owner preference (2026-09-12): use `gpt-5.6-sol` for implementation subagents
-  and `gpt-5.6-luna` for smaller bounded tasks. Keep review and integration with
-  the main agent; when a BMAD workflow requires independent review subagents,
-  use Sol or Luna for those too. Do not inherit the main agent's more expensive
-  model by default.
+- Superseded, kept for the record: an earlier 2026-09-20 instruction named
+  `gpt-5.6-sol` for story implementation, and a 2026-09-12 preference paired
+  `gpt-5.6-sol` with `gpt-5.6-luna` for smaller bounded tasks. **Do not follow
+  either.** They are listed only because three Epic 7 subagents in a row read
+  the stale text, noticed it contradicted their actual assignment, and spent
+  part of their run reasoning about it -- one concluded the file was not a
+  valid instruction source at all. It is: standing repo guidance is
+  authoritative. It was simply out of date, which is a different failure and
+  has a different fix, namely this edit.
+
+- The general rule this incident illustrates: repo instruction files are
+  authoritative but supersedable. A more recent instruction from the owner
+  wins over a written one, and whoever receives that instruction is
+  responsible for chasing it into this file -- otherwise every future agent
+  re-litigates it.
+
+## macOS WebKit focus behaviour, and why the suites cannot see it
+
+<!-- Outside the bmad:context block on purpose: kept across `bmad-project-context` refreshes. -->
+
+Epic 7 hit **four** distinct focus behaviours where WKWebView differs from the engines
+this repo tests with. Each one shipped or nearly shipped a dead interaction behind a
+fully green suite. They are collected here because the next one will look like none of
+them individually and like all of them together.
+
+1. **`WKPreferences.tabFocusesLinks` defaults to NO, so Tab cannot reach a `<button>`
+   at all.** Not a styling gap -- the documented Tab-then-ArrowDown path into the browse
+   menu was simply dead on macOS, and ArrowDown scrolled the document instead.
+   `main.go` sets `Mac.Preferences.TabFocusesLinks`; `TestAppOptionsEnablesMacTabFocus`
+   pins it. Any control that relies on Tab depends on that option staying set.
+2. **`:focus-visible` does not match an element focused by script.** Anything focused
+   with `element.focus()` -- a roving-tabindex menu item, a returned-to trigger -- never
+   matches, so every rule keyed to it is dead for that element. Chromium propagates the
+   keyboard modality through a programmatic focus and therefore looks correct. Where the
+   app moves focus itself and the element is keyboard-operable, key the appearance to
+   `:focus`, or set an explicit marker attribute and style that.
+3. **Clicking a `<button>` does not focus it.** WebKit mirrors native macOS here, so
+   after a pointer click focus is on `document.body` -- not the button. Any handler
+   attached to that button, or any `onBlur` on a subtree focus never entered, silently
+   never fires. This killed Escape, the arrow keys and click-outside dismissal on a
+   pointer-opened menu at once. If a component's keyboard or dismissal behaviour depends
+   on focus being somewhere after a click, put it there explicitly.
+4. **`forced-colors: active` strips decorative `box-shadow`.** A focus ring drawn only
+   as a shadow is invisible in Windows High Contrast. Only `outline` is a
+   system-recognised indicator guaranteed to survive, so a shadow-based ring needs an
+   `outline` fallback inside the forced-colors block.
+5. **Escape works. Synthetic Escape from automation does not — and that difference
+   produced a wrong "platform fact" in this file for one commit.** The owner reported
+   Escape closing the browse menu normally on the built binary. An automated probe had
+   concluded the opposite: an on-screen `window` keydown counter showed Escape firing
+   no event at all, twice, while the ArrowDown and ArrowUp pressed either side of it
+   advanced the counter immediately.
+
+   Both observations are real. A hardware Escape reaches web content; an Escape
+   synthesized by the computer-use tooling apparently does not reach it the same way,
+   while synthesized arrow keys do. The arrow keys were being used as the positive
+   control, and they were the wrong control: they proved that *some* synthetic keys
+   arrive, not that synthetic **Escape** is faithful to a real one. The instrument was
+   measuring itself.
+
+   **The rule this leaves behind: a synthetic keystroke is evidence about the harness
+   until a human has pressed the key.** Automation is fine for reading state and for
+   keys already known to round-trip, but a *negative* result from a synthetic key --
+   "nothing happened" -- cannot distinguish a dead feature from an undelivered event.
+   Before recording any "this key does nothing on macOS" as a platform fact, have a
+   person press it. The investigation pass that originally measured Escape working, on
+   real hardware, was right; it was overruled on the strength of the synthetic probe and
+   had to be reinstated.
+
+**Why nothing caught them.** `npm test` is jsdom, which performs no layout and -- worse
+for this class -- *does* focus a button on click, so it actively disagrees with the
+platform. `npm run test:browser` is real layout but **Chromium only**, and Chromium
+behaves correctly in every case above. A Playwright WebKit project was tried and
+rejected: it cannot reach a button with Tab either (same default as 1), and exposes no
+equivalent of the Wails-level Cocoa preference, so it cannot be put into the working
+state the assertions need.
+
+**What to do instead.** For anything focus-related, pin the *mechanism* in the
+stylesheet or component (which engine-independent tests can assert), write the
+behavioural test so it does not presuppose a click focused anything -- dispatch keys at
+`document.activeElement ?? document.body` rather than at a node you chose -- and then
+**drive the built binary by hand before believing it**. Every one of the four above was
+found that way and none of them any other way.
 
 ## Git workflow
 

@@ -175,7 +175,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                             */}
                             <button
                                 type="button"
-                                className="fd-button fd-name-toggle fd-target"
+                                className="fd-button fd-button--secondary fd-name-toggle fd-target"
                                 aria-expanded={showFullName}
                                 aria-controls="fd-item-name"
                                 aria-describedby="fd-item-name-full"
@@ -202,24 +202,69 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                       a textbox role: assistive technology reads
                                       the value of one reliably and disagrees
                                       about the other. It is still not a link.
+
+                                      The field's height comes entirely from CSS: this
+                                      wrapper is `display: grid`, and it and the hidden
+                                      `.fd-url-mirror` below carry the same URL in the same
+                                      grid cell, `1 / 1`. The mirror is a plain block that
+                                      wraps like any other text, so it -- not the textarea's
+                                      own `rows` -- is what the grid cell's height comes
+                                      from; the textarea then stretches to fill that cell,
+                                      which is the grid default for a block-axis-auto item.
+                                      A width change re-wraps the mirror and resizes the
+                                      cell in the same layout pass that re-wraps everything
+                                      else on the page -- no observer, no
+                                      `requestAnimationFrame`, no JavaScript at all.
+
+                                      The mirror is a real element carrying the text as its
+                                      own content, not a `::after` reading it back from a
+                                      `data-*` attribute with `attr()`. That is what the spec
+                                      for this story originally proposed, and it works for an
+                                      author's own overrides -- but WCAG 1.4.12 (`.fd-url`
+                                      case of `accessibility.test.tsx`) simulates a *reader's*
+                                      text-spacing override the way the standard bookmarklet
+                                      does, with a bare `* { line-height: ... !important }`
+                                      rule, and a bare universal selector does not match
+                                      generated pseudo-element content -- so a `::after` mirror
+                                      would silently stop tracking the textarea's line-height
+                                      the moment such an override was in effect, and the field
+                                      would clip. A genuine sibling element is matched by that
+                                      same `*` rule exactly like the textarea is, so the two
+                                      stay in sync under it. See
+                                      `_bmad-output/implementation-artifacts/evidence-7-9-make-resizing-seamless.md`
+                                      for the failing-test evidence this was found with.
                                     */}
-                                    <textarea
-                                        className="fd-url fd-target"
-                                        readOnly
-                                        rows={2}
-                                        value={metadata.url}
-                                        aria-labelledby="fd-direct-link-heading"
-                                        onFocus={(event) => event.currentTarget.select()}
-                                        onMouseDown={(event) => {
-                                            // Without this the mouseup that follows collapses the
-                                            // selection to a caret, and select-on-focus becomes a
-                                            // call that happens and a selection nobody gets.
-                                            if (document.activeElement !== event.currentTarget) {
-                                                event.preventDefault()
-                                                event.currentTarget.focus()
-                                            }
-                                        }}
-                                    />
+                                    <div className="fd-url-wrap">
+                                        <div className="fd-url-mirror" aria-hidden="true">
+                                            {metadata.url + ' '}
+                                        </div>
+                                        <textarea
+                                            className="fd-url fd-target"
+                                            readOnly
+                                            rows={1}
+                                            value={metadata.url}
+                                            aria-labelledby="fd-direct-link-heading"
+                                            onFocus={(event) => event.currentTarget.select()}
+                                            onKeyDown={(event) => {
+                                                // Escape clears focus rather than leaving the field
+                                                // ringed -- the same "get me out of this" reading as
+                                                // BrowseControl's `closeAndBlur` and the disclosure
+                                                // summary's own Escape handler (see their comments for
+                                                // the fuller reasoning). Nothing here is open to
+                                                // dismiss, so this is only the blur.
+                                                if (event.key === 'Escape') event.currentTarget.blur()
+                                            }}
+                                            onMouseDown={(event) => {
+                                                // Without this the mouseup that follows collapses the
+                                                // selection to a caret, and select-on-focus becomes a
+                                                // call that happens and a selection nobody gets.
+                                                if (document.activeElement !== event.currentTarget) {
+                                                    event.preventDefault()
+                                                    event.currentTarget.focus()
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                     <button
                                         type="button"
                                         className={`fd-button fd-target ${copied ? 'fd-button--copied' : 'fd-button--primary'}`}

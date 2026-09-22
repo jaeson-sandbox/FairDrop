@@ -77,27 +77,46 @@ describe('the stylesheet parser sees the whole file', () => {
     })
 })
 
-describe('the Terracotta Linen token layer', () => {
-    it('declares every authored light value as a Tailwind v4 theme variable', () => {
+describe('the Quartz token layer', () => {
+    it('declares every Quartz light value as a Tailwind v4 theme variable', () => {
         const light: Record<string, string> = {
-            canvas: '#F7F0E7',
-            surface: '#FFFAF4',
-            elevated: '#EFE2D4',
-            text: '#2C2723',
-            muted: '#70645B',
-            border: '#CDBDAE',
-            'control-border': '#8B7462',
-            primary: '#A94724',
+            canvas: '#F2F2F4',
+            surface: '#FFFFFF',
+            elevated: '#FFFFFF',
+            fill: '#F1F1F2',
+            'fill-strong': '#E8E8EA',
+            text: '#1A1A1C',
+            muted: '#65656B',
+            separator: '#D6D6D6',
+            'control-border': '#86868B',
+            // Story 7.8: the accent returns to the logo's mocha, sampled
+            // from build/appicon.png rather than invented.
+            primary: '#9C5636',
+            // Owner review, Story 7.7 follow-up: the dedicated hover-fill
+            // token. Darkens on hover in light mode. `primary-hi` is gone
+            // (black-flash defect fix): it fed only the retired colour-stop
+            // gradient, replaced by a translucent-white sheen independent
+            // of this token.
+            'primary-hover': '#7F4428',
             'primary-ink': '#FFFFFF',
-            hover: '#873719',
-            drop: '#F1D0BD',
-            progress: '#B64B23',
-            focus: '#7E4B92',
-            success: '#2F7658',
-            warning: '#946000',
-            error: '#AB3932',
+            // Story 7.8 review follow-up: mocha at 10% on --color-surface,
+            // replacing the leftover blue wash. Carries text (the drop
+            // zone's heading and meta line, drag-active) -- see the
+            // 'primary-tint carries text' describe block below.
+            'primary-tint': '#F5EEEB',
+            track: '#E9E9EB',
+            // Story 7.8 introduced a dedicated violet `focus` role here;
+            // Story 7.11 retired it in favour of the ring reading `primary`
+            // directly -- see "the focus ring is primary, kept visible by a
+            // structural gap, not a separate hue" describe block below.
+            success: '#177A48',
+            'success-tint': '#E3F1EA',
+            warning: '#8A5300',
+            'warning-tint': '#F6EDE0',
+            error: '#C0362C',
+            'error-tint': '#F8E9E7',
             'qr-surface': '#FFFFFF',
-            'qr-ink': '#221F1C',
+            'qr-ink': '#1A1A1C',
         }
 
         for (const [role, value] of Object.entries(light)) {
@@ -107,22 +126,35 @@ describe('the Terracotta Linen token layer', () => {
 
     it('declares the authored dark half as exact values rather than an inversion', () => {
         const darkPair: Record<string, string> = {
-            canvas: '#1C1916',
-            surface: '#25211D',
-            elevated: '#312A24',
-            text: '#F7EFE5',
-            muted: '#BCAF9F',
-            border: '#55493F',
-            'control-border': '#89796A',
-            primary: '#FF986D',
-            'primary-ink': '#2B1309',
-            hover: '#FFB18F',
-            drop: '#4A2D23',
-            progress: '#FF8858',
-            focus: '#C5A1D3',
-            success: '#79D5AA',
-            warning: '#F2BD62',
-            error: '#FF8B83',
+            canvas: '#161618',
+            surface: '#1F1F22',
+            elevated: '#27272B',
+            fill: '#313135',
+            'fill-strong': '#3A3A3E',
+            text: '#F2F2F4',
+            muted: '#9C9CA4',
+            separator: '#47474A',
+            'control-border': '#7A7A82',
+            // Story 7.8: dark half of the mocha accent -- see the light
+            // block above.
+            primary: '#E39B70',
+            // Owner review, Story 7.7 follow-up: the dedicated hover-fill
+            // token. Dark mode lightens on hover. `primary-hi` is gone
+            // (black-flash defect fix) -- see the light block above.
+            'primary-hover': '#F0B694',
+            'primary-ink': '#2B1206',
+            // Story 7.8 review follow-up: mocha at 12%, not 16%, on
+            // --color-surface-dark -- 16% put muted under the 4.5:1 floor
+            // on this fill. See the CSS comment beside the real
+            // declaration.
+            'primary-tint': '#372E2B',
+            track: '#3A3A3E',
+            success: '#4ED08B',
+            'success-tint': '#20342A',
+            warning: '#E7A33A',
+            'warning-tint': '#372E1D',
+            error: '#FF7A70',
+            'error-tint': '#3A2422',
         }
 
         for (const [role, value] of Object.entries(darkPair)) {
@@ -140,48 +172,28 @@ describe('the Terracotta Linen token layer', () => {
 
     it('declares the type ramp, radii and spacing steps DESIGN.md publishes', () => {
         for (const declaration of [
-            '--text-display: 24px;',
+            '--text-display: 26px;',
             '--text-headline: 20px;',
-            '--text-body: 14px;',
+            '--text-numeric: 30px;',
+            '--text-body: 13.5px;',
             '--text-label: 12px;',
             '--text-code: 12px;',
-            '--text-control: 13px;',
-            '--radius-xs: 4px;',
-            '--radius-sm: 8px;',
-            '--radius-md: 12px;',
-            '--radius-lg: 16px;',
+            '--text-control: 14px;',
+            '--font-weight-display: 650;',
+            '--font-weight-body: 400;',
+            '--font-weight-body-strong: 590;',
+            '--font-weight-control: 590;',
+            '--radius-xs: 6px;',
+            '--radius-sm: 9px;',
+            '--radius-md: 11px;',
+            '--radius-lg: 14px;',
+            '--radius-xl: 18px;',
+            '--radius-xxl: 24px;',
             '--radius-full: 9999px;',
-            '--spacing-window-gutter: 20px;',
+            '--spacing-window-gutter: 24px;',
             '--spacing-target-min: 44px;',
-            '--shadow-paper: 3px 3px 0 #CDBDAE;',
         ]) {
             expect(theme, declaration).toContain(declaration)
-        }
-    })
-
-    it('fetches no font over the network, and declares only the weight it ships', () => {
-        /*
-          The spine's rule was "system-safe stacks only, do not load a web
-          font", amended to allow one bundled face. What the rule was protecting
-          survives and is asserted here: nothing is fetched at runtime, so there
-          is no third party and no render-blocking request.
-
-          The weight matters as much as the source. Only Nunito 400 ships, so
-          asking for a heavier one would have the browser synthesise faux bold
-          -- smeared, and worse than the system face it replaced.
-        */
-        const face = block('@font-face {')
-        expect(face).toContain('font-weight: 400;')
-        expect(face).toMatch(/src: url\("assets\/fonts\/[^"]+\.woff2"\)/)
-        expect(stylesheet).not.toMatch(/@import url\(|https?:\/\//)
-
-        // Functional text stays on the system stack, which has real weights.
-        expect(theme).toContain('--font-body: system-ui,')
-        expect(theme).toContain('--font-display: "Nunito"')
-
-        for (const [, weight] of theme.matchAll(/--font-weight-[a-z-]+: (\d+);/g)) {
-            expect(Number(weight), 'no weight may exceed what a real face carries')
-                .toBeLessThanOrEqual(650)
         }
     })
 
@@ -197,7 +209,21 @@ describe('the Terracotta Linen token layer', () => {
             '(?<![-\\w])(?:red|blue|green|black|white|gray|grey|orange|purple|pink|brown|yellow|cyan|magenta)(?![-\\w])',
         ].join('|'), 'g')
 
-        expect(componentRules.match(colorLiteral) ?? []).toEqual([])
+        // The primary button's 1px inset highlight, and its sheen's two
+        // translucent-white stops (black-flash defect fix), are the authored
+        // literals this spine permits: DESIGN.md scopes them to the single
+        // gradient the product ships, and none of the three is a color role
+        // a token could carry -- each is a fixed white at a fixed opacity,
+        // unrelated to any theme color. The sheen appears twice
+        // (byte-identical, rest and :hover -- see "the primary button hover
+        // has no black flash" describe block), so both occurrences are
+        // stripped.
+        const withoutHighlight = componentRules
+            .replaceAll('rgb(255 255 255 / 0.4)', '')
+            .replaceAll('rgb(255 255 255 / 0.08)', '')
+            .replaceAll('rgb(255 255 255 / 0)', '')
+
+        expect(withoutHighlight.match(colorLiteral) ?? []).toEqual([])
     })
 })
 
@@ -234,24 +260,28 @@ describe('forced colors', () => {
       focus ring -- is restated as a system color rather than left to it.
     */
 
-    it('supersedes Terracotta Linen with system colors on every authored token', () => {
+    it('supersedes Quartz with system colors on every authored token', () => {
         const systemColors: Record<string, string> = {
             canvas: 'Canvas',
             surface: 'Canvas',
             elevated: 'Canvas',
+            fill: 'Canvas',
+            'fill-strong': 'Canvas',
             text: 'CanvasText',
             muted: 'CanvasText',
-            border: 'CanvasText',
+            separator: 'CanvasText',
             'control-border': 'CanvasText',
             primary: 'Highlight',
+            'primary-hover': 'Highlight',
             'primary-ink': 'HighlightText',
-            hover: 'Highlight',
-            drop: 'Canvas',
-            progress: 'Highlight',
-            focus: 'Highlight',
+            'primary-tint': 'Canvas',
+            track: 'Canvas',
             success: 'CanvasText',
+            'success-tint': 'Canvas',
             warning: 'CanvasText',
+            'warning-tint': 'Canvas',
             error: 'CanvasText',
+            'error-tint': 'Canvas',
         }
 
         for (const [role, value] of Object.entries(systemColors)) {
@@ -259,7 +289,7 @@ describe('forced colors', () => {
         }
 
         // Every authored role is covered: a token added to @theme without a
-        // forced-colors answer keeps its Terracotta value in the system palette.
+        // forced-colors answer keeps its Quartz value in the system palette.
         const authored = [...theme.matchAll(/--color-([a-z-]+):/g)].map(([, role]) => role)
         const uncovered = authored.filter((role) => !(role in systemColors) && !role.startsWith('qr-'))
         expect(uncovered).toEqual([])
@@ -268,12 +298,23 @@ describe('forced colors', () => {
     it('keeps the progress fill distinguishable from its own track', () => {
         // Highlight on Canvas. Left to the user agent both would become Canvas
         // and a determinate meter would read as empty at every percentage.
-        expect(forcedColors).toContain('--color-progress: Highlight;')
-        expect(forcedColors).toContain('--color-drop: Canvas;')
+        expect(forcedColors).toContain('--color-primary: Highlight;')
+        expect(forcedColors).toContain('--color-track: Canvas;')
     })
 
-    it('drops the decorative paper offset, which has no system color', () => {
-        expect(forcedColors).toContain('--shadow-paper: none;')
+    it('drops the primary button gradient and its highlight, which have no system color', () => {
+        expect(forcedColors).toMatch(/\.fd-button--primary \{\s*background: Highlight;\s*box-shadow: none;\s*\}/)
+    })
+
+    it('restates every box-shadow focus ring as an outline, because Windows High Contrast Mode strips decorative box-shadow (Story 7.11)', () => {
+        // Story 7.11 moved every ring from `outline` to `box-shadow`
+        // everywhere else in this file. `box-shadow` has no guaranteed
+        // survival in forced colors the way `outline` does, so it is
+        // restated here in system colors rather than left to inherit the
+        // (stripped) authored shadow.
+        const ring = block('.fd-button:focus-visible,\n    .fd-url:focus-visible,\n    .fd-button[data-focus-return],\n    .fd-disclosure__summary:focus-visible,\n    .fd-browse-menu .fd-button:focus {')
+        expect(ring).toContain('outline: var(--focus-ring-width) solid Highlight;')
+        expect(ring).toContain('box-shadow: none;')
     })
 })
 
@@ -295,13 +336,50 @@ describe('reduced motion', () => {
 })
 
 describe('the focus indicator', () => {
-    it('draws one ring from the focus token for the two Tab-reachable controls', () => {
+    it('draws a two-tone ring -- a surface gap, then a primary ring -- for the two Tab-reachable controls (Story 7.11)', () => {
         expect(stylesheet).toMatch(
-            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible \{\s*/,
+            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\.fd-button\[data-focus-return\] \{\s*/,
         )
-        expect(stylesheet).toContain('outline: var(--focus-ring-width) solid var(--color-focus);')
-        expect(stylesheet).toContain('outline-offset: var(--focus-ring-offset);')
-        expect(stylesheet).toContain('--focus-ring-width: 3px;')
+        const ring = block('.fd-button:focus-visible,')
+        // box-shadow, never a real outline: a separate outline and
+        // box-shadow "fighting each other" (the owner's words) is what
+        // Story 7.11 replaced with two shadows stacked in one declaration.
+        // `outline: none;` is allowed and expected here -- it is not a
+        // second ring, it is what suppresses WebKit's own default one; see
+        // the dedicated regression test below.
+        expect(ring).not.toMatch(/outline:(?!\s*none\b)/)
+        expect(ring).toContain('0 0 0 var(--focus-ring-offset) var(--color-surface)')
+        expect(ring).toContain('0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)')
+        expect(stylesheet).toContain('--focus-ring-width: 2px;')
+        expect(stylesheet).toContain('--focus-ring-offset: 2px;')
+    })
+
+    it('rings the browse trigger on its scripted-return marker (Story 7.10), alongside :focus-visible rather than replacing it', () => {
+        // `BrowseControl` sets `[data-focus-return]` only on the two returns
+        // it makes itself (Escape, or an item chosen by keyboard) and clears
+        // it on blur -- see `frontend/src/ui/IdleView.tsx`. This CANNOT
+        // become a bare `.fd-button:focus` rule: the trigger sits in the
+        // ordinary tab order and a mouse click focuses it too, so a plain
+        // `:focus` rule would repaint the ring after every click on it --
+        // the stale-ring regression `:focus-visible` exists to prevent.
+        const ring = block('.fd-button:focus-visible,')
+        expect(ring).toContain('[data-focus-return]')
+        expect(ring).not.toMatch(/\.fd-button:focus\b(?!-visible)/)
+    })
+
+    it('applies the identical two-tone ring to the disclosure summary, the third Tab-reachable ring in the product (Story 7.11)', () => {
+        // "Apply the same treatment everywhere the ring is used... so there
+        // is one focus appearance in the product, not two" -- the owner's
+        // words. The trigger/.fd-url rule above is one ring; this is the
+        // second of the three named explicitly.
+        const summaryRing = block('.fd-disclosure__summary:focus-visible {')
+        // See the comment above the equivalent assertion for the shared
+        // ring rule: `outline: none;` is expected, a real outline value is not.
+        expect(summaryRing).not.toMatch(/outline:(?!\s*none\b)/)
+        expect(summaryRing).toContain('0 0 0 var(--focus-ring-offset) var(--color-surface)')
+        expect(summaryRing).toContain(
+            '0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)',
+        )
     })
 
     it('never rings a routed landing target, even when focus on it is visible', () => {
@@ -323,6 +401,159 @@ describe('the focus indicator', () => {
         // Not folded into the controls' ring rule: a shared selector list is
         // exactly the regression this pins.
         expect(stylesheet).not.toMatch(/\.fd-button:focus-visible,[^{]*\[data-focus-target\]/)
+    })
+
+    it('suppresses the UA default outline on every box-shadow ring, so WebKit cannot paint its own blue ring underneath the product ring (regression fix)', () => {
+        /*
+          Owner-observed regression: pressing Escape closes the browse menu
+          correctly, but whatever receives focus afterwards shows a blue
+          macOS system focus ring around the product's own mocha two-tone
+          ring. Story 7.11 replaced `outline` with `box-shadow` for the ring,
+          but `box-shadow` does not replace the user agent's own default
+          focus outline the way `outline` used to -- so WebKit keeps drawing
+          its blue `outline` underneath the shadow ring, and two rings paint
+          at once. The fix is an explicit `outline: none;` alongside the
+          box-shadow on every normal-mode ring rule (never in the
+          forced-colors block, where a real `outline` is load-bearing).
+        */
+        for (const selector of ['.fd-button:focus-visible,', '.fd-disclosure__summary:focus-visible {']) {
+            const ring = block(selector)
+            expect(ring, selector).toContain('outline: none;')
+        }
+    })
+})
+
+describe('the focus ring is primary, kept visible by a structural gap, not a separate hue (Story 7.11)', () => {
+    /*
+      Story 7.8 protected the ring's visibility with a guard that the two
+      colours must never be equal -- a hue-difference mechanism, because the
+      ring was an `outline` painted directly against whatever fill sat under
+      it, and a same-hue outline on a same-hue fill disappears. The owner
+      found the resulting violet "poorly polished," a second hue with no
+      relationship to the rest of the product, and asked for the ring to be
+      the product's one accent colour instead.
+
+      Story 7.11 removes `--color-focus` entirely -- the ring now reads
+      `var(--color-primary)` directly, so there is no second token left to
+      collapse onto the first by accident. What still needs protecting is
+      the thing the old guard was actually protecting, visibility, not the
+      hue-difference mechanism it happened to use. The two-tone ring keeps
+      it visible structurally instead: a `--color-surface` gap sits between
+      the ring and whatever it surrounds, so a same-hue ring never touches a
+      same-hue fill directly. This is a reframing of the Story 7.8 guard,
+      not a deletion of it -- the assertion below is what replaces "must not
+      equal primary" with "must have a gap namely surface-coloured, strictly
+      inside the ring".
+    */
+    it('has no --color-focus token left in either mode -- the ring is primary itself', () => {
+        expect(theme).not.toMatch(/--color-focus:/)
+        expect(dark).not.toMatch(/--color-focus:/)
+    })
+
+    it('keeps a surface-coloured gap strictly inside the primary ring on every ringed control', () => {
+        // Mutation named by the owner: remove the gap (collapse to a single
+        // primary-only shadow) -> this must fail, naming the missing gap --
+        // the reframed form of Story 7.8's "must not collapse onto primary"
+        // guard. A ring with no gap sits flush against a primary fill (the
+        // trigger's own background once chosen, the browse menu item's
+        // fill) and disappears exactly as the outline-era violet was
+        // introduced to prevent.
+        for (const selector of ['.fd-button:focus-visible,', '.fd-disclosure__summary:focus-visible {']) {
+            const rule = block(selector)
+            const shadows = rule.match(/box-shadow:\s*([^;]+);/)?.[1]
+            expect(shadows, `${selector} box-shadow`).toBeTruthy()
+
+            const gapOffset = shadows!.match(/0 0 0 (var\(--focus-ring-offset\)) var\(--color-surface\)/)?.[1]
+            const ringOffset = shadows!.match(
+                /0 0 0 calc\((var\(--focus-ring-offset\)) \+ (var\(--focus-ring-width\))\) var\(--color-primary\)/,
+            )
+            expect(gapOffset, `${selector} surface gap stop`).toBeTruthy()
+            expect(ringOffset, `${selector} primary ring stop, offset by the gap plus its own width`).toBeTruthy()
+        }
+
+        // The browse menu item stacks a third shadow (the tint halo) ahead
+        // of the same gap/ring pair -- same guarantee, applied after an
+        // existing 4px layer rather than from zero.
+        const menuItemRing = block('.fd-browse-menu .fd-button:focus {')
+        expect(menuItemRing).toContain('0 0 0 calc(4px + var(--focus-ring-offset)) var(--color-surface)')
+        expect(menuItemRing).toContain(
+            '0 0 0 calc(4px + var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)',
+        )
+    })
+
+    it('declares the published Story 7.8 mocha values exactly, with no violet left to declare', () => {
+        expect(theme).toContain('--color-primary: #9C5636;')
+        expect(theme).toContain('--color-primary-hover: #7F4428;')
+        expect(theme).toContain('--color-primary-ink: #FFFFFF;')
+        expect(theme).not.toContain('#6B4E9E')
+
+        expect(dark).toContain('--color-primary: #E39B70;')
+        expect(dark).toContain('--color-primary-hover: #F0B694;')
+        expect(dark).toContain('--color-primary-ink: #2B1206;')
+        expect(dark).not.toContain('#B79BE0')
+    })
+
+    it('declares no --color-primary-hi any more -- the black-flash defect fix retired it', () => {
+        // primary-hi fed only the primary button's colour-stop gradient. The
+        // defect fix replaced that gradient with a translucent-white sheen
+        // independent of the fill colour beneath it, so nothing reads this
+        // token any more; DESIGN.md's Colors and Elevation & Depth sections
+        // were amended to match. A reappearance here would mean either the
+        // gradient came back or a declared token has no reader again.
+        expect(theme).not.toContain('--color-primary-hi')
+        expect(dark).not.toContain('--color-primary-hi')
+        expect(forcedColors).not.toContain('--color-primary-hi')
+        // componentRules still narrates the removal in prose (the CSS
+        // comments above .fd-button--primary), so this checks only that
+        // nothing there still *reads* the token through var().
+        expect(componentRules).not.toContain('var(--color-primary-hi)')
+    })
+})
+
+describe('primary-tint carries text (Story 7.8 review follow-up)', () => {
+    it('is mocha, not the leftover blue wash, in both modes', () => {
+        // Mutation named in the review follow-up: revert primary-tint to a
+        // blue value -> must fail, naming the pair. Checked here directly
+        // against the published tokens, and again below via the recomputed
+        // contrast pairs that would actually catch a bad fraction, not only
+        // a wrong hue.
+        expect(theme).toContain('--color-primary-tint: #F5EEEB;')
+        expect(theme).not.toContain('--color-primary-tint: #E6EFFB;')
+
+        expect(dark).toContain('--color-primary-tint: #372E2B;')
+        expect(dark).not.toContain('--color-primary-tint: #23303F;')
+    })
+
+    it('keeps muted readable on the drag-active fill, which is why the dark fraction is 12%, not 16%', () => {
+        // Mutation named in the review follow-up: a mocha fraction that
+        // puts muted under 4.5:1 -> must fail, naming the pair. #2E2621 is
+        // the 16% fraction the review rejected for exactly this reason
+        // (muted measured 4.49:1 there); resolved by luminance formula
+        // here, not by re-typing the rejected hex, so this test would catch
+        // any future fraction that repeats the same mistake, not only this
+        // one hex.
+        function channel(value: number): number {
+            const c = value / 255
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+        }
+        function luminance(hex: string): number {
+            const digits = hex.replace('#', '')
+            return 0.2126 * channel(Number.parseInt(digits.slice(0, 2), 16)) +
+                0.7152 * channel(Number.parseInt(digits.slice(2, 4), 16)) +
+                0.0722 * channel(Number.parseInt(digits.slice(4, 6), 16))
+        }
+        function contrast(foreground: string, background: string): number {
+            const a = luminance(foreground)
+            const b = luminance(background)
+            return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+        }
+
+        const darkMuted = dark.match(/--color-muted:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+        const darkTint = dark.match(/--color-primary-tint:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+        expect(darkMuted, '--color-muted (dark)').toBeTruthy()
+        expect(darkTint, '--color-primary-tint (dark)').toBeTruthy()
+
+        expect(contrast(darkMuted!, darkTint!), 'muted on primary-tint (dark)').toBeGreaterThan(4.5)
     })
 })
 
@@ -398,6 +629,230 @@ describe('reflow to 320 CSS pixels', () => {
     })
 })
 
+describe('Story 7.3: rebuilding Idle', () => {
+    it('gives the drop zone the xxl radius and sh-2 elevation, with no boundary of its own', () => {
+        const zone = block('.fd-drop-zone {')
+        expect(zone).toContain('border-radius: var(--radius-xxl);')
+        expect(zone).toContain('box-shadow: var(--shadow-sh-2);')
+        expect(zone).not.toMatch(/\bborder(-color|-style)?\s*:/)
+    })
+
+    it('insets the dashed inner rule 7px so its radius is concentric with the card', () => {
+        // DESIGN.md, Shapes: "A 24px card with 7px inset padding takes a
+        // 17-18px inner radius." --radius-xxl is 24px and --radius-xl is
+        // 18px (both pinned above), so the inner rule has to read the xl
+        // token, not a value chosen on its own -- a hand-picked radius here
+        // would drift silently the next time --radius-xxl or --radius-xl
+        // moved.
+        const zone = block('.fd-drop-zone {')
+        expect(zone).toContain('padding: 7px;')
+
+        const inner = block('.fd-drop-zone__inner {')
+        expect(inner).toContain('border-radius: var(--radius-xl);')
+        // The functional token, not the decorative one -- this dashed rule is
+        // the only thing that identifies the drop target. See the controls
+        // list below, which now includes .fd-drop-zone__inner.
+        expect(inner).toContain('border: 2px dashed var(--color-control-border);')
+    })
+
+    it('goes solid primary with a tinted fill on drag-active, and lifts the glyph -- never fill alone', () => {
+        const active = block('.fd-drop-zone.wails-drop-target-active .fd-drop-zone__inner {')
+        expect(active).toContain('border-style: solid;')
+        expect(active).toContain('border-color: var(--color-primary);')
+        expect(active).toContain('background: var(--color-primary-tint);')
+
+        const lift = block('.fd-drop-zone.wails-drop-target-active .fd-drop-symbol {')
+        expect(lift).toContain('transform: translateY(-3px);')
+    })
+
+    it('gives the disclosure family the xl radius, sh-1 elevation, a hover fill and a rotating chevron', () => {
+        const disclosure = block('.fd-disclosure {')
+        expect(disclosure).toContain('border-radius: var(--radius-xl);')
+        expect(disclosure).toContain('box-shadow: var(--shadow-sh-1);')
+
+        const summary = block('.fd-disclosure__summary {')
+        expect(summary).toContain('list-style: none;')
+
+        expect(stylesheet).toContain('.fd-disclosure__summary:hover {')
+
+        expect(stylesheet).toMatch(
+            /\.fd-disclosure\[open\] > \.fd-disclosure__summary \.fd-disclosure__chevron \{\s*transform: rotate\(45deg\);\s*\}/,
+        )
+    })
+
+    it("gives the open disclosure's body enough top padding to clear the focus ring, expressed as a token, not a magic number", () => {
+        // Owner: "these two tabs at the bottom when they have the
+        // highlighting it sort of covers the text, so maybe we need to
+        // offset them down a bit more as well." Cause: `.fd-disclosure__body`
+        // had NO top padding at all, so the open body's first line sat flush
+        // against the summary's bottom edge -- exactly where the summary's
+        // own two-tone focus ring (`--focus-ring-offset` + `--focus-ring-width`)
+        // extends beyond its box.
+        //
+        // This derives the ring's total reach from the same tokens the ring
+        // itself is built from (never a hand-copied "4px"), then requires
+        // whatever spacing token the body's top padding uses to exceed it --
+        // "exceed", not merely equal, per the owner's screenshot showing the
+        // body copy sitting too tight even ignoring the ring.
+        // The ring tokens live on :root, not in @theme (see the comment
+        // above their declaration in style.css), so they are read from the
+        // whole stylesheet rather than the `theme` block like the spacing
+        // tokens below.
+        const ringOffset = Number(stylesheet.match(/--focus-ring-offset:\s*(\d+)px;/)?.[1])
+        const ringWidth = Number(stylesheet.match(/--focus-ring-width:\s*(\d+)px;/)?.[1])
+        expect(ringOffset).toBeGreaterThan(0)
+        expect(ringWidth).toBeGreaterThan(0)
+        const ringExtent = ringOffset + ringWidth
+
+        const body = block('.fd-disclosure__body {')
+        const topPaddingToken = body.match(/padding:\s*var\(--spacing-(\d+)\)\s+var\(--spacing-4\)\s+var\(--spacing-4\);/)
+        expect(topPaddingToken, 'a spacing token for the body\'s top padding, not a bare pixel value').toBeTruthy()
+
+        const spacingValue = Number(theme.match(new RegExp(`--spacing-${topPaddingToken![1]}:\\s*(\\d+)px;`))?.[1])
+        expect(spacingValue, 'the chosen spacing token must resolve to a real value in @theme').toBeGreaterThan(0)
+        expect(spacingValue).toBeGreaterThan(ringExtent)
+    })
+
+    it('gives the browse trigger chevron the same 12x12 border-chevron mechanism as the disclosure, not a text glyph (defect fix)', () => {
+        /*
+          Owner-observed defect: the browse trigger's chevron looked tiny and
+          thin next to the disclosure chevrons. Cause: the disclosure marker
+          is a CSS border chevron (12x12 box, 2px border-right/border-bottom,
+          rotated), while the trigger rendered a text glyph (U+2304) styled
+          only with `margin-inline-start: auto` -- a text glyph at the
+          control's font size renders small and hairline-thin. The fix gives
+          the trigger the same border-chevron box, coloured for the mocha
+          fill it sits on (--color-primary-ink, not --color-muted, since the
+          trigger is a filled primary control, unlike the disclosure summary).
+        */
+        const chevron = block('.fd-browse-trigger__chevron {')
+        expect(chevron).toContain('width: 12px;')
+        expect(chevron).toContain('height: 12px;')
+        expect(chevron).toContain('border-right: 2px solid var(--color-primary-ink);')
+        expect(chevron).toContain('border-bottom: 2px solid var(--color-primary-ink);')
+        // Points DOWN, not right. The disclosure's chevron rests at
+        // `rotate(-45deg)` (pointing right) and rotates to 45deg when the
+        // details expands in place. This control does not expand in place --
+        // it opens a menu *below* itself -- so its indicator rests pointing
+        // down, the way the text glyph it replaced (U+2304) did and the way
+        // every platform popup button does. Owner-observed regression: giving
+        // it the disclosure's resting angle made the one control in Idle that
+        // *acts* visually indistinguishable from the two informational rows
+        // beneath it, which is the distinction Story 7.8 exists to draw.
+        expect(chevron).toContain('transform: rotate(45deg);')
+        expect(chevron).not.toContain('transform: rotate(-45deg);')
+    })
+
+    it('keeps the always-open recovery block styled separately from the Idle disclosure form', () => {
+        // Both share the fd-help class name -- StagedView's plain <div> and
+        // IdleView's <details> -- so the box styling has to be scoped away
+        // from the disclosure form, or Idle would paint both a card and a
+        // disclosure surface on the same element.
+        expect(stylesheet).toContain('.fd-help:not(.fd-disclosure) {')
+    })
+})
+
+describe('Story 7.7: compose the lifecycle region vertically', () => {
+    it('grows the region to fill the available height rather than hugging its content', () => {
+        // The mutation named in the acceptance criteria: remove the growth
+        // and restore the hugging column -> this must fail.
+        const region = block('.fd-region {')
+        expect(region).toMatch(/flex:\s*1 1 auto;/)
+    })
+
+    it('centres Pending, Transferring and the terminal outcome-as-phase-view, never Idle or Staged', () => {
+        // Mutation: top-align any of the three named states -> must fail.
+        const centered = block(".fd-region[data-phase-view='pending'],")
+        expect(centered).toContain("data-phase-view='transferring'")
+        expect(centered).toContain(".fd-app > .fd-outcome[data-phase-view='outcome']")
+        expect(centered).toContain('justify-content: center;')
+
+        // Idle and Staged are not named by the centering selector at all --
+        // top alignment is the flex default, so their absence here is what
+        // keeps them top-aligned. DESIGN.md states the Staged exception
+        // explicitly rather than leaving it as CSS silence.
+        expect(centered).not.toContain("data-phase-view='idle'")
+        expect(centered).not.toContain("data-phase-view='staged'")
+
+        const designSpine = readFileSync(designSpinePath(), 'utf8')
+        expect(designSpine).toMatch(/Staged is the one exception, and stays top-aligned/)
+    })
+
+    it('excludes a retained outcome from growth or centering, so it keeps its natural height', () => {
+        // OutcomePanel.tsx only sets data-phase-view when `phaseView` is true;
+        // a retained outcome above Idle renders without it, and a
+        // command-failure panel (also OutcomePanel, also phaseView=false)
+        // renders *inside* .fd-idle, not as .fd-app's direct child at all --
+        // so the growth/centering rule has to key off the base .fd-outcome
+        // class doing nothing on its own. Growth belongs only on the two
+        // qualified selectors this describe block already pins:
+        // .fd-app > .fd-outcome[data-phase-view='outcome'] for the terminal
+        // phase view, and nothing for a retained or command-failure panel.
+        const base = block('.fd-outcome {')
+        expect(base).not.toMatch(/flex:\s*1/)
+        expect(base).not.toContain('justify-content: center;')
+        expect(stylesheet).not.toMatch(/\.fd-app > \.fd-outcome\s*\{[^}]*flex:\s*1/)
+    })
+
+    it('grows the drop zone into Idle\'s slack with a bounded flexible height, never a fixed one', () => {
+        // Mutation: remove the growth and restore the hugging column, or give
+        // the drop zone a fixed height instead of a bounded flexible one ->
+        // both must fail.
+        const idle = block('.fd-idle {')
+        expect(idle).toMatch(/flex:\s*1 1 auto;/)
+
+        const zone = block('.fd-drop-zone {')
+        expect(zone).toMatch(/flex:\s*1 1 auto;/)
+        expect(zone).toMatch(/min-block-size:\s*200px;/)
+        expect(zone).toMatch(/max-block-size:\s*\d+px;/)
+        // A plain, unqualified height/block-size would be the fixed height
+        // the acceptance criteria forbid. Only the min-/max- bounded forms
+        // may appear.
+        expect(zone).not.toMatch(/(?<!min-|max-)\bblock-size:/)
+        expect(zone).not.toMatch(/(?<!min-)\bheight:/)
+
+        const inner = block('.fd-drop-zone__inner {')
+        expect(inner).toMatch(/flex:\s*1 1 auto;/)
+    })
+
+    it('states the vertical-composition rule in DESIGN.md before the stylesheet implements it', () => {
+        const designSpine = readFileSync(designSpinePath(), 'utf8')
+        expect(designSpine).toMatch(/### Vertical composition \(Story 7\.7\)/)
+        expect(designSpine).toMatch(
+            /The lifecycle region fills the available window height rather than hugging/,
+        )
+        expect(designSpine).toMatch(/bounded flexible/)
+    })
+
+    it('removes the disclosure summary icon rather than shipping a featureless dot', () => {
+        // Either resolution is acceptable per the acceptance criteria; this
+        // repo took removal. Mutation: reintroduce the icon markup or its
+        // rule -> must fail.
+        expect(stylesheet).not.toContain('.fd-disclosure__icon')
+    })
+
+    it('retires primary-hi rather than continuing to narrow it, once the black-flash defect fix gave it no reader', () => {
+        // This test used to pin the dark primary-hi delta (Story 7.7:
+        // #6FB0FF -> #5EA6FF; Story 7.8: superseded again by the mocha
+        // palette's #EBAA82). The black-flash defect fix removed the token
+        // outright -- it fed only the primary button's retired colour-stop
+        // gradient -- so there is nothing left to narrow. DESIGN.md's
+        // frontmatter and Colors/Elevation & Depth sections were amended to
+        // drop primary-hi and primary-hi-dark rather than leave a published
+        // value for a token the stylesheet no longer declares.
+        expect(dark).not.toContain('--color-primary-hi')
+
+        // The frontmatter token list is the maintained source of the
+        // declared palette -- prose elsewhere in the document is free to
+        // keep narrating primary-hi's retirement (and does, in the Colors
+        // and Elevation & Depth sections), but the frontmatter itself must
+        // not still list a token the stylesheet no longer declares.
+        const designSpine = readFileSync(designSpinePath(), 'utf8')
+        const frontmatter = designSpine.slice(0, designSpine.indexOf('\n---\n'))
+        expect(frontmatter).not.toContain('primary-hi')
+    })
+})
+
 describe('guarantees a stylesheet edit could silently undo', () => {
     /*
       These four were each applied during review and each survived mutation
@@ -429,12 +884,401 @@ describe('guarantees a stylesheet edit could silently undo', () => {
         )
     })
 
-    it('spends the one sanctioned paper offset on the packet and nowhere else', () => {
-        // DESIGN.md allows one decorative offset edge, names 3px 3px 0, scopes
-        // it to StagedView, and says every other surface stays flat.
-        const shadows = [...componentRules.matchAll(/box-shadow:\s*([^;]+);/g)].map(([, value]) => value.trim())
+    it('pins the three elevation tokens and the single-gradient rule', () => {
+        // The paper offset is gone; this is what replaces the assertion that
+        // pinned it. Three tokens, declared once each in @theme and again as
+        // exact dark values (proved above), plus exactly one gradient in the
+        // whole product.
+        for (const token of ['--shadow-sh-1:', '--shadow-sh-2:', '--shadow-sh-3:']) {
+            expect(theme.match(new RegExp(token.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'g')) ?? [], token)
+                .toHaveLength(1)
+        }
 
-        expect(shadows).toEqual(['var(--shadow-paper)'])
+        // Black-flash defect fix: the sheen's `background-image` now has to
+        // be declared identically at rest AND on :hover (see "the primary
+        // button hover has no black flash" describe block below -- if hover
+        // painted a different gradient, or none, `background-image` itself
+        // would jump instantly between two different images, which is the
+        // same class of defect the flash was). Two occurrences, one distinct
+        // value: the single-gradient rule is about how many different
+        // gradients the product has, not how many times the one of them is
+        // written.
+        const gradients = [...componentRules.matchAll(/(?<!repeating-)linear-gradient\(/g)]
+        expect(gradients).toHaveLength(2)
+
+        const sheen = 'linear-gradient(rgb(255 255 255 / 0.08), rgb(255 255 255 / 0))'
+        const primaryButton = block('.fd-button--primary {')
+        const primaryHover = block('.fd-button--primary:hover {')
+        expect(primaryButton).toContain(`background-image: ${sheen};`)
+        expect(primaryHover).toContain(`background-image: ${sheen};`)
+
+        // Never behind text: the one gradient sits on a control's background,
+        // and nothing clips a gradient to text anywhere in the sheet.
+        expect(stylesheet).not.toContain('background-clip: text')
+        expect(stylesheet).not.toContain('-webkit-background-clip: text')
+
+        // No element carries more than three shadow layers. box-shadow layers
+        // are comma-separated, but rgba()/rgb() commas are not layer
+        // separators, so they are stripped before counting. This has to look
+        // at both a literal `box-shadow:` declaration and the `--shadow-sh-*`
+        // tokens it reads through var() -- a var() reference itself never has
+        // a top-level comma to split on, so a layer added inside the token
+        // definition would otherwise pass unseen.
+        const shadowDeclarations = [
+            ...stylesheet.matchAll(/box-shadow:\s*([^;]+);/g),
+            ...stylesheet.matchAll(/--shadow-sh-[123]:\s*([^;]+);/g),
+        ]
+        expect(shadowDeclarations.length).toBeGreaterThan(0)
+
+        for (const [, value] of shadowDeclarations) {
+            const layers = value.replace(/rgba?\([^)]*\)/g, 'rgb').split(',')
+            expect(layers.length, value.trim()).toBeLessThanOrEqual(3)
+        }
+
+        /*
+          The primary control is the one place a `--shadow-sh-*` token and an
+          extra literal layer sit in the same declaration (its 1px inset
+          highlight). Counted separately, as the two loops above do, neither
+          the token's own two layers nor the declaration's two comma-separated
+          pieces (`var(--shadow-sh-1)` counts as one piece, `inset ...` as the
+          other) can ever exceed 3 -- so a third layer added *inside* the sh-1
+          token would still read as "2" from the declaration side and "3" from
+          the token side, both individually under the ceiling, while the
+          control would really be painting four. This resolves the var()
+          reference against its own current definition and counts what the
+          browser actually composites.
+        */
+        const sh1Definition = theme.match(/--shadow-sh-1:\s*([^;]+);/)?.[1] ?? ''
+        expect(sh1Definition, 'sh-1 token value').toBeTruthy()
+        const resolvedPrimaryShadow = primaryButton
+            .match(/box-shadow:\s*([^;]+);/)?.[1]
+            .replace('var(--shadow-sh-1)', sh1Definition) ?? ''
+        expect(resolvedPrimaryShadow, 'resolved .fd-button--primary box-shadow').toBeTruthy()
+        const resolvedLayers = resolvedPrimaryShadow.replace(/rgba?\([^)]*\)/g, 'rgb').split(',')
+        expect(resolvedLayers.length, resolvedPrimaryShadow.trim()).toBeLessThanOrEqual(3)
+    })
+})
+
+describe('the primary button hover has no black flash (defect fix)', () => {
+    /*
+      Observed defect: hovering "Choose a file or folder" (the primary
+      button) produced a black flash on the built binary. Mechanism: `.fd-button`
+      transitions `background-color` over 150ms. `.fd-button--primary` painted
+      its fill with the `background` SHORTHAND
+      (`background: linear-gradient(...)`), which -- as a side effect only the
+      shorthand has -- resets `background-color` to its initial value,
+      `transparent`. `.fd-button--primary:hover` then read
+      `background: var(--color-primary-hover)`, the shorthand again, which
+      resets `background-image` to `none`. `background-image` cannot
+      interpolate (gradients are not transitionable), so it jumps instantly,
+      while `background-color` -- reset to `transparent` a moment earlier --
+      spends the full 150ms transitioning from `transparent` to the hover
+      colour. For that window the button is partly see-through and the dark
+      canvas shows through it.
+
+      Fix: read and write `background-color` and `background-image` as
+      longhands on this rule pair, so the shorthand can never again silently
+      reset the half it does not name, and keep the sheen `background-image`
+      byte-identical between rest and hover so only the opaque
+      `background-color` animates.
+    */
+    it('never lets .fd-button--primary or its :hover use the background shorthand', () => {
+        const rest = block('.fd-button--primary {')
+        const hover = block('.fd-button--primary:hover {')
+
+        // The shorthand form -- a bare `background:` -- is what silently
+        // resets the paired longhand property. `background-color:` and
+        // `background-image:` are fine; `background:` is not.
+        for (const [name, rule] of [['.fd-button--primary', rest], ['.fd-button--primary:hover', hover]] as const) {
+            expect(rule, name).not.toMatch(/\bbackground:\s/)
+        }
+    })
+
+    it('keeps both background-color values opaque and the sheen background-image identical across :hover', () => {
+        const rest = block('.fd-button--primary {')
+        const hover = block('.fd-button--primary:hover {')
+
+        const restColor = rest.match(/background-color:\s*([^;]+);/)?.[1]
+        const hoverColor = hover.match(/background-color:\s*([^;]+);/)?.[1]
+        expect(restColor, 'rest background-color').toBeTruthy()
+        expect(hoverColor, 'hover background-color').toBeTruthy()
+
+        // Opaque: neither reads `transparent`, and neither is the fully
+        // transparent end of the sheen's own alpha ramp -- the actual defect
+        // was a `background-color` transitioning FROM `transparent`, so an
+        // opaque value in both states is the fix, not a detail of it.
+        expect(restColor).not.toMatch(/transparent|\/\s*0\)/)
+        expect(hoverColor).not.toMatch(/transparent|\/\s*0\)/)
+        expect(restColor).toBe('var(--color-primary)')
+        expect(hoverColor).toBe('var(--color-primary-hover)')
+
+        // The sheen has to be the same declaration in both states -- if hover
+        // painted its own (or no) background-image, `background-image` itself
+        // would still jump instantly between two different images, which is
+        // the same class of defect the flash was, just moved to the other
+        // longhand.
+        const restImage = rest.match(/background-image:\s*([^;]+);/)?.[1]
+        expect(restImage, 'rest background-image').toBeTruthy()
+        expect(hover).toContain(`background-image: ${restImage};`)
+    })
+})
+
+describe('the button family (Story 7.2)', () => {
+    it('gives the primary control its elevation token, a 40px height token and the press scale', () => {
+        const primary = block('.fd-button--primary {')
+        // DESIGN.md's Elevation table has no dedicated button step; `sh-1` --
+        // the lightest of the three -- is the closest match to "a resting
+        // surface", and it is what keeps this control inside the three-layer
+        // ceiling: two layers from the token plus the one inset highlight.
+        expect(primary).toContain('box-shadow: var(--shadow-sh-1), inset 0 1px 0 rgb(255 255 255 / 0.4);')
+
+        const base = block('.fd-button {')
+        expect(base).toContain('block-size: var(--spacing-control-height);')
+
+        // Every button, not only the primary one -- DESIGN.md's Motion section
+        // makes the press scale general ("Buttons scale to 0.975 on :active.
+        // Nothing else scales."), so this is one rule rather than one per
+        // variant.
+        expect(stylesheet).toMatch(/\.fd-button:active \{\s*transform: scale\(0\.975\);\s*\}/)
+    })
+
+    it('gives the secondary control a fill on top of the shared boundary, never instead of it', () => {
+        const secondary = block('.fd-button--secondary {')
+        // --color-fill-strong against --color-surface is 1.22:1 -- visible
+        // enough to read, nowhere near load-bearing -- so the 1px
+        // --color-control-border this rule inherits from .fd-button is what
+        // actually identifies the control as operable.
+        expect(secondary).toContain('background: var(--color-fill-strong);')
+        // A `border`/`border-color` declaration here would substitute a
+        // boundary rather than adding a fill on top of the shared one; this
+        // is the mutation the acceptance criterion names ("remove the
+        // boundary and keep the fill -> must fail").
+        expect(secondary).not.toMatch(/\bborder(-color)?\s*:/)
+
+        const base = block('.fd-button {')
+        expect(base).toContain('var(--color-control-border)')
+    })
+})
+
+describe('the browse menu surface (Story 7.2)', () => {
+    it('is a rounded.lg surface at sh-3 with a functional boundary', () => {
+        const menu = block('.fd-browse-menu {')
+        expect(menu).toContain('border-radius: var(--radius-lg);')
+        expect(menu).toContain('box-shadow: var(--shadow-sh-3);')
+        expect(menu).toContain('var(--color-control-border)')
+    })
+
+    it('gives menu items the sm radius', () => {
+        const items = block('.fd-browse-menu .fd-button {')
+        expect(items).toContain('border-radius: var(--radius-sm);')
+    })
+
+    it('distinguishes the focused item by primary fill, a tint halo, and its own two-tone ring -- keyed to :focus (Story 7.10, ring redrawn Story 7.11)', () => {
+        const focused = block('.fd-browse-menu .fd-button:focus {')
+        expect(focused).toContain('background: var(--color-primary);')
+        expect(focused).toMatch(/box-shadow:\s*0 0 0 4px var\(--color-primary-tint\),/)
+        // The ring is drawn here too, not only inherited from the shared
+        // `.fd-button:focus-visible` rule: that rule never matches these
+        // items on WebKit (see the mechanism test below), so it has to live
+        // in this rule for macOS to paint one at all. Story 7.11: stacked
+        // into the same box-shadow as the halo, not a separate `outline` --
+        // gap, then ring, both offset past the halo's own 4px. `outline:
+        // none;` is expected here too, suppressing WebKit's default ring;
+        // see the dedicated regression test below.
+        expect(focused).not.toMatch(/outline:(?!\s*none\b)/)
+        expect(focused).toContain('0 0 0 calc(4px + var(--focus-ring-offset)) var(--color-surface)')
+        expect(focused).toContain(
+            '0 0 0 calc(4px + var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)',
+        )
+    })
+
+    it('keys the menu item focus rule to :focus, never :focus-visible, because WebKit never matches :focus-visible on a script-focused element', () => {
+        /*
+          Mechanism pin for Story 7.10. `BrowseControl`'s menu items carry
+          `tabIndex={-1}` (roving tabindex), so they are only ever focused by
+          `element.focus()` -- the open effect, and the arrow-key handler --
+          never by a real Tab keypress. Confirmed directly against a real
+          engine: a `tabindex="-1"` button given `.focus()` from a keydown
+          handler matches `:focus-visible` in Chromium but never in WebKit
+          (Playwright's bundled build; see
+          `_bmad-output/implementation-artifacts/evidence-7-10-make-focus-visible.md`
+          for the probe). A `:focus-visible`-keyed rule here is therefore dead
+          on macOS specifically: the browse menu opens and Arrow keys move
+          between items with **no visible focus indication at all** on the
+          shipped app, even though every suite proving Chromium stays green.
+          If this assertion starts failing, whoever changed the rule back to
+          `:focus-visible` has just reintroduced that macOS defect.
+        */
+        expect(stylesheet).toContain('.fd-browse-menu .fd-button:focus {')
+        expect(stylesheet).not.toContain('.fd-browse-menu .fd-button:focus-visible {')
+    })
+
+    it('leaves the shared ring rule scoped to the ordinary controls, not folded in with the menu items', () => {
+        // The shared rule still exists for the trigger, the URL field, and
+        // every other plain .fd-button -- it is simply no longer what paints
+        // the browse menu items' ring (the test above pins that split).
+        expect(stylesheet).toMatch(
+            /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\.fd-button\[data-focus-return\] \{/,
+        )
+    })
+
+    it('suppresses the UA default outline on the focused menu item too, for the same reason as the shared ring rule (regression fix)', () => {
+        const focused = block('.fd-browse-menu .fd-button:focus {')
+        expect(focused).toContain('outline: none;')
+    })
+
+    it('carries no separate :hover appearance for menu items (Story 7.11)', () => {
+        // Before this story, `:hover` painted a faint, separate
+        // `background: var(--color-fill)` while `:focus` painted the full
+        // treatment -- two competing ideas of "the item about to be chosen."
+        // `BrowseControl` now moves focus to the hovered item itself
+        // (`onMouseEnter` in IdleView.tsx), so hover and keyboard focus
+        // share the single `:focus` rule above and there is nothing left
+        // for a `:hover` rule to paint. Its reappearance would restore the
+        // two-active-items defect this story closed.
+        expect(stylesheet).not.toContain('.fd-browse-menu .fd-button:hover')
+    })
+
+    it('gives the focused menu item the only marked appearance -- the identical rule serves hover and keyboard alike', () => {
+        // The behavioural half of "at most one item is ever marked" is
+        // proved in IdleView.test.tsx (focus is a single DOM property, and
+        // hover moves it rather than adding a second marker). This is the
+        // stylesheet half: there is exactly one selector, keyed to :focus,
+        // that marks a menu item at all, so whichever item holds focus --
+        // for any reason -- gets the identical treatment.
+        const focused = block('.fd-browse-menu .fd-button:focus {')
+        expect(focused).toContain('background: var(--color-primary);')
+        expect(stylesheet).not.toMatch(/\.fd-browse-menu \.fd-button:hover\s*\{/)
+    })
+})
+
+describe('the copy control takes the success tint (Story 7.2)', () => {
+    it('paints the fill, not only the border and text', () => {
+        const copied = block('.fd-button--copied {')
+        expect(copied).toContain('background: var(--color-success-tint);')
+        expect(copied).toContain('border-color: var(--color-success);')
+    })
+})
+
+describe('the progress card and meter (Story 7.5)', () => {
+    it('is a rounded.xxl surface at sh-3, the same step as the packet and the browse menu', () => {
+        const card = block('.fd-transfer-view {')
+        expect(card).toContain('border-radius: var(--radius-xxl);')
+        expect(card).toContain('box-shadow: var(--shadow-sh-3);')
+    })
+
+    it('keeps the pending card at its own radius, unaffected by the progress card split', () => {
+        // The two selectors shared one rule before this story; splitting them
+        // is what lets the progress card take sh-3/xxl without moving the
+        // stage-pending card, which Story 7.5 does not own.
+        const pending = block('.fd-pending-card {')
+        expect(pending).toContain('border-radius: var(--radius-lg);')
+        expect(pending).not.toContain('box-shadow')
+    })
+
+    it('is an 8px rounded.full track with a functional boundary', () => {
+        const meter = block('.fd-meter {')
+        expect(meter).toContain('height: 8px;')
+        expect(meter).toContain('border-radius: var(--radius-full);')
+        expect(meter).toContain('var(--color-control-border)')
+    })
+
+    it('fills the track solid -- the single-gradient rule is absolute and the button already spends it', () => {
+        const fill = block('.fd-meter__fill {')
+        expect(fill).toContain('background: var(--color-primary);')
+        expect(fill).not.toContain('gradient')
+    })
+
+    it('renders the percentage in {typography.numeric} with tabular numerals', () => {
+        const percent = block('.fd-progress-percent {')
+        expect(percent).toContain('font-size: var(--text-numeric);')
+        expect(percent).toContain('font-variant-numeric: tabular-nums;')
+    })
+})
+
+describe('progress presentation', () => {
+    it('keeps the unknown pattern static: no sweep, shimmer, or blink', () => {
+        expect(stylesheet).toMatch(/\.fd-meter--unknown \{[^}]*repeating-linear-gradient\(/)
+        expect(stylesheet).not.toContain('@keyframes')
+        expect(stylesheet).not.toContain('animation:')
+    })
+})
+
+describe('the outcome panel (Story 7.5)', () => {
+    it('is a centred rounded.xxl surface at sh-3', () => {
+        const outcome = block('.fd-outcome {')
+        expect(outcome).toContain('border-radius: var(--radius-xxl);')
+        expect(outcome).toContain('box-shadow: var(--shadow-sh-3);')
+        expect(outcome).toMatch(/align-items:\s*center;/)
+    })
+
+    it('gives the done and error discs their own tint, at the 74px DESIGN.md size', () => {
+        const icon = block('.fd-outcome__icon {')
+        expect(icon).toContain('width: 74px;')
+        expect(icon).toContain('height: 74px;')
+        expect(icon).toContain('border-radius: var(--radius-full);')
+
+        const done = block('.fd-outcome__icon--done {')
+        expect(done).toContain('background: var(--color-success-tint);')
+        expect(done).toContain('color: var(--color-success);')
+
+        const error = block('.fd-outcome__icon--error {')
+        expect(error).toContain('background: var(--color-error-tint);')
+        expect(error).toContain('color: var(--color-error);')
+    })
+
+    it('mutes the body copy', () => {
+        const body = block('.fd-outcome__body {')
+        expect(body).toContain('color: var(--color-muted);')
+    })
+
+    /*
+      Mutation named in the acceptance criterion: leave the check at
+      `stroke-dashoffset: 32` under reduced motion -> must fail, because the
+      check is a state cue and removing it removes meaning. The resting rule
+      below is what the reduced-motion universal transition-duration
+      collapse resolves to -- nothing inside the reduced-motion block may
+      override it back to 32.
+    */
+    it('draws the check via a transition, never a keyframe animation, and leaves it fully drawn under reduced motion', () => {
+        const path = block('.fd-outcome__check-path {')
+        expect(path).toContain('stroke-dasharray: 32;')
+        expect(path).toContain('stroke-dashoffset: 32;')
+        expect(path).toContain('transition: stroke-dashoffset 500ms var(--ease-decelerate);')
+        expect(path).not.toContain('@keyframes')
+
+        const drawn = block('.fd-outcome__check--drawn .fd-outcome__check-path {')
+        expect(drawn).toContain('stroke-dashoffset: 0;')
+
+        // Reduced motion must not re-hide the check by overriding its
+        // resting value back to the undrawn offset -- the literal mutation
+        // the acceptance criterion names.
+        expect(reducedMotion).not.toContain('stroke-dashoffset: 32')
+        expect(reducedMotion).not.toMatch(/\.fd-outcome__check/)
+    })
+})
+
+describe('the completion receipt (Story 7.5)', () => {
+    it('is two cells on {colors.fill}, divided by a separator', () => {
+        const receipt = block('.fd-receipt {')
+        expect(receipt).toContain('background: var(--color-fill);')
+        expect(receipt).toContain('grid-template-columns: 1fr 1fr;')
+
+        const divider = block('.fd-receipt__cell + .fd-receipt__cell {')
+        expect(divider).toContain('var(--color-separator)')
+    })
+
+    it('carries no duration cell and no third column', () => {
+        // The mutation this guards against is the worst possible outcome of
+        // this story: inventing a displayed duration. Nothing in the sheet
+        // may name a third receipt cell or a duration/elapsed rule.
+        expect(stylesheet).not.toMatch(/\.fd-receipt__cell--(duration|elapsed|time)/)
+        expect(stylesheet).not.toContain('grid-template-columns: 1fr 1fr 1fr')
+    })
+
+    it('renders the receipt figures with tabular numerals, like the percentage', () => {
+        const value = block('.fd-receipt__value {')
+        expect(value).toContain('font-variant-numeric: tabular-nums;')
     })
 })
 
@@ -444,8 +1288,8 @@ describe('forced colors beat the authored dark palette', () => {
           Both blocks redefine the same custom properties on bare `:root`, both
           match in a dark high-contrast theme, and their specificity is equal --
           so source order is the whole mechanism. Moving the dark block to the
-          end of the file restores Terracotta Linen for a Windows High Contrast
-          user with all 462 tests green.
+          end of the file restores Quartz for a Windows High Contrast user with
+          the whole suite green.
         */
         const darkAt = stylesheet.indexOf('@media (prefers-color-scheme: dark) {')
         const forcedAt = stylesheet.indexOf('@media (forced-colors: active) {')
@@ -473,14 +1317,6 @@ describe('the Tailwind v4 setup', () => {
         ]) {
             expect(existsSync(resolve(repositoryRoot, relative)), relative).toBe(false)
         }
-    })
-})
-
-describe('progress presentation', () => {
-    it('keeps the unknown pattern static: no sweep, shimmer, or blink', () => {
-        expect(stylesheet).toMatch(/\.fd-meter--unknown \{[^}]*repeating-linear-gradient\(/)
-        expect(stylesheet).not.toContain('@keyframes')
-        expect(stylesheet).not.toContain('animation:')
     })
 })
 
@@ -534,12 +1370,12 @@ describe('the unrounded contrast proof', () => {
 
     /** [foreground, background, minimum ratio, published as an exact figure]. */
     /*
-      `border` is absent on purpose. DESIGN.md calls it the decorative edge --
-      "paper offsets and nonessential dividers only; never the sole boundary for
-      a control, drop target, QR, progress track, or status" -- and at 1.76:1
-      against surface it would fail any load-bearing floor. The test below
-      keeps it out of the places that would make it load-bearing, which is the
-      guarantee that lets it stay out of this table.
+      `separator` is absent on purpose. DESIGN.md calls it the decorative edge
+      -- "dividers inside a surface, and nothing else... it deliberately does
+      not meet 3:1 -- it is not a boundary, it is a rule between paragraphs" --
+      and it would fail any load-bearing floor. The test below keeps it out of
+      the places that would make it load-bearing, which is the guarantee that
+      lets it stay out of this table.
     */
     const placed: Array<[string, string, number, boolean]> = [
         // Text: 4.5:1. Every one of these is body copy, a control label, or a
@@ -552,6 +1388,21 @@ describe('the unrounded contrast proof', () => {
         ['muted', 'elevated', 4.5, true],
         ['error', 'elevated', 4.5, true],
         ['primary-ink', 'primary', 4.5, true],
+        // Owner review, Story 7.7 follow-up: the hover fill is its own text
+        // background, not a stand-in covered by the resting primary-ink/
+        // primary row above. Its absence here is exactly what let
+        // .fd-button--primary:hover read --color-primary-hi (the gradient's
+        // lighter top stop, wrong direction for light mode) and land at
+        // 3.654:1 in light mode, unmeasured, under the 4.5:1 floor.
+        ['primary-ink', 'primary-hover', 4.5, true],
+        // Story 7.8 review follow-up: primary-tint is a text background too
+        // -- the drop zone's drag-active fill, which the heading and meta
+        // line render on while a drag is over it. Its absence here is
+        // exactly the kind of gap that hid the hover-fill bug in Story 7.7:
+        // primary-tint moved from a leftover blue wash to mocha alongside
+        // the rest of the accent, unmeasured, until this review pass.
+        ['text', 'primary-tint', 4.5, true],
+        ['muted', 'primary-tint', 4.5, true],
         // Status text on its own panel: published as a floor, checked below.
         ['warning', 'surface', 4.5, false],
         ['success', 'surface', 4.5, false],
@@ -561,18 +1412,26 @@ describe('the unrounded contrast proof', () => {
         ['control-border', 'canvas', 3, true],
         ['control-border', 'surface', 3, true],
         ['control-border', 'elevated', 3, true],
-        ['progress', 'drop', 3, true],
+        ['primary', 'track', 3, true],
         ['primary', 'surface', 3, true],
         ['primary', 'elevated', 3, true],
         ['warning', 'elevated', 3, true],
-        ['focus', 'elevated', 3, true],
-        // Status rules and focus against the stronger surfaces are published as
-        // the weakest-adjacent claim rather than one row each.
+        // Story 7.11: the focus ring is `--color-primary` itself now (no
+        // separate `--color-focus` token), so its visibility against every
+        // surface it can sit on is exactly the `primary` rows around it --
+        // `canvas` and `fill` are the two this table did not already need
+        // for another reason (surface/elevated/track/primary-tint above
+        // were already load-bearing before the ring moved onto `primary`).
+        ['primary', 'canvas', 3, true],
+        ['primary', 'fill', 3, true],
+        // Story 7.8 review follow-up: the drag-active rule and the
+        // solid-primary border sit directly on the primary-tint fill.
+        ['primary', 'primary-tint', 3, true],
+        // Status rules against the stronger surfaces are published as the
+        // weakest-adjacent claim rather than one row each.
         ['warning', 'canvas', 3, false],
         ['success', 'canvas', 3, false],
         ['error', 'canvas', 3, false],
-        ['focus', 'canvas', 3, false],
-        ['focus', 'surface', 3, false],
     ]
 
     it.each(placed)('%s on %s clears its AA ratio in both authored modes', (foreground, background, minimum) => {
@@ -581,6 +1440,126 @@ describe('the unrounded contrast proof', () => {
 
         expect(contrast(lightTokens[foreground], lightTokens[background])).toBeGreaterThan(minimum)
         expect(contrast(darkTokens[foreground], darkTokens[background])).toBeGreaterThan(minimum)
+    })
+
+    it('gives the hover fill its own direction-correct token, distinct from the gradient top stop', () => {
+        // Owner review, Story 7.7 follow-up. Resolves whichever --color-*
+        // var() the hover rule actually reads, then recomputes its own
+        // contrast against primary-ink -- rather than only string-matching
+        // the token name -- so a regression is reported as a failed ratio
+        // for that pair, not just a text mismatch.
+        //
+        // Reads `background-color:` specifically, not `background:` -- the
+        // black-flash defect fix moved this rule to the longhand on purpose
+        // (a bare `background:` shorthand here would reset the sheen
+        // `background-image` to `none`, which is the defect this fix
+        // closed), and "the primary button hover has no black flash"
+        // describe block below is what pins the shorthand's absence.
+        const hover = block('.fd-button--primary:hover {')
+        const hoverVar = hover.match(/background-color:\s*var\((--color-[a-z-]+)\);/)?.[1]
+        expect(hoverVar, 'the var() the hover background reads').toBeTruthy()
+        const hoverRole = hoverVar!.replace('--color-', '')
+
+        expect(hover).toContain(`border-color: var(--color-${hoverRole});`)
+        expect(lightTokens[hoverRole], hoverRole).toBeTruthy()
+        expect(darkTokens[hoverRole], hoverRole).toBeTruthy()
+
+        // Mutation 1 (owner review, the current-at-time-of-review bug):
+        // point the hover back at the gradient's top stop -> before the
+        // black-flash defect fix retired that token, hoverRole would
+        // resolve to 'primary-hi' and its light-mode ratio (3.654...) would
+        // fail this floor by name. Now that the token is gone entirely,
+        // lightTokens[hoverRole] resolves to undefined and the `toBeTruthy`
+        // check two lines up fails first -- a strictly earlier catch of the
+        // same mutation.
+        expect(
+            contrast(lightTokens['primary-ink'], lightTokens[hoverRole]),
+            `primary-ink on ${hoverRole} (light)`,
+        ).toBeGreaterThan(4.5)
+        expect(
+            contrast(darkTokens['primary-ink'], darkTokens[hoverRole]),
+            `primary-ink on ${hoverRole} (dark)`,
+        ).toBeGreaterThan(4.5)
+
+        // The resolved token must actually be the dedicated one, not merely
+        // one that happens to clear the floor.
+        expect(hoverRole).toBe('primary-hover')
+
+        // Mutation 2: swap the light hover for a value lighter than
+        // --color-primary -> caught on luminance direction, not a hex
+        // compare, so any lighter replacement is caught, not only the one
+        // hex this repo happened to pick. Dark mode is checked the opposite
+        // direction: it is supposed to lighten on hover.
+        expect(luminance(lightTokens['primary-hover'])).toBeLessThan(luminance(lightTokens['primary']))
+        expect(luminance(darkTokens['primary-hover'])).toBeGreaterThan(luminance(darkTokens['primary']))
+
+        // The gradient no longer has a colour-stop top value to check here:
+        // the black-flash defect fix replaced the primary-hi -> primary
+        // colour-stop gradient with a translucent-white sheen independent of
+        // the fill colour, so `primary-hi` was retired (see "declares no
+        // --color-primary-hi any more" above) rather than re-checked.
+    })
+
+    it('measures the sheen as a text background -- the label sits at the top of the button, where it is strongest', () => {
+        // Third time this file has found a surface text sits on that was
+        // never measured: the hover fill (Story 7.7), --color-primary-tint
+        // (Story 7.8), and now the primary button's sheen. The sheen is a
+        // translucent white overlay independent of the fill colour beneath
+        // it, painted over --color-primary-ink text, so composited it is a
+        // text background like any other and belongs in this proof.
+        //
+        // Re-derived from the stylesheet, not hand-copied: the alpha comes
+        // from the actual `.fd-button--primary` declaration, so a future
+        // edit to the sheen is measured here rather than assumed.
+        const primaryButton = block('.fd-button--primary {')
+        const sheenAlpha = Number(
+            primaryButton.match(/background-image:\s*linear-gradient\(rgb\(255 255 255 \/ ([\d.]+)\)/)?.[1],
+        )
+        expect(sheenAlpha, 'sheen top-stop alpha').toBeGreaterThan(0)
+        // Not a taste call -- DESIGN.md derives this exact figure and the
+        // rule not to raise it from the ratios this test proves below.
+        expect(sheenAlpha).toBe(0.08)
+
+        // Composites a translucent white top stop over an opaque background,
+        // rounding each channel the way a real compositor renders pixels --
+        // matching, not merely approximating, what the browser paints.
+        function composite(alpha: number, backgroundHex: string): string {
+            const bg = [0, 2, 4].map((i) => Number.parseInt(backgroundHex.slice(1).slice(i, i + 2), 16))
+            const blended = bg.map((channelValue) => Math.round(alpha * 255 + (1 - alpha) * channelValue))
+            return `#${blended.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+        }
+
+        // The label sits at the top of the button in every state the sheen
+        // paints, so all four combinations -- rest/hover x light/dark -- are
+        // real text-on-background pairs. Light rest is the worst case: the
+        // darkest of the four fills, so its composite sits closest to the
+        // 4.5:1 floor.
+        const cases: Array<[string, string, string]> = [
+            ['light rest', lightTokens['primary-ink'], lightTokens['primary']],
+            ['light hover', lightTokens['primary-ink'], lightTokens['primary-hover']],
+            ['dark rest', darkTokens['primary-ink'], darkTokens['primary']],
+            ['dark hover', darkTokens['primary-ink'], darkTokens['primary-hover']],
+        ]
+
+        const ratios = cases.map(([name, ink, fill]) => {
+            const ratio = contrast(ink, composite(sheenAlpha, fill))
+            expect(ratio, name).toBeGreaterThan(4.5)
+            return [name, ratio] as const
+        })
+
+        const worst = ratios.reduce((min, entry) => (entry[1] < min[1] ? entry : min))
+        expect(worst[0], 'the worst case is light rest, as DESIGN.md documents').toBe('light rest')
+
+        // Published, unrounded, as DESIGN.md requires of every figure this
+        // file proves.
+        expect(designSpine, `sheen top edge on primary (light rest) = ${worst[1].toFixed(9)}`)
+            .toContain(worst[1].toFixed(9))
+
+        // Mutation the task's own derivation table names: raising the alpha
+        // towards 0.12 fails this floor -- which is why 0.08 is chosen and
+        // pinned above, not a value someone could quietly nudge upward.
+        const raised = contrast(lightTokens['primary-ink'], composite(0.12, lightTokens['primary']))
+        expect(raised, 'sheen top edge on primary (light rest) at alpha 0.12').toBeLessThan(4.5)
     })
 
     it('keeps the fixed QR substrate at its published ratio in both modes', () => {
@@ -602,11 +1581,11 @@ describe('the unrounded contrast proof', () => {
     })
 
     it('keeps the floor DESIGN.md publishes instead of a row for status on its panel', () => {
-        expect(designSpine).toContain('exceed 5.14:1 light and 7.05:1 dark')
+        expect(designSpine).toContain('exceed 5.36:1 light and 6.47:1 dark')
 
         for (const status of ['warning', 'success', 'error']) {
-            expect(contrast(lightTokens[status], lightTokens['surface']), status).toBeGreaterThan(5.14)
-            expect(contrast(darkTokens[status], darkTokens['surface']), status).toBeGreaterThan(7.05)
+            expect(contrast(lightTokens[status], lightTokens['surface']), status).toBeGreaterThan(5.36)
+            expect(contrast(darkTokens[status], darkTokens['surface']), status).toBeGreaterThan(6.47)
         }
     })
 
@@ -623,12 +1602,94 @@ describe('the unrounded contrast proof', () => {
     })
 
     it('keeps the weakest-adjacent claim DESIGN.md makes for the focus indicator', () => {
+        // Story 7.11: the ring reads `--color-primary` directly, so the
+        // token this claim is about is `primary`, not a separate `focus`
+        // role -- there is no longer one to look up.
         const weakest = Math.min(
-            ...['canvas', 'surface', 'elevated'].map((surface) => contrast(lightTokens['focus'], lightTokens[surface])),
+            ...['canvas', 'surface', 'elevated'].map((surface) => contrast(lightTokens['primary'], lightTokens[surface])),
         )
 
-        expect(weakest).toBe(contrast(lightTokens['focus'], lightTokens['elevated']))
+        // The ring's weakest pairing is against canvas -- the lowest-contrast
+        // of the three surfaces it sits on -- the same relationship the
+        // violet token had before Story 7.11 retired it, because canvas was
+        // already the weakest of the three regardless of which hue sits in
+        // the ring.
+        expect(weakest).toBe(contrast(lightTokens['primary'], lightTokens['canvas']))
         expect(designSpine).toContain(weakest.toFixed(9))
+    })
+})
+
+describe('the decorative edge stays decorative', () => {
+    // DESIGN.md requires the functional boundary token on controls, the
+    // rest-state drop target, the QR frame, the URL field and the progress
+    // track. `--color-separator` deliberately fails 3:1 against every surface
+    // -- 1.45 light, 1.75 dark -- so using it on any of these would put an
+    // invisible boundary on something that needs a visible one, and it would
+    // still pass the contrast proof above, which does not look at that token
+    // at all.
+    // .fd-drop-zone is deliberately absent (Story 7.3): its outer surface
+    // carries no boundary of its own any more, only the sh-2 shadow, and its
+    // dashed inner rule (.fd-drop-zone__inner) is checked separately below --
+    // .fd-drop-zone__inner is in this list, not exempt from it. The zone
+    // carries no click handler and no tab stop, but its dashed rule is the
+    // only thing that identifies the drop target: the card is
+    // --color-surface on --color-canvas at 1.09:1 in light mode, and the
+    // spine forbids shadow from carrying a boundary. DESIGN.md's Colors
+    // table requires the functional token on "the rest-state drop target"
+    // in as many words. An earlier revision exempted it here and authored
+    // the rule with --color-separator at 1.45:1, which left the product's
+    // primary affordance with no perceivable edge.
+    const controls = [
+        '.fd-button',
+        '.fd-qr-panel',
+        '.fd-url',
+        '.fd-meter',
+        '.fd-browse-menu',
+        '.fd-drop-zone__inner',
+    ]
+
+    it.each(controls)('%s draws its boundary with the functional token, not the decorative one', (selector) => {
+        const rule = block(`${selector} {`)
+
+        expect(rule).toContain('var(--color-control-border)')
+        expect(rule).not.toContain('var(--color-separator)')
+    })
+
+    it('never uses the decorative edge as the sole boundary of a control anywhere in the sheet', () => {
+        // A stronger, sheet-wide version of the assertion above: every
+        // `border`/`border-*` declaration that names --color-separator sits
+        // outside the curated control list, and none of those declarations
+        // belongs to a selector this list names.
+        for (const selector of controls) {
+            expect(componentRules).not.toMatch(
+                new RegExp(`${selector.replace('.', '\\.')} \\{[^}]*var\\(--color-separator\\)`),
+            )
+        }
+    })
+})
+
+describe('no font ships and none is fetched', () => {
+    /*
+      Quartz retires Nunito. The platform's own display face carries the
+      voice -- SF Pro on macOS, Segoe UI Variable on Windows, system-ui behind
+      both -- so there is no local weight to protect and no faux-bold hazard
+      to legislate. What is left to assert is the structural guarantee: no
+      font file is bundled, and nothing in the stylesheet fetches one.
+    */
+    it('declares no @font-face and bundles no font file', () => {
+        expect(stylesheet).not.toContain('@font-face')
+        expect(stylesheet).not.toMatch(/url\(["']?assets\/fonts/)
+        expect(existsSync(resolve(projectRoot, 'src/assets/fonts'))).toBe(false)
+    })
+
+    it('fetches no font or any other asset over the network', () => {
+        expect(stylesheet).not.toMatch(/@import url\(|https?:\/\//)
+    })
+
+    it('names only system font stacks, never a bundled family', () => {
+        expect(theme).not.toContain('Nunito')
+        expect(theme).toContain('--font-display: -apple-system,')
+        expect(theme).toContain('--font-body: -apple-system,')
     })
 })
 
@@ -659,6 +1720,47 @@ describe('rules the components can only reference by name', () => {
         expect(url).toContain('resize: none;')
     })
 
+    /*
+      Story 7.9: the URL field's height comes from a CSS grid + hidden-mirror
+      technique (`.fd-url-wrap`/`.fd-url-mirror`), not a JS ResizeObserver.
+      `.fd-url-mirror` replicates the URL as text so its wrapped height can
+      size the grid cell -- and it must never be exposed as a second,
+      duplicate reading of the capability URL. Only `visibility: hidden`
+      removes generated/replicated content from the accessibility tree;
+      `opacity` and off-screen positioning both leave it readable.
+    */
+    it('hides the URL field sizing mirror from assistive technology with visibility, not opacity or position', () => {
+        const mirror = block('.fd-url-mirror {')
+        expect(mirror).toContain('visibility: hidden;')
+        expect(mirror).not.toMatch(/opacity:\s*0/)
+        expect(mirror).not.toContain('position: absolute')
+        expect(mirror).not.toMatch(/left:\s*-\d/)
+    })
+
+    /*
+      The mirror and the field must share font, padding, border and wrapping
+      rules exactly, or the mirror silently mis-sizes the box (Story 7.9
+      acceptance criteria). Both are driven from the same design tokens
+      declared once in `@theme`, so this checks token names rather than
+      resolved literals -- the guarantee the tokens exist to provide.
+    */
+    it.each([
+        'padding: var(--spacing-3);',
+        'border: 1px solid var(--color-control-border);',
+        'border-radius: var(--radius-md);',
+        'font-family: var(--font-code);',
+        'font-size: var(--text-code);',
+        'font-weight: var(--font-weight-code);',
+        'line-height: var(--leading-code);',
+        'overflow-wrap: anywhere;',
+        'grid-area: 1 / 1;',
+    ])('shares %s between the URL field and its sizing mirror', (declaration) => {
+        const field = block('.fd-url {')
+        const mirror = block('.fd-url-mirror {')
+        expect(field, '.fd-url').toContain(declaration)
+        expect(mirror, '.fd-url-mirror').toContain(declaration)
+    })
+
     it('shows an aria-disabled control as inert rather than merely saying so', () => {
         expect(componentRules).toMatch(/\.fd-button\[aria-disabled='true'\] \{[^}]*cursor: default;/)
     })
@@ -674,11 +1776,10 @@ describe('rules the components can only reference by name', () => {
 
       It was not hypothetical: `.fd-button[aria-disabled='true']` carried
       `opacity: 0.7`, and the quiet Cancel button underneath it is muted on
-      elevated -- published at 4.504478335:1 and composited to 2.64:1 light,
-      4.01:1 dark. The light pair has four thousandths of headroom at full
-      strength, so no fraction could have cleared the floor. Found by the Blind
-      Hunter layer re-run (D-109); DESIGN.md had already said it in the palette
-      table: "Muted is readable copy, never disabled text."
+      elevated -- a pair this file's proof publishes unrounded. No fraction
+      below 1 could safely dim it either. Found by the Blind Hunter layer
+      re-run (D-109); DESIGN.md had already said it in the palette table:
+      "Muted is readable copy, never disabled text."
 
       A future design that genuinely needs to dim something has to delete this
       test and publish the composited pair, which is the point.
@@ -710,22 +1811,6 @@ describe('a cancellation is a status, and never an error', () => {
     })
 })
 
-describe('the decorative edge stays decorative', () => {
-    // DESIGN.md requires the functional boundary token on controls, the
-    // rest-state drop target, the QR frame, the URL field and the progress
-    // track. --color-border is 1.76:1 against surface, so using it on any of
-    // them would put an invisible boundary on something that needs a visible
-    // one -- and it would still pass the contrast proof, which does not look
-    // at that token at all.
-    it.each(['.fd-button', '.fd-drop-zone', '.fd-qr-panel', '.fd-url', '.fd-meter', '.fd-browse-menu'])(
-        '%s draws its boundary with the functional token', (selector) => {
-            const rule = block(`${selector} {`)
-
-            expect(rule).not.toContain('var(--color-border)')
-        },
-    )
-})
-
 describe('declared weight nothing uses', () => {
     it('carries no animation library, since every animation one would serve is banned', () => {
         const manifest = JSON.parse(readFileSync(resolve(projectRoot, 'package.json'), 'utf8')) as {
@@ -734,15 +1819,5 @@ describe('declared weight nothing uses', () => {
 
         expect(Object.keys(manifest.dependencies).sort()).toEqual(['react', 'react-dom'])
         expect(JSON.stringify(manifest)).not.toContain('framer-motion')
-    })
-
-    it('ships the face the stylesheet names, so the local reference resolves', () => {
-        const face = block('@font-face {')
-        const [, relative] = face.match(/src: url\("([^"]+)"\)/) ?? []
-
-        expect(relative, 'a local src in @font-face').toBeTruthy()
-        expect(existsSync(resolve(projectRoot, 'src', relative!))).toBe(true)
-        // The licence travels with the face it covers.
-        expect(existsSync(resolve(projectRoot, 'src/assets/fonts/OFL.txt'))).toBe(true)
     })
 })

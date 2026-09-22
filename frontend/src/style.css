@@ -1,97 +1,145 @@
 @import "tailwindcss";
 
 /*
-  Nunito carries the paper voice: a rounded humanist face, bundled as a local
-  woff2 rather than fetched, so there is no network request and no third party.
-  Only the 400 weight ships, so nothing below asks for more -- a heavier request
-  would be synthesised into smeared faux bold. Emphasis is carried by the system
-  stack instead, which has real weights.
-*/
-@font-face {
-    font-family: "Nunito";
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url("assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
-}
-
-/*
-  Terracotta Linen -- the DESIGN.md token set, declared once as Tailwind v4 theme
+  Quartz -- the DESIGN.md token set, declared once as Tailwind v4 theme
   variables. Every rule below reads a var() from here, so a color, radius, type
   step or spacing step can be traced to a row of DESIGN.md rather than to a
   literal buried in a component.
 
   DESIGN.md publishes an authored light/dark pair, not a tint recipe, so the dark
   half is a second set of exact values further down rather than a filter over
-  these. The bundled web face the Wails template shipped is deliberately gone:
-  the spine allows system-safe stacks only, and no view names one any more.
+  these. No font is bundled and none is fetched: the platform's own display face
+  carries the voice, so this stylesheet declares no local font source at all.
 */
 @theme {
-    --color-canvas: #F7F0E7;
-    --color-surface: #FFFAF4;
-    --color-elevated: #EFE2D4;
-    --color-text: #2C2723;
-    --color-muted: #70645B;
-    --color-border: #CDBDAE;
-    --color-control-border: #8B7462;
-    --color-primary: #A94724;
+    --color-canvas: #F2F2F4;
+    --color-surface: #FFFFFF;
+    --color-elevated: #FFFFFF;
+    --color-fill: #F1F1F2;
+    --color-fill-strong: #E8E8EA;
+    --color-text: #1A1A1C;
+    --color-muted: #65656B;
+    --color-separator: #D6D6D6;
+    --color-control-border: #86868B;
+    /*
+      Story 7.8: the accent returns to the logo's mocha. Quartz's first cut
+      took the action colour to system blue on the reasoning that blue reads
+      native on both platforms; the owner kept the icon's copper-mocha
+      identity and asked for it back. The values below (primary, primary-hover,
+      primary-ink, and the violet focus token Story 7.11 later retired) are
+      sampled from build/appicon.png, not invented, and were validated against
+      both WCAG floors before this story was written -- see DESIGN.md's Colors
+      section for the re-derived contrast figures.
+
+      A `primary-hi` token lived here from Story 7.8 through the primary
+      button's black-flash defect fix: it fed only the button's retired
+      colour-stop gradient (`primary-hi` -> `primary`) and the hover rule's
+      brief, wrong-for-light-mode use of it (see the next comment). The
+      defect fix replaced that gradient with a translucent-white sheen that
+      is independent of the fill colour beneath it, so `primary-hi` has no
+      remaining reader and is not declared any more. See DESIGN.md's Colors
+      and Elevation & Depth sections for the removal.
+    */
+    --color-primary: #9C5636;
+    /*
+      The hover fill (owner review, Story 7.7 follow-up). Distinct from the
+      resting `--color-primary` fill because the two want opposite
+      directions -- light mode darkens on hover, dark mode lightens. #7F4428
+      clears the primary-ink pair at 7.608987041:1 in light mode.
+    */
+    --color-primary-hover: #7F4428;
     --color-primary-ink: #FFFFFF;
-    --color-hover: #873719;
-    --color-drop: #F1D0BD;
-    --color-progress: #B64B23;
-    --color-focus: #7E4B92;
-    --color-success: #2F7658;
-    --color-warning: #946000;
-    --color-error: #AB3932;
+    /*
+      Story 7.8 review follow-up: the original story's five-token table did
+      not name primary-tint, but the owner's actual intent -- replace the
+      blue accents with the logo's mocha -- did not stop at those five.
+      primary-tint was still a blue wash (#E6EFFB), and it sits directly
+      against the mocha border on the drag-active drop zone and the mocha
+      fill on the focused browse-menu item. #F5EEEB is mocha at 10% on
+      --color-surface, checked against every pair the drag-active fill
+      actually creates -- it carries text (the drop zone's heading and meta
+      line render on it while a drag is over it), not only a decorative
+      wash.
+    */
+    --color-primary-tint: #F5EEEB;
+    --color-track: #E9E9EB;
+    /*
+      Story 7.8 introduced a dedicated violet `--color-focus` here, distinct
+      from `--color-primary`, because a mocha ring on a mocha fill was not an
+      indicator with the *outline* mechanism then in use: same hue on same
+      hue disappears. Story 7.11 retired the token, not the concern -- the
+      owner found the violet itself "poorly polished," a second hue with no
+      relationship to the rest of the product. The replacement is a two-tone
+      ring (see `.fd-button:focus-visible` below): a `--color-surface` gap,
+      then the ring in `--color-primary` itself. The gap, not a different
+      hue, is what keeps a same-hue ring visible against a same-hue fill, so
+      the indicator is on-brand instead of foreign. There is no
+      `--color-focus` left to collapse onto `--color-primary` by accident --
+      the ring *is* `--color-primary`, structurally guarded by the gap
+      instead of by a hue difference; see styles.test.ts's reframed guard.
+    */
+    --color-success: #177A48;
+    --color-success-tint: #E3F1EA;
+    --color-warning: #8A5300;
+    --color-warning-tint: #F6EDE0;
+    --color-error: #C0362C;
+    --color-error-tint: #F8E9E7;
 
     /* Fixed in both modes: the QR substrate is never recolored or inverted. */
     --color-qr-surface: #FFFFFF;
-    --color-qr-ink: #221F1C;
+    --color-qr-ink: #1A1A1C;
 
-    --font-display: "Nunito", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-code: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --font-code: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", monospace;
 
-    --text-display: 24px;
-    --leading-display: 1.3;
-    --tracking-display: -0.005em;
-    --font-weight-display: 400;
+    --text-display: 26px;
+    --leading-display: 1.2;
+    --tracking-display: -0.022em;
+    --font-weight-display: 650;
 
     --text-headline: 20px;
-    --leading-headline: 1.35;
-    --tracking-headline: -0.005em;
-    --font-weight-headline: 400;
+    --leading-headline: 1.25;
+    --tracking-headline: -0.016em;
+    --font-weight-headline: 650;
 
-    --text-body: 14px;
-    --leading-body: 1.6;
+    --text-numeric: 30px;
+    --leading-numeric: 1.15;
+    --tracking-numeric: -0.022em;
+    --font-weight-numeric: 650;
+
+    --text-body: 13.5px;
+    --leading-body: 1.55;
     --font-weight-body: 400;
 
-    --text-body-strong: 14px;
+    --text-body-strong: 13.5px;
     --leading-body-strong: 1.5;
-    --font-weight-body-strong: 600;
+    --font-weight-body-strong: 590;
 
     --text-label: 12px;
     --leading-label: 1.3;
-    --tracking-label: 0.05em;
+    --tracking-label: 0.045em;
     --font-weight-label: 650;
 
-    --text-meta: 12px;
-    --leading-meta: 1.45;
+    --text-meta: 12.5px;
+    --leading-meta: 1.5;
     --font-weight-meta: 400;
 
     --text-code: 12px;
-    --leading-code: 1.4;
-    --font-weight-code: 500;
+    --leading-code: 1.45;
+    --font-weight-code: 400;
 
-    --text-control: 13px;
+    --text-control: 14px;
     --leading-control: 1.3;
-    --font-weight-control: 600;
+    --tracking-control: -0.005em;
+    --font-weight-control: 590;
 
-    --radius-xs: 4px;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
+    --radius-xs: 6px;
+    --radius-sm: 9px;
+    --radius-md: 11px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --radius-xxl: 24px;
     --radius-full: 9999px;
 
     --spacing-1: 4px;
@@ -102,12 +150,17 @@
     --spacing-6: 24px;
     --spacing-7: 32px;
     --spacing-8: 40px;
-    --spacing-window-gutter: 20px;
-    --spacing-control-height: 36px;
+    --spacing-window-gutter: 24px;
+    --spacing-control-height: 40px;
     --spacing-target-min: 44px;
 
-    /* Decorative paper offset, kept apart from any functional boundary. */
-    --shadow-paper: 3px 3px 0 #CDBDAE;
+    /*
+      Three elevation steps, declared once. Dark mode raises opacity rather
+      than deriving from the light values -- see the dark override below.
+    */
+    --shadow-sh-1: 0 0.5px 1px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.05);
+    --shadow-sh-2: 0 1px 2px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.07);
+    --shadow-sh-3: 0 2px 6px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.10);
 }
 
 /*
@@ -126,34 +179,72 @@
     color-scheme: light dark;
 
     /*
-      One focus indicator for the whole app. DESIGN.md names the focus color and
-      publishes its ratio against the weakest adjacent authored surface; the
-      width and offset live here so a control and a programmatic focus target
-      cannot end up wearing different rings.
+      One focus indicator for the whole app, a two-tone ring (Story 7.11):
+      `--focus-ring-offset` is the surface-coloured gap between a focused
+      element and its ring, and `--focus-ring-width` is the ring's own
+      thickness, drawn just beyond that gap. Both live here, not per-rule, so
+      every focus-ring declaration in this file -- the trigger, `.fd-url`,
+      the disclosure summary, the browse menu items -- draws the identical
+      shape. DESIGN.md names the ring colour (`--color-primary`, the gap
+      `--color-surface`) and publishes the ratio against the weakest adjacent
+      authored surface.
     */
-    --focus-ring-width: 3px;
+    --focus-ring-width: 2px;
     --focus-ring-offset: 2px;
+
+    /*
+      One easing curve for the whole product -- the decelerate curve platform
+      animations use. Motion durations live on the declarations that use them
+      (120ms press, 150-200ms hover/fill) rather than as tokens here, because
+      DESIGN.md's Motion section publishes them as prose, not a frontmatter
+      table the way colors, type, radii, spacing and elevation are.
+    */
+    --ease-decelerate: cubic-bezier(.32, .72, 0, 1);
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --color-canvas: #1C1916;
-        --color-surface: #25211D;
-        --color-elevated: #312A24;
-        --color-text: #F7EFE5;
-        --color-muted: #BCAF9F;
-        --color-border: #55493F;
-        --color-control-border: #89796A;
-        --color-primary: #FF986D;
-        --color-primary-ink: #2B1309;
-        --color-hover: #FFB18F;
-        --color-drop: #4A2D23;
-        --color-progress: #FF8858;
-        --color-focus: #C5A1D3;
-        --color-success: #79D5AA;
-        --color-warning: #F2BD62;
-        --color-error: #FF8B83;
-        --shadow-paper: 3px 3px 0 #55493F;
+        --color-canvas: #161618;
+        --color-surface: #1F1F22;
+        --color-elevated: #27272B;
+        --color-fill: #313135;
+        --color-fill-strong: #3A3A3E;
+        --color-text: #F2F2F4;
+        --color-muted: #9C9CA4;
+        --color-separator: #47474A;
+        --color-control-border: #7A7A82;
+        /* Story 7.8: dark half of the mocha accent -- see the light block above. */
+        --color-primary: #E39B70;
+        /*
+          The hover fill (owner review, Story 7.7 follow-up): dark mode
+          lightens on hover, the opposite direction from light mode's
+          --color-primary-hover above, so this is a distinct value rather
+          than a re-derivation of one rule. Story 7.8: #F0B694 clears the
+          primary-ink pair at 9.920419953:1.
+        */
+        --color-primary-hover: #F0B694;
+        --color-primary-ink: #2B1206;
+        /*
+          Story 7.8 review follow-up: #372E2B is mocha at 12%, not 16%, on
+          --color-surface-dark. 16% was checked first and put muted at
+          4.49:1 on the drag-active fill -- just under the 4.5:1 text
+          floor the drop zone's heading and meta line need there -- so 12%
+          is deliberate. Do not lighten this toward the accent for punch
+          without re-checking muted/primary-tint in the contrast proof.
+        */
+        --color-primary-tint: #372E2B;
+        --color-track: #3A3A3E;
+        --color-success: #4ED08B;
+        --color-success-tint: #20342A;
+        --color-warning: #E7A33A;
+        --color-warning-tint: #372E1D;
+        --color-error: #FF7A70;
+        --color-error-tint: #3A2422;
+
+        /* Dark mode raises opacity rather than lowering the light values. */
+        --shadow-sh-1: 0 0.5px 1px rgba(0,0,0,.4);
+        --shadow-sh-2: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.34);
+        --shadow-sh-3: 0 2px 8px rgba(0,0,0,.44), 0 16px 40px rgba(0,0,0,.5);
     }
 }
 
@@ -185,15 +276,57 @@ body {
     color: var(--color-text);
 }
 
-/* One centered readable column at the default window; it only ever shrinks. */
+/*
+  One centered readable column at the default window; it only ever shrinks.
+
+  flex: 1 1 auto (Story 7.7) is the vertical-composition rule DESIGN.md's
+  Layout & Spacing section now states: the region fills whatever height
+  .fd-app has left after an optional retained outcome above it, rather than
+  sizing to its own content and leaving the remainder of a tall window empty.
+  A retained outcome is a sibling of this element, not a child, and keeps the
+  default flex: 0 1 auto every .fd-app child gets when this rule does not
+  apply to it -- see the comment on .fd-app > .fd-outcome below.
+
+  How the extra height gets spent is a per-phase decision, not this rule's:
+  the default justify-content (flex-start) keeps Idle and Staged top-aligned;
+  the centering rule below opts Pending, Transferring and the terminal
+  outcome-as-phase-view into the alternative.
+*/
 .fd-region {
     display: flex;
     width: 100%;
     max-width: 720px;
     min-inline-size: 0;
     margin-inline: auto;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: var(--spacing-6);
+}
+
+/*
+  Pending, Transferring, and a terminal Done/Error rendered as the phase view
+  (DESIGN.md, Vertical composition): short, single-purpose states with no
+  reason to anchor to the top edge, so the region centres vertically instead
+  of hugging its content from the top.
+
+  The terminal outcome panel is not wrapped in .fd-region -- App.tsx renders
+  it directly as .fd-app's child, sharing the growth rule above so the same
+  centering can apply to it. The attribute selector below excludes a
+  *retained* outcome (data-phase-view is undefined on that one, per
+  OutcomePanel.tsx's phaseView prop) on purpose: a retained panel keeps its
+  natural height and never grows or centres.
+*/
+.fd-region[data-phase-view='pending'],
+.fd-region[data-phase-view='transferring'],
+.fd-app > .fd-outcome[data-phase-view='outcome'] {
+    flex: 1 1 auto;
+    justify-content: center;
+}
+
+.fd-app > .fd-outcome[data-phase-view='outcome'] {
+    width: 100%;
+    max-width: 720px;
+    margin-inline: auto;
 }
 
 .fd-state-heading {
@@ -276,6 +409,10 @@ body {
 }
 
 .fd-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    block-size: var(--spacing-control-height);
     padding-inline: var(--spacing-4);
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-md);
@@ -286,17 +423,108 @@ body {
     font-weight: var(--font-weight-control);
     line-height: var(--leading-control);
     cursor: pointer;
+    transition: transform 120ms var(--ease-decelerate),
+        background-color 150ms var(--ease-decelerate),
+        border-color 150ms var(--ease-decelerate);
 }
 
+/*
+  120ms press, the one accent every button shares. `.fd-target`'s min-block-size
+  already forces the real hit box to 44px on every button in the app today, so
+  this is the only place the press feedback needs to live: one rule, and
+  `prefers-reduced-motion` already neutralises its transition through the
+  universal `*` rule below, the same seam every other transition in this sheet
+  relies on.
+*/
+.fd-button:active {
+    transform: scale(0.975);
+}
+
+/*
+  The one gradient the product ships: a translucent-white sheen over the
+  primary button's own fill, plus a 1px inset top highlight. `{elevation.sh-btn}`
+  names a resting surface, so it reads as `sh-1` here -- the token spent on the
+  drop zone's disclosure rows, the lightest of the three steps -- since
+  DESIGN.md's Elevation table has no dedicated button step and this is the
+  closest match: two shadow layers plus the one inset highlight is exactly the
+  sheet's three-layer ceiling. Forced colors overrides this selector directly
+  below, after the dark block, so no authored hue -- gradient or otherwise --
+  survives into that mode.
+
+  Defect fix (owner-observed black-flash defect on hover): this rule and its
+  `:hover` below used to paint through the `background` SHORTHAND --
+  `background:` set to a colour-stop gradient function reading the retired
+  `--color-primary-hi` and `--color-primary` tokens at rest,
+  `background: var(--color-primary-hover)` on hover. `.fd-button` transitions
+  `background-color` over 150ms, and the shorthand's undocumented side effect
+  is to reset whichever longhand it does not name: the rest rule reset
+  `background-color` to `transparent`, and hover reset `background-image` to
+  `none`. `background-image` cannot interpolate, so it jumped instantly, while
+  `background-color` spent the full 150ms transitioning FROM `transparent` --
+  a see-through button for that whole window, with the dark canvas showing
+  through.
+
+  Fixed by reading/writing `background-color` and `background-image` as
+  longhands and never the shorthand, and by replacing the primary-hi ->
+  primary colour-stop gradient with a fixed translucent-white overlay
+  (independent of the fill colour underneath, so it can stay byte-identical
+  between rest and hover) over an opaque `background-color` that is the only
+  thing that changes on hover. `--color-primary-hi` fed only the retired
+  colour-stop gradient and is not declared any more -- see DESIGN.md's Colors
+  section and Elevation & Depth section for the removal.
+
+  The sheen's alpha (0.08) is a derived value, not a taste call: the label
+  sits at the top of the button, where the sheen is strongest, so the sheen is
+  a text background like the hover fill and `--color-primary-tint` turned out
+  to be. `styles.test.ts` recomputes the composited ratio from this
+  declaration and DESIGN.md publishes it; raising the alpha towards 0.12 fails
+  that floor. Do not raise it.
+*/
 .fd-button--primary {
     border-color: var(--color-primary);
-    background: var(--color-primary);
+    background-color: var(--color-primary);
+    background-image: linear-gradient(rgb(255 255 255 / 0.08), rgb(255 255 255 / 0));
+    box-shadow: var(--shadow-sh-1), inset 0 1px 0 rgb(255 255 255 / 0.4);
     color: var(--color-primary-ink);
 }
 
+/*
+  Owner review, Story 7.7 follow-up: this used to read --color-primary-hi,
+  the gradient's top stop, which is a lighter value in both modes -- correct
+  for dark mode's hover direction, wrong for light's. In light mode that put
+  --color-primary-ink on --color-primary-hi at 3.654:1, under the 4.5:1 text
+  floor the contrast proof never caught because it only measured the resting
+  primary-ink/primary pair. --color-primary-hover is
+  direction-correct in both modes -- darkens in light, lightens in dark --
+  and is never read by the gradient, so the two jobs no longer share one
+  token.
+
+  Defect fix, above this comment's story: `background-color` only, the
+  longhand, never the shorthand -- see the rest rule's comment above for why
+  the shorthand was the actual defect. `background-image` is deliberately
+  repeated here byte-identical to the rest rule so the sheen never itself
+  becomes a second thing that jumps on hover.
+*/
 .fd-button--primary:hover {
-    background: var(--color-hover);
-    border-color: var(--color-hover);
+    background-color: var(--color-primary-hover);
+    background-image: linear-gradient(rgb(255 255 255 / 0.08), rgb(255 255 255 / 0));
+    border-color: var(--color-primary-hover);
+}
+
+/*
+  Secondary: a fill on top of the shared functional boundary above, never
+  instead of it. `--color-fill-strong` against `--color-surface` is 1.22:1 --
+  visible enough to read as a control, nowhere near a load-bearing ratio -- so
+  the 1px `--color-control-border` this rule inherits from `.fd-button` is what
+  actually identifies it as operable. Removing that boundary while keeping this
+  fill is exactly the mutation `styles.test.ts` names.
+*/
+.fd-button--secondary {
+    background: var(--color-fill-strong);
+}
+
+.fd-button--secondary:hover {
+    background: var(--color-fill);
 }
 
 /* Cancel and Dismiss: quiet text actions that still own a full target. */
@@ -321,11 +549,51 @@ body {
 
   The routed landing targets below (`[data-focus-target]`) are deliberately not
   in this rule any more -- see the comment there.
+
+  Story 7.10 adds `[data-focus-return]` alongside `:focus-visible`, never in
+  place of it. It is the browse control trigger's own case: `BrowseControl`
+  sets this attribute only on the two moves it makes itself --
+  `closeAndReturnFocus`, called from Escape and from choosing an item -- and
+  clears it on blur (`frontend/src/ui/IdleView.tsx`). WebKit does not match
+  `:focus-visible` for a script-focused element (see the browse-menu-item
+  rule below for the full explanation), so without this the trigger would go
+  dark exactly when `closeAndReturnFocus` hands it focus back on macOS. The
+  trigger cannot simply switch to a bare `:focus` rule the way the menu items
+  do: it sits in the ordinary tab order and a pointer press focuses it too
+  (mousedown fires before click), so a plain `:focus` rule would repaint the
+  ring after every mouse click on it -- the exact "ring stays painted after a
+  mouse click" regression `:focus-visible` was introduced to fix in Epic 1.
+  The attribute is the narrower substitute: it fires only for the two
+  script-driven returns, never for a pointer press.
+
+  Story 7.11: `box-shadow`, not `outline`, and `--color-primary`, not a
+  separate violet token. Two stacked shadows -- a `--focus-ring-offset`
+  surface-coloured gap, then a ring `--focus-ring-width` further out in
+  `--color-primary` -- rather than an `outline` plus a `box-shadow` that
+  would have to agree with each other on radius and never quite would
+  ("fighting each other", the owner's words for the old outline/box-shadow
+  split this replaces). The gap is what keeps a same-hue ring legible
+  against a same-hue fill; see the token's own comment further up this file
+  for why the hue-separated violet was retired instead.
+
+  Regression fix: `outline: none;` alongside the shadow. `box-shadow` does
+  not replace the user agent's own default focus outline the way `outline`
+  used to -- WebKit keeps drawing its own system-coloured ring underneath
+  the shadow ring, so a control focused this way painted two rings at once
+  (reported live around the "Local network access" disclosure summary, but
+  the cause is here on every ringed surface, not just that one). The
+  forced-colors block further down restores a real `outline` on purpose --
+  Windows High Contrast strips decorative box-shadow -- and that rule wins
+  there because it is declared later; this `none` only ever applies outside
+  forced colors.
 */
 .fd-button:focus-visible,
-.fd-url:focus-visible {
-    outline: var(--focus-ring-width) solid var(--color-focus);
-    outline-offset: var(--focus-ring-offset);
+.fd-url:focus-visible,
+.fd-button[data-focus-return] {
+    outline: none;
+    box-shadow:
+        0 0 0 var(--focus-ring-offset) var(--color-surface),
+        0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
 }
 
 /*
@@ -359,12 +627,11 @@ body {
   It looks like it without dimming. This rule carried `opacity: 0.7`, which
   multiplied whichever text pair the control was already using and published no
   figure for the result: the quiet Cancel button is muted on elevated, a pair
-  the contrast table above publishes at 4.504478335:1 light, and at 0.7 that
-  composites to 2.6447:1 light and 4.0133:1 dark -- both under the 4.5:1 floor,
-  on the one label that says a cancellation is in progress. No opacity below 1
-  could have cleared it either: the light pair has four thousandths of headroom
-  at full strength. DESIGN.md's palette table settles it in one line -- "Muted
-  is readable copy, never disabled text."
+  the contrast table above publishes unrounded, and at 0.7 that composited
+  under the 4.5:1 floor on the one label that says a cancellation is in
+  progress. No opacity below 1 could have cleared it safely either. DESIGN.md's
+  palette table settles it in one line -- "Muted is readable copy, never
+  disabled text."
 
   What carries the state instead is already there and costs no contrast: the
   label itself changes (Cancel -> Canceling…, Cancel preparation -> Canceling
@@ -383,8 +650,13 @@ body {
     color: var(--color-muted);
 }
 
-/* Copy Feedback: the same control, in success text. No toast, no layout shift. */
+/*
+  Copy Feedback: the same control, taking the success tint and boundary --
+  never a toast, never a layout shift (the fixed-width rule below is what
+  guarantees the latter).
+*/
 .fd-button--copied {
+    background: var(--color-success-tint);
     border-color: var(--color-success);
     color: var(--color-success);
 }
@@ -400,26 +672,18 @@ body {
 
 /* --------------------------------------------------------------------- Idle */
 
+/*
+  flex: 1 1 auto (Story 7.7) makes .fd-idle consume the full height
+  .fd-region grows to, which is what gives the drop zone below something to
+  grow into. The other children here -- the cancel summary, the command-error
+  panel, the two disclosures, the browse control -- keep their default
+  flex: 0 1 auto, so only the drop zone actually grows.
+*/
 .fd-idle {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: var(--spacing-6);
-}
-
-.fd-preflight {
-    margin: 0;
-    padding: var(--spacing-4);
-    border-left: 4px solid var(--color-warning);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-}
-
-.fd-preflight__heading {
-    margin: 0 0 var(--spacing-2);
-    color: var(--color-warning);
-    font-size: var(--text-body-strong);
-    font-weight: var(--font-weight-body-strong);
-    line-height: var(--leading-body-strong);
 }
 
 .fd-preflight dl {
@@ -437,25 +701,89 @@ body {
     color: var(--color-muted);
 }
 
+/*
+  The drop zone: a {rounded.xxl} surface at {elevation.sh-2}, unchanged shape
+  from a functional-boundary standpoint -- it carries no click handler and no
+  tab stop (IdleView.tsx), so it is not one of the operable controls
+  "the decorative edge stays decorative" holds to --color-control-border.
+  Separation from canvas comes from the shadow, the same way .fd-packet's
+  does.
+
+  Story 7.7's vertical-composition rule: the drop zone is what absorbs Idle's
+  slack, so it is a flex item that grows (flex: 1 1 auto) rather than a block
+  box sized to its content. min-block-size is the floor it already had --
+  matched on .fd-drop-zone__inner below, since that inner box is what actually
+  reports the 200px minimum a sender sees. max-block-size is the bound the
+  acceptance criteria require, so a maximised window does not turn the target
+  into an absurd expanse: both are declared here, never a plain block-size or
+  height, which is what keeps this a *bounded flexible* height rather than a
+  fixed one. At the 640x480 native minimum this is the first thing to give
+  way -- the flex item shrinks toward its min-block-size floor and the window
+  scrolls rather than clipping, the same floor a retained outcome panel above
+  Idle cannot push it under.
+*/
 .fd-drop-zone {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: 200px;
+    max-block-size: 420px;
+    padding: 7px;
+    border-radius: var(--radius-xxl);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sh-2);
+}
+
+/*
+  The dashed inner rule, inset 7px inside the 24px card above and therefore
+  {rounded.xl} (18px) -- the parent's radius minus that inset, not a value
+  chosen on its own (DESIGN.md, Shapes: "Nested radii are concentric").
+
+  Rest state reads --color-control-border, the FUNCTIONAL token, even though
+  the zone carries no click handler and no tab stop. It was briefly authored
+  with the decorative --color-separator on the reasoning that the boundary
+  identifies nothing operable. It identifies the drop target, and nothing
+  else does: the card is --color-surface on --color-canvas, which is 1.09:1
+  in light mode, and DESIGN.md's own elevation rule says shadow is decorative
+  and that anything a shadow separates must also be separable without it. At
+  1.45:1 the app's primary affordance would have had no perceivable edge.
+  DESIGN.md's Colors table already required the functional token here --
+  "Required on controls, the rest-state drop target, ..." -- and its Drop Zone
+  component row contradicted it; the row was the error and has been corrected.
+
+  This also makes the forced-colors behaviour stated rather than emergent.
+  The previous pairing only satisfied DESIGN.md's "rest-state boundary uses
+  {colors.control-border} in forced colors" because --color-separator and
+  --color-control-border happen to resolve to the same CanvasText today, which
+  would break silently if either were ever given a different system color.
+*/
+.fd-drop-zone__inner {
     display: grid;
+    flex: 1 1 auto;
     min-block-size: 200px;
     place-items: center;
     padding: var(--spacing-6);
     border: 2px dashed var(--color-control-border);
-    border-radius: var(--radius-lg);
-    background: var(--color-surface);
+    border-radius: var(--radius-xl);
     text-align: center;
+    transition: border-color 150ms var(--ease-decelerate),
+        background-color 150ms var(--ease-decelerate);
 }
 
 /*
-  Wails adds this class while a native drag is over the gated element. The solid
-  action-colored boundary is the state cue; the fill is decoration on top of it.
+  Wails adds this class to the gated element -- .fd-drop-zone, the outer card
+  -- while a native drag is over it. The solid action-colored boundary on the
+  inner rule is the state cue; the fill is decoration on top of it, never the
+  only one, and the glyph lifts as a third.
 */
-.fd-drop-zone.wails-drop-target-active {
+.fd-drop-zone.wails-drop-target-active .fd-drop-zone__inner {
     border-style: solid;
     border-color: var(--color-primary);
-    background: var(--color-drop);
+    background: var(--color-primary-tint);
+}
+
+.fd-drop-zone.wails-drop-target-active .fd-drop-symbol {
+    transform: translateY(-3px);
 }
 
 .fd-drop-symbol {
@@ -468,6 +796,93 @@ body {
     border-radius: var(--radius-xs);
     color: var(--color-primary);
     font-size: var(--text-display);
+    transition: transform 150ms var(--ease-decelerate);
+}
+
+/*
+  DESIGN.md's Disclosure component: a {rounded.xl} surface at {elevation.sh-1}
+  with a leading tinted icon, a chevron that rotates when open, and a hover
+  fill. Native <details>/<summary> supplies the keyboard operability and the
+  open/closed state; this only paints it. `list-style: none` plus the
+  `::-webkit-details-marker` rule below remove the browser's own default
+  disclosure triangle so the authored chevron is the only one.
+*/
+.fd-disclosure {
+    border-radius: var(--radius-xl);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sh-1);
+}
+
+.fd-disclosure__summary {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-4);
+    list-style: none;
+    cursor: pointer;
+    border-radius: var(--radius-xl);
+    transition: background-color 150ms var(--ease-decelerate);
+}
+
+.fd-disclosure__summary::-webkit-details-marker {
+    display: none;
+}
+
+.fd-disclosure__summary:hover {
+    background: var(--color-fill);
+}
+
+/*
+  Story 7.11: same two-tone ring as `.fd-button:focus-visible` above -- see
+  that rule's comment for the gap/ring reasoning. `<details>`/`<summary>` is
+  natively Tab-reachable and click-activatable, so `:focus-visible` is the
+  right pseudo-class here for the same reason it is on the trigger: a plain
+  `:focus` rule would repaint after a mouse click.
+*/
+.fd-disclosure__summary:focus-visible {
+    /* Regression fix: see `.fd-button:focus-visible` above for why. */
+    outline: none;
+    box-shadow:
+        0 0 0 var(--focus-ring-offset) var(--color-surface),
+        0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
+}
+
+.fd-disclosure__heading {
+    flex: 1;
+    margin: 0;
+    color: var(--color-text);
+    font-size: var(--text-body-strong);
+    font-weight: var(--font-weight-body-strong);
+    line-height: var(--leading-body-strong);
+}
+
+.fd-disclosure__chevron {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border-right: 2px solid var(--color-muted);
+    border-bottom: 2px solid var(--color-muted);
+    transform: rotate(-45deg);
+    transition: transform 200ms var(--ease-decelerate);
+}
+
+.fd-disclosure[open] > .fd-disclosure__summary .fd-disclosure__chevron {
+    transform: rotate(45deg);
+}
+
+/*
+  Owner-observed defect: the open body's first line sat flush against the
+  summary's bottom edge (no top padding at all), which put it directly under
+  the summary's own focus ring -- the ring draws `--focus-ring-offset` +
+  `--focus-ring-width` (2px + 2px = 4px) beyond the summary's box, landing on
+  top of that line. `--spacing-3` (12px) clears that with real room to spare,
+  not the bare 4px minimum: the owner's screenshot showed the body copy
+  sitting too tight under the summary even ignoring the ring, and 12px also
+  matches the summary's own internal `gap: var(--spacing-3)` above, so the
+  open state reads as one consistent rhythm rather than two unrelated values.
+*/
+.fd-disclosure__body {
+    padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
 }
 
 /*
@@ -485,9 +900,38 @@ body {
 }
 
 /*
-  The product's first floating surface (spec-4-1). A functional boundary, not
-  the decorative paper shadow StagedView alone is allowed -- see "spends the
-  one sanctioned paper offset" in styles.test.ts.
+  Browse Control's trailing chevron (DESIGN.md, Components). Decorative only
+  -- aria-haspopup already names the button as a menu trigger.
+
+  Defect fix: this used to be a text glyph (U+2304), styled only with the
+  margin below -- at the control's font size a text glyph renders small and
+  hairline-thin, which read as "tiny" next to the disclosure chevrons. This
+  is now the same border-chevron mechanism as `.fd-disclosure__chevron`
+  (12x12 box, 2px border-right/border-bottom, rotated), coloured
+  `--color-primary-ink` rather than `--color-muted` because the trigger is a
+  filled primary control, not a surface row.
+
+  No open/closed rotation: the disclosure rotates because it expands in
+  place, and this chevron marks a menu that pops over instead -- a
+  different gesture, and the platform's own popup buttons do not rotate
+  their indicator. It stays static, always pointing down.
+*/
+.fd-browse-trigger__chevron {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    margin-inline-start: auto;
+    border-right: 2px solid var(--color-primary-ink);
+    border-bottom: 2px solid var(--color-primary-ink);
+    transform: rotate(45deg);
+}
+
+/*
+  The product's first floating surface (spec-4-1), raised to the same step as
+  the packet and the outcome panel -- it is the focal object of an open menu,
+  the same way those are the focal object of their own lifecycle state. A
+  functional boundary, not the decorative separator -- see "the decorative
+  edge stays decorative" in styles.test.ts.
 */
 .fd-browse-menu {
     position: absolute;
@@ -498,16 +942,86 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-1);
-    padding: var(--spacing-2);
+    padding: 5px;
     min-inline-size: 200px;
     background: var(--color-surface);
     border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sh-3);
 }
 
 .fd-browse-menu .fd-button {
     width: 100%;
     text-align: start;
+    border-color: transparent;
+    background: transparent;
+    border-radius: var(--radius-sm);
+}
+
+/*
+  Story 7.11: no `:hover` rule here on purpose. Before this story `:hover`
+  painted a separate, weaker `background: var(--color-fill)` while `:focus`
+  painted the full treatment below, so a sender pointing at `Folder` while
+  `File` still held focus (the open effect focused it unconditionally) saw
+  the strongly-marked item as the one they were *not* pointing at. The fix
+  is one active item, owned by focus: `BrowseControl`'s per-item
+  `onMouseEnter` moves focus to the hovered item (see `IdleView.tsx`), so
+  hover and keyboard share this single `:focus` rule and two items can never
+  be marked at once. Do not reintroduce a `:hover` rule here -- it would
+  restore the two-ideas-of-active-item defect this story closed.
+
+  Story 7.10: keyed to `:focus`, not `:focus-visible` -- deliberately, and
+  only for these elements.
+
+  Menu items carry `tabIndex={-1}` by design (roving tabindex: the menu is
+  one tab stop, arrows move within it -- see `BrowseControl` in
+  `frontend/src/ui/IdleView.tsx`), so they are *only ever* focused
+  programmatically: by the open effect when the menu appears by keyboard, by
+  the arrow-key handler while it is open, and, since Story 7.11, by
+  `onMouseEnter` when the pointer moves onto one. WebKit's `:focus-visible` heuristic
+  does not match an element focused by script (confirmed against Playwright's
+  WebKit build: a `tabindex="-1"` element given `.focus()` from a keydown
+  handler never matches `:focus-visible` there, where Chromium's does) --
+  so on macOS every rule keyed to `:focus-visible` was dead for these
+  buttons, and the menu opened with no visible focus at all: no fill, no
+  halo, no ring, confirmed on the shipped app. `:focus` fires regardless of
+  input-modality heuristics, so it is unconditionally correct here.
+
+  This is safe for exactly these elements, not a general license to swap
+  `:focus-visible` for `:focus` elsewhere: a menu item is reachable only from
+  an open menu, never a bare Tab stop, and a pointer press on one activates
+  it and immediately closes the menu (see `choose` in `BrowseControl`), so
+  the "ring stays painted after a mouse click" problem `:focus-visible`
+  exists to solve cannot arise here -- there is no closed, still-focused
+  state left behind to look stale in. Do not revert this to
+  `:focus-visible`: styles.test.ts's mutation for this rule fails naming the
+  WebKit consequence, precisely so the next edit here does not re-break it.
+
+  The ring itself has to live here too, not only the fill and the halo,
+  because the shared `.fd-button:focus-visible` rule above is exactly the
+  dead rule this comment describes for these buttons on macOS -- it still
+  applies to every other `.fd-button` (the trigger, the retry/copy/cancel
+  controls), where a real Tab always precedes their focus, so it stays put
+  there. DESIGN.md's Browse Menu row asks for fill and halo distinct from
+  the ring alone; this rule now supplies all three together.
+
+  Story 7.11: the ring itself is now `box-shadow`, not `outline` (see
+  `.fd-button:focus-visible` above for why), so it stacks with the tint halo
+  in one declaration instead of fighting it as a second, independent layer:
+  the halo at 4px, then the surface-coloured gap just beyond it, then the
+  `--color-primary` ring beyond that. All three are non-text boundaries the
+  gap keeps distinct from the mocha fill beneath them.
+*/
+.fd-browse-menu .fd-button:focus {
+    /* Regression fix: see `.fd-button:focus-visible` above for why. */
+    outline: none;
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary-ink);
+    box-shadow:
+        0 0 0 4px var(--color-primary-tint),
+        0 0 0 calc(4px + var(--focus-ring-offset)) var(--color-surface),
+        0 0 0 calc(4px + var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
 }
 
 /*
@@ -564,8 +1078,7 @@ body {
     text-transform: uppercase;
 }
 
-.fd-pending-card,
-.fd-transfer-view {
+.fd-pending-card {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-4);
@@ -575,15 +1088,57 @@ body {
     color: var(--color-text);
 }
 
+/*
+  Progress Card (Story 7.5): rounded.xxl at sh-3, the focal object of the
+  Transferring state alongside the packet and the open browse menu -- see
+  DESIGN.md's Elevation table.
+*/
+.fd-transfer-view {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
+    padding: var(--spacing-5);
+    border-radius: var(--radius-xxl);
+    background: var(--color-elevated);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sh-3);
+}
+
+/*
+  The head above the track: the percentage or literal status on the left,
+  wire bytes and throughput beside it on the right. Both sit above the 8px
+  track per DESIGN.md's Progress Card row.
+*/
+.fd-progress-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--spacing-3) var(--spacing-4);
+}
+
+/*
+  {typography.numeric}: the transfer percentage. Tabular numerals so a
+  changing value does not reflow its own row (DESIGN.md, Typography).
+*/
+.fd-progress-percent {
+    font-family: var(--font-display);
+    font-size: var(--text-numeric);
+    font-weight: var(--font-weight-numeric);
+    letter-spacing: var(--tracking-numeric);
+    line-height: var(--leading-numeric);
+    font-variant-numeric: tabular-nums;
+}
+
 .fd-packet {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-4);
     padding: var(--spacing-5);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-separator);
     border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg);
     background: var(--color-elevated);
-    box-shadow: var(--shadow-paper);
+    box-shadow: var(--shadow-sh-3);
 }
 
 .fd-hero {
@@ -608,11 +1163,20 @@ body {
 
 /* ----------------------------------------- Recovery help (Idle and Staged) */
 
-.fd-help {
+/*
+  :not(.fd-disclosure) scopes this to the always-open form StagedView renders
+  (a plain <div>, RecoveryHelp's own wrapper). Idle's form is the same class
+  on a <details> that also carries .fd-disclosure (IdleView.tsx), and takes
+  its surface styling from the shared .fd-disclosure rule above instead --
+  DESIGN.md's Disclosure component "replaces the always-open firewall and
+  recovery blocks", but only where Story 7.3 actually rebuilt them, which is
+  Idle. Staged is unchanged.
+*/
+.fd-help:not(.fd-disclosure) {
     display: grid;
     gap: var(--spacing-3);
     padding: var(--spacing-4);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-separator);
     border-radius: var(--radius-md);
     background: var(--color-surface);
     color: var(--color-text);
@@ -676,35 +1240,125 @@ body {
   under 200% text a single-line field shows a fraction of the capability URL,
   and that URL is the fallback when the QR cannot be scanned.
 
+  Story 7.9: the field's height used to be set from JavaScript (a
+  `useLayoutEffect` measuring `scrollHeight`, kept live across a window resize
+  by a `ResizeObserver` whose write was deferred a frame through
+  `requestAnimationFrame` to satisfy Chromium's loop detector). That deferral
+  meant the field was always one frame behind its own width during a live
+  drag, while everything else on screen re-wrapped in the same frame -- the
+  seam this story removes.
+
+  `.fd-url-wrap` replaces that with the CSS grid + hidden-mirror technique:
+  the wrapper is `display: grid`, and it and `.fd-url-mirror` occupy the same
+  grid cell (`grid-area: 1 / 1`). The mirror replicates the URL as plain text
+  and wraps exactly as the textarea's own text would, so the grid cell's
+  height comes from *its* layout, not from `rows` or a JS measurement.
+  `.fd-url` then stretches to fill that cell -- the default behaviour for a
+  grid item with no explicit block size, which form controls participate in
+  like any other item. A width change re-wraps the mirror and resizes the
+  cell inside the same layout pass everything else re-wraps in: no observer,
+  no `requestAnimationFrame`, no width-change bookkeeping.
+
+  `field-sizing: content` would do this with no wrapper at all, but it is
+  Chromium-only and DESIGN.md's cross-platform constraint is binding: this
+  product ships identically in WKWebView (macOS) and WebView2 (Windows), and a
+  rule that auto-sizes on one engine and clips on the other is not a fix.
+  Plain grid, and a hidden sibling element, are implemented identically in
+  both.
+
+  The mirror is a real element (`StagedView.tsx` renders it as a sibling
+  `<div>`, not a `::after` reading `attr(data-*)`). That is what this story
+  originally specified, and it works for any author-level styling -- but not
+  for WCAG 1.4.12's *reader*-level override, which `accessibility.test.tsx`
+  applies the way the standard text-spacing bookmarklet does: a bare
+  `* { line-height: ... !important }` rule. A bare universal selector does not
+  match generated pseudo-element content, so a `::after` mirror would silently
+  stop tracking the textarea's line-height, letter-spacing and word-spacing
+  the moment such an override was in effect, and the field would clip --
+  caught by the existing `accessibility.test.tsx` cases, not a new one. A
+  genuine sibling element is matched by that same `*` rule exactly like the
+  textarea is, so the two never desync under it.
+*/
+.fd-url-wrap {
+    display: grid;
+    min-inline-size: 0;
+}
+
+/*
+  `visibility: hidden` -- not `opacity: 0`, not off-screen positioning -- is
+  what removes the mirror from the accessibility tree; either of those
+  alternatives leaves it readable, and the sender would hear the capability
+  URL twice. `aria-hidden="true"` on the element in `StagedView.tsx` is a
+  second, redundant guard for the same guarantee. The trailing space appended
+  to its text content in `StagedView.tsx` mirrors the standard technique for
+  this trick: it keeps a value ending in whitespace from having its last line
+  collapse away.
+
+  Every box-model and text property below is a design token (`var(--...)`),
+  the same ones `.fd-url` reads below it, rather than a restated literal --
+  that is what "the same tokens" means here: both rules draw from one
+  definition in `@theme`, so a token change can never desync them the way two
+  independently chosen literals could. The two rules stay textually separate
+  (rather than one comma-joined selector) on purpose: it is what lets a
+  mutation change *only* the mirror's padding or line-height, which is
+  exactly the load-bearing case named in Story 7.9's acceptance criteria.
+*/
+.fd-url-mirror {
+    visibility: hidden;
+    white-space: pre-wrap;
+    grid-area: 1 / 1;
+    padding: var(--spacing-3);
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-md);
+    font-family: var(--font-code);
+    font-size: var(--text-code);
+    font-weight: var(--font-weight-code);
+    line-height: var(--leading-code);
+    overflow-wrap: anywhere;
+}
+
+/*
+  A readonly <textarea>, not a div wearing a textbox role: assistive technology
+  reads the value of a real form control reliably and disagrees about the other.
+  A textarea rather than an input because the value has to wrap -- at 320px
+  under 200% text a single-line field shows a fraction of the capability URL,
+  and that URL is the fallback when the QR cannot be scanned.
+
   Its activation floor comes from the shared .fd-target rule rather than a
-  duplicated size here, and it fills its grid column so the field can never set
-  the row's width.
+  duplicated size here. `grid-area: 1 / 1` places it in the same cell as
+  `.fd-url-mirror` above; `block-size: 100%` is what lets it stretch to fill
+  that cell -- the grid default for a block-axis-auto item, which the cell's
+  own height (set by the mirror's wrapped text) then drives. `overflow:
+  hidden` replaces `resize: none`'s old job of hiding any sub-pixel rounding
+  remainder between the two; there is nothing to scroll once the cell is
+  correctly sized.
 */
 .fd-url {
     inline-size: 100%;
+    block-size: 100%;
     resize: none;
+    overflow: hidden;
     /*
       This is what actually holds the 320px reflow floor, measured in Chromium
       (D-068's rendered suite): `anywhere` lets the field's min-content width
       fall to a single character, so the capability URL -- one unbroken token --
       cannot widen the grid track.
 
-      `min-inline-size: 0` below and `minmax(0, 1fr)` on .fd-direct-row are the
-      two standard floors for a grid item that would otherwise refuse to shrink.
-      Removing either one, or both, changes no measurement today, because this
-      declaration already got there first. They stay as depth: an edit that
-      narrows the wrapping -- to `break-word`, say, which leaves an unbreakable
-      token intrinsically wide -- lands on them rather than on a horizontal
-      scrollbar. An earlier comment here claimed min-inline-size was itself
-      load-bearing and named a scrollbar it would prevent; the rendered suite
-      disagreed, and the rule stays while the claim does not.
+      `min-inline-size: 0` below and on `.fd-url-wrap` above, plus `minmax(0,
+      1fr)` on .fd-direct-row, are the standard floors for a grid item that
+      would otherwise refuse to shrink. Removing any of them changes no
+      measurement today, because this declaration already got there first.
+      They stay as depth: an edit that narrows the wrapping -- to
+      `break-word`, say, which leaves an unbreakable token intrinsically wide
+      -- lands on them rather than on a horizontal scrollbar.
     */
     overflow-wrap: anywhere;
     min-inline-size: 0;
+    grid-area: 1 / 1;
     padding: var(--spacing-3);
     border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    background: var(--color-fill);
     color: var(--color-text);
     font-family: var(--font-code);
     font-size: var(--text-code);
@@ -744,7 +1398,7 @@ body {
     display: grid;
     gap: var(--spacing-2);
     padding-top: var(--spacing-4);
-    border-top: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-separator);
     color: var(--color-muted);
 }
 
@@ -782,11 +1436,11 @@ body {
 
 .fd-meter {
     position: relative;
-    height: 10px;
+    height: 8px;
     overflow: hidden;
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-full);
-    background: var(--color-drop);
+    background: var(--color-track);
 }
 
 /*
@@ -797,7 +1451,7 @@ body {
     background-image: repeating-linear-gradient(
         135deg,
         transparent 0 8px,
-        var(--color-progress) 8px 12px,
+        var(--color-primary) 8px 12px,
         transparent 12px 20px
     );
 }
@@ -805,7 +1459,7 @@ body {
 .fd-meter__fill {
     display: block;
     height: 100%;
-    background: var(--color-progress);
+    background: var(--color-primary);
 }
 
 .fd-empty-status {
@@ -827,7 +1481,7 @@ body {
 
 .fd-metric {
     padding: var(--spacing-3);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-separator);
     border-radius: var(--radius-sm);
     background: var(--color-surface);
 }
@@ -848,39 +1502,131 @@ body {
 
 /* ---------------------------------------------------------------- Outcomes */
 
+/*
+  Outcome Panel (Story 7.5): a centred composition at rounded.xxl / sh-3, the
+  same elevation step as the progress card and the packet -- the focal object
+  of the Done/Error lifecycle state.
+*/
 .fd-outcome {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-2);
-    align-items: start;
-    padding: var(--spacing-5);
-    border: 1px solid currentColor;
-    border-radius: var(--radius-lg);
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-6) var(--spacing-5);
+    border-radius: var(--radius-xxl);
     background: var(--color-surface);
+    box-shadow: var(--shadow-sh-3);
+    color: var(--color-text);
+    text-align: center;
 }
 
-.fd-outcome--done {
+/*
+  The 74px tinted disc. Color is never the only cue: the done disc also
+  carries the stroke-drawn check, the error disc the literal "!" glyph, and
+  both panels additionally differ by heading and body text.
+*/
+.fd-outcome__icon {
+    display: grid;
+    width: 74px;
+    height: 74px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: var(--radius-full);
+    font-size: 32px;
+    font-weight: var(--font-weight-label);
+}
+
+.fd-outcome__icon--done {
+    background: var(--color-success-tint);
     color: var(--color-success);
 }
 
-.fd-outcome--error {
+.fd-outcome__icon--error {
+    background: var(--color-error-tint);
     color: var(--color-error);
 }
 
-.fd-outcome__icon {
-    display: grid;
-    width: 30px;
-    height: 30px;
-    place-items: center;
-    border: 2px solid currentColor;
-    border-radius: var(--radius-full);
-    font-size: var(--text-headline);
-    font-weight: var(--font-weight-label);
+/*
+  The stroke-drawn check. `pathLength={32}` on the JSX path normalizes the
+  path's own length to exactly 32 units, so `stroke-dasharray: 32` always
+  means "the whole stroke" and `stroke-dashoffset: 32` always means "none of
+  it drawn yet", independent of the coordinates chosen there.
+
+  The draw is a plain CSS transition, never a keyframe-based one -- this
+  sheet declares no keyframe rule and paints no motion through the CSS
+  property the "progress presentation" tests below refuse, on purpose --
+  triggered once by OutcomePanel adding the `--drawn` modifier after mount.
+  That happens unconditionally, so `prefers-reduced-motion` never has to
+  decide whether the check gets drawn, only how fast: the universal
+  `transition-duration: 1ms !important` rule already collapses this
+  transition like every other one in the sheet, landing on the same fully
+  drawn `stroke-dashoffset: 0` this rule pins as the resting value.
+*/
+.fd-outcome__check {
+    width: 36px;
+    height: 36px;
+}
+
+.fd-outcome__check-path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 32;
+    stroke-dashoffset: 32;
+    transition: stroke-dashoffset 500ms var(--ease-decelerate);
+}
+
+.fd-outcome__check--drawn .fd-outcome__check-path {
+    stroke-dashoffset: 0;
 }
 
 .fd-outcome__body {
     margin: 0;
-    color: var(--color-text);
+    max-width: 44ch;
+    color: var(--color-muted);
+}
+
+/*
+  Completion Receipt (Story 7.5): two cells on {colors.fill}, divided by a
+  separator. Two cells, not three -- no elapsed-time cell exists here or
+  anywhere else, because no clock is tracked in the frontend and
+  EXPERIENCE.md forbids a frontend lifecycle timer. Both values are read out
+  of `CompletionReceipt`, never recomputed.
+*/
+.fd-receipt {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    margin: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-fill);
+    text-align: start;
+}
+
+.fd-receipt__cell {
+    min-inline-size: 0;
+    padding: var(--spacing-3) var(--spacing-4);
+}
+
+.fd-receipt__cell + .fd-receipt__cell {
+    border-inline-start: 1px solid var(--color-separator);
+}
+
+.fd-receipt__caption {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+}
+
+.fd-receipt__value {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--text-body-strong);
+    font-weight: var(--font-weight-body-strong);
+    font-variant-numeric: tabular-nums;
 }
 
 /* ---------------------------------------------------------------- Reflow */
@@ -920,7 +1666,7 @@ body {
 /* ------------------------------------------------- Forced colors and motion */
 
 /*
-  Forced colors supersede Terracotta Linen.
+  Forced colors supersede Quartz.
 
   The override is done on the tokens, not rule by rule, because every component
   rule already reads a var(): one block therefore reaches the whole app and no
@@ -933,28 +1679,77 @@ body {
   state is left to color alone in either mode: the drop target's active state is
   a solid boundary against a dashed one, unknown progress is a static pattern
   plus its literal text, and every outcome carries a glyph and a heading.
+
+  Every shadow and every gradient is dropped here too. The three elevation
+  tokens have no system color and are reset to none; the primary button's
+  fill (--color-primary) and its sheen have no system color either, so the
+  declaration below strips the sheen `background-image` and the inset
+  highlight outright and paints a flat `Highlight` instead.
 */
 @media (forced-colors: active) {
     :root {
         --color-canvas: Canvas;
         --color-surface: Canvas;
         --color-elevated: Canvas;
+        --color-fill: Canvas;
+        --color-fill-strong: Canvas;
         --color-text: CanvasText;
         --color-muted: CanvasText;
-        --color-border: CanvasText;
+        --color-separator: CanvasText;
         --color-control-border: CanvasText;
         --color-primary: Highlight;
+        --color-primary-hover: Highlight;
         --color-primary-ink: HighlightText;
-        --color-hover: Highlight;
-        --color-drop: Canvas;
-        --color-progress: Highlight;
-        --color-focus: Highlight;
+        --color-primary-tint: Canvas;
+        --color-track: Canvas;
+        /*
+          Story 7.11: no `--color-focus` override needed here any more. The
+          ring reads `--color-primary` directly (Highlight, above) and its
+          gap reads `--color-surface` directly (Canvas, above), so a
+          forced-colors ring is a Canvas gap around a Highlight ring without
+          a third variable to keep in step with the other two.
+        */
         --color-success: CanvasText;
+        --color-success-tint: Canvas;
         --color-warning: CanvasText;
+        --color-warning-tint: Canvas;
         --color-error: CanvasText;
+        --color-error-tint: Canvas;
 
         /* Decorative depth has no meaning in this mode and no system color. */
-        --shadow-paper: none;
+        --shadow-sh-1: none;
+        --shadow-sh-2: none;
+        --shadow-sh-3: none;
+    }
+
+    .fd-button--primary {
+        background: Highlight;
+        box-shadow: none;
+    }
+
+    /*
+      Story 7.11 switched every focus ring from `outline` to stacked
+      `box-shadow` layers (see `.fd-button:focus-visible` and neighbours
+      earlier in this file). That is fine for ordinary rendering, but
+      Windows High Contrast Mode strips decorative box-shadow the same way
+      it strips the elevation shadows reset to `none` above -- only
+      `outline` is a system-recognized focus indicator guaranteed to
+      survive forced colors. Restated here as an outline in the two system
+      colors the ring already resolves to elsewhere in this file
+      (`Highlight` for the ring, matching `--color-primary` above), so the
+      indicator does not silently vanish in forced colors specifically. The
+      tint halo on the browse menu item is allowed to go with the other
+      shadows here -- the item's own `Highlight` background and
+      `HighlightText` label already carry the marked state without it.
+    */
+    .fd-button:focus-visible,
+    .fd-url:focus-visible,
+    .fd-button[data-focus-return],
+    .fd-disclosure__summary:focus-visible,
+    .fd-browse-menu .fd-button:focus {
+        outline: var(--focus-ring-width) solid Highlight;
+        outline-offset: var(--focus-ring-offset);
+        box-shadow: none;
     }
 
     /*

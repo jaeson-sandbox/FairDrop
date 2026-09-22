@@ -219,9 +219,9 @@ func singleInstanceOption(app *App, usable func() bool) *options.SingleInstanceL
 // one once tracked a Tailwind class Story 1.9 had deleted.
 func canvasFor(dark bool) *options.RGBA {
 	if dark {
-		return &options.RGBA{R: 0x1C, G: 0x19, B: 0x16, A: 1}
+		return &options.RGBA{R: 0x16, G: 0x16, B: 0x18, A: 1}
 	}
-	return &options.RGBA{R: 0xF7, G: 0xF0, B: 0xE7, A: 1}
+	return &options.RGBA{R: 0xF2, G: 0xF2, B: 0xF4, A: 1}
 }
 
 // newBoundApp builds the App exactly as main does: wired to the real Wails

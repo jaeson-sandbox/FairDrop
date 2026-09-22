@@ -22,6 +22,12 @@ const metadata = {
     warnings: [],
 } as const
 
+const finalProgress = {
+    bytesSent: 100, totalBytes: 100, totalKnown: true, percent: 100, speedBytesPerSec: 0,
+} as const
+
+const doneReceipt = {name: metadata.name, isDir: metadata.isDir, bytesSent: finalProgress.bytesSent} as const
+
 describe('progress presentation modes', () => {
     it('derives the determinate percentage from the authoritative byte pair', () => {
         expect(selectProgressSnapshot({
@@ -140,7 +146,9 @@ describe('state-aware selectors', () => {
             commandError: null,
         }
         const done: TransferState = {
-            phase: 'done', session: {sessionId: metadata.sessionId, lastSeq: 3}, outcome: {kind: 'done'},
+            phase: 'done',
+            session: {sessionId: metadata.sessionId, lastSeq: 3},
+            outcome: {kind: 'done', receipt: doneReceipt},
         }
 
         expect(selectProgress(transferring)).toMatchObject({mode: 'known-positive', value: 25})
@@ -320,8 +328,8 @@ describe('terminal and retained outcomes', () => {
         expect(selectOutcome({
             phase: 'done',
             session: {sessionId: metadata.sessionId, lastSeq: 4},
-            outcome: {kind: 'done'},
-        })).toEqual({kind: 'done', retained: false})
+            outcome: {kind: 'done', receipt: doneReceipt},
+        })).toEqual({kind: 'done', retained: false, receipt: doneReceipt})
 
         expect(selectOutcome({
             phase: 'error',
@@ -339,13 +347,59 @@ describe('terminal and retained outcomes', () => {
     })
 
     it('presents the same outcome as retained once reset has cleared the session', () => {
-        expect(selectOutcome({phase: 'idle', retainedOutcome: {kind: 'done'}, commandError: null}))
-            .toEqual({kind: 'done', retained: true})
+        expect(selectOutcome({
+            phase: 'idle',
+            retainedOutcome: {kind: 'done', receipt: doneReceipt},
+            commandError: null,
+        })).toEqual({kind: 'done', retained: true, receipt: doneReceipt})
         expect(selectOutcome({
             phase: 'idle',
             retainedOutcome: {kind: 'error', error: publicError('source_changed')},
             commandError: null,
         })?.retained).toBe(true)
+    })
+
+    /*
+      Given a retained Done outcome in Idle, it carries the same retained
+      receipt a live Done carried -- so a reset does not empty the panel the
+      sender is still looking at.
+    */
+    it('carries the same retained receipt a live Done outcome carried', () => {
+        const live = selectOutcome({
+            phase: 'done',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'done', receipt: doneReceipt},
+        })
+        const retained = selectOutcome({
+            phase: 'idle',
+            retainedOutcome: {kind: 'done', receipt: doneReceipt},
+            commandError: null,
+        })
+
+        expect(live?.kind).toBe('done')
+        expect(retained?.kind).toBe('done')
+        expect(live?.kind === 'done' ? live.receipt : null)
+            .toEqual(retained?.kind === 'done' ? retained.receipt : null)
+    })
+
+    /*
+      `selectOutcome` only forwards `CompletionReceipt`; it computes nothing.
+      The wire-bytes-vs-logical-size guarantee (Story 7.4 AC3) is proven once,
+      where the receipt is actually built, in state.test.ts -- there is no
+      `metadata.size` in scope at this layer for a selector to substitute.
+      This instead proves the pass-through is exact, for a directory outcome
+      Story 7.5 will need to phrase differently (`receipt.isDir`).
+    */
+    it('forwards the receipt unchanged, including for a directory outcome', () => {
+        const dirReceipt = {name: 'papers', isDir: true, bytesSent: 4_096} as const
+
+        const outcome = selectOutcome({
+            phase: 'done',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'done', receipt: dirReceipt},
+        })
+
+        expect(outcome).toEqual({kind: 'done', retained: false, receipt: dirReceipt})
     })
 
     it('refuses to present a cancellation as an outcome panel', () => {

@@ -119,15 +119,38 @@ describe('the direct URL row', () => {
         expect(container.querySelectorAll('a')).toHaveLength(0)
     })
 
-    it('exposes the capability token once, and never as prose or a link target', () => {
+    it('exposes the capability token as readable content exactly once, and never as prose or a link target', () => {
         const {container} = render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
-        const serialized = container.innerHTML
-        const occurrences = serialized.split(token).length - 1
-        expect(occurrences).toBe(1)
         expect((screen.getByRole('textbox') as HTMLInputElement).value).toContain(token)
         // The QR carries the same URL as an image, not as readable text.
         expect(screen.getByRole('img').getAttribute('src')).not.toContain(token)
+        expect(container.querySelectorAll('a')).toHaveLength(0)
+
+        /*
+          Story 7.9: the field's height comes from a CSS-only grid + hidden-
+          mirror technique (`.fd-url-wrap`/`.fd-url-mirror` in style.css),
+          replacing the old JavaScript ResizeObserver. The mirror is a real
+          sibling element carrying the same URL as its own text content --
+          not a `::after` reading it back from a `data-*` attribute, because a
+          reader's WCAG 1.4.12 text-spacing override (a bare `* { ... }` rule)
+          does not reach generated pseudo-element content and would desync the
+          mirror from the textarea (see the comment beside `.fd-url-mirror` in
+          style.css). So the token now appears in `innerHTML` a second time, as
+          `.fd-url-mirror`'s text content -- but not as a second *readable*
+          occurrence: that element is `visibility: hidden` (removed from the
+          accessibility tree, unlike `opacity: 0` or off-screen positioning, so
+          it is never read aloud) and carries `aria-hidden="true"` besides,
+          never a link, and never presented as prose. It exists purely to size
+          the grid cell the real, single readable field sits in.
+        */
+        const serialized = container.innerHTML
+        const occurrences = serialized.split(token).length - 1
+        expect(occurrences).toBe(2)
+        const mirror = container.querySelector('.fd-url-mirror')
+        expect(mirror).not.toBeNull()
+        expect(mirror?.getAttribute('aria-hidden')).toBe('true')
+        expect(mirror?.textContent).toBe(`${capabilityURL} `)
     })
 
     it('renders every warning even when two arrive under the same code', () => {

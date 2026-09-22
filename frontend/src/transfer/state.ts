@@ -1,6 +1,7 @@
 import {publicError} from './errors'
 import {parseLifecycleEvent} from './validation'
 import type {
+    CompletionReceipt,
     FileMetadata,
     LifecycleEvent,
     LifecycleEventName,
@@ -48,7 +49,15 @@ export interface TransferringTransferState {
 export interface DoneTransferState {
     readonly phase: 'done'
     readonly session: SessionCursor
-    readonly outcome: {readonly kind: 'done'}
+    readonly outcome: {
+        readonly kind: 'done'
+        /**
+         * What was sent and how much -- never the full `FileMetadata`. That
+         * type also carries the one-shot capability URL and its QR code,
+         * which must not outlive the session (see `CompletionReceipt`).
+         */
+        readonly receipt: CompletionReceipt
+    }
 }
 
 export interface ErrorTransferState {
@@ -230,7 +239,18 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                         outcome: {kind: 'error', error: publicError('transfer_failed')},
                     }
                 }
-                return {phase: 'done', session, outcome: {kind: 'done'}}
+                return {
+                    phase: 'done',
+                    session,
+                    outcome: {
+                        kind: 'done',
+                        receipt: {
+                            name: state.metadata.name,
+                            isDir: state.metadata.isDir,
+                            bytesSent: event.progress.bytesSent,
+                        },
+                    },
+                }
             }
             if (event.kind === 'transfer-error') {
                 // Same rule, easier answer: this event is already a failure, so
@@ -249,7 +269,10 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
             if (event.kind !== 'transfer-reset') return state
             return {
                 phase: 'idle',
-                retainedOutcome: {kind: 'done'},
+                retainedOutcome: {
+                    kind: 'done',
+                    receipt: state.outcome.receipt,
+                },
                 commandError: null,
             }
 

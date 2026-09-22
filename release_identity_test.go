@@ -387,8 +387,8 @@ func shippedSurfaceFiles(t *testing.T) []string {
 		filepath.Join("docs", "fairdrop-architecture.md"),
 		filepath.Join("docs", "fairdrop-contracts.md"),
 		filepath.Join("_bmad-output", "specs", "spec-fairdrop", "SPEC.md"),
-		filepath.Join("_bmad-output", "planning-artifacts", "ux-designs", "ux-FairDrop-2026-08-23", "EXPERIENCE.md"),
-		filepath.Join("_bmad-output", "planning-artifacts", "ux-designs", "ux-FairDrop-2026-08-23", "DESIGN.md"),
+		filepath.Join("_bmad-output", "planning-artifacts", "ux-designs", "ux-FairDrop-quartz-2026-09-20", "EXPERIENCE.md"),
+		filepath.Join("_bmad-output", "planning-artifacts", "ux-designs", "ux-FairDrop-quartz-2026-09-20", "DESIGN.md"),
 	}
 
 	for _, root := range []string{

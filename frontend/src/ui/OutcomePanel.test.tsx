@@ -1,6 +1,6 @@
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {afterEach, describe, expect, it, vi} from 'vitest'
-import type {PublicError} from '../transfer/types'
+import type {CompletionReceipt, PublicError} from '../transfer/types'
 import {OutcomePanel} from './OutcomePanel'
 
 afterEach(cleanup)
@@ -11,9 +11,19 @@ function panel(): HTMLElement {
     return found as HTMLElement
 }
 
+const doneReceipt: CompletionReceipt = {
+    name: 'report.pdf',
+    isDir: false,
+    bytesSent: 100,
+}
+
+function doneOutcome(retained: boolean) {
+    return {kind: 'done', retained, receipt: doneReceipt} as const
+}
+
 describe('the Done panel', () => {
     it('says only that FairDrop finished sending', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
 
         expect(screen.getByRole('heading').textContent).toBe('Transfer finished')
         expect(screen.getByText('FairDrop finished sending the item.')).toBeTruthy()
@@ -21,7 +31,7 @@ describe('the Done panel', () => {
     })
 
     it('claims nothing about the receiver, its storage, or the download', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
 
         const text = panel().textContent ?? ''
         for (const claim of ['saved', 'received', 'downloaded', 'stored', 'Files']) {
@@ -36,15 +46,26 @@ describe('the Done panel', () => {
     // (D-059). The expectation moved because the contract did.
     it('carries the control a live terminal outcome is given, so a lost reset cannot strand it', () => {
         const dismiss = vi.fn()
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}} onDismiss={dismiss}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)} onDismiss={dismiss}/>)
 
         const control = screen.getByRole('button')
         fireEvent.click(control)
         expect(dismiss).toHaveBeenCalledTimes(1)
     })
 
+    // A live terminal outcome has nothing else on screen to be a next action --
+    // its one control has to carry that weight itself, so it takes the
+    // primary style rather than the quiet one the retained node uses below.
+    it('gives the live control primary weight, not the quiet retained styling', () => {
+        render(<OutcomePanel outcome={doneOutcome(false)} onDismiss={vi.fn()}/>)
+
+        const control = screen.getByRole('button')
+        expect(control.className).toContain('fd-button--primary')
+        expect(control.className).not.toContain('fd-button--quiet')
+    })
+
     it('offers no control when the caller supplies no handler', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
 
         expect(screen.queryByRole('button')).toBeNull()
     })
@@ -53,18 +74,22 @@ describe('the Done panel', () => {
 describe('the retained outcome node', () => {
     it('keeps the same visible content and adds Dismiss', () => {
         const onDismiss = vi.fn()
-        render(<OutcomePanel outcome={{kind: 'done', retained: true}} onDismiss={onDismiss}/>)
+        render(<OutcomePanel outcome={doneOutcome(true)} onDismiss={onDismiss}/>)
 
         expect(screen.getByRole('heading').textContent).toBe('Transfer finished')
         const dismiss = screen.getByRole('button', {name: 'Dismiss'})
         expect(dismiss.className).toContain('fd-target')
+        // Idle's own browse control is the next action once retained; this
+        // one only needs to be the quiet Dismiss beside it.
+        expect(dismiss.className).toContain('fd-button--quiet')
+        expect(dismiss.className).not.toContain('fd-button--primary')
 
         fireEvent.click(dismiss)
         expect(onDismiss).toHaveBeenCalledTimes(1)
     })
 
     it('marks itself retained so a reader can tell status from session', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: true}} onDismiss={vi.fn()}/>)
+        render(<OutcomePanel outcome={doneOutcome(true)} onDismiss={vi.fn()}/>)
 
         expect(panel().getAttribute('data-retained')).toBe('true')
     })
@@ -112,7 +137,7 @@ describe('the Error panel', () => {
 
 describe('heading rank and phase ownership', () => {
     it('owns the document heading when it is the whole phase view', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}} level={1} phaseView/>)
+        render(<OutcomePanel outcome={doneOutcome(false)} level={1} phaseView/>)
 
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
         expect(panel().getAttribute('data-phase-view')).toBe('outcome')
@@ -122,7 +147,7 @@ describe('heading rank and phase ownership', () => {
         // Rank and phase are separate props because reset changes only one of
         // them: the user must be looking at the same node, at the same weight,
         // while Idle becomes the phase view underneath it.
-        render(<OutcomePanel outcome={{kind: 'done', retained: true}} level={1} onDismiss={vi.fn()}/>)
+        render(<OutcomePanel outcome={doneOutcome(true)} level={1} onDismiss={vi.fn()}/>)
 
         expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
         expect(panel().hasAttribute('data-phase-view')).toBe(false)
@@ -147,7 +172,7 @@ describe('the focused container has a name', () => {
       role="textbox" div out of StagedView.
     */
     it.each([
-        ['done', {kind: 'done', retained: false} as const, 'Transfer finished'],
+        ['done', doneOutcome(false), 'Transfer finished'],
         ['error', {kind: 'error', retained: false, error: {code: 'transfer_failed', message: 'x'} as PublicError} as const,
             'Transfer stopped'],
     ])('names the %s panel with its own heading', (_name, outcome, heading) => {
@@ -162,19 +187,110 @@ describe('the focused container has a name', () => {
 
 describe('focus surface', () => {
     it('is reachable by a programmatic focus move without joining the Tab order', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
 
         // Story 1.10 routes focus; this story only guarantees the target exists.
         expect(panel().getAttribute('tabindex')).toBe('-1')
     })
 
     it('never paints its state with color alone', () => {
-        render(<OutcomePanel outcome={{kind: 'done', retained: false}}/>)
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
         const icon = document.querySelector('.fd-outcome__icon')
 
-        expect(icon?.textContent).toBe('✓')
         expect(icon?.getAttribute('aria-hidden')).toBe('true')
+        expect(icon?.querySelector('svg.fd-outcome__check')).toBeTruthy()
         // The heading text is the real cue; the glyph only reinforces it.
         expect(screen.getByRole('heading').textContent).toBe('Transfer finished')
+    })
+
+    it('marks the error state with the literal "!" glyph, not color alone', () => {
+        const error: PublicError = {code: 'transfer_failed', message: 'x'}
+        render(<OutcomePanel outcome={{kind: 'error', retained: false, error}}/>)
+        const icon = document.querySelector('.fd-outcome__icon')
+
+        expect(icon?.textContent).toBe('!')
+        expect(icon?.getAttribute('aria-hidden')).toBe('true')
+        expect(icon?.querySelector('svg')).toBeNull()
+    })
+
+    it('draws the check stroke once after mount, unconditionally', async () => {
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
+        const check = document.querySelector('svg.fd-outcome__check')
+
+        // React Testing Library flushes mount effects inside act() before
+        // render() returns, so the drawn modifier is already applied here --
+        // this is what "unconditional" is: nothing gates it on a media query
+        // or a later interaction the reduced-motion mutation could hide behind.
+        expect(check?.classList.contains('fd-outcome__check--drawn')).toBe(true)
+    })
+
+    // Every path that shows this panel is a focus-owned row of the routing
+    // table, and the spine allows an alert only on a path that does not also
+    // move focus -- so role="alert" is refused in every shape this component
+    // can take, not merely the default one.
+    it.each([
+        ['a live Done', doneOutcome(false)],
+        ['a retained Done', doneOutcome(true)],
+        ['a live Error', {kind: 'error', retained: false, error: {code: 'transfer_failed', message: 'x'} as PublicError} as const],
+        ['a retained Error', {kind: 'error', retained: true, error: {code: 'transfer_failed', message: 'x'} as PublicError} as const],
+    ])('never carries role="alert", for %s', (_name, outcome) => {
+        render(<OutcomePanel outcome={outcome} onDismiss={vi.fn()}/>)
+
+        expect(document.querySelector('[role="alert"]')).toBeNull()
+        expect(panel().getAttribute('role')).toBeNull()
+    })
+})
+
+/*
+  Story 7.4 wired the retained receipt values through as non-visible
+  attributes; Story 7.5 replaces that proof with the real receipt UI these
+  tests check instead. The values still come from the same `CompletionReceipt`
+  Story 7.4 built (state.test.ts and selectors.test.ts already prove
+  `bytesSent` is the wire count, never `metadata.size`) -- this only confirms
+  the panel renders it.
+*/
+describe('the completion receipt (Story 7.5)', () => {
+    it('renders exactly two cells: the item name and the wire bytes sent', () => {
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
+
+        const cells = document.querySelectorAll('.fd-receipt__cell')
+        expect(cells).toHaveLength(2)
+        expect(document.querySelector('.fd-receipt bdi')?.textContent).toBe('report.pdf')
+        expect(screen.getByText('100 bytes')).toBeTruthy()
+        expect(screen.getByText('Wire bytes')).toBeTruthy()
+    })
+
+    it('carries the same receipt once the outcome is retained in Idle', () => {
+        render(<OutcomePanel outcome={doneOutcome(true)} onDismiss={vi.fn()}/>)
+
+        expect(document.querySelector('.fd-receipt bdi')?.textContent).toBe('report.pdf')
+        expect(screen.getByText('100 bytes')).toBeTruthy()
+    })
+
+    it('names a directory receipt as a folder and formats its byte count', () => {
+        const dirReceipt: CompletionReceipt = {name: 'papers', isDir: true, bytesSent: 4_096}
+        render(<OutcomePanel outcome={{kind: 'done', retained: false, receipt: dirReceipt}}/>)
+
+        expect(document.querySelector('.fd-receipt bdi')?.textContent).toBe('papers')
+        expect(screen.getByText('Folder')).toBeTruthy()
+        expect(screen.getByText('4.1 KB')).toBeTruthy()
+    })
+
+    // The mutation this guards: inventing a duration is the worst outcome
+    // this story could produce. Two cells only, never a third.
+    it('never renders a third cell or any elapsed-time figure', () => {
+        render(<OutcomePanel outcome={doneOutcome(false)}/>)
+
+        expect(document.querySelectorAll('.fd-receipt__cell')).toHaveLength(2)
+        for (const forbidden of ['duration', 'elapsed', 'Elapsed', 'Duration']) {
+            expect(panel().textContent, forbidden).not.toContain(forbidden)
+        }
+    })
+
+    it('does not render a receipt for an Error outcome', () => {
+        const error: PublicError = {code: 'transfer_failed', message: 'x'}
+        render(<OutcomePanel outcome={{kind: 'error', retained: false, error}}/>)
+
+        expect(document.querySelector('.fd-receipt')).toBeNull()
     })
 })

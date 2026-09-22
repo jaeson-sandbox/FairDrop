@@ -71,3 +71,8 @@ __pycache__/
 **/fairdrop_logo*.[jJ][pP]*[gG]
 **/fairdrop_logo*.[pP][nN][gG]
 **/fairdrop_logo*.[wW][eE][bB][pP]
+
+# Agent worktrees created by Claude Code subagents. Transient, and never part
+# of a commit -- a stray `git add -A` while one exists would otherwise stage an
+# entire second checkout of the repository into it.
+.claude/worktrees/
