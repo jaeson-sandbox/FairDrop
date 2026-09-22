@@ -588,3 +588,48 @@ describe('forced colors (D-065)', () => {
         })
     })
 })
+
+describe('QR drag source is disabled (macOS drag-and-drop crash)', () => {
+    /*
+      Owner report: dragging the QR image after staging a file crashes and
+      closes the whole app. Diagnosis from the vendored Wails source
+      (WailsWebView.m, performDragOperation:) rather than an instrumented
+      reproduction -- the crash itself is a macOS/Cocoa fatality this repo's
+      suites cannot trigger, jsdom performs no drag pasteboard at all and
+      Chromium is a different engine with different drag-source behaviour.
+
+      The QR `<img>` is a `data:image/png;base64,...` URL. WebKit lets any
+      `<img>` be dragged by default, which puts that URL on the OS drag
+      pasteboard as an NSURL. Wails' native drop handler then calls
+      `fileSystemRepresentation` on every NSURL on the pasteboard
+      unconditionally, with no guard for a non-file URL -- an Objective-C
+      exception in that call is fatal inside the cgo process hosting WebKit,
+      which matches the reported crash with no Go panic and no crash report.
+
+      Nothing here can execute that native code path, so what is pinned is
+      the *mechanism* that prevents WebKit from ever starting the drag:
+      `draggable={false}` (the standard HTML attribute WebKit's own default
+      drag-start check consults) and `-webkit-user-drag: none` (the CSS
+      property WebKit actually honours for `<img>` regardless of the
+      attribute). Losing either one re-opens the crash.
+    */
+    it('marks the QR image non-draggable both ways, so WebKit never starts a drag pasteboard', () => {
+        const container = renderStaged()
+        const qr = container.querySelector<HTMLImageElement>('.fd-qr')
+        if (qr === null) throw new Error('.fd-qr did not render')
+
+        expect(
+            qr.draggable,
+            'the QR <img> is draggable -- dragging it can crash the app (fileSystemRepresentation ' +
+                'on a non-file NSURL in WailsWebView.m performDragOperation:); set draggable={false}',
+        ).toBe(false)
+
+        const userDrag = getComputedStyle(qr).getPropertyValue('-webkit-user-drag').trim()
+        expect(
+            userDrag,
+            'the QR <img> computes -webkit-user-drag other than none -- WebKit can still start a drag ' +
+                'that crashes the app (fileSystemRepresentation on a non-file NSURL in WailsWebView.m ' +
+                'performDragOperation:); add -webkit-user-drag: none to .fd-qr',
+        ).toBe('none')
+    })
+})

@@ -280,10 +280,29 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                         </div>
 
                         <div className="fd-qr-panel">
+                            {/*
+                              Not draggable. The QR is a rendered bitmap of a
+                              one-shot capability URL, not a file and not a
+                              link -- there is no reason to drag it, and doing
+                              so is a crash vector: WebKit puts the `data:`
+                              image URL on the OS drag pasteboard as an NSURL,
+                              and the vendored Wails native drop handler
+                              (WailsWebView.m, performDragOperation:) calls
+                              fileSystemRepresentation on every NSURL on the
+                              pasteboard unconditionally, with no guard for a
+                              non-file URL. Both `draggable={false}` (the
+                              attribute WebKit's own drag-start check reads)
+                              and `-webkit-user-drag: none` in style.css (the
+                              CSS property WebKit actually honours for `<img>`)
+                              are needed -- see the pinning test beside
+                              "QR drag source is disabled" in
+                              accessibility.test.tsx.
+                            */}
                             <img
                                 className="fd-qr"
                                 src={`data:image/png;base64,${metadata.qrBase64}`}
                                 alt={qrAltFor(metadata.name)}
+                                draggable={false}
                             />
                         </div>
                     </div>
