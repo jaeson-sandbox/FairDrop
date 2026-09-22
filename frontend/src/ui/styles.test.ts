@@ -341,10 +341,13 @@ describe('the focus indicator', () => {
             /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\.fd-button\[data-focus-return\] \{\s*/,
         )
         const ring = block('.fd-button:focus-visible,')
-        // box-shadow, never outline: a separate outline and box-shadow
-        // "fighting each other" (the owner's words) is what Story 7.11
-        // replaced with two shadows stacked in one declaration.
-        expect(ring).not.toMatch(/outline:/)
+        // box-shadow, never a real outline: a separate outline and
+        // box-shadow "fighting each other" (the owner's words) is what
+        // Story 7.11 replaced with two shadows stacked in one declaration.
+        // `outline: none;` is allowed and expected here -- it is not a
+        // second ring, it is what suppresses WebKit's own default one; see
+        // the dedicated regression test below.
+        expect(ring).not.toMatch(/outline:(?!\s*none\b)/)
         expect(ring).toContain('0 0 0 var(--focus-ring-offset) var(--color-surface)')
         expect(ring).toContain('0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)')
         expect(stylesheet).toContain('--focus-ring-width: 2px;')
@@ -370,7 +373,9 @@ describe('the focus indicator', () => {
         // words. The trigger/.fd-url rule above is one ring; this is the
         // second of the three named explicitly.
         const summaryRing = block('.fd-disclosure__summary:focus-visible {')
-        expect(summaryRing).not.toMatch(/outline:/)
+        // See the comment above the equivalent assertion for the shared
+        // ring rule: `outline: none;` is expected, a real outline value is not.
+        expect(summaryRing).not.toMatch(/outline:(?!\s*none\b)/)
         expect(summaryRing).toContain('0 0 0 var(--focus-ring-offset) var(--color-surface)')
         expect(summaryRing).toContain(
             '0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)',
@@ -396,6 +401,25 @@ describe('the focus indicator', () => {
         // Not folded into the controls' ring rule: a shared selector list is
         // exactly the regression this pins.
         expect(stylesheet).not.toMatch(/\.fd-button:focus-visible,[^{]*\[data-focus-target\]/)
+    })
+
+    it('suppresses the UA default outline on every box-shadow ring, so WebKit cannot paint its own blue ring underneath the product ring (regression fix)', () => {
+        /*
+          Owner-observed regression: pressing Escape closes the browse menu
+          correctly, but whatever receives focus afterwards shows a blue
+          macOS system focus ring around the product's own mocha two-tone
+          ring. Story 7.11 replaced `outline` with `box-shadow` for the ring,
+          but `box-shadow` does not replace the user agent's own default
+          focus outline the way `outline` used to -- so WebKit keeps drawing
+          its blue `outline` underneath the shadow ring, and two rings paint
+          at once. The fix is an explicit `outline: none;` alongside the
+          box-shadow on every normal-mode ring rule (never in the
+          forced-colors block, where a real `outline` is load-bearing).
+        */
+        for (const selector of ['.fd-button:focus-visible,', '.fd-disclosure__summary:focus-visible {']) {
+            const ring = block(selector)
+            expect(ring, selector).toContain('outline: none;')
+        }
     })
 })
 
@@ -654,6 +678,26 @@ describe('Story 7.3: rebuilding Idle', () => {
         expect(stylesheet).toMatch(
             /\.fd-disclosure\[open\] > \.fd-disclosure__summary \.fd-disclosure__chevron \{\s*transform: rotate\(45deg\);\s*\}/,
         )
+    })
+
+    it('gives the browse trigger chevron the same 12x12 border-chevron mechanism as the disclosure, not a text glyph (defect fix)', () => {
+        /*
+          Owner-observed defect: the browse trigger's chevron looked tiny and
+          thin next to the disclosure chevrons. Cause: the disclosure marker
+          is a CSS border chevron (12x12 box, 2px border-right/border-bottom,
+          rotated), while the trigger rendered a text glyph (U+2304) styled
+          only with `margin-inline-start: auto` -- a text glyph at the
+          control's font size renders small and hairline-thin. The fix gives
+          the trigger the same border-chevron box, coloured for the mocha
+          fill it sits on (--color-primary-ink, not --color-muted, since the
+          trigger is a filled primary control, unlike the disclosure summary).
+        */
+        const chevron = block('.fd-browse-trigger__chevron {')
+        expect(chevron).toContain('width: 12px;')
+        expect(chevron).toContain('height: 12px;')
+        expect(chevron).toContain('border-right: 2px solid var(--color-primary-ink);')
+        expect(chevron).toContain('border-bottom: 2px solid var(--color-primary-ink);')
+        expect(chevron).toContain('transform: rotate(-45deg);')
     })
 
     it('keeps the always-open recovery block styled separately from the Idle disclosure form', () => {
@@ -995,8 +1039,10 @@ describe('the browse menu surface (Story 7.2)', () => {
         // items on WebKit (see the mechanism test below), so it has to live
         // in this rule for macOS to paint one at all. Story 7.11: stacked
         // into the same box-shadow as the halo, not a separate `outline` --
-        // gap, then ring, both offset past the halo's own 4px.
-        expect(focused).not.toMatch(/outline:/)
+        // gap, then ring, both offset past the halo's own 4px. `outline:
+        // none;` is expected here too, suppressing WebKit's default ring;
+        // see the dedicated regression test below.
+        expect(focused).not.toMatch(/outline:(?!\s*none\b)/)
         expect(focused).toContain('0 0 0 calc(4px + var(--focus-ring-offset)) var(--color-surface)')
         expect(focused).toContain(
             '0 0 0 calc(4px + var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)',
@@ -1031,6 +1077,11 @@ describe('the browse menu surface (Story 7.2)', () => {
         expect(stylesheet).toMatch(
             /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\.fd-button\[data-focus-return\] \{/,
         )
+    })
+
+    it('suppresses the UA default outline on the focused menu item too, for the same reason as the shared ring rule (regression fix)', () => {
+        const focused = block('.fd-browse-menu .fd-button:focus {')
+        expect(focused).toContain('outline: none;')
     })
 
     it('carries no separate :hover appearance for menu items (Story 7.11)', () => {

@@ -575,10 +575,22 @@ body {
   split this replaces). The gap is what keeps a same-hue ring legible
   against a same-hue fill; see the token's own comment further up this file
   for why the hue-separated violet was retired instead.
+
+  Regression fix: `outline: none;` alongside the shadow. `box-shadow` does
+  not replace the user agent's own default focus outline the way `outline`
+  used to -- WebKit keeps drawing its own system-coloured ring underneath
+  the shadow ring, so a control focused this way painted two rings at once
+  (reported live around the "Local network access" disclosure summary, but
+  the cause is here on every ringed surface, not just that one). The
+  forced-colors block further down restores a real `outline` on purpose --
+  Windows High Contrast strips decorative box-shadow -- and that rule wins
+  there because it is declared later; this `none` only ever applies outside
+  forced colors.
 */
 .fd-button:focus-visible,
 .fd-url:focus-visible,
 .fd-button[data-focus-return] {
+    outline: none;
     box-shadow:
         0 0 0 var(--focus-ring-offset) var(--color-surface),
         0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
@@ -828,6 +840,8 @@ body {
   `:focus` rule would repaint after a mouse click.
 */
 .fd-disclosure__summary:focus-visible {
+    /* Regression fix: see `.fd-button:focus-visible` above for why. */
+    outline: none;
     box-shadow:
         0 0 0 var(--focus-ring-offset) var(--color-surface),
         0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
@@ -877,9 +891,28 @@ body {
 /*
   Browse Control's trailing chevron (DESIGN.md, Components). Decorative only
   -- aria-haspopup already names the button as a menu trigger.
+
+  Defect fix: this used to be a text glyph (U+2304), styled only with the
+  margin below -- at the control's font size a text glyph renders small and
+  hairline-thin, which read as "tiny" next to the disclosure chevrons. This
+  is now the same border-chevron mechanism as `.fd-disclosure__chevron`
+  (12x12 box, 2px border-right/border-bottom, rotated), coloured
+  `--color-primary-ink` rather than `--color-muted` because the trigger is a
+  filled primary control, not a surface row.
+
+  No open/closed rotation: the disclosure rotates because it expands in
+  place, and this chevron marks a menu that pops over instead -- a
+  different gesture, and the platform's own popup buttons do not rotate
+  their indicator. It stays static, always pointing down.
 */
 .fd-browse-trigger__chevron {
+    flex: none;
+    width: 12px;
+    height: 12px;
     margin-inline-start: auto;
+    border-right: 2px solid var(--color-primary-ink);
+    border-bottom: 2px solid var(--color-primary-ink);
+    transform: rotate(-45deg);
 }
 
 /*
@@ -969,6 +1002,8 @@ body {
   gap keeps distinct from the mocha fill beneath them.
 */
 .fd-browse-menu .fd-button:focus {
+    /* Regression fix: see `.fd-button:focus-visible` above for why. */
+    outline: none;
     background: var(--color-primary);
     border-color: var(--color-primary);
     color: var(--color-primary-ink);

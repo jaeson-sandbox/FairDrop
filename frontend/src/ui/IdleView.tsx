@@ -531,8 +531,10 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
             >
                 {copy.label.chooseFileOrFolder}
                 {/* Decorative only: aria-haspopup already tells assistive
-                    technology this opens a menu. */}
-                <span className="fd-browse-trigger__chevron" aria-hidden="true">⌄</span>
+                    technology this opens a menu. Shares the disclosure's
+                    border-chevron mechanism (style.css) rather than a text
+                    glyph -- see that rule for why. */}
+                <span className="fd-browse-trigger__chevron" aria-hidden="true"/>
             </button>
             {open ? (
                 <div

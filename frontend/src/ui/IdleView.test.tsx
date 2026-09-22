@@ -176,6 +176,27 @@ describe('Idle at rest', () => {
     })
 })
 
+describe('the browse trigger chevron matches the disclosure chevron family (defect fix)', () => {
+    // Owner-observed defect: the trigger's chevron looked "tiny and thin"
+    // next to the disclosure chevrons. Cause: the disclosure marker is the
+    // shared CSS border-chevron mechanism (`.fd-disclosure__chevron`, a
+    // 12x12 box with a rotated 2px border), while the trigger rendered a
+    // bare text glyph (U+2304) that inherits the control's font size and
+    // renders small and hairline-thin. The fix drops the glyph and gives
+    // the trigger the same border-chevron element the disclosures use.
+    it('renders the chevron as the shared border-chevron element, not a text glyph', () => {
+        show()
+
+        const control = screen.getByRole('button', {name: 'Choose a file or folder'})
+        const chevron = control.querySelector('.fd-browse-trigger__chevron')!
+        expect(chevron).toBeTruthy()
+        // A text glyph has visible text content; the shared border-chevron
+        // mechanism is an empty decorative box with no text node at all.
+        expect(chevron.textContent).toBe('')
+        expect(chevron.getAttribute('aria-hidden')).toBe('true')
+    })
+})
+
 describe('the drop zone carries the concentric inner rule', () => {
     it('wraps the instruction in an inner element, distinct from the outer card', () => {
         show()
