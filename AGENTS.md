@@ -260,30 +260,28 @@ them individually and like all of them together.
    as a shadow is invisible in Windows High Contrast. Only `outline` is a
    system-recognised indicator guaranteed to survive, so a shadow-based ring needs an
    `outline` fallback inside the forced-colors block.
-5. **Escape is never dispatched to the DOM at all.** Arrow keys are; Escape is not.
-   Measured against the built binary with an on-screen `window` keydown probe that
-   prints a monotonic counter: with the browse menu open, pressing Escape left the
-   counter unchanged, and the very next ArrowUp advanced it (`key="ArrowUp"
-   target=BUTTON`). Repeated with focus on the menu container (`target=DIV`) and on a
-   menu item (`target=BUTTON`) -- Escape produced no event in either state. macOS
-   routes it up the responder chain as `-[NSResponder cancelOperation:]` instead.
-   Wails' own override of that method (`WailsContext.m`) returns early only in
-   fullscreen, so it is not the culprit; the key simply never reaches web content.
+5. **Escape works. Synthetic Escape from automation does not — and that difference
+   produced a wrong "platform fact" in this file for one commit.** The owner reported
+   Escape closing the browse menu normally on the built binary. An automated probe had
+   concluded the opposite: an on-screen `window` keydown counter showed Escape firing
+   no event at all, twice, while the ArrowDown and ArrowUp pressed either side of it
+   advanced the counter immediately.
 
-   **Consequence: the ARIA menu pattern's Escape has never worked in this app on
-   macOS, and no JavaScript can make it work.** A `keydown` listener cannot hear an
-   event that is not dispatched. `handleMenuKeyDown`'s Escape branch is correct code
-   that is unreachable on this platform; it remains correct and reachable on Windows.
-   Do not "fix" it by rewriting the handler.
+   Both observations are real. A hardware Escape reaches web content; an Escape
+   synthesized by the computer-use tooling apparently does not reach it the same way,
+   while synthesized arrow keys do. The arrow keys were being used as the positive
+   control, and they were the wrong control: they proved that *some* synthetic keys
+   arrive, not that synthetic **Escape** is faithful to a real one. The instrument was
+   measuring itself.
 
-   **This one was reported as measured in both directions before it was settled.** An
-   investigation pass concluded the opposite -- that Escape does reach the DOM and the
-   menu closes -- having exercised only the *keyboard-open* path and being unable to
-   drive the pointer-open path. The probe above then showed Escape firing no event on
-   either path. Two lessons: a negative result needs a positive control in the same
-   breath (the arrow key that *does* increment the counter is what makes "Escape fired
-   nothing" mean something), and an investigation that cannot reach the reported
-   reproduction has not reproduced it, whatever else it found.
+   **The rule this leaves behind: a synthetic keystroke is evidence about the harness
+   until a human has pressed the key.** Automation is fine for reading state and for
+   keys already known to round-trip, but a *negative* result from a synthetic key --
+   "nothing happened" -- cannot distinguish a dead feature from an undelivered event.
+   Before recording any "this key does nothing on macOS" as a platform fact, have a
+   person press it. The investigation pass that originally measured Escape working, on
+   real hardware, was right; it was overruled on the strength of the synthetic probe and
+   had to be reinstated.
 
 **Why nothing caught them.** `npm test` is jsdom, which performs no layout and -- worse
 for this class -- *does* focus a button on click, so it actively disagrees with the

@@ -1,81 +1,60 @@
 # Evidence — macOS Escape investigation
 
-**Question:** with the browse menu open, does a DOM `keydown` for Escape fire at all
-inside the built macOS app?
+**Question:** with the browse menu open, does Escape close it on the built macOS app?
 
-**Answer: no. Escape is never dispatched to web content. Arrow keys are.**
+**Answer: yes. Escape works.** An automated probe said otherwise and was wrong; the
+correction and the reason are below, because the reason is the useful part.
 
-## Method
+## What actually happened
 
-An on-screen probe was added temporarily to `frontend/src/main.tsx`: a `window`
-`keydown` listener rendering a monotonic counter, the `key`, and the event target into
-a fixed overlay. The app was rebuilt with `wails build` and driven at the tip
-(`dfcb64f`).
+An owner report of "Escape does nothing" was investigated twice.
 
-The counter is the point. A negative result on its own proves nothing — "Escape did
-nothing" is indistinguishable from "the keystroke never left the harness". A counter
-that demonstrably advances for a *different* key pressed moments later, in the same
-state, through the same path, is what turns the silence into a measurement.
+1. An investigation pass drove the **keyboard-open** path and reported Escape reaching
+   the DOM and closing the menu. It could not drive the pointer-open path and said so,
+   and held the finding back from `AGENTS.md` pending confirmation.
+2. A second pass used an on-screen `window` keydown probe printing a monotonic counter.
+   Escape left the counter unchanged, twice — with focus on the menu container
+   (`target=DIV`) and on a menu item (`target=BUTTON`) — while the ArrowDown and ArrowUp
+   pressed either side of it advanced it immediately. That was read as proof that macOS
+   never dispatches Escape to web content, and committed as a platform fact.
+3. **The owner then pressed Escape on real hardware and the menu closed**, with the only
+   visible problem being a stray focus ring afterwards (a separate defect, fixed
+   separately).
 
-## Raw result
+## The correction
 
-| Step | Key sent | Probe after | Menu |
-|---|---|---|---|
-| Pointer-open the menu, then press Escape | Escape | `keyprobe: (none yet)` | still open |
-| Press ArrowDown from that state | ArrowDown | `keyprobe #1: key="ArrowDown" target=DIV` | open, item marked |
-| Press Escape again | Escape | `keyprobe #1: key="ArrowDown" target=DIV` — **unchanged** | still open |
-| Press ArrowUp | ArrowUp | `keyprobe #2: key="ArrowUp" target=BUTTON` | open |
+Both measurements were accurate about what they touched. A hardware Escape reaches web
+content. An Escape synthesized by the computer-use tooling evidently does not, while
+synthesized arrow keys do.
 
-Escape was pressed twice and produced **no event either time**, with focus on the menu
-container (`target=DIV`) and on a menu item (`target=BUTTON`) respectively. Both arrow
-presses advanced the counter immediately.
+The arrow keys were serving as the positive control, and they were **the wrong control**.
+They established that *some* synthetic keys arrive — not that synthetic Escape is
+faithful to a real Escape. The probe was measuring the harness, not the application, and
+the conclusion inverted a correct earlier finding.
 
-## Conclusion
+## The rule
 
-macOS routes Escape up the responder chain as `-[NSResponder cancelOperation:]` rather
-than dispatching it to web content. Wails overrides that method in `WailsContext.m`,
-but the override returns early only when `disableEscapeExitsFullscreen` is set *and*
-the window is fullscreen — neither applies — so Wails is not the culprit. The key
-simply never reaches the page.
+**A synthetic keystroke is evidence about the harness until a human has pressed the key.**
 
-**Therefore the ARIA menu pattern's Escape has never worked in this app on macOS, and
-no JavaScript change can make it work.** A listener cannot hear an undispatched event.
-`handleMenuKeyDown`'s Escape branch is correct code that is unreachable on this
-platform, and remains correct and reachable on Windows/WebView2. It should not be
-rewritten.
+A *negative* result from a synthetic key — "nothing happened" — cannot tell a dead
+feature apart from an undelivered event. A positive control only counts if it exercises
+the same delivery path as the thing under test, and a different key is not the same path.
+Before recording "this key does nothing on this platform" as fact, have a person press it.
 
-## A prior pass concluded the opposite
+This is the inverse of the lesson the rest of this epic taught. Everywhere else, driving
+the built binary caught what green suites missed. Here, driving it produced a false
+negative that a green suite and a human both contradicted. Automation is not a stronger
+instrument than a suite; it is a *different* one, with its own failure mode.
 
-An earlier investigation reported that Escape *does* reach the DOM and closes the menu.
-It exercised only the **keyboard-open** path, could not drive the pointer-open path
-(the computer-use tooling refused to click a control carrying `aria-haspopup="menu"`,
-and display-scope control was unavailable in that session), and said so explicitly
-rather than papering over it. Holding the finding back from `AGENTS.md` pending
-confirmation was the correct call and is why the wrong fact never landed.
+## Status
 
-Two lessons, recorded because they generalise:
-
-1. **A negative result needs a positive control in the same breath.** The ArrowUp that
-   advanced the counter is what makes "Escape produced nothing" a measurement instead
-   of an absence of evidence.
-2. **An investigation that cannot reach the reported reproduction has not reproduced
-   it**, whatever else it establishes. The reported case was a pointer-opened menu; the
-   pass that could not open the menu with a pointer had not tested the report.
+No product defect. `handleMenuKeyDown`'s Escape branch is correct and reachable on macOS.
+No Cocoa-level work is needed and none should be undertaken on the strength of the
+retracted finding.
 
 ## Process note
 
-The probe was removed from `main.tsx` (the source diff is clean) but the **built
-binary still contained it** — `build/bin/fairdrop.app` rendered the green
-`keyprobe:` overlay on launch afterwards. The gate's `wails build` had run before the
-instrumentation was removed, so "full gate green" described a build of instrumented
-code. Remove instrumentation *first*, then build, then run the gate. A clean rebuild
-was performed after this investigation.
-
-## What was NOT done
-
-No fix. There is nothing to fix in the frontend: the handler is correct and the event
-does not arrive. Whether to pursue a Cocoa-level hook, bind Escape through the
-application menu, or accept that macOS dismissal happens by click-outside, Tab-away or
-a second press of the trigger is an open product decision, not a defect with an obvious
-repair. It is recorded in `AGENTS.md` item 5 so the next reader starts from the
-measurement rather than from the handler.
+The probe was removed from `main.tsx` but the **built binary still contained it** — the
+gate's `wails build` had run before the removal, so "full gate green" described a build
+of instrumented code, and the app launched afterwards showing a green `keyprobe:`
+overlay. Remove instrumentation first, then build, then gate. A clean rebuild followed.
