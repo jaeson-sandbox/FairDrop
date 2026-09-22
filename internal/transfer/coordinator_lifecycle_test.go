@@ -1220,18 +1220,26 @@ func TestCancelReportsACodedFailureWhenTheDrainerNeverEnds(t *testing.T) {
 	h.transferring()
 	h.server.keepLaneOpenOnStop = true
 
+	// h.transferring() already committed a claim, which calls
+	// stopBeaconBounded synchronously and armed-and-resolved its own bound
+	// during setup -- so the only bound left in this teardown's cascade
+	// before the drainer join's is ServerPort.Stop's.
+	preCancel := h.bounds.armed()
 	cancelDone := make(chan error, 1)
 	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
 
-	// Both adapter calls must have *returned* before the bound is fired, not
-	// merely started. awaitBoundsPending returns the moment armed exceeds
-	// stops, which is already true while the first of the three bounds in this
-	// cascade is pending -- so firing then could hit StopBeacon's bound
-	// instead, leaving the drainer join pending forever and Cancel blocked.
-	// That is not hypothetical: it failed on a Windows CI runner under -race
-	// after passing twenty local iterations.
+	// ServerPort.Stop's own bound must *resolve*, not merely arm, before the
+	// bound this test forces is fired: it is logged the instant it is
+	// entered (see awaitCalls), so awaitBoundPending's single snapshot could
+	// catch it while it is itself still pending and mistake it for the
+	// drainer join's -- that is not hypothetical, it is what failed on a
+	// Windows CI runner under -race after passing twenty local iterations.
+	// awaitBoundResolvedAt waits for that specific, already-armed bound to
+	// finish resolving on its own first, so the following awaitBoundPending
+	// can only land on the bound armed after it: the drainer join's.
 	h.awaitCalls("network.StopBeacon", "server.Stop")
-	h.awaitBoundsPending()
+	h.awaitBoundResolvedAt(preCancel)
+	h.awaitBoundPending(preCancel + 1)
 	h.bounds.fire()
 
 	select {
@@ -1284,11 +1292,12 @@ func TestAuthorizeClaimCommitsWhenStopBeaconNeverReturns(t *testing.T) {
 	}
 	t.Cleanup(func() { unblockOnce.Do(func() { close(unblock) }) })
 
+	baseline := h.bounds.armed()
 	claimDone := make(chan error, 1)
 	go func() { claimDone <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
 
 	<-blocked
-	h.awaitBoundsPending()
+	h.awaitBoundPending(baseline)
 	h.bounds.fire()
 
 	select {
@@ -1330,11 +1339,12 @@ func TestCancelHonoursAnAbandonedCallerContext(t *testing.T) {
 		}
 	})
 
+	baseline := h.bounds.armed()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancelDone := make(chan error, 1)
 	go func() { cancelDone <- h.coordinator.Cancel(ctx) }()
 
-	h.awaitBoundsPending()
+	h.awaitBoundPending(baseline)
 	cancel()
 
 	select {
@@ -1366,10 +1376,11 @@ func TestShutdownReportsACodedFailureWhenTheLeaseNeverFrees(t *testing.T) {
 		}
 	})
 
+	baseline := h.bounds.armed()
 	shutdownDone := make(chan error, 1)
 	go func() { shutdownDone <- h.coordinator.Shutdown(context.Background()) }()
 
-	h.awaitBoundsPending()
+	h.awaitBoundPending(baseline)
 	h.bounds.fire()
 
 	select {
@@ -1732,11 +1743,12 @@ func TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown(t *testing.T) {
 	}
 	t.Cleanup(func() { unblockOnce.Do(func() { close(unblock) }) })
 
+	claimBaseline := h.bounds.armed()
 	claimDone := make(chan error, 1)
 	go func() { claimDone <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
 
 	<-blocked
-	h.awaitBoundsPending()
+	h.awaitBoundPending(claimBaseline)
 	h.bounds.fire()
 
 	select {
@@ -1752,13 +1764,7 @@ func TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown(t *testing.T) {
 	beforeBounds := h.bounds.armed()
 	cancelDone := make(chan error, 1)
 	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
-	deadline := time.Now().Add(5 * time.Second)
-	for h.bounds.armed() == beforeBounds {
-		if time.Now().After(deadline) {
-			t.Fatal("the coalesced cleanup wait did not arm its own bound")
-		}
-		runtime.Gosched()
-	}
+	h.awaitBoundPending(beforeBounds)
 	h.bounds.fire()
 	if err := <-cancelDone; ErrorCodeOf(err) != ErrTransferFailed {
 		t.Fatalf("Cancel returned %v, want the coalesced stop bound", err)
@@ -1773,7 +1779,7 @@ func TestAClaimWhoseStopBeaconTimedOutLeavesItForTeardown(t *testing.T) {
 
 	hang.Store(false)
 	unblockOnce.Do(func() { close(unblock) })
-	deadline = time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for h.coordinator.cleanupPending() {
 		if time.Now().After(deadline) {
 			t.Fatal("beacon cleanup did not become quiescent after StopBeacon returned")
@@ -1808,20 +1814,31 @@ func TestATeardownThatLosesTwoResourcesReportsBoth(t *testing.T) {
 	}
 	h.server.keepLaneOpenOnStop = true
 
+	baseline := h.bounds.armed()
 	cancelDone := make(chan error, 1)
 	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
 
 	// The beacon's own bound first: it is the first resource released, so its
 	// is the only bound pending at this point.
 	h.awaitCalls("network.StopBeacon")
-	h.awaitBoundsPending()
+	h.awaitBoundPending(baseline)
 	h.bounds.fire()
 
-	// Then the drainer join's. server.Stop has returned by the time it appears
-	// in the call log, so its bound is already armed and stopped and the one
-	// still pending is the join's.
+	// Then the drainer join's. ServerPort.Stop's own bound is interposed --
+	// armed and resolved on its own, without being forced -- ahead of the
+	// drainer join's in this cascade. It is logged the instant it is
+	// entered, not once it returns (see awaitCalls), so a single snapshot
+	// after the log entry appears can still catch its bound genuinely
+	// pending and mistake it for the drainer join's: that is exactly what
+	// used to hang this test's Cancel call for its full 10s safety net on a
+	// starved Windows CI runner. awaitBoundResolvedAt waits for that
+	// specific, already-armed bound (index baseline+1, right after the
+	// beacon bound this test just fired) to finish resolving on its own
+	// first, so the following awaitBoundPending can only land on the bound
+	// armed after it: the drainer join's.
 	h.awaitCalls("server.Stop")
-	h.awaitBoundsPending()
+	h.awaitBoundResolvedAt(baseline + 1)
+	h.awaitBoundPending(baseline + 2)
 	h.bounds.fire()
 
 	select {
@@ -1843,6 +1860,96 @@ func TestATeardownThatLosesTwoResourcesReportsBoth(t *testing.T) {
 	h.server.closeEvents()
 }
 
+// TestATeardownThatLosesTwoResourcesStillFiresTheRightBoundWhenServerStopIsSlow
+// pins the exact interleaving behind the CI flake this story found in
+// TestATeardownThatLosesTwoResourcesReportsBoth: a scheduling delay that
+// leaves ServerPort.Stop's own bound genuinely pending -- entered and logged,
+// but not yet resolved -- at the moment a test tries to move on to the
+// drainer join's bound.
+//
+// Before the fix, awaitBoundsPending compared a global armed() count to a
+// global stops() count, and firing a bound through the test seam marks it
+// "fired" but can never mark it "stopped" (production stops a bound by
+// winning a select the forced fire deliberately loses for it), so the first
+// forced fire in a test permanently widened that gap. The second
+// awaitBoundsPending call in a test could therefore return true the instant
+// *any* later bound armed, including one -- like ServerPort.Stop's -- that
+// was still transiently pending and never meant to be forced at all. This
+// test makes that window wide and deterministic instead of leaving it to
+// chance: it hangs the production stop call itself for a controlled instant
+// so its bound is provably still pending when the second phase begins, which
+// reproduced "Cancel never returned" on every run before the fix.
+func TestATeardownThatLosesTwoResourcesStillFiresTheRightBoundWhenServerStopIsSlow(t *testing.T) {
+	h := newHarness(t)
+	h.stageSuccessfully()
+
+	beaconReleased := make(chan struct{})
+	t.Cleanup(func() { close(beaconReleased) })
+	h.network.stopBeacon = func() error {
+		<-beaconReleased
+		return nil
+	}
+	h.server.keepLaneOpenOnStop = true
+
+	// server.Stop is logged the instant it is entered (see awaitCalls), so
+	// holding it open here keeps its own bound genuinely pending -- armed,
+	// unstopped -- for as long as the test wants, which is exactly the
+	// window the old helper could mistake for the drainer join's bound.
+	serverStopEntered := make(chan struct{})
+	var serverStopEnteredOnce sync.Once
+	serverStopRelease := make(chan struct{})
+	var serverStopReleaseOnce sync.Once
+	t.Cleanup(func() { serverStopReleaseOnce.Do(func() { close(serverStopRelease) }) })
+	h.server.stop = func() error {
+		serverStopEnteredOnce.Do(func() { close(serverStopEntered) })
+		<-serverStopRelease
+		return nil
+	}
+
+	baseline := h.bounds.armed()
+	cancelDone := make(chan error, 1)
+	go func() { cancelDone <- h.coordinator.Cancel(context.Background()) }()
+
+	h.awaitCalls("network.StopBeacon")
+	h.awaitBoundPending(baseline)
+	h.bounds.fire()
+
+	h.awaitCalls("server.Stop")
+	<-serverStopEntered
+	// server.Stop's own bound is provably still pending right here: it has
+	// been logged, but its call has not returned (serverStopRelease is still
+	// open), and the drainer join's bound cannot exist yet because
+	// releaseAcquired has not returned from this very call.
+	afterServerLogged := h.bounds.armed()
+	if calls := h.bounds.calls(); len(calls) == 0 || calls[len(calls)-1].wasStopped() {
+		t.Fatalf("server.Stop's bound was already stopped before the drainer join's could be forced -- the reproduction did not hold")
+	}
+	// Let the real Stop call return now, exactly as it would on a healthy
+	// adapter -- its own bound resolves normally (stop() wins the select),
+	// and releaseAcquired moves on to arm the drainer join's bound next.
+	serverStopReleaseOnce.Do(func() { close(serverStopRelease) })
+	h.awaitBoundPending(afterServerLogged)
+	h.bounds.fire() // must hit the drainer join's bound, not server.Stop's
+
+	select {
+	case err := <-cancelDone:
+		if err == nil {
+			t.Fatal("Cancel succeeded with two resources unaccounted for")
+		}
+		report := err.Error()
+		if !strings.Contains(report, "device discovery") {
+			t.Errorf("Cancel reported %q, which never names the beacon", report)
+		}
+		if !strings.Contains(report, "drainer did not finish") {
+			t.Errorf("Cancel reported %q, which never names the drainer join", report)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Cancel never returned: the wrong bound was fired")
+	}
+
+	h.server.closeEvents()
+}
+
 // TestAnObserverThatNeverReturnsCannotHoldACommand is D-034.
 //
 // Publish is a UI callback: a webview that stops answering must cost the
@@ -1857,11 +1964,12 @@ func TestAnObserverThatNeverReturnsCannotHoldACommand(t *testing.T) {
 	t.Cleanup(func() { close(released) })
 	h.observer.publish = func(Event) { <-released }
 
+	baseline := h.bounds.armed()
 	claimDone := make(chan error, 1)
 	go func() { claimDone <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
 
 	h.awaitCalls("observer.Publish")
-	h.awaitBoundsPending()
+	h.awaitBoundPending(baseline)
 	h.bounds.fire()
 
 	select {
