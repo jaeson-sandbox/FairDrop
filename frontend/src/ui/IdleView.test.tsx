@@ -405,6 +405,117 @@ describe('the browse menu', () => {
     })
 })
 
+/*
+  Story 7.11: the menu has one active item, owned by focus, driven by
+  whichever input last acted. A pointer open pre-selects nothing; a keyboard
+  open focuses the first item as before; hovering an item moves focus to it,
+  so hover and keyboard share one appearance and one code path; and the
+  dead-key gap (ArrowDown/ArrowUp on a pointer-opened trigger) now moves
+  focus into the menu instead of doing nothing.
+
+  `event.detail` is how the trigger's single onClick handler tells a real
+  pointer click (detail >= 1) apart from a click synthesized from a keyboard
+  activation (detail === 0, the default `fireEvent.click` already uses
+  everywhere else in this file, which is why every other test above keeps
+  passing unchanged: it reads exactly like a keyboard-style activation, which
+  is what it always meant here).
+*/
+describe('the browse menu has one active item (Story 7.11)', () => {
+    function control(): HTMLElement {
+        return screen.getByRole('button', {name: 'Choose a file or folder'})
+    }
+
+    it('pre-selects nothing when opened by a real pointer click, leaving focus on the trigger', () => {
+        show()
+        // jsdom does not synthesize the focus-follows-mousedown a real
+        // pointer press performs before its click, so it is staged
+        // explicitly here -- the same technique the pre-existing "dismisses
+        // its own menu" tests above use for the same reason.
+        control().focus()
+
+        fireEvent.click(control(), {detail: 1})
+
+        expect(screen.getByRole('menu')).toBeTruthy()
+        expect(control().getAttribute('aria-expanded')).toBe('true')
+        for (const item of screen.getAllByRole('menuitem')) {
+            expect(document.activeElement).not.toBe(item)
+        }
+        expect(document.activeElement).toBe(control())
+    })
+
+    it('still focuses the first item when opened by keyboard activation (Enter/Space, detail 0)', () => {
+        show()
+
+        fireEvent.click(control(), {detail: 0})
+
+        const items = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(items[0])
+    })
+
+    it('still focuses the first item when opened by ArrowDown or ArrowUp on the trigger', () => {
+        for (const key of ['ArrowDown', 'ArrowUp']) {
+            cleanup()
+            show()
+            fireEvent.keyDown(control(), {key})
+
+            const items = screen.getAllByRole('menuitem')
+            expect(document.activeElement).toBe(items[0])
+        }
+    })
+
+    it('moves focus to an item on hover, and only that item', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        const [file, folder] = screen.getAllByRole('menuitem')
+        expect(document.activeElement).not.toBe(file)
+        expect(document.activeElement).not.toBe(folder)
+
+        fireEvent.mouseEnter(folder)
+
+        expect(document.activeElement).toBe(folder)
+        expect(document.activeElement).not.toBe(file)
+
+        fireEvent.mouseEnter(file)
+
+        expect(document.activeElement).toBe(file)
+        expect(document.activeElement).not.toBe(folder)
+    })
+
+    it('hands off from keyboard focus to hover focus cleanly -- never two items marked at once', () => {
+        show()
+        fireEvent.click(control())
+        const [file, folder] = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(file)
+
+        fireEvent.mouseEnter(folder)
+
+        // document.activeElement can only ever be one node, but the point of
+        // this story is the single *rule*, not merely the single DOM API --
+        // assert both sides explicitly rather than trusting the API's shape.
+        expect(document.activeElement).toBe(folder)
+        expect(document.activeElement).not.toBe(file)
+    })
+
+    it('closes the dead-key gap: ArrowDown/ArrowUp on a pointer-opened trigger moves focus into the menu', () => {
+        for (const key of ['ArrowDown', 'ArrowUp']) {
+            cleanup()
+            show()
+            // Staged for the same reason as the test above: a real pointer
+            // press leaves focus on the trigger, which jsdom's bare
+            // fireEvent.click does not simulate on its own.
+            control().focus()
+            fireEvent.click(control(), {detail: 1})
+            expect(document.activeElement).toBe(control())
+
+            fireEvent.keyDown(control(), {key})
+
+            const items = screen.getAllByRole('menuitem')
+            expect(document.activeElement).toBe(items[0])
+            expect(screen.getByRole('menu')).toBeTruthy()
+        }
+    })
+})
+
 describe('Idle with a command failure', () => {
     it('renders the fixed invalid-selection panel and stages nothing', () => {
         const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}

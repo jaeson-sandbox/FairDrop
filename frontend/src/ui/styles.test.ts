@@ -858,6 +858,30 @@ describe('the browse menu surface (Story 7.2)', () => {
             /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\.fd-button\[data-focus-return\] \{/,
         )
     })
+
+    it('carries no separate :hover appearance for menu items (Story 7.11)', () => {
+        // Before this story, `:hover` painted a faint, separate
+        // `background: var(--color-fill)` while `:focus` painted the full
+        // treatment -- two competing ideas of "the item about to be chosen."
+        // `BrowseControl` now moves focus to the hovered item itself
+        // (`onMouseEnter` in IdleView.tsx), so hover and keyboard focus
+        // share the single `:focus` rule above and there is nothing left
+        // for a `:hover` rule to paint. Its reappearance would restore the
+        // two-active-items defect this story closed.
+        expect(stylesheet).not.toContain('.fd-browse-menu .fd-button:hover')
+    })
+
+    it('gives the focused menu item the only marked appearance -- the identical rule serves hover and keyboard alike', () => {
+        // The behavioural half of "at most one item is ever marked" is
+        // proved in IdleView.test.tsx (focus is a single DOM property, and
+        // hover moves it rather than adding a second marker). This is the
+        // stylesheet half: there is exactly one selector, keyed to :focus,
+        // that marks a menu item at all, so whichever item holds focus --
+        // for any reason -- gets the identical treatment.
+        const focused = block('.fd-browse-menu .fd-button:focus {')
+        expect(focused).toContain('background: var(--color-primary);')
+        expect(stylesheet).not.toMatch(/\.fd-browse-menu \.fd-button:hover\s*\{/)
+    })
 })
 
 describe('the copy control takes the success tint (Story 7.2)', () => {

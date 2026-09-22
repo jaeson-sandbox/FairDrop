@@ -843,19 +843,27 @@ body {
     border-radius: var(--radius-sm);
 }
 
-.fd-browse-menu .fd-button:hover {
-    background: var(--color-fill);
-}
-
 /*
+  Story 7.11: no `:hover` rule here on purpose. Before this story `:hover`
+  painted a separate, weaker `background: var(--color-fill)` while `:focus`
+  painted the full treatment below, so a sender pointing at `Folder` while
+  `File` still held focus (the open effect focused it unconditionally) saw
+  the strongly-marked item as the one they were *not* pointing at. The fix
+  is one active item, owned by focus: `BrowseControl`'s per-item
+  `onMouseEnter` moves focus to the hovered item (see `IdleView.tsx`), so
+  hover and keyboard share this single `:focus` rule and two items can never
+  be marked at once. Do not reintroduce a `:hover` rule here -- it would
+  restore the two-ideas-of-active-item defect this story closed.
+
   Story 7.10: keyed to `:focus`, not `:focus-visible` -- deliberately, and
   only for these elements.
 
   Menu items carry `tabIndex={-1}` by design (roving tabindex: the menu is
   one tab stop, arrows move within it -- see `BrowseControl` in
   `frontend/src/ui/IdleView.tsx`), so they are *only ever* focused
-  programmatically: by the open effect when the menu appears, and by the
-  arrow-key handler while it is open. WebKit's `:focus-visible` heuristic
+  programmatically: by the open effect when the menu appears by keyboard, by
+  the arrow-key handler while it is open, and, since Story 7.11, by
+  `onMouseEnter` when the pointer moves onto one. WebKit's `:focus-visible` heuristic
   does not match an element focused by script (confirmed against Playwright's
   WebKit build: a `tabindex="-1"` element given `.focus()` from a keydown
   handler never matches `:focus-visible` there, where Chromium's does) --

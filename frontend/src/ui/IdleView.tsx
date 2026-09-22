@@ -1,4 +1,4 @@
-import type {CSSProperties, FocusEvent, KeyboardEvent} from 'react'
+import type {CSSProperties, FocusEvent, KeyboardEvent, MouseEvent} from 'react'
 import {useEffect, useId, useRef, useState} from 'react'
 import {selectCommandError} from '../transfer/selectors'
 import type {IdleTransferState} from '../transfer/state'
@@ -231,13 +231,27 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     const triggerId = useId()
     const menuId = useId()
 
-    // Opened, not merely rendered: the item the sender reaches with the very
-    // next keystroke is the first one, per "the menu opens, focus lands in
-    // it" (I/O matrix). Running this only on the open transition, rather than
-    // on every render, is what keeps a later re-render from stealing focus
-    // back off whichever item the sender has since moved to with the keyboard.
+    // Story 7.11: which input is opening the menu, read by the open effect
+    // below and set just before every `setOpen(true)`. A ref, not state --
+    // nothing here needs to trigger a render of its own, only to be current
+    // by the time the effect runs after this open commits. Defaults to
+    // 'keyboard' so a mount-time `open === true` (there is none today, but
+    // nothing here should silently assume one) pre-selects rather than not.
+    const openedByRef = useRef<'pointer' | 'keyboard'>('keyboard')
+
+    // Opened, not merely rendered: only a **keyboard** open pre-selects, per
+    // "the menu opens, focus lands in it" (I/O matrix) -- the rule that
+    // matrix entry was written for. A native menu opened by pointer
+    // pre-selects nothing, which is why this now checks `openedByRef` rather
+    // than firing unconditionally: firing on every open, including a pointer
+    // click, was Story 7.11's first defect -- a sender who clicked the
+    // control saw `File` already marked as if a choice had been made for
+    // them. Running this only on the open transition, rather than on every
+    // render, is what keeps a later re-render from stealing focus back off
+    // whichever item the sender has since moved to with the keyboard or the
+    // pointer (see the per-item `onMouseEnter` below).
     useEffect(() => {
-        if (open) firstItemRef.current?.focus()
+        if (open && openedByRef.current === 'keyboard') firstItemRef.current?.focus()
     }, [open])
 
     /**
@@ -321,6 +335,15 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
      * reason: a pointer press leaves focus on the trigger while the menu is
      * open, so without this the one gesture that means "put this away" would
      * do nothing in exactly the state a mouse user is most likely to be in.
+     *
+     * Story 7.11 closes a second, related gap here: with the menu already
+     * open and focus still on the trigger (the pointer-open state, since a
+     * pointer open no longer moves focus into the menu), ArrowDown/ArrowUp
+     * used to call `setOpen(true)` on a menu that was already open -- no
+     * state change, so the open effect never re-ran, and the key did
+     * nothing. It now focuses the first item directly in that case, which
+     * both satisfies the key and hands off to the menu's own `onKeyDown` for
+     * every keypress after this one.
      */
     function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>): void {
         if (event.key === 'Escape') {
@@ -331,7 +354,33 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
         }
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
         event.preventDefault()
+        if (open) {
+            // Already open with focus still on the trigger (pointer-opened):
+            // move focus into the menu rather than no-op `setOpen(true)`.
+            firstItemRef.current?.focus()
+            return
+        }
+        openedByRef.current = 'keyboard'
         setOpen(true)
+    }
+
+    /**
+     * The trigger's plain click/activation toggle.
+     *
+     * Story 7.11: this one handler covers both a real pointer click and a
+     * keyboard activation (Enter/Space), because the browser turns both into
+     * the same `click` event on a `<button>` -- `handleTriggerKeyDown` above
+     * never sees Enter or Space at all. The two are told apart by
+     * `event.detail`: a real pointer click carries the OS click count (1 for
+     * a single click, 2+ for a double), while a `click` synthesized from a
+     * key press carries `0`. This is what `openedByRef` is set from before
+     * every toggle, so the open effect above knows whether to pre-select.
+     * Closing (the `was` branch) ignores the reason -- it only matters on the
+     * transition into `open`.
+     */
+    function handleTriggerClick(event: MouseEvent<HTMLButtonElement>): void {
+        openedByRef.current = event.detail === 0 ? 'keyboard' : 'pointer'
+        setOpen((was) => !was)
     }
 
     /**
@@ -384,7 +433,7 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                 // See the flag's declaration above and the CSS rule in
                 // style.css that keys off this attribute.
                 data-focus-return={triggerFocusReturned ? '' : undefined}
-                onClick={() => setOpen((was) => !was)}
+                onClick={handleTriggerClick}
                 onKeyDown={handleTriggerKeyDown}
                 onBlur={() => setTriggerFocusReturned(false)}
             >
@@ -403,6 +452,17 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                     onKeyDown={handleMenuKeyDown}
                     onBlur={handleMenuBlur}
                 >
+                    {/*
+                      Story 7.11: `onMouseEnter` on each item, not a CSS
+                      `:hover` rule, is what marks the item the pointer is
+                      over. Moving focus to the hovered item is what makes
+                      hover and keyboard navigation share one appearance
+                      (style.css's `.fd-browse-menu .fd-button:focus`) and
+                      one code path, and it is what guarantees at most one
+                      item is ever marked: a `:hover` rule painted alongside
+                      `:focus` could mark two at once, which is the defect
+                      this story closes. See DESIGN.md's Browse Menu row.
+                    */}
                     <button
                         type="button"
                         role="menuitem"
@@ -413,6 +473,7 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                         tabIndex={-1}
                         className="fd-button fd-target"
                         onClick={() => choose(onSelectFile)}
+                        onMouseEnter={(event) => event.currentTarget.focus()}
                     >
                         {copy.label.file}
                     </button>
@@ -422,6 +483,7 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                         tabIndex={-1}
                         className="fd-button fd-target"
                         onClick={() => choose(onSelectDirectory)}
+                        onMouseEnter={(event) => event.currentTarget.focus()}
                     >
                         {copy.label.folder}
                     </button>
