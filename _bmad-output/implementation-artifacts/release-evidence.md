@@ -56,6 +56,71 @@ makes a named test fail. Everything a machine cannot observe is below.
 
 ## Artifact identity
 
+**v1.2.0 — candidate, not yet tagged or published.** Version bumped on
+`epic-8-release-1-2-0` at commit `46e79c700993ff72db1dae8ed48a8e3143705d19`. Verify workflow run
+[35688046826](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35688046826) (a push
+event whose `headSha` **is** this commit — not an ancestor cancelled mid-run) concluded
+**success**, each job read with `gh run view 35688046826 --json conclusion,jobs`, never
+`gh run watch`:
+
+| Job | Conclusion |
+|---|---|
+| `verify (windows-latest)` | success |
+| `verify (macos-latest)` | success |
+| `Linux adapter verification (not release proof)` | success |
+
+Local gate at the same commit, run in `verify.yml` order: `wails build` (darwin/arm64, self-signed),
+`gofmt -l .` (clean), `go vet ./...` (clean), `go tool staticcheck ./...` (clean),
+`go test -count=1 ./...` (9 packages, all `ok`), `CGO_ENABLED=1 go test -count=1 -race ./...`
+(same 9 packages, all `ok`), `frontend/npm test` (665 tests across 17 files), `frontend/npm run
+test:browser` (23 tests across 2 files), and `GOOS=windows GOARCH=amd64 go build ./...` — all
+passed. `wails build` flipped the three `frontend/wailsjs/go/...` files to mode 755; they were
+`chmod 644`'d back before committing, and the regenerated
+`frontend/browser/captures/qr-panel-forced-colors.capture.png` byte-diff from
+`npm run test:browser` was discarded with `git checkout --` rather than committed.
+
+**Mutation proof for the version-agreement claim `release_identity_test.go` makes:** setting
+`frontend/package.json`'s `version` to `1.2.1` while `wails.json`'s `productVersion` stayed
+`1.2.0` failed `TestTheVersionIsStatedOnceAndFollowedEverywhere`, naming both values verbatim
+(`frontend/package.json says version "1.2.1" but wails.json says productVersion "1.2.0"`).
+Separately, setting `wails.json`'s `productVersion` to `1.2.0-beta` failed
+`TestReleaseIdentityAgreesAcrossWailsJSONTemplatesAndMainGo` (`not a plain x.y.z version the
+release tag rule can compare against`) and, because the two files then disagreed, also failed
+`TestTheVersionIsStatedOnceAndFollowedEverywhere`, again naming both values. Both mutations were
+reverted before committing; `release_identity_test.go` itself was not edited.
+
+**Windows was not driven interactively for this release.** No Windows host was available. The
+`verify (windows-latest)` job above proves the build, `go vet`, staticcheck, the unit and race
+suites, and both frontend suites on a native Windows runner; nobody clicked through the built
+app on Windows. `docs/release-policy.md` permits this, and it is stated here rather than implied.
+
+**What was observed on macOS is inherited from Epic 7, not re-observed against this exact
+commit.** `_bmad-output/implementation-artifacts/evidence-7-6-prove-the-rebuild-on-both-platforms.md`
+recorded, against the built macOS binary at Epic 7's tip `9823abf` (three commits before this
+branch's version-and-docs bump, none of them touching application code): both colour schemes
+across all five lifecycle states (idle, staged, transferring, done, retained-outcome), two
+complete transfers with SHA-256 of the received bytes matched against the source on both runs,
+the Tab-then-ArrowDown keyboard path into the browse menu, and the owner's own 2026-09-21
+confirmation of the focused browse-menu item carrying the mocha fill, the tint halo and the
+focus ring together. All of it is macOS-only, and cited here as evidence about the code this
+release ships, not as evidence about this release's own commit — no one has launched
+`46e79c7` itself and driven it by hand.
+
+**Not observed / optional / unverified for this candidate — named, not implied as passed:**
+- No macOS or Windows binary built from commit `46e79c7` has been launched and driven by a
+  person. The nearest observation is Epic 7's tip, `9823abf`, as above.
+- The Story 7.11 browse-menu polish's final appearance (hover following the cursor, the
+  highlight clearing on mouse-leave, the mocha two-tone ring) — open since Epic 7, still
+  unobserved by anyone.
+- Every optional manual-check row carried in the table further down this file (browser
+  combinations, screen readers, rendered layout through a real high-contrast Windows session, a
+  camera reading the QR under forced colors) remains unrun for this release, exactly as it was
+  for 1.1.0.
+- No tag has been pushed and `release.yml` has not run: there is no built `fairdrop.exe` or
+  `fairdrop-macos.zip` for 1.2.0 to size or checksum, and no published GitHub release. Cutting
+  the tag is the owner's own act, by this story's instructions — this entry describes a verified
+  candidate commit, not a published artifact.
+
 **v1.1.0 — published 2026-09-20, current release.** Final candidate
 `54a5f87223f34647aed40344296d79824a33d4bd` passed all three jobs in both PR
 [35499365200](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35499365200) and push
