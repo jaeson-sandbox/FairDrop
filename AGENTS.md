@@ -260,6 +260,30 @@ them individually and like all of them together.
    as a shadow is invisible in Windows High Contrast. Only `outline` is a
    system-recognised indicator guaranteed to survive, so a shadow-based ring needs an
    `outline` fallback inside the forced-colors block.
+5. **Escape is never dispatched to the DOM at all.** Arrow keys are; Escape is not.
+   Measured against the built binary with an on-screen `window` keydown probe that
+   prints a monotonic counter: with the browse menu open, pressing Escape left the
+   counter unchanged, and the very next ArrowUp advanced it (`key="ArrowUp"
+   target=BUTTON`). Repeated with focus on the menu container (`target=DIV`) and on a
+   menu item (`target=BUTTON`) -- Escape produced no event in either state. macOS
+   routes it up the responder chain as `-[NSResponder cancelOperation:]` instead.
+   Wails' own override of that method (`WailsContext.m`) returns early only in
+   fullscreen, so it is not the culprit; the key simply never reaches web content.
+
+   **Consequence: the ARIA menu pattern's Escape has never worked in this app on
+   macOS, and no JavaScript can make it work.** A `keydown` listener cannot hear an
+   event that is not dispatched. `handleMenuKeyDown`'s Escape branch is correct code
+   that is unreachable on this platform; it remains correct and reachable on Windows.
+   Do not "fix" it by rewriting the handler.
+
+   **This one was reported as measured in both directions before it was settled.** An
+   investigation pass concluded the opposite -- that Escape does reach the DOM and the
+   menu closes -- having exercised only the *keyboard-open* path and being unable to
+   drive the pointer-open path. The probe above then showed Escape firing no event on
+   either path. Two lessons: a negative result needs a positive control in the same
+   breath (the arrow key that *does* increment the counter is what makes "Escape fired
+   nothing" mean something), and an investigation that cannot reach the reported
+   reproduction has not reproduced it, whatever else it found.
 
 **Why nothing caught them.** `npm test` is jsdom, which performs no layout and -- worse
 for this class -- *does* focus a button on click, so it actively disagrees with the
