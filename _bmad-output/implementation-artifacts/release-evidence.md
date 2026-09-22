@@ -56,7 +56,7 @@ makes a named test fail. Everything a machine cannot observe is below.
 
 ## Artifact identity
 
-**v1.2.0 — candidate, not yet tagged or published.** Version bumped on
+**v1.2.0 — PUBLISHED 2026-09-22.** Version bumped on
 `epic-8-release-1-2-0` at commit `46e79c700993ff72db1dae8ed48a8e3143705d19`. Verify workflow run
 [35688046826](https://github.com/jaeson-sandbox/FairDrop/actions/runs/35688046826) (a push
 event whose `headSha` **is** this commit — not an ancestor cancelled mid-run) concluded
@@ -310,3 +310,49 @@ history**, not the current tree: 269 commits and 3,099 objects across all refs.
 
 **Enabled the same day:** GitHub secret scanning and push protection, so a future accident is
 blocked at push rather than found by an audit. Dependabot security updates remain off.
+
+### v1.2.0 publication record
+
+Tag `v1.2.0` points at `2accf9c`, the `main` merge of Epic 8. That commit's own verify run is
+**35728453883**, and its three job conclusions, read with `gh run view --json conclusion,jobs`
+and never `gh run watch`: `verify (windows-latest)` success, `verify (macos-latest)` success,
+`Linux adapter verification` success. The commit cited here **is** the tagged commit, not an
+ancestor — `verify.yml` cancels in-flight runs on every push, so a completed green run can
+belong to a commit that is no longer the tip, and several runs during Epic 7 completed with the
+Windows job cancelled rather than passed. A cancelled job is an absence, not a pass.
+
+The earlier candidate entry above cites run 35688046826 against `46e79c7`, the branch commit.
+That run is real and its tree differs from the tagged commit only by this evidence file itself.
+It is kept rather than deleted, but the run that proves what shipped is 35728453883.
+
+Release workflow run **35729870204** on tag `v1.2.0`, all jobs success: the shared gate on both
+native runners, `build (windows-latest)`, `build (macos-latest)`, and `release`. Each platform
+built its own artifact through Wails; no cross-build was used, and none ever is. The workflow
+verified both checksums with `sha256sum --check` before upload.
+
+Published assets: `fairdrop.exe` (13,810,688 bytes) with `fairdrop.exe.sha256`, and
+`fairdrop-macos.zip` (6,238,224 bytes) with `fairdrop-macos.zip.sha256`.
+
+`release.yml` creates a **draft** deliberately — its own comment reads "publishing a release is
+a human act on this public repository." The draft was published on the owner's explicit
+instruction to release, given in session on 2026-09-22. Recording who decided, and that the
+guardrail was crossed on instruction rather than bypassed, is the point of this line.
+
+**Still unverified at publication, and not softened:**
+
+- **No Windows binary has been driven interactively, for this release or any other in this
+  epic.** No Windows host was available. The gate proves the build, `go vet`, staticcheck, the
+  unit and race suites, and both frontend suites on `windows-latest`. Nobody clicked through
+  the app on Windows.
+- **No binary built from the tagged commit `2accf9c` has been launched by a person.** The macOS
+  observations this epic recorded — both colour schemes, all five lifecycle states, two
+  transfers with SHA-256 integrity verified against the source, the Tab-then-ArrowDown keyboard
+  path, and the owner's own confirmation of the focus ring, the menu behaviour and Escape — were
+  made against Epic 7 commits, the last at `9823abf`. They are real observations of the same
+  code paths, and they are not observations of this artifact.
+- The standing optional manual rows remain unrun: browser combinations, screen readers, a real
+  Windows High Contrast session, and a camera-scanned QR under forced colors.
+
+None of the above blocks acceptance under `docs/release-policy.md`, which makes manual
+observation optional for this personal project. They are listed because the policy's other half
+— never convert an unrun check into a pass — is the half that is easy to forget on a green day.
