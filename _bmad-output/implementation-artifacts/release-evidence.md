@@ -356,3 +356,64 @@ guardrail was crossed on instruction rather than bypassed, is the point of this 
 None of the above blocks acceptance under `docs/release-policy.md`, which makes manual
 observation optional for this personal project. They are listed because the policy's other half
 — never convert an unrun check into a pass — is the half that is easy to forget on a green day.
+
+## v1.2.1 — PUBLISHED 2026-09-22
+
+A patch release for a crash: dragging the staged QR code terminated the app on macOS. The
+defect predates 1.2.0 — the QR has been a plain `<img>` since the first release — so 1.0.0
+and 1.1.0 carry it too.
+
+**Root cause, measured rather than inferred.** The Wails runtime's native drop handler
+(`WailsWebView.m`, `performDragOperation:`) reads every `NSURL` off the drag pasteboard with
+an empty options dictionary and calls `fileSystemRepresentation` on each unconditionally.
+A standalone Objective-C program compiled against Foundation established the behaviour
+directly: for a non-file URL, `fileSystemRepresentation` **returns NULL rather than raising**,
+and the next line — `[[NSString alloc] initWithCString:NULL encoding:]` — segfaults. The test
+program exited **139 (SIGSEGV)**. That is why the app vanished with no Go panic, no
+Objective-C exception, and no crash report.
+
+The QR's `src` is a `data:image/png;base64,...` URL, so dragging it puts exactly such a
+non-file URL on the pasteboard. The `disableWebViewDragAndDrop` guard sits *after* that loop,
+and `EnableFileDrop` cannot be turned off — it is the product's main input path — so no Wails
+option avoids it.
+
+**The fix is a workaround, deliberately.** FairDrop stops the drag from ever starting
+(`draggable={false}` plus `-webkit-user-drag: none`). The upstream loop is unchanged and is
+**still present in Wails v2.16.0**, verified by inspection. The upstream one-line fix would be
+`NSDictionary *options = @{NSPasteboardURLReadingFileURLsOnlyKey: @YES};`. This is recorded in
+`AGENTS.md` as macOS platform fact 6 so a future Wails upgrade is checked against it.
+
+**Verification.** Tag `v1.2.1` points at `b8840a1`. That commit's verify run is **35754321628**,
+read with `gh run view --json conclusion,jobs`: `verify (windows-latest)` success,
+`verify (macos-latest)` success, `Linux adapter verification` success. Release run
+**35756086035** on the tag: all six jobs success — the shared gate on both native runners,
+`build (windows-latest)`, `build (macos-latest)`, and `release`. Each platform built its own
+artifact; no cross-build. Published assets: `fairdrop.exe` (13,810,688 bytes) and
+`fairdrop-macos.zip` (6,238,229 bytes), each with its `.sha256`.
+
+**A failed gate blocked this release once, and was fixed rather than retried.** Run
+**35749628271** against `028fb3e` failed `verify (windows-latest)`:
+`TestATeardownThatLosesTwoResourcesReportsBoth` reported "Cancel never returned". That commit
+touched zero Go files, 200 local race runs passed, and the test had not failed in the previous
+twelve `main` runs — but `docs/release-policy.md` says a failed check is never "retried until
+green", so it was diagnosed instead. `fakeTimer.fire()` marks a bound fired but can never mark
+it stopped, permanently corrupting the `armed() > stops()` comparison two wait helpers relied
+on. The race was reproduced deterministically (5/5) before the fix and pinned by a new
+regression test that fails 3/3 if the old helper semantics return. Test-only change, no
+assertion weakened. See `evidence-flaky-teardown-bound-test-fix.md`.
+
+**Still unverified at publication, and not softened:**
+
+- **The crash was never reproduced under instrumentation.** The diagnosis is from reading the
+  Wails source plus the standalone Foundation experiment above, and the owner confirmed the
+  QR can no longer be dragged. Nobody has observed the crash itself in a captured session.
+- **No Windows binary has been driven interactively**, for this release or any other. No
+  Windows host was available. The gate proves build, vet, staticcheck, unit, race and both
+  frontend suites there; nobody clicked through the app.
+- **No binary built from `b8840a1` has been launched by a person.**
+- The standing optional manual rows remain unrun: browser combinations, screen readers, a real
+  Windows High Contrast session, and a camera-scanned QR under forced colors.
+
+The draft was published on the owner's standing instruction to release, given 2026-09-22.
+`release.yml` creates a draft on purpose — "publishing a release is a human act on this public
+repository" — and recording who decided is the point of this line.
