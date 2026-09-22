@@ -1897,3 +1897,33 @@ This is a WCAG 2.4.7 failure on a keyboard-operable component, and it defeats St
 - Given the rendered browser suite, then it runs against **WebKit as well as Chromium** if that can be made to work (Playwright ships a WebKit build). Every rendered assertion in this repo currently proves one engine for a product that ships two, and this defect is the second macOS-only escape of this epic after `TabFocusesLinks`. If a WebKit project cannot be made reliable here, say so explicitly and record what manual macOS observation replaces it -- do not leave the gap unstated.
 - Given `docs/release-policy.md`, then the manual macOS observation that closes this defect is recorded honestly as observed, with what was done and seen. It is not fabricated and not implied.
 - Given the full gate on both platforms, when it runs, then it passes.
+
+### Story 7.11: Give the Browse Menu One Active Item
+
+As a sender reaching for the menu with either hand,
+I want the item I am about to choose to be the one that looks chosen,
+So that the menu behaves the way every other menu on the machine does.
+
+Created 2026-09-21 from an owner observation on the built binary: "why does it open with one option highlighted but hovering over another one only greys it out a little... it should open up unhighlighted and whichever one the mouse is on gets the bronze highlighting."
+
+**Two defects, one cause.** The menu has two different ideas of "the item you are about to pick" and no single notion of an active item.
+
+1. `BrowseControl`'s open effect is `if (open) firstItemRef.current?.focus()`, which fires on **every** open, including one caused by a pointer click. A native menu opened with the mouse pre-selects nothing; this one always pre-selects `File`, so a sender who clicked the control is shown a choice already apparently made.
+2. Focus paints the full treatment -- mocha fill, tint halo, violet ring (Story 7.10) -- while `:hover` paints `background: var(--color-fill)`, a faint grey. So moving the mouse onto `Folder` while `File` holds focus shows a strongly-marked item the sender is not pointing at and a weakly-marked one they are.
+
+**The fix is a single active item, owned by focus, driven by whichever input last acted.** Hovering an item moves focus to it, so hover and keyboard navigation share one highlight, one rule and one code path, and two items can never be marked at once. This is what native menus do and what the established menu patterns do.
+
+**This story deliberately edits `BrowseControl`'s event handling**, which every prior Epic 7 story was told not to touch. Those handlers each encode a separately reproduced defect and the protection was correct; it is being lifted here on purpose and only here. Every existing `BrowseControl` test must still pass, and the handlers' existing comments must be preserved or updated rather than dropped -- they are the record of what each one is defending against.
+
+**Acceptance Criteria:**
+
+- Given the menu opened by **pointer**, then no item is focused or highlighted, and focus remains on the trigger. *Mutation:* focus the first item on a pointer-open -> must fail.
+- Given the menu opened by **keyboard** (ArrowDown, ArrowUp, Enter or Space on the trigger), then the first item is focused and carries the full treatment. The existing I/O-matrix rule -- "the menu opens, focus lands in it" -- is preserved for the keyboard path, which is the path it was written for. *Mutation:* stop focusing the first item on a keyboard-open -> must fail.
+- Given the pointer moves onto an item, then that item takes focus, and therefore the identical treatment a keyboard-focused item has. `:hover` no longer carries a separate, weaker appearance. *Mutations:* remove the focus-on-hover -> must fail; give `:hover` a different appearance from `:focus` -> must fail.
+- Given any moment with the menu open, then **at most one item is marked**. *Mutation:* allow hover and focus to mark different items simultaneously -> must fail.
+- Given the menu was opened by pointer and the sender then presses ArrowDown or ArrowUp on the trigger, then focus moves into the menu rather than nothing happening. Today `setOpen(true)` on an already-open menu changes no state, the open effect does not re-run, and the key is dead -- a real gap this story must close. *Mutation:* leave that key dead -> must fail.
+- Given Escape, Tab out, blur, item activation and focus return, then every existing behaviour is unchanged: Escape closes and returns focus to the trigger; Tab leaves and closes without trapping; a pointer press on the trigger toggles rather than reopening; `closeAndReturnFocus` still sets the `data-focus-return` marker Story 7.10 added. The existing tests covering each of these must pass **unchanged**.
+- Given `DESIGN.md`'s **Browse Menu** row, then it states the single-active-item rule, that hover and keyboard focus share one appearance, and that a pointer-open pre-selects nothing. The spine is amended before the CSS, not after.
+- Given the full gate on both platforms, when it runs, then it passes.
+
+**Note on proof:** the pointer-versus-keyboard distinction is behavioural and testable in jsdom (which input opened the menu, and what has focus afterwards). The *appearance* equality of hover and focus is a stylesheet fact, assertable from the CSS text. Neither needs a real engine, unlike Story 7.10's `:focus-visible` defect.
