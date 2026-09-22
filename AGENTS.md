@@ -230,6 +230,52 @@ supported no-follow queries; preserve content-read separation and identity check
   responsible for chasing it into this file -- otherwise every future agent
   re-litigates it.
 
+## macOS WebKit focus behaviour, and why the suites cannot see it
+
+<!-- Outside the bmad:context block on purpose: kept across `bmad-project-context` refreshes. -->
+
+Epic 7 hit **four** distinct focus behaviours where WKWebView differs from the engines
+this repo tests with. Each one shipped or nearly shipped a dead interaction behind a
+fully green suite. They are collected here because the next one will look like none of
+them individually and like all of them together.
+
+1. **`WKPreferences.tabFocusesLinks` defaults to NO, so Tab cannot reach a `<button>`
+   at all.** Not a styling gap -- the documented Tab-then-ArrowDown path into the browse
+   menu was simply dead on macOS, and ArrowDown scrolled the document instead.
+   `main.go` sets `Mac.Preferences.TabFocusesLinks`; `TestAppOptionsEnablesMacTabFocus`
+   pins it. Any control that relies on Tab depends on that option staying set.
+2. **`:focus-visible` does not match an element focused by script.** Anything focused
+   with `element.focus()` -- a roving-tabindex menu item, a returned-to trigger -- never
+   matches, so every rule keyed to it is dead for that element. Chromium propagates the
+   keyboard modality through a programmatic focus and therefore looks correct. Where the
+   app moves focus itself and the element is keyboard-operable, key the appearance to
+   `:focus`, or set an explicit marker attribute and style that.
+3. **Clicking a `<button>` does not focus it.** WebKit mirrors native macOS here, so
+   after a pointer click focus is on `document.body` -- not the button. Any handler
+   attached to that button, or any `onBlur` on a subtree focus never entered, silently
+   never fires. This killed Escape, the arrow keys and click-outside dismissal on a
+   pointer-opened menu at once. If a component's keyboard or dismissal behaviour depends
+   on focus being somewhere after a click, put it there explicitly.
+4. **`forced-colors: active` strips decorative `box-shadow`.** A focus ring drawn only
+   as a shadow is invisible in Windows High Contrast. Only `outline` is a
+   system-recognised indicator guaranteed to survive, so a shadow-based ring needs an
+   `outline` fallback inside the forced-colors block.
+
+**Why nothing caught them.** `npm test` is jsdom, which performs no layout and -- worse
+for this class -- *does* focus a button on click, so it actively disagrees with the
+platform. `npm run test:browser` is real layout but **Chromium only**, and Chromium
+behaves correctly in every case above. A Playwright WebKit project was tried and
+rejected: it cannot reach a button with Tab either (same default as 1), and exposes no
+equivalent of the Wails-level Cocoa preference, so it cannot be put into the working
+state the assertions need.
+
+**What to do instead.** For anything focus-related, pin the *mechanism* in the
+stylesheet or component (which engine-independent tests can assert), write the
+behavioural test so it does not presuppose a click focused anything -- dispatch keys at
+`document.activeElement ?? document.body` rather than at a node you chose -- and then
+**drive the built binary by hand before believing it**. Every one of the four above was
+found that way and none of them any other way.
+
 ## Git workflow
 
 <!-- Outside the bmad:context block on purpose: kept across `bmad-project-context` refreshes. -->
