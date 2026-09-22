@@ -1215,6 +1215,17 @@ body {
     width: 100%;
     height: auto;
     image-rendering: pixelated;
+    /*
+      Belt and braces with the `draggable={false}` attribute in StagedView.tsx:
+      this is the property WebKit actually honours for an <img> drag source.
+      Without it, dragging the QR puts its `data:image/png;base64,...` URL on
+      the OS drag pasteboard as an NSURL, and the vendored Wails native drop
+      handler (WailsWebView.m, performDragOperation:) calls
+      fileSystemRepresentation on every NSURL there unconditionally -- fatal
+      inside the cgo process for a non-file URL. See "QR drag source is
+      disabled (macOS drag-and-drop crash)" in accessibility.test.tsx.
+    */
+    -webkit-user-drag: none;
 }
 
 /* --------------------------------------------------------- Direct URL Row */

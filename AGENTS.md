@@ -298,6 +298,52 @@ behavioural test so it does not presuppose a click focused anything -- dispatch 
 **drive the built binary by hand before believing it**. Every one of the four above was
 found that way and none of them any other way.
 
+6. **Dragging a non-file `<img>` can crash the whole app, and the cause is not in this
+   repo's code.** The owner reported that dragging the QR image after staging a file
+   "sort of just breaks and the application closes." The QR is an `<img>` whose `src` is
+   a `data:image/png;base64,...` URL. WebKit lets any `<img>` be a drag source by
+   default, and dragging one puts its `src` on the OS drag pasteboard as an `NSURL`. The
+   vendored Wails native drop handler
+   (`~/go/pkg/mod/github.com/wailsapp/wails/v2@v2.15.0/internal/frontend/desktop/darwin/WailsWebView.m`,
+   `performDragOperation:`) reads every `NSURL` off that pasteboard and calls
+   `fileSystemRepresentation` on it **unconditionally**, with no guard for a non-file
+   URL:
+
+   ```objc
+   NSArray<NSURL*> *files = [pboard readObjectsForClasses:@[[NSURL class]] options:@{}];
+   NSMutableArray *files_strs = [[NSMutableArray alloc] init];
+   for (NSURL *url in files) {
+       const char *fs_path = [url fileSystemRepresentation];
+       NSString *fs_path_str = [[NSString alloc] initWithCString:fs_path encoding:NSUTF8StringEncoding];
+       [files_strs addObject:fs_path_str];
+   }
+   ```
+
+   `fileSystemRepresentation` on a non-file URL does not return a usable path -- it can
+   raise, or yield `NULL` which then feeds `initWithCString:`. An Objective-C exception
+   inside a cgo-hosted process is fatal, which matches the report: the app vanishes with
+   no Go panic and no crash report. The `disableWebViewDragAndDrop` guard sits *after*
+   this loop, so no Wails option prevents it, and `EnableFileDrop` cannot be disabled --
+   it is the product's core input path, per "Native drop targets" above.
+
+   **This diagnosis came from reading the vendored source, not from an instrumented
+   reproduction** -- the crash is a macOS/Cocoa fatality neither `npm test` (jsdom,
+   no drag pasteboard at all) nor `npm run test:browser` (real layout, but Chromium,
+   a different engine with different default drag-source behaviour) can trigger. The
+   fix stops the drag from ever starting: `draggable={false}` on the `<img>` (the
+   attribute WebKit's own drag-start check reads) **and** `-webkit-user-drag: none` in
+   CSS (the property WebKit actually honours for images), belt and braces. Confirmed by
+   rendering a bare `<img draggable={false}>` with no stylesheet in Chromium: its
+   computed `-webkit-user-drag` already reads `none`, which means Chromium derives that
+   property from the `draggable` attribute and the rendered suite (`accessibility.test.tsx`)
+   cannot tell a missing CSS rule from a present one once the attribute is also set --
+   the CSS declaration has to be pinned as stylesheet text instead
+   (`styles.test.ts`, "the QR image cannot be dragged"). A future Wails upgrade should
+   be checked against this exact loop in `WailsWebView.m`: if it gains a URL-scheme
+   guard, this class of hazard goes away upstream; if the loop is unchanged, any new
+   non-file drag source (another `<img>`, an anchor, anything WebKit will treat as
+   draggable) is exposed to the same crash and needs the same two-part guard.
+
 ## Git workflow
 
 <!-- Outside the bmad:context block on purpose: kept across `bmad-project-context` refreshes. -->

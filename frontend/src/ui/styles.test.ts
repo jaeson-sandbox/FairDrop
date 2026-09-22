@@ -959,6 +959,45 @@ describe('guarantees a stylesheet edit could silently undo', () => {
     })
 })
 
+describe('the QR image cannot be dragged (macOS drag-and-drop crash, defect fix)', () => {
+    /*
+      Owner report: dragging the QR after staging a file crashed and closed
+      the app. Diagnosis from the vendored Wails source (WailsWebView.m,
+      performDragOperation:), not from an instrumented reproduction -- the
+      crash is a macOS/Cocoa fatality neither suite in this repo can trigger.
+      That source reads every NSURL off the drag pasteboard and calls
+      `fileSystemRepresentation` on it unconditionally; the QR `<img>`'s
+      `data:image/png;base64,...` src is a non-file URL, and WebKit will put
+      it on the pasteboard as an NSURL if the image is draggable.
+
+      Two independent guards close this: `draggable={false}` on the element
+      (pinned as a rendered assertion in accessibility.test.tsx, where a real
+      DOM and computed style exist) and `-webkit-user-drag: none` here.
+
+      This property is text-pinned rather than checked via computed style
+      because Chromium (the engine `test:browser` runs) derives
+      `-webkit-user-drag` from the `draggable` attribute itself when no CSS
+      rule sets it -- confirmed by rendering a plain `<img draggable={false}>`
+      with no stylesheet at all and reading `getComputedStyle(...).
+      getPropertyValue('-webkit-user-drag')`, which came back `"none"` with
+      no `.fd-qr` rule in scope. That makes computed style blind to this
+      declaration's removal in the one browser this repo's rendered suite
+      uses. A real WKWebView is the platform the diagnosis is about, and
+      "belt and braces" is deliberate: the safety this rule buys is real even
+      though the rendered suite cannot observe it, which is exactly why the
+      literal has to be pinned as text instead.
+    */
+    it('declares -webkit-user-drag: none on .fd-qr, so WebKit never starts a drag pasteboard for the QR image', () => {
+        const qrRule = block('.fd-qr {')
+        expect(
+            qrRule,
+            'expected .fd-qr to declare `-webkit-user-drag: none;` -- without it, dragging the QR ' +
+                'image can crash the app (fileSystemRepresentation on a non-file NSURL in ' +
+                'WailsWebView.m performDragOperation:)',
+        ).toContain('-webkit-user-drag: none;')
+    })
+})
+
 describe('the primary button hover has no black flash (defect fix)', () => {
     /*
       Observed defect: hovering "Choose a file or folder" (the primary
