@@ -912,7 +912,7 @@ body {
     margin-inline-start: auto;
     border-right: 2px solid var(--color-primary-ink);
     border-bottom: 2px solid var(--color-primary-ink);
-    transform: rotate(-45deg);
+    transform: rotate(45deg);
 }
 
 /*

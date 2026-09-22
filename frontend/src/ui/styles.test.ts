@@ -697,7 +697,17 @@ describe('Story 7.3: rebuilding Idle', () => {
         expect(chevron).toContain('height: 12px;')
         expect(chevron).toContain('border-right: 2px solid var(--color-primary-ink);')
         expect(chevron).toContain('border-bottom: 2px solid var(--color-primary-ink);')
-        expect(chevron).toContain('transform: rotate(-45deg);')
+        // Points DOWN, not right. The disclosure's chevron rests at
+        // `rotate(-45deg)` (pointing right) and rotates to 45deg when the
+        // details expands in place. This control does not expand in place --
+        // it opens a menu *below* itself -- so its indicator rests pointing
+        // down, the way the text glyph it replaced (U+2304) did and the way
+        // every platform popup button does. Owner-observed regression: giving
+        // it the disclosure's resting angle made the one control in Idle that
+        // *acts* visually indistinguishable from the two informational rows
+        // beneath it, which is the distinction Story 7.8 exists to draw.
+        expect(chevron).toContain('transform: rotate(45deg);')
+        expect(chevron).not.toContain('transform: rotate(-45deg);')
     })
 
     it('keeps the always-open recovery block styled separately from the Idle disclosure form', () => {
