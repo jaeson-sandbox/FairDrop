@@ -2,7 +2,10 @@
 
 **Status:** complete. The one item originally recorded as not observed was closed by
 owner observation on 2026-09-21; see **NOT observed** below.
-**Tip proven:** `dec76ae` (`fix(epic-7): make focus visible where the app moves it`).
+**Tip proven:** `9823abf` (`fix(epic-7): keep the browse menu's keyboard/blur paths live
+after a pointer-open, and retire the violet focus ring`). An earlier revision of this
+file cited `dec76ae`; three further stories landed after it and the evidence was
+re-pointed rather than left naming a commit that is no longer the tip.
 **Policy:** `docs/release-policy.md`. Automated verification is mandatory; manual
 observations are optional for this personal project, but an unobserved check is
 recorded as unobserved and never implied to have passed.
@@ -18,7 +21,7 @@ states show real numbers rather than fixtures.
 
 ## Automated gate on the tip
 
-GitHub Actions run **35600709363**, head `dec76ae`:
+GitHub Actions run **35673201360**, head `9823abf`:
 
 | Job | Conclusion |
 |---|---|
@@ -92,7 +95,24 @@ recorded here because finding them is the story's actual value.
    correct. A WCAG 2.4.7 failure on an operable component. Fixed by Story 7.10. See
    `evidence-7-10-make-focus-visible.md`.
 
-Both are instances of `AGENTS.md`'s first testing lesson: a green test can pin a
+3. **The browse menu had no single active item.** Reported by the owner: the menu
+   pre-selected `File` even when opened with the mouse, and hovering another item only
+   tinted it faintly, so the strongly-marked item could be the one the sender was not
+   pointing at. Fixed by Story 7.11.
+4. **Fixing (3) regressed three interactions, found only on the binary.** Removing the
+   unconditional pre-select removed the thing that had been keeping focus inside the
+   menu, and because WebKit does not focus a `<button>` on click, a pointer-opened menu
+   then had dead Escape, dead arrow keys and no click-outside dismissal. The story's own
+   first-pass test had staged a `control().focus()` call that does not reflect the
+   platform, which is why it passed. Fixed in the same story; see
+   `evidence-7-11-browse-menu-active-item.md`.
+5. **The violet focus ring was retired** at the owner's request and replaced with a
+   two-tone ring in the accent colour, kept visible by a surface-coloured gap. A
+   forced-colors `outline` fallback was added because Windows High Contrast strips the
+   decorative `box-shadow` the ring is drawn with — a fourth platform trap, and one that
+   would have made the indicator invisible on Windows specifically.
+
+All are instances of `AGENTS.md`'s first testing lesson: a green test can pin a
 behaviour that is dead on a platform you never ran. Both were invisible to a
 Chromium-only rendered proof, on a product that ships WKWebView as well.
 
@@ -106,6 +126,12 @@ Chromium-only rendered proof, on a product that ships WKWebView as well.
   story could not obtain during the automated pass, when the machine's screen was
   locked. The fix is now observed, not merely reasoned about.
 
+- **The Story 7.11 menu polish has not been re-checked by hand on the rebuilt binary.**
+  The regression it fixed was found by driving the app, and the fix is proven by four
+  tests confirmed failing against the pre-fix tree. But the final appearance — hover
+  following the cursor, the highlight clearing on mouse-leave, and the new mocha
+  two-tone ring — was not observed: the display locked and then screen capture failed
+  partway through the attempt. **Recorded as unobserved, not as passed.**
 - **No screenshots are retained as files.** The states above were observed live and
   reviewed in-session; the capture tool returned them inline but did not persist them
   to disk, and `screencapture` is blocked by screen-recording permission for the shell.
