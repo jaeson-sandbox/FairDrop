@@ -1,4 +1,4 @@
-import type {ReactNode} from 'react'
+import type {KeyboardEvent, ReactNode} from 'react'
 
 interface DisclosureProps {
     /**
@@ -44,9 +44,24 @@ interface DisclosureProps {
  * real browser.
  */
 export function Disclosure({className, headingId, summary, children, defaultOpen = false}: DisclosureProps) {
+    /**
+     * Escape clears focus from a focused summary. There is no native
+     * `<details>`/`<summary>` Escape behaviour to preserve here -- unlike
+     * `BrowseControl`'s menu, there is nothing open to dismiss -- so this is
+     * purely "Escape removes the highlighting" (the owner's words) in
+     * isolation. See the fuller trade-off comment on `closeAndBlur` in
+     * `IdleView.tsx`'s `BrowseControl`, which this mirrors: nothing here
+     * re-focuses anything afterward, so the next Tab restarts from the top
+     * of the document rather than continuing from this summary.
+     */
+    function handleSummaryKeyDown(event: KeyboardEvent<HTMLElement>): void {
+        if (event.key !== 'Escape') return
+        event.currentTarget.blur()
+    }
+
     return (
         <details className={`${className} fd-disclosure`} open={defaultOpen || undefined}>
-            <summary className="fd-disclosure__summary">
+            <summary className="fd-disclosure__summary" onKeyDown={handleSummaryKeyDown}>
                 <h2 id={headingId} className="fd-disclosure__heading">{summary}</h2>
                 <span className="fd-disclosure__chevron" aria-hidden="true"/>
             </summary>

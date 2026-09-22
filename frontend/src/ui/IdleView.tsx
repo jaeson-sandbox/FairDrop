@@ -304,9 +304,10 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     /**
      * Closes the menu and returns focus to the control that opened it.
      *
-     * Used for Escape and for an item being chosen -- never for focus simply
-     * leaving the menu on its own, which is `handleMenuBlur` below and must
-     * not fight the sender's own focus move.
+     * Used only for an item being chosen by keyboard -- never for Escape
+     * (that is `closeAndBlur` below, a deliberately different ending) and
+     * never for focus simply leaving the menu on its own, which is
+     * `handleMenuBlur` below and must not fight the sender's own focus move.
      *
      * Returning focus before the native chooser opens (rather than after)
      * matters because the menu item that was just activated is about to
@@ -324,6 +325,41 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
         setTriggerFocusReturned(true)
     }
 
+    /**
+     * Closes the menu on Escape and leaves nothing focused.
+     *
+     * Owner: "I feel like escape should remove ANY highlighting of the tabs,
+     * not add it in. I feel like that makes more sense." Story 7.10 taught
+     * `closeAndReturnFocus` to paint a visible ring on the trigger after a
+     * scripted return, because WebKit does not match `:focus-visible` for an
+     * element focused by script -- the right fix for keyboard navigation
+     * *continuing* (choosing File or Folder). Escape is not that: it reads
+     * as "get me out of this," not "put me somewhere," so it must not use
+     * that marker at all.
+     *
+     * Blurring whichever element currently has focus (the menu container on
+     * a pointer-open, an item on a keyboard-open, or the trigger itself on
+     * the defensive fallback in `handleTriggerKeyDown`) is what this does
+     * instead of re-focusing the trigger. Where that focused node is about
+     * to unmount anyway (the menu/its items), the browser would move focus
+     * to `<body>` on its own once `setOpen(false)` commits; blurring first
+     * makes the "nothing is focused" outcome immediate and explicit rather
+     * than relying on that unmount side effect, and it is also what reaches
+     * the trigger in the one case where nothing unmounts under it.
+     *
+     * Trade-off, real and worth recording rather than leaving for the next
+     * reader to rediscover: with nothing focused, the next Tab restarts from
+     * the top of the document instead of continuing from wherever the
+     * sender was. Idle has three tab stops, so the cost is small, and no
+     * WCAG 2.4.7 obligation is left unmet -- that requirement is about *a*
+     * focused component's indicator, and after Escape there is not one to
+     * indicate.
+     */
+    function closeAndBlur(): void {
+        (document.activeElement as HTMLElement | null)?.blur()
+        setOpen(false)
+    }
+
     function choose(action: () => void): void {
         closeAndReturnFocus()
         action()
@@ -332,7 +368,7 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     function handleMenuKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
         if (event.key === 'Escape') {
             event.preventDefault()
-            closeAndReturnFocus()
+            closeAndBlur()
             return
         }
         // Tab leaves the menu, so the menu closes. Handled here rather than in
@@ -439,7 +475,7 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
         if (event.key === 'Escape') {
             if (!open) return
             event.preventDefault()
-            setOpen(false)
+            closeAndBlur()
             return
         }
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return

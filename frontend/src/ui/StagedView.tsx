@@ -245,6 +245,15 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                             value={metadata.url}
                                             aria-labelledby="fd-direct-link-heading"
                                             onFocus={(event) => event.currentTarget.select()}
+                                            onKeyDown={(event) => {
+                                                // Escape clears focus rather than leaving the field
+                                                // ringed -- the same "get me out of this" reading as
+                                                // BrowseControl's `closeAndBlur` and the disclosure
+                                                // summary's own Escape handler (see their comments for
+                                                // the fuller reasoning). Nothing here is open to
+                                                // dismiss, so this is only the blur.
+                                                if (event.key === 'Escape') event.currentTarget.blur()
+                                            }}
                                             onMouseDown={(event) => {
                                                 // Without this the mouseup that follows collapses the
                                                 // selection to a caret, and select-on-focus becomes a

@@ -870,8 +870,19 @@ body {
     transform: rotate(45deg);
 }
 
+/*
+  Owner-observed defect: the open body's first line sat flush against the
+  summary's bottom edge (no top padding at all), which put it directly under
+  the summary's own focus ring -- the ring draws `--focus-ring-offset` +
+  `--focus-ring-width` (2px + 2px = 4px) beyond the summary's box, landing on
+  top of that line. `--spacing-3` (12px) clears that with real room to spare,
+  not the bare 4px minimum: the owner's screenshot showed the body copy
+  sitting too tight under the summary even ignoring the ring, and 12px also
+  matches the summary's own internal `gap: var(--spacing-3)` above, so the
+  open state reads as one consistent rhythm rather than two unrelated values.
+*/
 .fd-disclosure__body {
-    padding: 0 var(--spacing-4) var(--spacing-4);
+    padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
 }
 
 /*

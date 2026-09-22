@@ -242,6 +242,41 @@ describe('the firewall preflight is a collapsed disclosure (Story 7.3, FR23 amen
     })
 })
 
+/*
+  Change 1's second Escape path: a keyboard-operable control with no menu
+  open at all. `<details>`/`<summary>` has no native Escape behaviour to
+  preserve -- there is nothing to dismiss -- so this is purely "Escape
+  clears focus" in isolation, proving the fix is not merely an accident of
+  BrowseControl's own dismissal logic.
+*/
+describe('Escape clears focus on a focused disclosure summary, with no menu open', () => {
+    it('blurs the firewall summary on Escape', () => {
+        show()
+        const summary = document.querySelector('.fd-preflight > summary') as HTMLElement
+        summary.focus()
+        expect(document.activeElement).toBe(summary)
+
+        fireEvent.keyDown(summary, {key: 'Escape'})
+
+        expect(document.activeElement).not.toBe(summary)
+    })
+
+    it('never blurs a routed landing target, which this path never touches', () => {
+        // Sanity check for the scoping rule: a landing target is never given
+        // an Escape handler at all, so pressing Escape while one is focused
+        // (the state heading, focused by script to route an announcement)
+        // must leave it exactly as focused as it was.
+        show()
+        const heading = document.querySelector('[data-focus-target="idle-instruction"]') as HTMLElement
+        heading.focus()
+        expect(document.activeElement).toBe(heading)
+
+        fireEvent.keyDown(heading, {key: 'Escape'})
+
+        expect(document.activeElement).toBe(heading)
+    })
+})
+
 describe('recovery guidance is a second collapsed disclosure', () => {
     it('renders as a <details>, closed by default, distinct from the preflight disclosure', () => {
         show()
@@ -349,16 +384,21 @@ describe('the browse menu', () => {
         expect(trigger.getAttribute('data-focus-return')).toBe('')
     })
 
-    it('closes on Escape, returns focus to the control, and announces nothing', () => {
+    it('closes on Escape, clears focus rather than returning it, and announces nothing', () => {
+        // Owner: "I feel like escape should remove ANY highlighting of the
+        // tabs, not add it in." Escape is a distinct dismissal path from
+        // choosing an item by keyboard (below): it ends with nothing focused,
+        // not with the trigger re-focused and ringed. See the trade-off this
+        // records in BrowseControl's `closeAndBlur` doc comment.
         show()
         fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
 
         fireEvent.keyDown(screen.getByRole('menu'), {key: 'Escape'})
 
         expect(screen.queryByRole('menu')).toBeNull()
-        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
-        expect(document.activeElement).toBe(trigger)
-        expect(trigger.getAttribute('data-focus-return')).toBe('')
+        expect(document.activeElement).not.toBe(trigger)
+        expect(trigger.getAttribute('data-focus-return')).toBeNull()
         // Not asserted here: that nothing was announced. IdleView renders no
         // live region in any state, so querying for one passes whatever the
         // menu does -- the announcer belongs to App, and the one-owner rule is
@@ -383,10 +423,14 @@ describe('the browse menu', () => {
     })
 
     it('clears the trigger scripted-return marker on blur', () => {
+        // The marker is now set by only one path -- choosing an item by
+        // keyboard (`closeAndReturnFocus`, via `choose`) -- since Escape
+        // (`closeAndBlur`) never sets it at all. See "closes on Escape,
+        // clears focus rather than returning it" above for that half.
         show()
         fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
         const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
-        fireEvent.keyDown(screen.getByRole('menu'), {key: 'Escape'})
+        fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
         expect(trigger.getAttribute('data-focus-return')).toBe('')
 
         fireEvent.blur(trigger)
@@ -841,17 +885,31 @@ describe('the browse menu follows the menu-button pattern', () => {
         }
     })
 
-    it('closes on Escape while focus is still on the control', () => {
+    it('closes on Escape while focus is still on the control, and clears focus rather than leaving the trigger ringed', () => {
         show()
         fireEvent.click(control())
         // What a pointer press leaves behind: the menu open, focus on the
         // trigger rather than inside the menu.
         fireEvent.blur(screen.getByRole('menu'), {relatedTarget: control()})
+        // `fireEvent.blur`/`fireEvent.click` dispatch events without moving
+        // real jsdom focus, so this is staged explicitly -- the scenario
+        // `handleTriggerKeyDown`'s own Escape branch defends is a real Tab
+        // landing on the trigger while the menu is open, and the assertions
+        // below are meaningless unless the trigger is genuinely focused
+        // first.
+        control().focus()
+        expect(document.activeElement).toBe(control())
 
         fireEvent.keyDown(control(), {key: 'Escape'})
 
         expect(screen.queryByRole('menu')).toBeNull()
         expect(control().getAttribute('aria-expanded')).toBe('false')
+        // This is the defensive fallback branch (`handleTriggerKeyDown`'s own
+        // Escape case, focus already on the trigger rather than routed
+        // through `handleMenuKeyDown`) -- it must clear focus exactly like
+        // the primary path does, not leave the trigger focused and ringed.
+        expect(document.activeElement).not.toBe(control())
+        expect(control().getAttribute('data-focus-return')).toBeNull()
     })
 
     it('is one tab stop, with the items reachable by arrow rather than by Tab', () => {

@@ -680,6 +680,39 @@ describe('Story 7.3: rebuilding Idle', () => {
         )
     })
 
+    it("gives the open disclosure's body enough top padding to clear the focus ring, expressed as a token, not a magic number", () => {
+        // Owner: "these two tabs at the bottom when they have the
+        // highlighting it sort of covers the text, so maybe we need to
+        // offset them down a bit more as well." Cause: `.fd-disclosure__body`
+        // had NO top padding at all, so the open body's first line sat flush
+        // against the summary's bottom edge -- exactly where the summary's
+        // own two-tone focus ring (`--focus-ring-offset` + `--focus-ring-width`)
+        // extends beyond its box.
+        //
+        // This derives the ring's total reach from the same tokens the ring
+        // itself is built from (never a hand-copied "4px"), then requires
+        // whatever spacing token the body's top padding uses to exceed it --
+        // "exceed", not merely equal, per the owner's screenshot showing the
+        // body copy sitting too tight even ignoring the ring.
+        // The ring tokens live on :root, not in @theme (see the comment
+        // above their declaration in style.css), so they are read from the
+        // whole stylesheet rather than the `theme` block like the spacing
+        // tokens below.
+        const ringOffset = Number(stylesheet.match(/--focus-ring-offset:\s*(\d+)px;/)?.[1])
+        const ringWidth = Number(stylesheet.match(/--focus-ring-width:\s*(\d+)px;/)?.[1])
+        expect(ringOffset).toBeGreaterThan(0)
+        expect(ringWidth).toBeGreaterThan(0)
+        const ringExtent = ringOffset + ringWidth
+
+        const body = block('.fd-disclosure__body {')
+        const topPaddingToken = body.match(/padding:\s*var\(--spacing-(\d+)\)\s+var\(--spacing-4\)\s+var\(--spacing-4\);/)
+        expect(topPaddingToken, 'a spacing token for the body\'s top padding, not a bare pixel value').toBeTruthy()
+
+        const spacingValue = Number(theme.match(new RegExp(`--spacing-${topPaddingToken![1]}:\\s*(\\d+)px;`))?.[1])
+        expect(spacingValue, 'the chosen spacing token must resolve to a real value in @theme').toBeGreaterThan(0)
+        expect(spacingValue).toBeGreaterThan(ringExtent)
+    })
+
     it('gives the browse trigger chevron the same 12x12 border-chevron mechanism as the disclosure, not a text glyph (defect fix)', () => {
         /*
           Owner-observed defect: the browse trigger's chevron looked tiny and
