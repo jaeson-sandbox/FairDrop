@@ -1927,3 +1927,28 @@ Created 2026-09-21 from an owner observation on the built binary: "why does it o
 - Given the full gate on both platforms, when it runs, then it passes.
 
 **Note on proof:** the pointer-versus-keyboard distinction is behavioural and testable in jsdom (which input opened the menu, and what has focus afterwards). The *appearance* equality of hover and focus is a stylesheet fact, assertable from the CSS text. Neither needs a real engine, unlike Story 7.10's `:focus-visible` defect.
+
+## Epic 8: Release 1.2.0
+
+FairDrop 1.2.0 ships the Quartz interface. Created 2026-09-22, after Epic 7 merged to `main` at `7ba3424` with `verify (windows-latest)`, `verify (macos-latest)` and the Linux job all green on its tip.
+
+**Why 1.2.0 and not 2.0.0.** The visual change is total -- Terracotta Linen is retired and the app looks like a different product -- but semantic versioning tracks the contract, not the appearance. FairDrop still does exactly what 1.1.0 did: one file or folder, one receiver, plain HTTP on a trusted LAN, nothing persisted. No command, flag, format or behaviour was removed, and no receiver-side expectation changed. A major bump would advertise a break that did not happen. The minor bump is carried by real additions: the macOS Tab-focus fix, the completion receipt, and the resize and clipping fixes.
+
+**FRs covered:** none new. This packages what Epic 7 built.
+
+### Story 8.1: Cut the 1.2.0 Release
+
+As the owner,
+I want 1.2.0 tagged and published with honest notes and retained evidence,
+So that what shipped can be re-checked later rather than taken on trust.
+
+**Acceptance Criteria:**
+
+- Given the version, then `wails.json`'s `info.productVersion` and `frontend/package.json` (with its lockfile) all read `1.2.0` and agree with each other. `release_identity_test.go` already pins the agreement and the tag-to-`productVersion` rule; it must pass unchanged rather than be adjusted to fit. *Mutation:* disagree any one of them -> must fail naming both values.
+- Given `docs/release-notes-1.2.0.md`, then it follows the 1.1.0 format and **leads with the interface rebuild**, because that is what a user updating will notice first -- not as a footnote about polish. It states plainly that transfer behaviour is unchanged from 1.1.0, and it repeats the standing limitations rather than quietly dropping them: the Windows executable is unsigned, the macOS app is ad-hoc signed but not Developer ID signed or notarised, and there is no installer, auto-update, Linux package, hostile-network protection, or end-to-end encryption.
+- Given the notes, then they name the functional fixes a user can feel -- Tab reaching the browse control on macOS, the completion screen showing what was sent, the direct-link field no longer clipping its own URL -- rather than only the visual change.
+- Given `README.md`, then its "Current release" line reads 1.2.0 and describes this release rather than the icon work.
+- Given `_bmad-output/implementation-artifacts/release-evidence.md`, then it records the workflow run id, the commit it ran against, and **each job's own conclusion**, read with `gh run view --json conclusion,jobs` and never `gh run watch`, which has exited 0 over a failed run in this project. Anything not observed reads as *optional / unverified* and names what would have to be observed; it is never converted into a pass.
+- Given the evidence, then it records honestly that **Windows was never driven interactively** for this release: no Windows host was available, the gate proves the build and the suites there, and nobody clicked through the app. `docs/release-policy.md` permits this and it is stated rather than implied.
+- Given the tag `v1.2.0`, then `release.yml` asserts it matches `wails.json`'s `productVersion` **before** `wails build` runs, so a mismatched tag fails without producing an artifact.
+- Given the full gate on both platforms, when it runs against the release commit, then it passes, and that run -- not an earlier one on an ancestor -- is the one the evidence cites. `verify.yml` cancels in-flight runs on a new push, so a completed green run can belong to a commit that is no longer the tip.

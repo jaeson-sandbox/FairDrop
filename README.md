@@ -6,10 +6,12 @@ Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged cop
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: v1.1.0.** FairDrop now ships its own app icon on Windows and macOS, with automated checks
-against the resources embedded in the Windows executable. The transfer behavior remains the
-same complete FR1–FR24 scope proven for v1.0.0, including the observed file and folder transfer
-from desktop to a phone on the same Wi-Fi on 2026-09-18.
+**Current release: v1.2.0.** FairDrop's interface is rebuilt on the Quartz spine, replacing
+Terracotta Linen throughout the window. This release also fixes Tab reaching the browse control
+on macOS, adds a completion screen that shows what was sent and how much, and stops the
+direct-link field from clipping its own URL or lagging behind a window resize. Transfer behavior
+remains the same complete FR1–FR24 scope proven for v1.0.0: one file or folder, one receiver,
+plain HTTP on a trusted LAN, nothing persisted.
 
 ## Using it
 
