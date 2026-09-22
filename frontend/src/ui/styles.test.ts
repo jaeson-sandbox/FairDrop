@@ -104,10 +104,10 @@ describe('the Quartz token layer', () => {
             // 'primary-tint carries text' describe block below.
             'primary-tint': '#F5EEEB',
             track: '#E9E9EB',
-            // Story 7.8: focus moves off the action colour to a dedicated
-            // violet, distinct from primary -- see the "focus indicator is
-            // distinct from the action colour" describe block below.
-            focus: '#6B4E9E',
+            // Story 7.8 introduced a dedicated violet `focus` role here;
+            // Story 7.11 retired it in favour of the ring reading `primary`
+            // directly -- see "the focus ring is primary, kept visible by a
+            // structural gap, not a separate hue" describe block below.
             success: '#177A48',
             'success-tint': '#E3F1EA',
             warning: '#8A5300',
@@ -150,7 +150,6 @@ describe('the Quartz token layer', () => {
             // declaration.
             'primary-tint': '#372E2B',
             track: '#3A3A3E',
-            focus: '#B79BE0',
             success: '#4ED08B',
             'success-tint': '#20342A',
             warning: '#E7A33A',
@@ -271,7 +270,6 @@ describe('forced colors', () => {
             'primary-ink': 'HighlightText',
             'primary-tint': 'Canvas',
             track: 'Canvas',
-            focus: 'Highlight',
             success: 'CanvasText',
             'success-tint': 'Canvas',
             warning: 'CanvasText',
@@ -301,6 +299,17 @@ describe('forced colors', () => {
     it('drops the primary button gradient and its highlight, which have no system color', () => {
         expect(forcedColors).toMatch(/\.fd-button--primary \{\s*background: Highlight;\s*box-shadow: none;\s*\}/)
     })
+
+    it('restates every box-shadow focus ring as an outline, because Windows High Contrast Mode strips decorative box-shadow (Story 7.11)', () => {
+        // Story 7.11 moved every ring from `outline` to `box-shadow`
+        // everywhere else in this file. `box-shadow` has no guaranteed
+        // survival in forced colors the way `outline` does, so it is
+        // restated here in system colors rather than left to inherit the
+        // (stripped) authored shadow.
+        const ring = block('.fd-button:focus-visible,\n    .fd-url:focus-visible,\n    .fd-button[data-focus-return],\n    .fd-disclosure__summary:focus-visible,\n    .fd-browse-menu .fd-button:focus {')
+        expect(ring).toContain('outline: var(--focus-ring-width) solid Highlight;')
+        expect(ring).toContain('box-shadow: none;')
+    })
 })
 
 describe('reduced motion', () => {
@@ -321,13 +330,19 @@ describe('reduced motion', () => {
 })
 
 describe('the focus indicator', () => {
-    it('draws one ring from the focus token for the two Tab-reachable controls', () => {
+    it('draws a two-tone ring -- a surface gap, then a primary ring -- for the two Tab-reachable controls (Story 7.11)', () => {
         expect(stylesheet).toMatch(
             /\.fd-button:focus-visible,\s*\.fd-url:focus-visible,\s*\.fd-button\[data-focus-return\] \{\s*/,
         )
-        expect(stylesheet).toContain('outline: var(--focus-ring-width) solid var(--color-focus);')
-        expect(stylesheet).toContain('outline-offset: var(--focus-ring-offset);')
-        expect(stylesheet).toContain('--focus-ring-width: 3px;')
+        const ring = block('.fd-button:focus-visible,')
+        // box-shadow, never outline: a separate outline and box-shadow
+        // "fighting each other" (the owner's words) is what Story 7.11
+        // replaced with two shadows stacked in one declaration.
+        expect(ring).not.toMatch(/outline:/)
+        expect(ring).toContain('0 0 0 var(--focus-ring-offset) var(--color-surface)')
+        expect(ring).toContain('0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)')
+        expect(stylesheet).toContain('--focus-ring-width: 2px;')
+        expect(stylesheet).toContain('--focus-ring-offset: 2px;')
     })
 
     it('rings the browse trigger on its scripted-return marker (Story 7.10), alongside :focus-visible rather than replacing it', () => {
@@ -341,6 +356,19 @@ describe('the focus indicator', () => {
         const ring = block('.fd-button:focus-visible,')
         expect(ring).toContain('[data-focus-return]')
         expect(ring).not.toMatch(/\.fd-button:focus\b(?!-visible)/)
+    })
+
+    it('applies the identical two-tone ring to the disclosure summary, the third Tab-reachable ring in the product (Story 7.11)', () => {
+        // "Apply the same treatment everywhere the ring is used... so there
+        // is one focus appearance in the product, not two" -- the owner's
+        // words. The trigger/.fd-url rule above is one ring; this is the
+        // second of the three named explicitly.
+        const summaryRing = block('.fd-disclosure__summary:focus-visible {')
+        expect(summaryRing).not.toMatch(/outline:/)
+        expect(summaryRing).toContain('0 0 0 var(--focus-ring-offset) var(--color-surface)')
+        expect(summaryRing).toContain(
+            '0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)',
+        )
     })
 
     it('never rings a routed landing target, even when focus on it is visible', () => {
@@ -365,38 +393,76 @@ describe('the focus indicator', () => {
     })
 })
 
-describe('the focus indicator is distinct from the action colour (Story 7.8)', () => {
-    it('never lets focus collapse onto primary in either mode', () => {
-        // Mutation named in the acceptance criteria: set --color-focus equal
-        // to --color-primary -> this must fail, naming the collapse. A ring
-        // in the accent hue on a control filled with the accent hue is not
-        // an indicator; Paper Relay separated these for the same reason.
-        const lightFocus = theme.match(/--color-focus:\s*(#[0-9A-Fa-f]{6});/)?.[1]
-        const lightPrimary = theme.match(/--color-primary:\s*(#[0-9A-Fa-f]{6});/)?.[1]
-        const darkFocus = dark.match(/--color-focus:\s*(#[0-9A-Fa-f]{6});/)?.[1]
-        const darkPrimary = dark.match(/--color-primary:\s*(#[0-9A-Fa-f]{6});/)?.[1]
+describe('the focus ring is primary, kept visible by a structural gap, not a separate hue (Story 7.11)', () => {
+    /*
+      Story 7.8 protected the ring's visibility with a guard that the two
+      colours must never be equal -- a hue-difference mechanism, because the
+      ring was an `outline` painted directly against whatever fill sat under
+      it, and a same-hue outline on a same-hue fill disappears. The owner
+      found the resulting violet "poorly polished," a second hue with no
+      relationship to the rest of the product, and asked for the ring to be
+      the product's one accent colour instead.
 
-        expect(lightFocus, '--color-focus (light)').toBeTruthy()
-        expect(lightPrimary, '--color-primary (light)').toBeTruthy()
-        expect(darkFocus, '--color-focus (dark)').toBeTruthy()
-        expect(darkPrimary, '--color-primary (dark)').toBeTruthy()
-
-        expect(lightFocus, 'focus must not collapse onto primary in light mode').not.toBe(lightPrimary)
-        expect(darkFocus, 'focus must not collapse onto primary in dark mode').not.toBe(darkPrimary)
+      Story 7.11 removes `--color-focus` entirely -- the ring now reads
+      `var(--color-primary)` directly, so there is no second token left to
+      collapse onto the first by accident. What still needs protecting is
+      the thing the old guard was actually protecting, visibility, not the
+      hue-difference mechanism it happened to use. The two-tone ring keeps
+      it visible structurally instead: a `--color-surface` gap sits between
+      the ring and whatever it surrounds, so a same-hue ring never touches a
+      same-hue fill directly. This is a reframing of the Story 7.8 guard,
+      not a deletion of it -- the assertion below is what replaces "must not
+      equal primary" with "must have a gap namely surface-coloured, strictly
+      inside the ring".
+    */
+    it('has no --color-focus token left in either mode -- the ring is primary itself', () => {
+        expect(theme).not.toMatch(/--color-focus:/)
+        expect(dark).not.toMatch(/--color-focus:/)
     })
 
-    it('declares the published Story 7.8 mocha and violet values exactly', () => {
+    it('keeps a surface-coloured gap strictly inside the primary ring on every ringed control', () => {
+        // Mutation named by the owner: remove the gap (collapse to a single
+        // primary-only shadow) -> this must fail, naming the missing gap --
+        // the reframed form of Story 7.8's "must not collapse onto primary"
+        // guard. A ring with no gap sits flush against a primary fill (the
+        // trigger's own background once chosen, the browse menu item's
+        // fill) and disappears exactly as the outline-era violet was
+        // introduced to prevent.
+        for (const selector of ['.fd-button:focus-visible,', '.fd-disclosure__summary:focus-visible {']) {
+            const rule = block(selector)
+            const shadows = rule.match(/box-shadow:\s*([^;]+);/)?.[1]
+            expect(shadows, `${selector} box-shadow`).toBeTruthy()
+
+            const gapOffset = shadows!.match(/0 0 0 (var\(--focus-ring-offset\)) var\(--color-surface\)/)?.[1]
+            const ringOffset = shadows!.match(
+                /0 0 0 calc\((var\(--focus-ring-offset\)) \+ (var\(--focus-ring-width\))\) var\(--color-primary\)/,
+            )
+            expect(gapOffset, `${selector} surface gap stop`).toBeTruthy()
+            expect(ringOffset, `${selector} primary ring stop, offset by the gap plus its own width`).toBeTruthy()
+        }
+
+        // The browse menu item stacks a third shadow (the tint halo) ahead
+        // of the same gap/ring pair -- same guarantee, applied after an
+        // existing 4px layer rather than from zero.
+        const menuItemRing = block('.fd-browse-menu .fd-button:focus {')
+        expect(menuItemRing).toContain('0 0 0 calc(4px + var(--focus-ring-offset)) var(--color-surface)')
+        expect(menuItemRing).toContain(
+            '0 0 0 calc(4px + var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)',
+        )
+    })
+
+    it('declares the published Story 7.8 mocha values exactly, with no violet left to declare', () => {
         expect(theme).toContain('--color-primary: #9C5636;')
         expect(theme).toContain('--color-primary-hi: #B06A45;')
         expect(theme).toContain('--color-primary-hover: #7F4428;')
         expect(theme).toContain('--color-primary-ink: #FFFFFF;')
-        expect(theme).toContain('--color-focus: #6B4E9E;')
+        expect(theme).not.toContain('#6B4E9E')
 
         expect(dark).toContain('--color-primary: #E39B70;')
         expect(dark).toContain('--color-primary-hi: #EBAA82;')
         expect(dark).toContain('--color-primary-hover: #F0B694;')
         expect(dark).toContain('--color-primary-ink: #2B1206;')
-        expect(dark).toContain('--color-focus: #B79BE0;')
+        expect(dark).not.toContain('#B79BE0')
     })
 })
 
@@ -817,16 +883,21 @@ describe('the browse menu surface (Story 7.2)', () => {
         expect(items).toContain('border-radius: var(--radius-sm);')
     })
 
-    it('distinguishes the focused item by primary fill, a tint halo, and its own ring -- keyed to :focus (Story 7.10)', () => {
+    it('distinguishes the focused item by primary fill, a tint halo, and its own two-tone ring -- keyed to :focus (Story 7.10, ring redrawn Story 7.11)', () => {
         const focused = block('.fd-browse-menu .fd-button:focus {')
         expect(focused).toContain('background: var(--color-primary);')
-        expect(focused).toMatch(/box-shadow:\s*0 0 0 4px var\(--color-primary-tint\);/)
+        expect(focused).toMatch(/box-shadow:\s*0 0 0 4px var\(--color-primary-tint\),/)
         // The ring is drawn here too, not only inherited from the shared
         // `.fd-button:focus-visible` rule: that rule never matches these
-        // items on WebKit (see the mechanism test below), so the outline has
-        // to live in this rule for macOS to paint one at all.
-        expect(focused).toContain('outline: var(--focus-ring-width) solid var(--color-focus);')
-        expect(focused).toContain('outline-offset: var(--focus-ring-offset);')
+        // items on WebKit (see the mechanism test below), so it has to live
+        // in this rule for macOS to paint one at all. Story 7.11: stacked
+        // into the same box-shadow as the halo, not a separate `outline` --
+        // gap, then ring, both offset past the halo's own 4px.
+        expect(focused).not.toMatch(/outline:/)
+        expect(focused).toContain('0 0 0 calc(4px + var(--focus-ring-offset)) var(--color-surface)')
+        expect(focused).toContain(
+            '0 0 0 calc(4px + var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary)',
+        )
     })
 
     it('keys the menu item focus rule to :focus, never :focus-visible, because WebKit never matches :focus-visible on a script-focused element', () => {
@@ -1148,17 +1219,22 @@ describe('the unrounded contrast proof', () => {
         ['primary', 'surface', 3, true],
         ['primary', 'elevated', 3, true],
         ['warning', 'elevated', 3, true],
-        ['focus', 'elevated', 3, true],
+        // Story 7.11: the focus ring is `--color-primary` itself now (no
+        // separate `--color-focus` token), so its visibility against every
+        // surface it can sit on is exactly the `primary` rows around it --
+        // `canvas` and `fill` are the two this table did not already need
+        // for another reason (surface/elevated/track/primary-tint above
+        // were already load-bearing before the ring moved onto `primary`).
+        ['primary', 'canvas', 3, true],
+        ['primary', 'fill', 3, true],
         // Story 7.8 review follow-up: the drag-active rule and the
         // solid-primary border sit directly on the primary-tint fill.
         ['primary', 'primary-tint', 3, true],
-        // Status rules and focus against the stronger surfaces are published as
-        // the weakest-adjacent claim rather than one row each.
+        // Status rules against the stronger surfaces are published as the
+        // weakest-adjacent claim rather than one row each.
         ['warning', 'canvas', 3, false],
         ['success', 'canvas', 3, false],
         ['error', 'canvas', 3, false],
-        ['focus', 'canvas', 3, false],
-        ['focus', 'surface', 3, false],
     ]
 
     it.each(placed)('%s on %s clears its AA ratio in both authored modes', (foreground, background, minimum) => {
@@ -1256,14 +1332,19 @@ describe('the unrounded contrast proof', () => {
     })
 
     it('keeps the weakest-adjacent claim DESIGN.md makes for the focus indicator', () => {
+        // Story 7.11: the ring reads `--color-primary` directly, so the
+        // token this claim is about is `primary`, not a separate `focus`
+        // role -- there is no longer one to look up.
         const weakest = Math.min(
-            ...['canvas', 'surface', 'elevated'].map((surface) => contrast(lightTokens['focus'], lightTokens[surface])),
+            ...['canvas', 'surface', 'elevated'].map((surface) => contrast(lightTokens['primary'], lightTokens[surface])),
         )
 
-        // Quartz's focus token is identical to primary, so the weakest pairing
-        // is against canvas -- the lowest-contrast of the three surfaces it
-        // sits on -- unlike Terracotta Linen, where elevated was weakest.
-        expect(weakest).toBe(contrast(lightTokens['focus'], lightTokens['canvas']))
+        // The ring's weakest pairing is against canvas -- the lowest-contrast
+        // of the three surfaces it sits on -- the same relationship the
+        // violet token had before Story 7.11 retired it, because canvas was
+        // already the weakest of the three regardless of which hue sits in
+        // the ring.
+        expect(weakest).toBe(contrast(lightTokens['primary'], lightTokens['canvas']))
         expect(designSpine).toContain(weakest.toFixed(9))
     })
 })

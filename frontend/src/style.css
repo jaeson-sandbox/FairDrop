@@ -26,10 +26,11 @@
       took the action colour to system blue on the reasoning that blue reads
       native on both platforms; the owner kept the icon's copper-mocha
       identity and asked for it back. The five values below (primary,
-      primary-hi, primary-hover, primary-ink, and --color-focus further down)
-      are sampled from build/appicon.png, not invented, and were validated
-      against both WCAG floors before this story was written -- see
-      DESIGN.md's Colors section for the re-derived contrast figures.
+      primary-hi, primary-hover, primary-ink, and the violet focus token
+      Story 7.11 later retired) are sampled from build/appicon.png, not
+      invented, and were validated against both WCAG floors before this
+      story was written -- see DESIGN.md's Colors section for the re-derived
+      contrast figures.
     */
     --color-primary: #9C5636;
     --color-primary-hi: #B06A45;
@@ -57,14 +58,20 @@
     --color-primary-tint: #F5EEEB;
     --color-track: #E9E9EB;
     /*
-      Story 7.8: focus moves off the action colour entirely. With a mocha
-      accent, a mocha focus ring on a button already filled with mocha is not
-      an indicator -- Paper Relay separated these for the same reason, and
-      Quartz's first cut had quietly collapsed them back together by giving
-      both tokens the same blue. #6B4E9E is a distinct violet that clears its
-      own floors against every adjacent surface; see DESIGN.md.
+      Story 7.8 introduced a dedicated violet `--color-focus` here, distinct
+      from `--color-primary`, because a mocha ring on a mocha fill was not an
+      indicator with the *outline* mechanism then in use: same hue on same
+      hue disappears. Story 7.11 retired the token, not the concern -- the
+      owner found the violet itself "poorly polished," a second hue with no
+      relationship to the rest of the product. The replacement is a two-tone
+      ring (see `.fd-button:focus-visible` below): a `--color-surface` gap,
+      then the ring in `--color-primary` itself. The gap, not a different
+      hue, is what keeps a same-hue ring visible against a same-hue fill, so
+      the indicator is on-brand instead of foreign. There is no
+      `--color-focus` left to collapse onto `--color-primary` by accident --
+      the ring *is* `--color-primary`, structurally guarded by the gap
+      instead of by a hue difference; see styles.test.ts's reframed guard.
     */
-    --color-focus: #6B4E9E;
     --color-success: #177A48;
     --color-success-tint: #E3F1EA;
     --color-warning: #8A5300;
@@ -166,12 +173,17 @@
     color-scheme: light dark;
 
     /*
-      One focus indicator for the whole app. DESIGN.md names the focus color and
-      publishes its ratio against the weakest adjacent authored surface; the
-      width and offset live here so a control and a programmatic focus target
-      cannot end up wearing different rings.
+      One focus indicator for the whole app, a two-tone ring (Story 7.11):
+      `--focus-ring-offset` is the surface-coloured gap between a focused
+      element and its ring, and `--focus-ring-width` is the ring's own
+      thickness, drawn just beyond that gap. Both live here, not per-rule, so
+      every focus-ring declaration in this file -- the trigger, `.fd-url`,
+      the disclosure summary, the browse menu items -- draws the identical
+      shape. DESIGN.md names the ring colour (`--color-primary`, the gap
+      `--color-surface`) and publishes the ratio against the weakest adjacent
+      authored surface.
     */
-    --focus-ring-width: 3px;
+    --focus-ring-width: 2px;
     --focus-ring-offset: 2px;
 
     /*
@@ -217,8 +229,6 @@
         */
         --color-primary-tint: #372E2B;
         --color-track: #3A3A3E;
-        /* Story 7.8: dark half of the violet focus token -- see the light block above. */
-        --color-focus: #B79BE0;
         --color-success: #4ED08B;
         --color-success-tint: #20342A;
         --color-warning: #E7A33A;
@@ -513,12 +523,23 @@ body {
   mouse click" regression `:focus-visible` was introduced to fix in Epic 1.
   The attribute is the narrower substitute: it fires only for the two
   script-driven returns, never for a pointer press.
+
+  Story 7.11: `box-shadow`, not `outline`, and `--color-primary`, not a
+  separate violet token. Two stacked shadows -- a `--focus-ring-offset`
+  surface-coloured gap, then a ring `--focus-ring-width` further out in
+  `--color-primary` -- rather than an `outline` plus a `box-shadow` that
+  would have to agree with each other on radius and never quite would
+  ("fighting each other", the owner's words for the old outline/box-shadow
+  split this replaces). The gap is what keeps a same-hue ring legible
+  against a same-hue fill; see the token's own comment further up this file
+  for why the hue-separated violet was retired instead.
 */
 .fd-button:focus-visible,
 .fd-url:focus-visible,
 .fd-button[data-focus-return] {
-    outline: var(--focus-ring-width) solid var(--color-focus);
-    outline-offset: var(--focus-ring-offset);
+    box-shadow:
+        0 0 0 var(--focus-ring-offset) var(--color-surface),
+        0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
 }
 
 /*
@@ -757,9 +778,17 @@ body {
     background: var(--color-fill);
 }
 
+/*
+  Story 7.11: same two-tone ring as `.fd-button:focus-visible` above -- see
+  that rule's comment for the gap/ring reasoning. `<details>`/`<summary>` is
+  natively Tab-reachable and click-activatable, so `:focus-visible` is the
+  right pseudo-class here for the same reason it is on the trigger: a plain
+  `:focus` rule would repaint after a mouse click.
+*/
 .fd-disclosure__summary:focus-visible {
-    outline: var(--focus-ring-width) solid var(--color-focus);
-    outline-offset: var(--focus-ring-offset);
+    box-shadow:
+        0 0 0 var(--focus-ring-offset) var(--color-surface),
+        0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
 }
 
 .fd-disclosure__heading {
@@ -889,14 +918,22 @@ body {
   controls), where a real Tab always precedes their focus, so it stays put
   there. DESIGN.md's Browse Menu row asks for fill and halo distinct from
   the ring alone; this rule now supplies all three together.
+
+  Story 7.11: the ring itself is now `box-shadow`, not `outline` (see
+  `.fd-button:focus-visible` above for why), so it stacks with the tint halo
+  in one declaration instead of fighting it as a second, independent layer:
+  the halo at 4px, then the surface-coloured gap just beyond it, then the
+  `--color-primary` ring beyond that. All three are non-text boundaries the
+  gap keeps distinct from the mocha fill beneath them.
 */
 .fd-browse-menu .fd-button:focus {
-    outline: var(--focus-ring-width) solid var(--color-focus);
-    outline-offset: var(--focus-ring-offset);
     background: var(--color-primary);
     border-color: var(--color-primary);
     color: var(--color-primary-ink);
-    box-shadow: 0 0 0 4px var(--color-primary-tint);
+    box-shadow:
+        0 0 0 4px var(--color-primary-tint),
+        0 0 0 calc(4px + var(--focus-ring-offset)) var(--color-surface),
+        0 0 0 calc(4px + var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
 }
 
 /*
@@ -1579,7 +1616,13 @@ body {
         --color-primary-ink: HighlightText;
         --color-primary-tint: Canvas;
         --color-track: Canvas;
-        --color-focus: Highlight;
+        /*
+          Story 7.11: no `--color-focus` override needed here any more. The
+          ring reads `--color-primary` directly (Highlight, above) and its
+          gap reads `--color-surface` directly (Canvas, above), so a
+          forced-colors ring is a Canvas gap around a Highlight ring without
+          a third variable to keep in step with the other two.
+        */
         --color-success: CanvasText;
         --color-success-tint: Canvas;
         --color-warning: CanvasText;
@@ -1595,6 +1638,31 @@ body {
 
     .fd-button--primary {
         background: Highlight;
+        box-shadow: none;
+    }
+
+    /*
+      Story 7.11 switched every focus ring from `outline` to stacked
+      `box-shadow` layers (see `.fd-button:focus-visible` and neighbours
+      earlier in this file). That is fine for ordinary rendering, but
+      Windows High Contrast Mode strips decorative box-shadow the same way
+      it strips the elevation shadows reset to `none` above -- only
+      `outline` is a system-recognized focus indicator guaranteed to
+      survive forced colors. Restated here as an outline in the two system
+      colors the ring already resolves to elsewhere in this file
+      (`Highlight` for the ring, matching `--color-primary` above), so the
+      indicator does not silently vanish in forced colors specifically. The
+      tint halo on the browse menu item is allowed to go with the other
+      shadows here -- the item's own `Highlight` background and
+      `HighlightText` label already carry the marked state without it.
+    */
+    .fd-button:focus-visible,
+    .fd-url:focus-visible,
+    .fd-button[data-focus-return],
+    .fd-disclosure__summary:focus-visible,
+    .fd-browse-menu .fd-button:focus {
+        outline: var(--focus-ring-width) solid Highlight;
+        outline-offset: var(--focus-ring-offset);
         box-shadow: none;
     }
 

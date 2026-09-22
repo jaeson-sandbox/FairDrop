@@ -273,7 +273,7 @@ Recovery remains available from Idle and Staged:
 ## Accessibility Floor
 
 - Target WCAG 2.2 AA. Visual contrast/focus tokens and their measured ratios are in `DESIGN.md`; color is never the sole state or action cue.
-- Every pointer action has a semantic keyboard equivalent. Focus uses `{colors.focus}` / `{colors.focus-dark}` in authored modes and system focus colors in forced colors.
+- Every pointer action has a semantic keyboard equivalent. Focus uses `{colors.primary}` / `{colors.primary-dark}` with a `{colors.surface}` / `{colors.surface-dark}` gap in authored modes (Story 7.11 retired the dedicated `{colors.focus}` token) and system focus colors in forced colors.
 - The one-owner routing table above binds. The Status Announcer is pre-mounted, atomic, and replaces text rather than appending a log.
 - Known-positive progress uses `role="progressbar"`, min 0, max 100, and finite `aria-valuenow`. Unknown total omits `aria-valuenow`. Known-empty has no percentage-bearing progressbar and exposes its literal text status.
 - At an effective content width of 320 CSS pixels, use only one-dimensional vertical reflow. At 200% text and with WCAG text-spacing overrides (1.5× line height, 2× paragraph spacing, 0.12em letter spacing, 0.16em word spacing), all information and actions remain visible/reachable without page-level horizontal scroll, overlap, or clipping. Fixed-height content grows.

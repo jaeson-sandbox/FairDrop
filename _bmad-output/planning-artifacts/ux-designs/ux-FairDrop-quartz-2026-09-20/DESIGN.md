@@ -156,7 +156,7 @@ the frontmatter in ordinary colour modes.
 | Decorative edge | `{colors.separator}` / `{colors.separator-dark}` | Dividers inside a surface, and nothing else. Never the sole boundary for a control, drop target, QR, progress track, or status. It deliberately does **not** meet 3:1 — it is not a boundary, it is a rule between paragraphs. |
 | Functional boundary | `{colors.control-border}` / `{colors.control-border-dark}` | Required on controls, the rest-state drop target, the QR frame, the URL field, and the progress-track outline. These values were chosen as the lightest greys that still clear 3:1 against every surface they touch. |
 | Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, `{colors.primary-hi}` / `{colors.primary-hi-dark}` as the gradient's top stop, and `{colors.primary-hover}` / `{colors.primary-hover-dark}` as the hover fill | The single strongest action, the (solid) progress fill, and the item-kind pill. Never status decoration. **The hover fill is a separate token from the gradient's top stop, and the two move in opposite directions: light darkens on hover, dark lightens.** A single shared lighter value once put light mode's hover label under the 4.5:1 text floor — see the hover-pair row below. |
-| Focus | `{colors.focus}` / `{colors.focus-dark}` | A 3px outline at 2px offset. Scoped to keyboard-operable controls only — see the amendment carried forward below. |
+| Focus | `{colors.primary}` / `{colors.primary-dark}`, with a `{colors.surface}` / `{colors.surface-dark}` gap | A two-tone ring (Story 7.11): a surface-coloured gap, then a 2px ring in the accent colour itself, stacked as `box-shadow`, never `outline`. Story 7.8's dedicated violet is retired — the owner found it "poorly polished," a second hue with no relationship to the rest of the product — and the gap, not a different hue, is what keeps a same-hue ring legible against a same-hue fill. Scoped to keyboard-operable controls only — see the amendment carried forward below. |
 | Outcomes | Success, warning, error, each with a tint | Always pair colour with outline, glyph, or literal text. |
 | QR | `{colors.qr-surface}` / `{colors.qr-ink}` in both modes | Fixed high-contrast substrate; never recolour, invert, texture, rotate, round modules, or overlay a logo. Unchanged from Paper Relay and non-negotiable — it is a scan-reliability constraint, not a style choice. |
 
@@ -227,21 +227,35 @@ proven, unrounded, to exceed 5.36:1 light and 6.47:1 dark.
 | `primary` on `surface` | 5.529272927 | 7.193529288 |
 | `primary` on `elevated` | 5.529272927 | 6.510527964 |
 | `warning` on `elevated` | 6.329195349 | 6.871224941 |
-| `focus` on `elevated` | 6.544828832 | 6.219794189 |
+| `primary` on `canvas` | 4.945442820 | 7.907185645 |
+| `primary` on `fill` | 4.898523535 | 5.667386798 |
 | `primary` on `primary-tint` | 4.821510572 | 5.785865409 |
 
-Status rules and the focus ring against the stronger surfaces (`canvas` and
-`surface`) are published as the weakest-of-the-set claim rather than one row
-each, for the same reason as the status-on-surface floor above. The weakest of
-`warning`/`success`/`error` on `canvas` is `success` at **4.799052371** light
-and `error` at **7.116437439** dark. The weakest of `focus` against
-`canvas`/`surface`/`elevated` is `focus` on `canvas` at **5.853767247** (light).
-**Story 7.8 moves focus off the action colour**, to a dedicated violet
-(`{colors.focus}` / `{colors.focus-dark}`) distinct from `{colors.primary}` —
-a mocha focus ring on a button already filled with mocha was not an
-indicator, the same reasoning Paper Relay applied. `canvas` remains the
-weakest adjacent surface in light mode with the new token, the same as it was
-when focus equalled primary.
+Status rules and the focus ring against the stronger surfaces (`canvas`,
+`surface`, `elevated`) are published as the weakest-of-the-set claim rather
+than one row each, for the same reason as the status-on-surface floor above.
+The weakest of `warning`/`success`/`error` on `canvas` is `success` at
+**4.799052371** light and `error` at **7.116437439** dark. The weakest of
+`primary` — the ring's own colour, since Story 7.11 — against
+`canvas`/`surface`/`elevated` is `primary` on `canvas` at **4.945442820**
+(light); `canvas` was already the weakest of the three before the ring moved
+onto this token, and stays weakest now. Widening the set to the fourth surface
+the ring can sit on, `fill`, the overall weakest is `primary` on `fill` at
+**4.898523535** light and **5.667386798** dark — both published as their own
+row in the table above, since `fill` is load-bearing for the ring in a way the
+other three status rules never need it to be.
+
+**Story 7.11 retires the dedicated violet Story 7.8 introduced**, and the ring
+reads `{colors.primary}` / `{colors.primary-dark}` directly — the owner found
+the violet "poorly polished," a second hue with no relationship to the rest of
+the product. Story 7.8's reasoning still holds — a same-hue ring on a
+same-hue fill is not an indicator — but the mechanism moves from a distinct
+hue to a structural gap: the ring is drawn as two stacked `box-shadow` layers,
+a `{colors.surface}` gap and then the `{colors.primary}` ring beyond it, so
+the ring never touches a same-hue fill directly. The four rows above —
+`surface`, `elevated`, `canvas`, `fill` — are exactly the ring's own
+visibility proof restated using the token it now shares with the rest of the
+accent colour, each well clear of the 3:1 non-text floor in both modes.
 
 `separator` is excluded from both tables on purpose: it is the decorative edge,
 never a boundary, and it deliberately fails 3:1 against every surface it can sit

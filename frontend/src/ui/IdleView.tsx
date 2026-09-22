@@ -239,6 +239,20 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     // nothing here should silently assume one) pre-selects rather than not.
     const openedByRef = useRef<'pointer' | 'keyboard'>('keyboard')
 
+    // Story 7.11 regression fix: which input marked the *currently* active
+    // item, if any -- `null` when no item is marked. Set to `'keyboard'`
+    // wherever this component moves focus to an item on purpose (the open
+    // effect's keyboard branch, and every navigation move in
+    // `handleMenuKeyDown`), and to `'pointer'` by each item's `onMouseEnter`.
+    // `handleMenuMouseLeave` below reads it to decide whether the pointer
+    // leaving the menu should clear the mark: only when the pointer put it
+    // there. A keyboard user's place in the menu must survive the mouse
+    // merely passing over it and leaving -- owner report, confirmed on the
+    // built binary: "when I move my mouse off of any option they don't
+    // unhighlight" was the pointer half of this bug; losing a keyboard
+    // selection to an incidental mouse pass would have been a worse one.
+    const activeSourceRef = useRef<'pointer' | 'keyboard' | null>(null)
+
     // Opened, not merely rendered: only a **keyboard** open pre-selects, per
     // "the menu opens, focus lands in it" (I/O matrix) -- the rule that
     // matrix entry was written for. A native menu opened by pointer
@@ -250,8 +264,41 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     // render, is what keeps a later re-render from stealing focus back off
     // whichever item the sender has since moved to with the keyboard or the
     // pointer (see the per-item `onMouseEnter` below).
+    //
+    // Story 7.11 regression, found on the built macOS binary after the fix
+    // above first shipped: WebKit does not focus a <button> when it is
+    // clicked -- it mirrors the native platform, where a pointer click on a
+    // button moves no keyboard focus at all (unlike Chromium, which focuses
+    // on mousedown, and unlike jsdom's own fireEvent.click, which moves no
+    // focus either -- both of which is why the first version of this fix
+    // looked complete in every suite). Doing nothing on a pointer-open,
+    // which is what the keyboard-only guard above reduces to for the
+    // pointer branch, therefore left focus on neither the trigger nor any
+    // item -- on document.body -- so `handleTriggerKeyDown` never fired
+    // (Escape and the arrow keys went nowhere) and `handleMenuBlur` never
+    // fired (nothing was focused inside the menu for a later blur to
+    // report, so a click outside never closed it). All three were reported
+    // dead on the shipped app.
+    //
+    // The fix focuses the menu container itself on a pointer-open --
+    // `tabIndex={-1}` on `.fd-browse-menu` below is what makes it a valid
+    // target -- rather than the trigger. The container already carries
+    // `onKeyDown={handleMenuKeyDown}` and `onBlur={handleMenuBlur}`, so
+    // every one of those paths is live the instant the menu opens, and
+    // nothing is visually marked because `.fd-browse-menu .fd-button:focus`
+    // in style.css only ever matches an item, never the container div. This
+    // is also the "no item active" focus target `handleMenuMouseLeave`
+    // returns to below -- one answer, in both places, for where focus lives
+    // when nothing is marked.
     useEffect(() => {
-        if (open && openedByRef.current === 'keyboard') firstItemRef.current?.focus()
+        if (!open) return
+        if (openedByRef.current === 'keyboard') {
+            activeSourceRef.current = 'keyboard'
+            firstItemRef.current?.focus()
+            return
+        }
+        activeSourceRef.current = null
+        menuRef.current?.focus()
     }, [open])
 
     /**
@@ -313,6 +360,17 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
         const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
         if (items === undefined || items.length === 0) return
         const itemList = [...items]
+        // Story 7.11: every navigation move below marks its target as
+        // keyboard-sourced, including from the "no item active" state --
+        // `document.activeElement` is then the menu container itself (or,
+        // on a pointer-opened trigger reached via the defensive branch in
+        // `handleTriggerKeyDown` below, the trigger), neither of which is in
+        // `itemList`, so `indexOf` below returns -1 and the arithmetic
+        // already lands on the first item without special-casing that
+        // state. Marking it here is what tells `handleMenuMouseLeave` this
+        // item must survive an incidental mouse pass rather than clearing
+        // it the way a merely-hovered item would.
+        activeSourceRef.current = 'keyboard'
         if (event.key === 'Home') {
             itemList[0]?.focus()
             return
@@ -327,23 +385,55 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
     }
 
     /**
-     * The trigger's own keys, which the menu's handler cannot see.
+     * The pointer leaving the menu entirely -- not moving between items,
+     * which never fires this (`mouseleave` does not bubble and only fires
+     * when the pointer actually exits the element it is bound to).
      *
-     * ArrowDown and ArrowUp open a menu button -- the convention every native
-     * menu follows, and the gesture a keyboard sender reaches for before
-     * finding out that Enter also works. Escape matters here for a different
-     * reason: a pointer press leaves focus on the trigger while the menu is
-     * open, so without this the one gesture that means "put this away" would
-     * do nothing in exactly the state a mouse user is most likely to be in.
+     * Story 7.11 owner regression: hovering an item moves focus to it (see
+     * `onMouseEnter` below), but moving the pointer away does not itself
+     * remove focus, so the item stayed marked after the mouse left --
+     * "when I move my mouse off of any option they don't unhighlight."
+     * Clearing the mark here, by returning focus to the neutral holder the
+     * pointer-open branch of the open effect above already uses, is what a
+     * native menu does. Gated on `activeSourceRef`, not unconditional: a
+     * keyboard user's place in the menu must not be stolen because the
+     * mouse happened to drift across the window and leave -- only a
+     * pointer-marked item is cleared here.
+     */
+    function handleMenuMouseLeave(): void {
+        if (activeSourceRef.current !== 'pointer') return
+        activeSourceRef.current = null
+        menuRef.current?.focus()
+    }
+
+    /**
+     * The trigger's own keys, which the menu's handler cannot see while the
+     * trigger itself has focus.
      *
-     * Story 7.11 closes a second, related gap here: with the menu already
-     * open and focus still on the trigger (the pointer-open state, since a
-     * pointer open no longer moves focus into the menu), ArrowDown/ArrowUp
-     * used to call `setOpen(true)` on a menu that was already open -- no
-     * state change, so the open effect never re-ran, and the key did
-     * nothing. It now focuses the first item directly in that case, which
-     * both satisfies the key and hands off to the menu's own `onKeyDown` for
-     * every keypress after this one.
+     * ArrowDown and ArrowUp open a menu button -- the convention every
+     * native menu follows, and the gesture a keyboard sender reaches for
+     * before finding out that Enter also works. That is the branch that
+     * matters in ordinary use: the trigger is a normal Tab stop, and
+     * pressing an arrow key there while the menu is closed is how a
+     * keyboard sender opens it.
+     *
+     * The `if (open)` branches below (Escape, and the second ArrowDown/
+     * ArrowUp branch) used to be the live path for a pointer-opened menu,
+     * back when this component assumed a pointer press leaves focus on the
+     * trigger. It does not: confirmed on the built macOS binary, WebKit
+     * does not focus a `<button>` on click at all, so a real pointer-open
+     * never leaves the trigger focused, and the open effect above now
+     * focuses the menu container instead precisely so that ITS OWN
+     * `onKeyDown` (`handleMenuKeyDown`) is what actually handles Escape and
+     * the arrows after a pointer-open, not this function. These two
+     * branches are kept as a defensive fallback -- for the one path that
+     * can still legitimately land real focus back on the trigger while
+     * `open` is true, a Tab landing on it from outside Idle entirely, and
+     * for direct-dispatch tests that exercise a handler by name rather than
+     * by routing a real keypress through whatever currently has focus (see
+     * `IdleView.test.tsx`'s "closes on Escape while focus is still on the
+     * control" for exactly that precedent) -- not because either is the
+     * primary route any more.
      */
     function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>): void {
         if (event.key === 'Escape') {
@@ -355,8 +445,10 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
         event.preventDefault()
         if (open) {
-            // Already open with focus still on the trigger (pointer-opened):
-            // move focus into the menu rather than no-op `setOpen(true)`.
+            // Defensive fallback only -- see the doc comment above. Marks
+            // the target keyboard-sourced for the same reason
+            // `handleMenuKeyDown`'s navigation branch does.
+            activeSourceRef.current = 'keyboard'
             firstItemRef.current?.focus()
             return
         }
@@ -449,8 +541,16 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                     role="menu"
                     aria-labelledby={triggerId}
                     className="fd-browse-menu"
+                    // Story 7.11 regression fix: a valid `.focus()` target,
+                    // not a Tab stop -- same roving-tabindex reasoning as
+                    // the items below. This is what lets a pointer-open
+                    // focus the container itself (see the open effect
+                    // above) so `onKeyDown`/`onBlur` here stay live with no
+                    // item marked.
+                    tabIndex={-1}
                     onKeyDown={handleMenuKeyDown}
                     onBlur={handleMenuBlur}
+                    onMouseLeave={handleMenuMouseLeave}
                 >
                     {/*
                       Story 7.11: `onMouseEnter` on each item, not a CSS
@@ -462,6 +562,10 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                       item is ever marked: a `:hover` rule painted alongside
                       `:focus` could mark two at once, which is the defect
                       this story closes. See DESIGN.md's Browse Menu row.
+                      Each item also records itself as the pointer-sourced
+                      mark (`activeSourceRef`), which is what lets
+                      `handleMenuMouseLeave` clear it again on the way out
+                      without also clearing a keyboard-placed one.
                     */}
                     <button
                         type="button"
@@ -473,7 +577,10 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                         tabIndex={-1}
                         className="fd-button fd-target"
                         onClick={() => choose(onSelectFile)}
-                        onMouseEnter={(event) => event.currentTarget.focus()}
+                        onMouseEnter={(event) => {
+                            activeSourceRef.current = 'pointer'
+                            event.currentTarget.focus()
+                        }}
                     >
                         {copy.label.file}
                     </button>
@@ -483,7 +590,10 @@ function BrowseControl({onSelectFile, onSelectDirectory}: BrowseControlProps) {
                         tabIndex={-1}
                         className="fd-button fd-target"
                         onClick={() => choose(onSelectDirectory)}
-                        onMouseEnter={(event) => event.currentTarget.focus()}
+                        onMouseEnter={(event) => {
+                            activeSourceRef.current = 'pointer'
+                            event.currentTarget.focus()
+                        }}
                     >
                         {copy.label.folder}
                     </button>

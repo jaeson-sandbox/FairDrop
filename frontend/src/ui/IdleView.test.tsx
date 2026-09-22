@@ -425,14 +425,13 @@ describe('the browse menu has one active item (Story 7.11)', () => {
         return screen.getByRole('button', {name: 'Choose a file or folder'})
     }
 
-    it('pre-selects nothing when opened by a real pointer click, leaving focus on the trigger', () => {
+    it('pre-selects nothing when opened by a real pointer click', () => {
         show()
-        // jsdom does not synthesize the focus-follows-mousedown a real
-        // pointer press performs before its click, so it is staged
-        // explicitly here -- the same technique the pre-existing "dismisses
-        // its own menu" tests above use for the same reason.
-        control().focus()
 
+        // No manual .focus() staged beforehand: a bare fireEvent.click, like
+        // a real pointer click on WebKit, moves no focus by itself. Whatever
+        // BrowseControl does with focus after this has to be something the
+        // component does on purpose, not something the test manufactured.
         fireEvent.click(control(), {detail: 1})
 
         expect(screen.getByRole('menu')).toBeTruthy()
@@ -440,7 +439,6 @@ describe('the browse menu has one active item (Story 7.11)', () => {
         for (const item of screen.getAllByRole('menuitem')) {
             expect(document.activeElement).not.toBe(item)
         }
-        expect(document.activeElement).toBe(control())
     })
 
     it('still focuses the first item when opened by keyboard activation (Enter/Space, detail 0)', () => {
@@ -496,23 +494,173 @@ describe('the browse menu has one active item (Story 7.11)', () => {
         expect(document.activeElement).not.toBe(file)
     })
 
-    it('closes the dead-key gap: ArrowDown/ArrowUp on a pointer-opened trigger moves focus into the menu', () => {
-        for (const key of ['ArrowDown', 'ArrowUp']) {
-            cleanup()
-            show()
-            // Staged for the same reason as the test above: a real pointer
-            // press leaves focus on the trigger, which jsdom's bare
-            // fireEvent.click does not simulate on its own.
-            control().focus()
-            fireEvent.click(control(), {detail: 1})
-            expect(document.activeElement).toBe(control())
+})
 
-            fireEvent.keyDown(control(), {key})
+/*
+  Owner regression, found by hand on the built macOS binary after the tests
+  above first shipped green: after a pointer-open, Escape did nothing, the
+  arrow keys did nothing, and clicking outside the menu did not close it --
+  the only way to dismiss it was a second click on the trigger. All three
+  worked before Story 7.11.
 
-            const items = screen.getAllByRole('menuitem')
-            expect(document.activeElement).toBe(items[0])
-            expect(screen.getByRole('menu')).toBeTruthy()
-        }
+  Root cause: WebKit does not focus a <button> when it is clicked (it
+  mirrors the native platform, where a pointer click on a button moves no
+  keyboard focus at all). The first version of the pointer-open fix removed
+  the old unconditional "focus the first item on every open," which fixed
+  the visual defect (File no longer pre-selected) but never put anything
+  else in its place -- so a pointer-open left focus on neither the trigger
+  nor any item, on document.body, and:
+  - `handleTriggerKeyDown` never fires, because the trigger never has focus.
+    That is what killed Escape and the arrow keys.
+  - `handleMenuBlur` never fires, because focus was never inside the menu to
+    begin with, so there is nothing for a later blur to report. That is
+    what killed click-outside dismissal.
+
+  jsdom cannot see this on its own -- a bare fireEvent.click moves no focus
+  in jsdom either, which is exactly why it was invisible: the first version
+  of these tests staged `control().focus()` by hand before the click, an
+  assumption about what a pointer press leaves focused that turned out to be
+  false on the one platform that matters here. The tests below do not stage
+  any focus: they dispatch every key on `document.activeElement` (or
+  document.body, its default), exactly where a real keypress would land,
+  never on `control()` directly -- dispatching straight at a specific node
+  would keep passing even with the underlying focus bug still present, which
+  is how the first version of this story shipped a green suite over three
+  dead interactions.
+
+  The fix keeps every one of `BrowseControl`'s own handlers live by giving
+  the menu container itself real focus on a pointer-open (`tabIndex={-1}` on
+  `.fd-browse-menu`, focused from the open effect) rather than the trigger:
+  the container already carries `onKeyDown={handleMenuKeyDown}` and
+  `onBlur={handleMenuBlur}`, so Escape, the arrows, and click-outside are
+  all live the instant the menu opens, and nothing is visually marked
+  because `.fd-browse-menu .fd-button:focus` only ever matches an item, not
+  the container div.
+*/
+describe('a pointer-open keeps Escape, the arrows and click-outside alive (owner regression, confirmed on the macOS binary)', () => {
+    function control(): HTMLElement {
+        return screen.getByRole('button', {name: 'Choose a file or folder'})
+    }
+
+    function whereverFocusIs(): Element {
+        return (document.activeElement ?? document.body) as Element
+    }
+
+    it('Escape still closes a pointer-opened menu', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        expect(screen.getByRole('menu')).toBeTruthy()
+
+        fireEvent.keyDown(whereverFocusIs(), {key: 'Escape'})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('ArrowDown still moves focus into a pointer-opened menu', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+
+        fireEvent.keyDown(whereverFocusIs(), {key: 'ArrowDown'})
+
+        const items = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(items[0])
+    })
+
+    it('ArrowUp still moves focus into a pointer-opened menu', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+
+        fireEvent.keyDown(whereverFocusIs(), {key: 'ArrowUp'})
+
+        const items = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(items[0])
+    })
+
+    it('a focus move to an element outside the control closes a pointer-opened menu', () => {
+        const {view} = show()
+        fireEvent.click(control(), {detail: 1})
+        const outside = document.createElement('button')
+        view.container.append(outside)
+
+        // What a real click outside the control does: it moves focus away
+        // from wherever the pointer-open fix put it. Dispatched on
+        // whichever element that turns out to be, not a hardcoded node, so
+        // this does not presuppose which element the fix chose to focus.
+        fireEvent.blur(whereverFocusIs(), {relatedTarget: outside})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+})
+
+/*
+  Second owner finding, same session, same component: "when I move my mouse
+  OFF of any option they don't both unhighlight, but when I click on the
+  expander again they both unhighlight." Hovering an item moves *focus* to
+  it (above), and moving the pointer away does not itself remove focus, so
+  the item stayed marked after the mouse left. A native menu clears the
+  highlight when the pointer leaves it -- but only when the pointer is what
+  put it there: a keyboard user's place in the menu must survive the mouse
+  merely passing over it and leaving.
+*/
+describe('the pointer-marked item unmarks when the pointer leaves the menu (owner regression)', () => {
+    function control(): HTMLElement {
+        return screen.getByRole('button', {name: 'Choose a file or folder'})
+    }
+
+    it('clears a hover-marked item when the pointer leaves the whole menu', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        const [file, folder] = screen.getAllByRole('menuitem')
+        fireEvent.mouseEnter(folder)
+        expect(document.activeElement).toBe(folder)
+
+        fireEvent.mouseLeave(screen.getByRole('menu'))
+
+        expect(document.activeElement).not.toBe(folder)
+        expect(document.activeElement).not.toBe(file)
+    })
+
+    it('keeps every interaction live after the pointer leaves and unmarks the item (same focus target as the click-outside fix)', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        fireEvent.mouseEnter(screen.getAllByRole('menuitem')[0])
+        fireEvent.mouseLeave(screen.getByRole('menu'))
+
+        fireEvent.keyDown(document.activeElement ?? document.body, {key: 'Escape'})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('leaves a keyboard-marked item alone when the pointer merely passes over the menu and leaves', () => {
+        show()
+        // Keyboard-open: the first item is keyboard-marked.
+        fireEvent.click(control(), {detail: 0})
+        const [file] = screen.getAllByRole('menuitem')
+        expect(document.activeElement).toBe(file)
+
+        // The mouse happening to be over the menu and then leaving must not
+        // steal a keyboard user's place -- only a pointer-sourced mark is
+        // cleared on leave.
+        fireEvent.mouseLeave(screen.getByRole('menu'))
+
+        expect(document.activeElement).toBe(file)
+    })
+
+    it('leaves a keyboard-marked item alone even after the mouse had previously marked a different one', () => {
+        show()
+        fireEvent.click(control(), {detail: 1})
+        const [file, folder] = screen.getAllByRole('menuitem')
+        fireEvent.mouseEnter(folder)
+        expect(document.activeElement).toBe(folder)
+
+        // Keyboard takes back over: the arrow key re-marks the item it
+        // lands on as keyboard-sourced, superseding the hover.
+        fireEvent.keyDown(screen.getByRole('menu'), {key: 'ArrowUp'})
+        expect(document.activeElement).toBe(file)
+
+        fireEvent.mouseLeave(screen.getByRole('menu'))
+
+        expect(document.activeElement).toBe(file)
     })
 })
 
