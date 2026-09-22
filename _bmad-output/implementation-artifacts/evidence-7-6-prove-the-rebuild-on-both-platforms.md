@@ -1,6 +1,7 @@
 # Evidence — Story 7.6: Prove the Rebuild on Both Platforms
 
-**Status:** complete except for one named item, recorded below as **not observed**.
+**Status:** complete. The one item originally recorded as not observed was closed by
+owner observation on 2026-09-21; see **NOT observed** below.
 **Tip proven:** `dec76ae` (`fix(epic-7): make focus visible where the app moves it`).
 **Policy:** `docs/release-policy.md`. Automated verification is mandatory; manual
 observations are optional for this personal project, but an unobserved check is
@@ -97,14 +98,14 @@ Chromium-only rendered proof, on a product that ships WKWebView as well.
 
 ## NOT observed
 
-- **The Story 7.10 focus fix has not been re-checked by hand on the rebuilt binary.**
-  The fix is sound by construction — `:focus` matches a focused element unconditionally,
-  with no engine heuristic — and is pinned by five new tests plus a mechanism assertion
-  that fails if the rule is returned to `:focus-visible`. But the interactive
-  confirmation that the focused menu item now paints its fill, halo and ring was not
-  performed: the machine's screen locked partway through this pass, and macOS blocks
-  window-level Accessibility actions while locked. **This is recorded as unobserved,
-  not as passed.** It requires roughly a minute of unlocked screen to close.
+- ~~The Story 7.10 focus fix has not been re-checked by hand on the rebuilt binary.~~
+  **CLOSED 2026-09-21: observed.** The owner ran the rebuilt binary, opened the browse
+  menu, and supplied a screenshot showing the focused `File` item carrying all three
+  cues together -- the mocha primary fill, the tint halo, and the violet focus ring --
+  with `Folder` unhighlighted beside it. This is the interactive confirmation this
+  story could not obtain during the automated pass, when the machine's screen was
+  locked. The fix is now observed, not merely reasoned about.
+
 - **No screenshots are retained as files.** The states above were observed live and
   reviewed in-session; the capture tool returned them inline but did not persist them
   to disk, and `screencapture` is blocked by screen-recording permission for the shell.
