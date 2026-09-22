@@ -849,6 +849,12 @@ func (c *scheduledCall) wasStopped() bool {
 	return c.stopped
 }
 
+func (c *scheduledCall) wasFired() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.fired
+}
+
 func (f *fakeTimer) calls() []*scheduledCall {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -976,24 +982,13 @@ func (h *harness) awaitClosing() {
 	}
 }
 
-// awaitBoundsPending blocks until the bounds seam (h.bounds, wired to the
-// coordinator's BoundTimer) has at least one armed timer that has not yet
-// been stopped.
-//
-// A bounded wait's own arm-then-stop cycle is near-instant on a healthy
-// adapter, so several may arm and settle before the one this test actually
-// wants to force -- releaseAcquired's beacon and server calls, say, ahead of
-// the drainer join. By the time exactly one stays pending, every earlier one
-// has necessarily already resolved (they run sequentially on one goroutine),
-// so the pending one is the one fakeTimer.fire's "most recently armed" rule
-// will hit.
 // awaitCalls blocks until every named port call has appeared in the call log.
 //
-// awaitBoundsPending alone is not enough to say which bound is pending: it
-// returns the moment armed exceeds stops, which is true as soon as the first
-// bound in a cascade is armed. A test that then fires can hit the wrong one --
-// that is a real flake, caught on a Windows CI runner under -race after the
-// suite had passed twenty local iterations.
+// This alone does not say a call's own bound is done with, let alone which
+// bound a later fire() should hit: a port call is logged the instant it is
+// entered, not when it returns, so its own bound can still be armed and
+// pending at the moment its name appears here. Pair this with
+// awaitBoundPending(baseline), not the call log alone, before firing.
 func (h *harness) awaitCalls(names ...string) {
 	h.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -1019,15 +1014,91 @@ func (h *harness) awaitCalls(names ...string) {
 	}
 }
 
-func (h *harness) awaitBoundsPending() {
+// awaitBoundPending blocks until a bound armed *after* baseline (an
+// h.bounds.armed() count the caller captured before triggering whatever
+// arms the bound it actually wants) is itself genuinely pending -- armed,
+// and neither fired nor stopped yet.
+//
+// baseline exists because a bounded wait's own arm-then-stop cycle is
+// near-instant on a healthy adapter: several may arm and settle before the
+// one a test wants to force, e.g. releaseAcquired's server-stop call ahead
+// of the drainer join it precedes. This helper skips over each such call by
+// re-checking the *newest* armed entry's own state -- if it has already
+// resolved on its own, that is not the one to fire, so the loop keeps
+// waiting for the next entry to be armed -- rather than asking "is anything
+// at all pending", which used to be answered by comparing h.bounds.armed()
+// to h.bounds.stops().
+//
+// That comparison is what previously lived here as awaitBoundsPending, and
+// it had two independent problems. First, a call is logged the instant it
+// is entered, not when it returns (see awaitCalls), so the global armed()
+// and stops() counts could disagree for a call that simply has not returned
+// yet, not only for one a test is deliberately hanging -- awaitBoundsPending
+// could return true while an *earlier*, soon-to-resolve-on-its-own bound was
+// the one still outstanding, and fire() would hit that one instead of the
+// one the test meant to force. Second, and worse in any test that forces
+// more than one bound: fakeTimer.fire marks a bound "fired" but can never
+// mark it "stopped" -- production stop()s a bound by letting the real call
+// win the select, which a forced fire deliberately prevents -- so every
+// forced fire permanently widens the gap between armed() and stops(). After
+// the first forced fire in a test, armed() > stops() is true forever
+// afterwards regardless of what is actually pending, so the second and
+// later awaitBoundsPending call in the same test could return immediately,
+// before the bound the test wanted was even armed. TestATeardownThat
+// LosesTwoResourcesReportsBoth hit exactly this: its second fire could land
+// on ServerPort.Stop's own already-resolved bound instead of the drainer
+// join's, which then never got fired and hung Cancel for its full 10s
+// safety net. See coordinator_lifecycle_test.go for the reproduction that
+// confirmed it.
+//
+// Anchoring to a baseline and inspecting each bound's own fired/stopped
+// state, rather than a global count, keeps this correct no matter how many
+// bounds a test has already forced.
+func (h *harness) awaitBoundPending(baseline int) {
 	h.t.Helper()
 	deadline := time.Now().Add(mutexProbeTimeout)
 	for {
-		if h.bounds.armed() > h.bounds.stops() {
-			return
+		calls := h.bounds.calls()
+		if len(calls) > baseline {
+			newest := calls[len(calls)-1]
+			if !newest.wasFired() && !newest.wasStopped() {
+				return
+			}
 		}
 		if time.Now().After(deadline) {
-			h.t.Fatal("no bound was ever left pending")
+			h.t.Fatalf("no bound armed after the first %d became pending (now %d armed)", baseline, len(calls))
+		}
+		time.Sleep(200 * time.Microsecond)
+	}
+}
+
+// awaitBoundResolvedAt blocks until the bound at the given zero-based index
+// (in h.bounds' arming order) exists and has resolved on its own -- stopped
+// by the real call winning its select, exactly like a healthy adapter call's
+// bound does -- or, failing that, been forced. It never forces one itself.
+//
+// This is the other half of skipping an interposed, self-resolving bound in
+// a cascade: awaitBoundPending(baseline) alone is not safe for that, because
+// its single snapshot can catch the interposed bound while it is itself
+// still transiently pending -- neither stopped nor fired -- and mistake it
+// for the target. Waiting here for a *specific, already-armed* bound to
+// finish resolving first, then calling awaitBoundPending with a baseline
+// that includes it, removes the ambiguity: by the time awaitBoundPending
+// starts looking, the interposed bound can no longer be the "newest pending"
+// one, because it is no longer pending at all.
+func (h *harness) awaitBoundResolvedAt(index int) {
+	h.t.Helper()
+	deadline := time.Now().Add(mutexProbeTimeout)
+	for {
+		calls := h.bounds.calls()
+		if len(calls) > index {
+			call := calls[index]
+			if call.wasStopped() || call.wasFired() {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			h.t.Fatalf("the bound at index %d never resolved on its own (armed=%d)", index, len(calls))
 		}
 		time.Sleep(200 * time.Microsecond)
 	}
