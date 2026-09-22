@@ -21,7 +21,6 @@ colors:
   separator: '#D6D6D6'
   control-border: '#86868B'
   primary: '#9C5636'
-  primary-hi: '#B06A45'
   primary-hover: '#7F4428'
   primary-ink: '#FFFFFF'
   primary-tint: '#F5EEEB'
@@ -43,7 +42,6 @@ colors:
   separator-dark: '#47474A'
   control-border-dark: '#7A7A82'
   primary-dark: '#E39B70'
-  primary-hi-dark: '#EBAA82'
   primary-hover-dark: '#F0B694'
   primary-ink-dark: '#2B1206'
   primary-tint-dark: '#372E2B'
@@ -155,7 +153,7 @@ the frontmatter in ordinary colour modes.
 | Text | `{colors.text}` / `{colors.text-dark}`; `{colors.muted}` / `{colors.muted-dark}` | Muted is readable secondary copy, never disabled text. |
 | Decorative edge | `{colors.separator}` / `{colors.separator-dark}` | Dividers inside a surface, and nothing else. Never the sole boundary for a control, drop target, QR, progress track, or status. It deliberately does **not** meet 3:1 — it is not a boundary, it is a rule between paragraphs. |
 | Functional boundary | `{colors.control-border}` / `{colors.control-border-dark}` | Required on controls, the rest-state drop target, the QR frame, the URL field, and the progress-track outline. These values were chosen as the lightest greys that still clear 3:1 against every surface they touch. |
-| Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, `{colors.primary-hi}` / `{colors.primary-hi-dark}` as the gradient's top stop, and `{colors.primary-hover}` / `{colors.primary-hover-dark}` as the hover fill | The single strongest action, the (solid) progress fill, and the item-kind pill. Never status decoration. **The hover fill is a separate token from the gradient's top stop, and the two move in opposite directions: light darkens on hover, dark lightens.** A single shared lighter value once put light mode's hover label under the 4.5:1 text floor — see the hover-pair row below. |
+| Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, and `{colors.primary-hover}` / `{colors.primary-hover-dark}` as the hover fill | The single strongest action, the (solid) progress fill, and the item-kind pill. Never status decoration. **The hover fill is a separate token from the resting fill, and the two move in opposite directions: light darkens on hover, dark lightens.** A single shared lighter value once put light mode's hover label under the 4.5:1 text floor — see the hover-pair row below. The primary button's own sheen (Elevation & Depth, below) is a fixed translucent white independent of both, not a third fill token. |
 | Focus | `{colors.primary}` / `{colors.primary-dark}`, with a `{colors.surface}` / `{colors.surface-dark}` gap | A two-tone ring (Story 7.11): a surface-coloured gap, then a 2px ring in the accent colour itself, stacked as `box-shadow`, never `outline`. Story 7.8's dedicated violet is retired — the owner found it "poorly polished," a second hue with no relationship to the rest of the product — and the gap, not a different hue, is what keeps a same-hue ring legible against a same-hue fill. Scoped to keyboard-operable controls only — see the amendment carried forward below. |
 | Outcomes | Success, warning, error, each with a tint | Always pair colour with outline, glyph, or literal text. |
 | QR | `{colors.qr-surface}` / `{colors.qr-ink}` in both modes | Fixed high-contrast substrate; never recolour, invert, texture, rotate, round modules, or overlay a logo. Unchanged from Paper Relay and non-negotiable — it is a scan-reliability constraint, not a style choice. |
@@ -188,6 +186,7 @@ at **17.377657264**.
 | `primary-ink` on `primary-hover` | 7.608987041 | 9.920419953 |
 | `text` on `primary-tint` | 15.153268673 | 11.826910776 |
 | `muted` on `primary-tint` | 5.048617711 | 4.851652072 |
+| `primary-ink` on primary button sheen (rest) | 4.677257536 | 8.269767363 |
 
 **The hover row above is a review finding, added after ship.** An interactive
 state's own fill is a text background like any other, and belongs in this
@@ -210,6 +209,25 @@ dark on `{colors.surface}` / `{colors.surface-dark}`. The dark fraction is
 deliberately 12%, not 16%: 16% was checked first and put `muted` on it at
 4.49:1, under the 4.5:1 floor: `text`/`primary-tint` and `muted`/`primary-tint`
 must both be re-checked before this token moves again.
+
+**The sheen row above is a third finding of the same shape, from the
+black-flash defect fix.** This is the third time in this epic a colour
+turned out to be an unmeasured text background -- the hover fill, then
+`{colors.primary-tint}`, and now the primary button's own sheen. The pattern
+is that any surface text sits on belongs in this proof, whether or not it is
+a named token. The sheen is a fixed translucent-white overlay, independent
+of the fill colour beneath it (see Elevation & Depth, below, for why it
+replaced the `primary-hi` -> `primary` colour-stop gradient), and it sits
+directly under the `primary-ink` label at the top of the button in every
+state, so composited over whichever fill is beneath it, it is a text
+background like any other. Rest is the weaker of the two states in both
+modes (hover's fill is already lighter in light mode and lighter still in
+dark mode, both moving the composite away from the floor), so rest is what
+is published; light rest, **4.677257536**, is the weakest of all four
+rest/hover x light/dark combinations and the figure the sheen's alpha
+(0.08) is chosen against. Re-derived, unrounded, from
+`frontend/src/ui/styles.test.ts`, not hand-computed: raising the alpha
+towards 0.12 fails this floor, which is why it is not raised.
 
 Status text placed on its own panel (`.fd-button--quiet`'s muted/error on
 elevated is the row above; `warning`/`success`/`error` on `surface` is what the
@@ -398,18 +416,38 @@ Rules, all enforceable:
 - **Shadow is decorative and never a boundary.** Anything a shadow separates must
   also be separable without it — by tone in dark mode, by a functional boundary
   where the element is a control. This is what keeps forced-colors honest.
-- **Exactly one gradient exists in the product**: the primary button's
-  `{colors.primary-hi}` → `{colors.primary}` vertical fill, plus its 1px inset top
-  highlight. No other gradient is permitted, and none may sit behind text. The
-  progress fill is therefore solid, not a gradient.
-  **Story 7.7 narrows `{colors.primary-hi-dark}`** from `#6FB0FF` to
-  `#5EA6FF` -- half the original delta above `{colors.primary-dark}` -- because
-  the fill read hot on the dark canvas. `primary-hi` feeds only this gradient
-  and the primary button's hover fill; it is not one of the tokens the
-  unrounded contrast proof publishes a figure for, so narrowing it changes no
-  published ratio and required no re-derivation. `{colors.primary}` itself is
-  unchanged, so every load-bearing pair that does depend on it keeps its
-  published figure exactly.
+- **Exactly one gradient exists in the product**: a fixed translucent-white
+  sheen (`rgb(255 255 255 / 0.08)` to `rgb(255 255 255 / 0)`) over the primary
+  button's own fill, plus its 1px inset top highlight. No other gradient is
+  permitted, and none may sit behind text. The progress fill is therefore
+  solid, not a gradient. The sheen is declared identically at rest and on
+  `:hover` -- one gradient, painted twice, not two -- so only the opaque
+  `background-color` beneath it changes on hover; see the black-flash defect
+  fix below for why.
+  **The black-flash defect fix retires `{colors.primary-hi}` and
+  `{colors.primary-hi-dark}`.** Through Story 7.7 this gradient read
+  `{colors.primary-hi}` → `{colors.primary}` as a colour-stop fill, and
+  `primary-hi` fed only that gradient and (briefly, incorrectly) the hover
+  fill -- Story 7.7 narrowed its dark value from `#6FB0FF` to `#5EA6FF` for
+  exactly that reason, without disturbing any published ratio, since
+  `primary-hi` was never one of the tokens the unrounded contrast proof
+  publishes a figure for. The owner-observed defect: hovering the primary
+  button produced a black flash, because `.fd-button--primary` set this
+  gradient through the `background` shorthand, which resets
+  `background-color` to `transparent` as a side effect, and `:hover` set its
+  flat fill through the same shorthand, which resets `background-image` to
+  `none`. `background-image` cannot interpolate, so it jumped instantly,
+  while `background-color` spent the whole 150ms transition animating FROM
+  the shorthand's `transparent` reset -- a see-through button for that
+  window. The fix reads and writes `background-color` and `background-image`
+  as longhands, and replaces the colour-stop gradient with the sheen above,
+  which -- unlike a colour-stop gradient -- is independent of the fill colour
+  underneath it and can therefore stay byte-identical between rest and hover.
+  `primary-hi` has no remaining reader and is not declared any more. The
+  sheen's alpha (0.08) is a derived value: the button label sits at the top
+  of the button, where the sheen is strongest, so it is a text background --
+  see the sheen row in the text-pair table above and its accompanying finding
+  for the re-derived, unrounded figures and the floor the alpha must clear.
 - **One `repeating-linear-gradient` is exempt** and is not a gradient in this
   rule's sense: the unknown-total meter's static diagonal pattern, which carries
   a state distinction rather than decoration and never moves.

@@ -92,10 +92,11 @@ describe('the Quartz token layer', () => {
             // Story 7.8: the accent returns to the logo's mocha, sampled
             // from build/appicon.png rather than invented.
             primary: '#9C5636',
-            'primary-hi': '#B06A45',
             // Owner review, Story 7.7 follow-up: the dedicated hover-fill
-            // token. Darkens on hover in light mode -- the opposite
-            // direction from primary-hi's lighter gradient top stop.
+            // token. Darkens on hover in light mode. `primary-hi` is gone
+            // (black-flash defect fix): it fed only the retired colour-stop
+            // gradient, replaced by a translucent-white sheen independent
+            // of this token.
             'primary-hover': '#7F4428',
             'primary-ink': '#FFFFFF',
             // Story 7.8 review follow-up: mocha at 10% on --color-surface,
@@ -137,11 +138,9 @@ describe('the Quartz token layer', () => {
             // Story 7.8: dark half of the mocha accent -- see the light
             // block above.
             primary: '#E39B70',
-            'primary-hi': '#EBAA82',
             // Owner review, Story 7.7 follow-up: the dedicated hover-fill
-            // token, distinct from primary-hi above. Dark mode lightens on
-            // hover, the same direction primary-hi already moves in. Story
-            // 7.8 gives it its own mocha value rather than reusing primary-hi.
+            // token. Dark mode lightens on hover. `primary-hi` is gone
+            // (black-flash defect fix) -- see the light block above.
             'primary-hover': '#F0B694',
             'primary-ink': '#2B1206',
             // Story 7.8 review follow-up: mocha at 12%, not 16%, on
@@ -210,11 +209,19 @@ describe('the Quartz token layer', () => {
             '(?<![-\\w])(?:red|blue|green|black|white|gray|grey|orange|purple|pink|brown|yellow|cyan|magenta)(?![-\\w])',
         ].join('|'), 'g')
 
-        // The primary button's 1px inset highlight is the one authored literal
-        // this spine permits: DESIGN.md scopes it to that single gradient's top
-        // edge, and it is not a color role a token could carry -- it is a fixed
-        // white at a fixed opacity, unrelated to any theme color.
-        const withoutHighlight = componentRules.replace('rgb(255 255 255 / 0.4)', '')
+        // The primary button's 1px inset highlight, and its sheen's two
+        // translucent-white stops (black-flash defect fix), are the authored
+        // literals this spine permits: DESIGN.md scopes them to the single
+        // gradient the product ships, and none of the three is a color role
+        // a token could carry -- each is a fixed white at a fixed opacity,
+        // unrelated to any theme color. The sheen appears twice
+        // (byte-identical, rest and :hover -- see "the primary button hover
+        // has no black flash" describe block), so both occurrences are
+        // stripped.
+        const withoutHighlight = componentRules
+            .replaceAll('rgb(255 255 255 / 0.4)', '')
+            .replaceAll('rgb(255 255 255 / 0.08)', '')
+            .replaceAll('rgb(255 255 255 / 0)', '')
 
         expect(withoutHighlight.match(colorLiteral) ?? []).toEqual([])
     })
@@ -265,7 +272,6 @@ describe('forced colors', () => {
             separator: 'CanvasText',
             'control-border': 'CanvasText',
             primary: 'Highlight',
-            'primary-hi': 'Highlight',
             'primary-hover': 'Highlight',
             'primary-ink': 'HighlightText',
             'primary-tint': 'Canvas',
@@ -453,16 +459,30 @@ describe('the focus ring is primary, kept visible by a structural gap, not a sep
 
     it('declares the published Story 7.8 mocha values exactly, with no violet left to declare', () => {
         expect(theme).toContain('--color-primary: #9C5636;')
-        expect(theme).toContain('--color-primary-hi: #B06A45;')
         expect(theme).toContain('--color-primary-hover: #7F4428;')
         expect(theme).toContain('--color-primary-ink: #FFFFFF;')
         expect(theme).not.toContain('#6B4E9E')
 
         expect(dark).toContain('--color-primary: #E39B70;')
-        expect(dark).toContain('--color-primary-hi: #EBAA82;')
         expect(dark).toContain('--color-primary-hover: #F0B694;')
         expect(dark).toContain('--color-primary-ink: #2B1206;')
         expect(dark).not.toContain('#B79BE0')
+    })
+
+    it('declares no --color-primary-hi any more -- the black-flash defect fix retired it', () => {
+        // primary-hi fed only the primary button's colour-stop gradient. The
+        // defect fix replaced that gradient with a translucent-white sheen
+        // independent of the fill colour beneath it, so nothing reads this
+        // token any more; DESIGN.md's Colors and Elevation & Depth sections
+        // were amended to match. A reappearance here would mean either the
+        // gradient came back or a declared token has no reader again.
+        expect(theme).not.toContain('--color-primary-hi')
+        expect(dark).not.toContain('--color-primary-hi')
+        expect(forcedColors).not.toContain('--color-primary-hi')
+        // componentRules still narrates the removal in prose (the CSS
+        // comments above .fd-button--primary), so this checks only that
+        // nothing there still *reads* the token through var().
+        expect(componentRules).not.toContain('var(--color-primary-hi)')
     })
 })
 
@@ -724,18 +744,25 @@ describe('Story 7.7: compose the lifecycle region vertically', () => {
         expect(stylesheet).not.toContain('.fd-disclosure__icon')
     })
 
-    it('narrows the dark primary-hi delta without disturbing any published contrast figure', () => {
-        // The original blue-palette narrowing this test pinned (Story 7.7:
-        // #6FB0FF -> #5EA6FF) was superseded by Story 7.8's mocha palette;
-        // primary-hi-dark is now #EBAA82 per that story's token table. The
-        // property this test guards -- that primary-hi never silently drifts
-        // out of sync with the published DESIGN.md value -- still holds.
-        expect(dark).toContain('--color-primary-hi: #EBAA82;')
-        expect(dark).not.toContain('--color-primary-hi: #6FB0FF;')
-        expect(dark).not.toContain('--color-primary-hi: #5EA6FF;')
+    it('retires primary-hi rather than continuing to narrow it, once the black-flash defect fix gave it no reader', () => {
+        // This test used to pin the dark primary-hi delta (Story 7.7:
+        // #6FB0FF -> #5EA6FF; Story 7.8: superseded again by the mocha
+        // palette's #EBAA82). The black-flash defect fix removed the token
+        // outright -- it fed only the primary button's retired colour-stop
+        // gradient -- so there is nothing left to narrow. DESIGN.md's
+        // frontmatter and Colors/Elevation & Depth sections were amended to
+        // drop primary-hi and primary-hi-dark rather than leave a published
+        // value for a token the stylesheet no longer declares.
+        expect(dark).not.toContain('--color-primary-hi')
 
+        // The frontmatter token list is the maintained source of the
+        // declared palette -- prose elsewhere in the document is free to
+        // keep narrating primary-hi's retirement (and does, in the Colors
+        // and Elevation & Depth sections), but the frontmatter itself must
+        // not still list a token the stylesheet no longer declares.
         const designSpine = readFileSync(designSpinePath(), 'utf8')
-        expect(designSpine).toContain("primary-hi-dark: '#EBAA82'")
+        const frontmatter = designSpine.slice(0, designSpine.indexOf('\n---\n'))
+        expect(frontmatter).not.toContain('primary-hi')
     })
 })
 
@@ -780,11 +807,23 @@ describe('guarantees a stylesheet edit could silently undo', () => {
                 .toHaveLength(1)
         }
 
+        // Black-flash defect fix: the sheen's `background-image` now has to
+        // be declared identically at rest AND on :hover (see "the primary
+        // button hover has no black flash" describe block below -- if hover
+        // painted a different gradient, or none, `background-image` itself
+        // would jump instantly between two different images, which is the
+        // same class of defect the flash was). Two occurrences, one distinct
+        // value: the single-gradient rule is about how many different
+        // gradients the product has, not how many times the one of them is
+        // written.
         const gradients = [...componentRules.matchAll(/(?<!repeating-)linear-gradient\(/g)]
-        expect(gradients).toHaveLength(1)
+        expect(gradients).toHaveLength(2)
 
+        const sheen = 'linear-gradient(rgb(255 255 255 / 0.08), rgb(255 255 255 / 0))'
         const primaryButton = block('.fd-button--primary {')
-        expect(primaryButton).toContain('linear-gradient(var(--color-primary-hi), var(--color-primary))')
+        const primaryHover = block('.fd-button--primary:hover {')
+        expect(primaryButton).toContain(`background-image: ${sheen};`)
+        expect(primaryHover).toContain(`background-image: ${sheen};`)
 
         // Never behind text: the one gradient sits on a control's background,
         // and nothing clips a gradient to text anywhere in the sheet.
@@ -830,6 +869,70 @@ describe('guarantees a stylesheet edit could silently undo', () => {
         expect(resolvedPrimaryShadow, 'resolved .fd-button--primary box-shadow').toBeTruthy()
         const resolvedLayers = resolvedPrimaryShadow.replace(/rgba?\([^)]*\)/g, 'rgb').split(',')
         expect(resolvedLayers.length, resolvedPrimaryShadow.trim()).toBeLessThanOrEqual(3)
+    })
+})
+
+describe('the primary button hover has no black flash (defect fix)', () => {
+    /*
+      Observed defect: hovering "Choose a file or folder" (the primary
+      button) produced a black flash on the built binary. Mechanism: `.fd-button`
+      transitions `background-color` over 150ms. `.fd-button--primary` painted
+      its fill with the `background` SHORTHAND
+      (`background: linear-gradient(...)`), which -- as a side effect only the
+      shorthand has -- resets `background-color` to its initial value,
+      `transparent`. `.fd-button--primary:hover` then read
+      `background: var(--color-primary-hover)`, the shorthand again, which
+      resets `background-image` to `none`. `background-image` cannot
+      interpolate (gradients are not transitionable), so it jumps instantly,
+      while `background-color` -- reset to `transparent` a moment earlier --
+      spends the full 150ms transitioning from `transparent` to the hover
+      colour. For that window the button is partly see-through and the dark
+      canvas shows through it.
+
+      Fix: read and write `background-color` and `background-image` as
+      longhands on this rule pair, so the shorthand can never again silently
+      reset the half it does not name, and keep the sheen `background-image`
+      byte-identical between rest and hover so only the opaque
+      `background-color` animates.
+    */
+    it('never lets .fd-button--primary or its :hover use the background shorthand', () => {
+        const rest = block('.fd-button--primary {')
+        const hover = block('.fd-button--primary:hover {')
+
+        // The shorthand form -- a bare `background:` -- is what silently
+        // resets the paired longhand property. `background-color:` and
+        // `background-image:` are fine; `background:` is not.
+        for (const [name, rule] of [['.fd-button--primary', rest], ['.fd-button--primary:hover', hover]] as const) {
+            expect(rule, name).not.toMatch(/\bbackground:\s/)
+        }
+    })
+
+    it('keeps both background-color values opaque and the sheen background-image identical across :hover', () => {
+        const rest = block('.fd-button--primary {')
+        const hover = block('.fd-button--primary:hover {')
+
+        const restColor = rest.match(/background-color:\s*([^;]+);/)?.[1]
+        const hoverColor = hover.match(/background-color:\s*([^;]+);/)?.[1]
+        expect(restColor, 'rest background-color').toBeTruthy()
+        expect(hoverColor, 'hover background-color').toBeTruthy()
+
+        // Opaque: neither reads `transparent`, and neither is the fully
+        // transparent end of the sheen's own alpha ramp -- the actual defect
+        // was a `background-color` transitioning FROM `transparent`, so an
+        // opaque value in both states is the fix, not a detail of it.
+        expect(restColor).not.toMatch(/transparent|\/\s*0\)/)
+        expect(hoverColor).not.toMatch(/transparent|\/\s*0\)/)
+        expect(restColor).toBe('var(--color-primary)')
+        expect(hoverColor).toBe('var(--color-primary-hover)')
+
+        // The sheen has to be the same declaration in both states -- if hover
+        // painted its own (or no) background-image, `background-image` itself
+        // would still jump instantly between two different images, which is
+        // the same class of defect the flash was, just moved to the other
+        // longhand.
+        const restImage = rest.match(/background-image:\s*([^;]+);/)?.[1]
+        expect(restImage, 'rest background-image').toBeTruthy()
+        expect(hover).toContain(`background-image: ${restImage};`)
     })
 })
 
@@ -1251,8 +1354,15 @@ describe('the unrounded contrast proof', () => {
         // contrast against primary-ink -- rather than only string-matching
         // the token name -- so a regression is reported as a failed ratio
         // for that pair, not just a text mismatch.
+        //
+        // Reads `background-color:` specifically, not `background:` -- the
+        // black-flash defect fix moved this rule to the longhand on purpose
+        // (a bare `background:` shorthand here would reset the sheen
+        // `background-image` to `none`, which is the defect this fix
+        // closed), and "the primary button hover has no black flash"
+        // describe block below is what pins the shorthand's absence.
         const hover = block('.fd-button--primary:hover {')
-        const hoverVar = hover.match(/background:\s*var\((--color-[a-z-]+)\);/)?.[1]
+        const hoverVar = hover.match(/background-color:\s*var\((--color-[a-z-]+)\);/)?.[1]
         expect(hoverVar, 'the var() the hover background reads').toBeTruthy()
         const hoverRole = hoverVar!.replace('--color-', '')
 
@@ -1261,9 +1371,13 @@ describe('the unrounded contrast proof', () => {
         expect(darkTokens[hoverRole], hoverRole).toBeTruthy()
 
         // Mutation 1 (owner review, the current-at-time-of-review bug):
-        // point the hover at --color-primary-hi again -> hoverRole resolves
-        // to 'primary-hi' and its light-mode ratio (3.654...) fails this
-        // floor by name, not merely by a token-string mismatch.
+        // point the hover back at the gradient's top stop -> before the
+        // black-flash defect fix retired that token, hoverRole would
+        // resolve to 'primary-hi' and its light-mode ratio (3.654...) would
+        // fail this floor by name. Now that the token is gone entirely,
+        // lightTokens[hoverRole] resolves to undefined and the `toBeTruthy`
+        // check two lines up fails first -- a strictly earlier catch of the
+        // same mutation.
         expect(
             contrast(lightTokens['primary-ink'], lightTokens[hoverRole]),
             `primary-ink on ${hoverRole} (light)`,
@@ -1285,11 +1399,73 @@ describe('the unrounded contrast proof', () => {
         expect(luminance(lightTokens['primary-hover'])).toBeLessThan(luminance(lightTokens['primary']))
         expect(luminance(darkTokens['primary-hover'])).toBeGreaterThan(luminance(darkTokens['primary']))
 
-        // The gradient's own top stop keeps lightening in both modes --
-        // unaffected by the hover fix, still the value the single-gradient
-        // assertion elsewhere in this file pins.
-        expect(luminance(lightTokens['primary-hi'])).toBeGreaterThan(luminance(lightTokens['primary']))
-        expect(luminance(darkTokens['primary-hi'])).toBeGreaterThan(luminance(darkTokens['primary']))
+        // The gradient no longer has a colour-stop top value to check here:
+        // the black-flash defect fix replaced the primary-hi -> primary
+        // colour-stop gradient with a translucent-white sheen independent of
+        // the fill colour, so `primary-hi` was retired (see "declares no
+        // --color-primary-hi any more" above) rather than re-checked.
+    })
+
+    it('measures the sheen as a text background -- the label sits at the top of the button, where it is strongest', () => {
+        // Third time this file has found a surface text sits on that was
+        // never measured: the hover fill (Story 7.7), --color-primary-tint
+        // (Story 7.8), and now the primary button's sheen. The sheen is a
+        // translucent white overlay independent of the fill colour beneath
+        // it, painted over --color-primary-ink text, so composited it is a
+        // text background like any other and belongs in this proof.
+        //
+        // Re-derived from the stylesheet, not hand-copied: the alpha comes
+        // from the actual `.fd-button--primary` declaration, so a future
+        // edit to the sheen is measured here rather than assumed.
+        const primaryButton = block('.fd-button--primary {')
+        const sheenAlpha = Number(
+            primaryButton.match(/background-image:\s*linear-gradient\(rgb\(255 255 255 \/ ([\d.]+)\)/)?.[1],
+        )
+        expect(sheenAlpha, 'sheen top-stop alpha').toBeGreaterThan(0)
+        // Not a taste call -- DESIGN.md derives this exact figure and the
+        // rule not to raise it from the ratios this test proves below.
+        expect(sheenAlpha).toBe(0.08)
+
+        // Composites a translucent white top stop over an opaque background,
+        // rounding each channel the way a real compositor renders pixels --
+        // matching, not merely approximating, what the browser paints.
+        function composite(alpha: number, backgroundHex: string): string {
+            const bg = [0, 2, 4].map((i) => Number.parseInt(backgroundHex.slice(1).slice(i, i + 2), 16))
+            const blended = bg.map((channelValue) => Math.round(alpha * 255 + (1 - alpha) * channelValue))
+            return `#${blended.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+        }
+
+        // The label sits at the top of the button in every state the sheen
+        // paints, so all four combinations -- rest/hover x light/dark -- are
+        // real text-on-background pairs. Light rest is the worst case: the
+        // darkest of the four fills, so its composite sits closest to the
+        // 4.5:1 floor.
+        const cases: Array<[string, string, string]> = [
+            ['light rest', lightTokens['primary-ink'], lightTokens['primary']],
+            ['light hover', lightTokens['primary-ink'], lightTokens['primary-hover']],
+            ['dark rest', darkTokens['primary-ink'], darkTokens['primary']],
+            ['dark hover', darkTokens['primary-ink'], darkTokens['primary-hover']],
+        ]
+
+        const ratios = cases.map(([name, ink, fill]) => {
+            const ratio = contrast(ink, composite(sheenAlpha, fill))
+            expect(ratio, name).toBeGreaterThan(4.5)
+            return [name, ratio] as const
+        })
+
+        const worst = ratios.reduce((min, entry) => (entry[1] < min[1] ? entry : min))
+        expect(worst[0], 'the worst case is light rest, as DESIGN.md documents').toBe('light rest')
+
+        // Published, unrounded, as DESIGN.md requires of every figure this
+        // file proves.
+        expect(designSpine, `sheen top edge on primary (light rest) = ${worst[1].toFixed(9)}`)
+            .toContain(worst[1].toFixed(9))
+
+        // Mutation the task's own derivation table names: raising the alpha
+        // towards 0.12 fails this floor -- which is why 0.08 is chosen and
+        // pinned above, not a value someone could quietly nudge upward.
+        const raised = contrast(lightTokens['primary-ink'], composite(0.12, lightTokens['primary']))
+        expect(raised, 'sheen top edge on primary (light rest) at alpha 0.12').toBeLessThan(4.5)
     })
 
     it('keeps the fixed QR substrate at its published ratio in both modes', () => {

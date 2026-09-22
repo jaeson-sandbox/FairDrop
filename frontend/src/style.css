@@ -25,21 +25,27 @@
       Story 7.8: the accent returns to the logo's mocha. Quartz's first cut
       took the action colour to system blue on the reasoning that blue reads
       native on both platforms; the owner kept the icon's copper-mocha
-      identity and asked for it back. The five values below (primary,
-      primary-hi, primary-hover, primary-ink, and the violet focus token
-      Story 7.11 later retired) are sampled from build/appicon.png, not
-      invented, and were validated against both WCAG floors before this
-      story was written -- see DESIGN.md's Colors section for the re-derived
-      contrast figures.
+      identity and asked for it back. The values below (primary, primary-hover,
+      primary-ink, and the violet focus token Story 7.11 later retired) are
+      sampled from build/appicon.png, not invented, and were validated against
+      both WCAG floors before this story was written -- see DESIGN.md's Colors
+      section for the re-derived contrast figures.
+
+      A `primary-hi` token lived here from Story 7.8 through the primary
+      button's black-flash defect fix: it fed only the button's retired
+      colour-stop gradient (`primary-hi` -> `primary`) and the hover rule's
+      brief, wrong-for-light-mode use of it (see the next comment). The
+      defect fix replaced that gradient with a translucent-white sheen that
+      is independent of the fill colour beneath it, so `primary-hi` has no
+      remaining reader and is not declared any more. See DESIGN.md's Colors
+      and Elevation & Depth sections for the removal.
     */
     --color-primary: #9C5636;
-    --color-primary-hi: #B06A45;
     /*
-      The hover fill, distinct from --color-primary-hi above (owner review,
-      Story 7.7 follow-up). One token cannot do both jobs: the gradient's top
-      stop and the hover fill want opposite directions -- light mode darkens
-      on hover, dark mode lightens. #7F4428 clears the primary-ink pair at
-      7.608987041:1 in light mode.
+      The hover fill (owner review, Story 7.7 follow-up). Distinct from the
+      resting `--color-primary` fill because the two want opposite
+      directions -- light mode darkens on hover, dark mode lightens. #7F4428
+      clears the primary-ink pair at 7.608987041:1 in light mode.
     */
     --color-primary-hover: #7F4428;
     --color-primary-ink: #FFFFFF;
@@ -209,7 +215,6 @@
         --color-control-border: #7A7A82;
         /* Story 7.8: dark half of the mocha accent -- see the light block above. */
         --color-primary: #E39B70;
-        --color-primary-hi: #EBAA82;
         /*
           The hover fill (owner review, Story 7.7 follow-up): dark mode
           lightens on hover, the opposite direction from light mode's
@@ -436,19 +441,49 @@ body {
 }
 
 /*
-  The one gradient the product ships: the primary button's primary-hi -> primary
-  vertical fill, plus a 1px inset top highlight. `{elevation.sh-btn}` names a
-  resting surface, so it reads as `sh-1` here -- the token spent on the drop
-  zone's disclosure rows, the lightest of the three steps -- since DESIGN.md's
-  Elevation table has no dedicated button step and this is the closest match:
-  two shadow layers plus the one inset highlight is exactly the sheet's
-  three-layer ceiling. Forced colors overrides this selector directly below,
-  after the dark block, so no authored hue -- gradient or otherwise -- survives
-  into that mode.
+  The one gradient the product ships: a translucent-white sheen over the
+  primary button's own fill, plus a 1px inset top highlight. `{elevation.sh-btn}`
+  names a resting surface, so it reads as `sh-1` here -- the token spent on the
+  drop zone's disclosure rows, the lightest of the three steps -- since
+  DESIGN.md's Elevation table has no dedicated button step and this is the
+  closest match: two shadow layers plus the one inset highlight is exactly the
+  sheet's three-layer ceiling. Forced colors overrides this selector directly
+  below, after the dark block, so no authored hue -- gradient or otherwise --
+  survives into that mode.
+
+  Defect fix (owner-observed black-flash defect on hover): this rule and its
+  `:hover` below used to paint through the `background` SHORTHAND --
+  `background:` set to a colour-stop gradient function reading the retired
+  `--color-primary-hi` and `--color-primary` tokens at rest,
+  `background: var(--color-primary-hover)` on hover. `.fd-button` transitions
+  `background-color` over 150ms, and the shorthand's undocumented side effect
+  is to reset whichever longhand it does not name: the rest rule reset
+  `background-color` to `transparent`, and hover reset `background-image` to
+  `none`. `background-image` cannot interpolate, so it jumped instantly, while
+  `background-color` spent the full 150ms transitioning FROM `transparent` --
+  a see-through button for that whole window, with the dark canvas showing
+  through.
+
+  Fixed by reading/writing `background-color` and `background-image` as
+  longhands and never the shorthand, and by replacing the primary-hi ->
+  primary colour-stop gradient with a fixed translucent-white overlay
+  (independent of the fill colour underneath, so it can stay byte-identical
+  between rest and hover) over an opaque `background-color` that is the only
+  thing that changes on hover. `--color-primary-hi` fed only the retired
+  colour-stop gradient and is not declared any more -- see DESIGN.md's Colors
+  section and Elevation & Depth section for the removal.
+
+  The sheen's alpha (0.08) is a derived value, not a taste call: the label
+  sits at the top of the button, where the sheen is strongest, so the sheen is
+  a text background like the hover fill and `--color-primary-tint` turned out
+  to be. `styles.test.ts` recomputes the composited ratio from this
+  declaration and DESIGN.md publishes it; raising the alpha towards 0.12 fails
+  that floor. Do not raise it.
 */
 .fd-button--primary {
     border-color: var(--color-primary);
-    background: linear-gradient(var(--color-primary-hi), var(--color-primary));
+    background-color: var(--color-primary);
+    background-image: linear-gradient(rgb(255 255 255 / 0.08), rgb(255 255 255 / 0));
     box-shadow: var(--shadow-sh-1), inset 0 1px 0 rgb(255 255 255 / 0.4);
     color: var(--color-primary-ink);
 }
@@ -463,9 +498,16 @@ body {
   direction-correct in both modes -- darkens in light, lightens in dark --
   and is never read by the gradient, so the two jobs no longer share one
   token.
+
+  Defect fix, above this comment's story: `background-color` only, the
+  longhand, never the shorthand -- see the rest rule's comment above for why
+  the shorthand was the actual defect. `background-image` is deliberately
+  repeated here byte-identical to the rest rule so the sheen never itself
+  becomes a second thing that jumps on hover.
 */
 .fd-button--primary:hover {
-    background: var(--color-primary-hover);
+    background-color: var(--color-primary-hover);
+    background-image: linear-gradient(rgb(255 255 255 / 0.08), rgb(255 255 255 / 0));
     border-color: var(--color-primary-hover);
 }
 
@@ -1594,10 +1636,9 @@ body {
 
   Every shadow and every gradient is dropped here too. The three elevation
   tokens have no system color and are reset to none; the primary button's
-  gradient stops (--color-primary-hi and --color-primary) both resolve to
-  Highlight in this block, so the declaration below strips the gradient
-  function and its inset highlight outright rather than leaving two identical
-  stops behind.
+  fill (--color-primary) and its sheen have no system color either, so the
+  declaration below strips the sheen `background-image` and the inset
+  highlight outright and paints a flat `Highlight` instead.
 */
 @media (forced-colors: active) {
     :root {
@@ -1611,7 +1652,6 @@ body {
         --color-separator: CanvasText;
         --color-control-border: CanvasText;
         --color-primary: Highlight;
-        --color-primary-hi: Highlight;
         --color-primary-hover: Highlight;
         --color-primary-ink: HighlightText;
         --color-primary-tint: Canvas;
