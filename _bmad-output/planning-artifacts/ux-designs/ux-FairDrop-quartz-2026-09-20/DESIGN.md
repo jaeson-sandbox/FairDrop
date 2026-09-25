@@ -488,7 +488,7 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 | **Drop Zone** | `{rounded.xxl}` surface at `{elevation.sh-2}` with a 2px dashed inner rule at `{colors.control-border}` inset 7px (concentric, so `{rounded.xl}`). The **functional** token, not the decorative one: the zone carries no click handler and no tab stop, but that rule is the only thing identifying the drop target -- the card is `{colors.surface}` on `{colors.canvas}` at 1.09:1 in light mode, and shadow may not carry a boundary. This row previously said `{colors.separator}` and contradicted the Colors table above it, which already required the functional token on the rest-state drop target; the row was the error. Drag-active: the rule goes solid `{colors.primary}`, the fill goes `{colors.primary-tint}`, and the glyph lifts 3px. Fill is never the only state cue. The rest-state boundary uses `{colors.control-border}` in forced colors. |
 | **Browse Control** | Full-width primary button with a trailing chevron and `aria-haspopup="menu"`. Opens the menu; the label never changes. |
 | **Browse Menu** | `{rounded.lg}` raised surface at `{elevation.sh-3}` with a functional boundary, 5px padding, `{rounded.sm}` items. **One active item at a time, owned by focus** (Story 7.11): the menu has a single notion of "the item about to be chosen," and it is whichever item currently holds focus -- never a separate hover state and never two items marked at once. Hovering an item moves focus to it, so hover and keyboard navigation paint the identical treatment -- primary fill plus a tint halo and its own ring, not only the focus ring -- through the one `:focus` rule; there is no weaker `:hover`-only appearance. A menu opened by **pointer** pre-selects nothing: the trigger keeps focus and no item is marked until the sender points at or arrows onto one. A menu opened by **keyboard** (ArrowDown, ArrowUp, Enter or Space on the trigger) focuses the first item immediately, matching the platform convention that a keyboard-opened menu always lands focus inside it. |
-| **Disclosure** | `{rounded.xl}` surface at `{elevation.sh-1}` with a 12px chevron that rotates 90° when open, and a hover fill. **No leading icon**: Story 7.7 removed it after finding that a tinted circle small enough to sit beside a one-line summary resolves to a featureless coloured dot, which reads as a bullet rather than as an icon. A dot is not an acceptable outcome per that story's acceptance criteria, and a shape legible at this size does not fit the row without crowding the summary text, so the row ships with no glyph at all -- consistent with the platform's own disclosure rows, which frequently carry none either. **Replaces the always-open firewall and recovery blocks** — see the FR23 note below. |
+| **Disclosure** | `{rounded.xl}` surface at `{elevation.sh-1}` with a 12px chevron that rotates 90° when open, and a hover fill. **No leading icon**: Story 7.7 removed it after finding that a tinted circle small enough to sit beside a one-line summary resolves to a featureless coloured dot, which reads as a bullet rather than as an icon. A dot is not an acceptable outcome per that story's acceptance criteria, and a shape legible at this size does not fit the row without crowding the summary text, so the row ships with no glyph at all -- consistent with the platform's own disclosure rows, which frequently carry none either. **Replaces the always-open firewall and recovery blocks** — see the FR23 note below. **Story 9.1 implementation choice, recorded here as the acceptance criteria require:** this used to be native `<details>`/`<summary>`, which supplied keyboard operability and open/closed state for free but cannot smoothly expand or collapse in both engines this product ships to -- `build/darwin/Info.plist` declares `LSMinimumSystemVersion` 10.13, and neither the `<details>` display swap nor the newer `::details-content` pseudo-element needed to transition it is available across that whole range. It is now a controlled `<button aria-expanded aria-controls>` (wrapped in an `<h2>`, since a button's content model does not permit a heading child -- the WAI-ARIA APG accordion pattern) plus a region that expands and collapses with `grid-template-rows: 0fr ↔ 1fr`, the same technique the owner-approved prototype uses for every expand/collapse in the product and one with materially broader cross-engine support than an animated `<details>` open. Collapsed content stays in the DOM either way -- a transitioned `visibility: hidden`, not `inert` (unsupported on the older WebKit this range includes) and not an unmount, is what keeps it out of the tab order and the accessibility tree while still letting the region's height animate. Every existing keyboard, focus and content guarantee (Tab reachability, Enter/Space activation, Escape blurring the trigger, every recovery and firewall string still present regardless of open state) holds under the new markup; see `Disclosure.tsx` and `styles.test.ts` for the mutation-verified detail. |
 | **Packet** | `{rounded.xxl}` surface at `{elevation.sh-3}`. Holds the warning banner, hero, disclosures and cancel. Replaces the folder-tab silhouette and the paper offset. |
 | **Item Kind Pill** | `{rounded.full}`, `{colors.primary-tint}` on `{colors.primary}`, `{typography.label}`, with a leading glyph. Says File or Folder. Never an authoritative-state badge. |
 | **Item Summary** | `{typography.headline}` name in a bidi isolate with the full-name control beside it; kind, logical size and the ZIP note in `{typography.meta}`. |
@@ -538,20 +538,61 @@ document order above it and nothing else in this spine depends on that ordering.
 ## Motion
 
 Motion is new to this spine; Paper Relay had none beyond a reduced-motion guard.
+Story 9.1 gives it a foundation every later Epic 9 story builds on.
 
-- One easing curve: `cubic-bezier(.32,.72,0,1)`, the decelerate curve platform
-  animations use. One accent curve is what makes a set of transitions read as one
-  system.
+- One easing curve, unchanged: `--ease-decelerate`, `cubic-bezier(.32,.72,0,1)`,
+  the decelerate curve platform animations use. One accent curve is what makes a
+  set of transitions read as one system.
 - Durations: 120ms for a press, 150–200ms for hover and fill changes, 200ms for the
   disclosure chevron, 400ms for the progress fill, 500ms for the completion check.
-- The completion check draws its stroke once via `stroke-dashoffset`. It is the
-  only entrance animation in the product, and it marks the only moment worth
-  marking.
-- Buttons scale to 0.975 on `:active`. Nothing else scales.
-- **`prefers-reduced-motion: reduce` removes every animation and transition and
-  leaves the check mark fully drawn.** The existing assertion that reduced motion
-  removes nothing which carries meaning stays binding: the check is a state cue, so
-  it must be present, not animated.
+- **Entrance.** Every one of the five views -- Idle, Pending, Staged, Transferring,
+  and the outcome panel when it is the phase view -- carries `data-phase-view` and
+  enters with a fade (opacity 0→1, ~340ms) plus a 10px rise (translate, ~420ms),
+  both on the one easing curve, via `@starting-style`. An optional per-child
+  stagger (`--fd-stagger`, read into `transition-delay` at ~55ms a step) lets a
+  view's own children rise in sequence behind it; it is capped at five steps so a
+  long list can never queue a straggler more than ~275ms behind. **Views animate
+  in and never out**: there is no exit transition anywhere in the product. An
+  outgoing view is replaced, not animated off -- keeping an unmounted view's DOM
+  alive long enough to animate it away would give one moment two nodes both
+  claiming to be the current view, which breaks the one-retained-node identity
+  reset and the outcome panel depend on.
+- **Motion is progressive enhancement.** `build/darwin/Info.plist` declares
+  `LSMinimumSystemVersion` 10.13, so the WKWebView this product runs in ranges from
+  engines with no `@starting-style` support at all to current Safari. Every
+  entrance is written so that an unsupporting engine simply shows the finished,
+  resting state on first paint -- opaque, untranslated, unscaled -- with nothing
+  to detect and no fallback branch to maintain. This is also why entrance motion is
+  built from CSS transitions plus `@starting-style` rather than a keyframe rule:
+  neither construct depends on the other, and `@starting-style`'s own graceful
+  no-op is what a keyframe-based entrance would not get for free. **No `@keyframes`
+  rule and no `animation` property appear anywhere in this sheet, and `styles.test.ts`
+  enforces the ban directly.**
+- **Disclosure.** Opens and closes by animating `grid-template-rows` between `0fr`
+  and `1fr` on a controlled `<button aria-expanded>` plus region, not native
+  `<details>` -- see the Disclosure row below for the choice and why. The chevron
+  rotates in step, over 200ms, unchanged from before this story.
+- **Browse Menu.** Enters with a fade and a scale from ~0.96, anchored at the
+  corner it hangs from, over ≤200ms, via `@starting-style` -- the product's first
+  floating surface gets the same progressive-enhancement treatment as a phase view.
+- The completion check draws its stroke once via `stroke-dashoffset`. It is no
+  longer the only entrance animation in the product, now that views, disclosures
+  and the browse menu all animate in too -- but it remains the only moment marked
+  by *drawing* rather than by fading or rising, which is still worth marking on its
+  own terms.
+- Buttons scale to 0.975 on `:active` via `transform: scale(0.975)` -- the one
+  *interaction* accent that scales, and unaffected by the entrance motion above,
+  which scales through the standalone `scale` property instead (the browse menu now,
+  cards and discs in the stories that follow). The two compose independently and
+  are neutralised independently, so pressing a button never loses its feedback to a
+  rule written for an unrelated entrance.
+- **`prefers-reduced-motion: reduce` collapses every duration and delay to
+  effectively nothing and removes `translate`/`scale` outright, leaving the check
+  mark fully drawn and every other state cue in its finished form.** The existing
+  assertion that reduced motion removes nothing which carries meaning stays
+  binding: the check is a state cue, so it must be present, not animated, and the
+  same now holds for a disclosure's open state and the browse menu's presence --
+  reduced motion changes how fast they arrive, never whether they do.
 
 ## Do's and Don'ts
 
