@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FairDrop Motion Proposal</title>
+<style>
+:root {
+  --ease: cubic-bezier(.32,.72,0,1);
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-code: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  --page: #E6E6EA; --page-ink: #1A1A1C; --page-muted: #65656B; --page-line: #CFCFD4;
+}
+:root[data-theme="light"] {
+  --canvas:#F2F2F4; --surface:#FFFFFF; --fill:#F1F1F2; --fill-strong:#E8E8EA; --text:#1A1A1C; --muted:#65656B;
+  --sep:#D6D6D6; --ctl:#86868B; --primary:#9C5636; --primary-hover:#7F4428; --primary-ink:#FFFFFF; --primary-tint:#F5EEEB;
+  --track:#E9E9EB; --success:#177A48; --success-tint:#E3F1EA; --error:#C0362C; --error-tint:#F8E9E7;
+  --sh1:0 0.5px 1px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.05);
+  --sh2:0 1px 2px rgba(0,0,0,.05),0 4px 12px rgba(0,0,0,.07);
+  --sh3:0 2px 6px rgba(0,0,0,.06),0 12px 32px rgba(0,0,0,.10);
+  --titlebar:#E9E9EC;
+}
+:root[data-theme="dark"] {
+  --canvas:#161618; --surface:#1F1F22; --fill:#313135; --fill-strong:#3A3A3E; --text:#F2F2F4; --muted:#9C9CA4;
+  --sep:#47474A; --ctl:#7A7A82; --primary:#E39B70; --primary-hover:#F0B694; --primary-ink:#2B1206; --primary-tint:#372E2B;
+  --track:#3A3A3E; --success:#4ED08B; --success-tint:#20342A; --error:#FF7A70; --error-tint:#3A2422;
+  --sh1:0 0.5px 1px rgba(0,0,0,.4);
+  --sh2:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.34);
+  --sh3:0 2px 8px rgba(0,0,0,.44),0 16px 40px rgba(0,0,0,.5);
+  --titlebar:#2A2A2E;
+  --page:#0E0E10; --page-ink:#F2F2F4; --page-muted:#9C9CA4; --page-line:#2E2E33;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); color: var(--page-ink); font: 13.5px/1.55 var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* ---------- harness chrome (not part of the proposal) ---------- */
+.harness { max-width: 1072px; margin: 0 auto; padding: 20px 16px 48px; }
+.harness h1 { font: 650 20px/1.25 var(--font-display); letter-spacing: -.016em; margin: 0 0 4px; }
+.harness .sub { color: var(--page-muted); margin: 0 0 16px; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 14px; }
+.seg { display: inline-flex; background: color-mix(in srgb, var(--page-ink) 8%, transparent); border-radius: 9px; padding: 2px; }
+.seg button { font: 590 12.5px/1 var(--font-body); color: var(--page-ink); background: none; border: 0; border-radius: 7px; padding: 7px 11px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: var(--sh1); }
+.seg-label { font: 650 11px/1 var(--font-body); letter-spacing: .045em; text-transform: uppercase; color: var(--page-muted); margin-right: 6px; }
+.hbtn { font: 590 12.5px/1 var(--font-body); color: var(--page-ink); background: none; border: 1px solid var(--page-line); border-radius: 8px; padding: 7px 11px; cursor: pointer; }
+.hbtn:disabled { opacity: .4; cursor: default; }
+.notes { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.note { border: 1px solid var(--page-line); border-radius: 12px; padding: 12px 14px; }
+.note h3 { font: 650 12px/1.3 var(--font-body); letter-spacing: .045em; text-transform: uppercase; color: var(--page-muted); margin: 0 0 6px; }
+.note ul { margin: 0; padding-left: 18px; }
+.note li { margin: 2px 0; }
+
+/* ---------- the window ---------- */
+.stage-wrap { width: 100%; }
+.win { width: 1024px; height: 720px; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 .5px rgba(0,0,0,.35), 0 20px 60px rgba(0,0,0,.28); transform-origin: top left; }
+.titlebar { height: 32px; background: var(--titlebar); display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+.titlebar i { width: 12px; height: 12px; border-radius: 50%; background: #FF5F57; }
+.titlebar i:nth-child(2) { background: #FEBC2E; } .titlebar i:nth-child(3) { background: #28C840; }
+.app { height: calc(100% - 32px); background: var(--canvas); color: var(--text); display: grid; place-items: center; padding: 24px; overflow: auto; position: relative; }
+.col { width: min(100%, 600px); }
+
+/* ---------- motion system ---------- */
+/* Every view enters; nothing exits. @starting-style needs no keyframes and degrades to an instant swap. */
+.view { transition: opacity 340ms var(--ease), translate 420ms var(--ease); }
+@starting-style { .view { opacity: 0; translate: 0 10px; } }
+.rise { transition: opacity 380ms var(--ease), translate 460ms var(--ease); transition-delay: calc(var(--i, 0) * 55ms); }
+@starting-style { .rise { opacity: 0; translate: 0 8px; } }
+
+.reduced *, .reduced *::before, .reduced *::after { transition-duration: 1ms !important; transition-delay: 0ms !important; translate: none !important; }
+
+/* ---------- controls ---------- */
+.btn { font: 590 14px/1.3 var(--font-body); letter-spacing: -.005em; min-height: 40px; padding: 0 16px; border-radius: 11px; border: 1px solid var(--ctl);
+  background: var(--surface); color: var(--text); display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer;
+  transition: background-color 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease), scale 120ms var(--ease), box-shadow 160ms var(--ease); }
+.btn:hover { background-color: var(--fill); }
+.btn:active { scale: .975; }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary); }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn--primary { border-color: var(--primary); background-color: var(--primary); background-image: linear-gradient(rgb(255 255 255 / .08), rgb(255 255 255 / 0));
+  color: var(--primary-ink); box-shadow: var(--sh1), inset 0 1px 0 rgb(255 255 255 / .35); }
+.btn--primary:hover { background-color: var(--primary-hover); border-color: var(--primary-hover); }
+.btn--pill { border-radius: 999px; padding: 0 20px; min-height: 42px; }
+.btn--quiet { border-color: transparent; background: none; color: var(--muted); padding: 0 10px; }
+.btn--quiet:hover { background: var(--fill); color: var(--text); }
+.btn--copied { border-color: var(--success); background-color: var(--success-tint); color: var(--success); box-shadow: none; background-image: none; }
+.btn--copied:hover { background-color: var(--success-tint); border-color: var(--success); }
+.btn .label-swap { display: grid; }
+.btn .label-swap > * { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 7px; justify-content: center; transition: opacity 200ms var(--ease), translate 260ms var(--ease); }
+.btn .label-swap > [data-off] { opacity: 0; translate: 0 6px; }
+
+/* ---------- Idle ---------- */
+.drop { border-radius: 24px; background: var(--surface); box-shadow: var(--sh2); padding: 10px; transition: box-shadow 200ms var(--ease); }
+.drop__inner { border: 1.5px dashed var(--ctl); border-radius: 16px; padding: 44px 24px 40px; display: flex; flex-direction: column; align-items: center; text-align: center;
+  transition: border-color 200ms var(--ease), background-color 200ms var(--ease); }
+.drop.is-over .drop__inner { border-style: solid; border-color: var(--primary); background-color: var(--primary-tint); }
+.drop__icon { width: 60px; height: 60px; border-radius: 16px; background: var(--primary-tint); color: var(--primary); display: grid; place-items: center; margin-bottom: 18px;
+  transition: translate 260ms var(--ease), scale 260ms var(--ease); }
+.drop.is-over .drop__icon { translate: 0 -4px; scale: 1.06; }
+.drop__icon svg { width: 28px; height: 28px; }
+.h-display { font: 650 26px/1.2 var(--font-display); letter-spacing: -.022em; margin: 0; }
+.h-headline { font: 650 20px/1.25 var(--font-display); letter-spacing: -.016em; margin: 0; }
+.muted { color: var(--muted); }
+.drop p { margin: 6px 0 22px; }
+
+.browse { position: relative; }
+.menu { position: absolute; left: 50%; top: calc(100% + 6px); translate: -50% 0; min-width: 190px; background: var(--surface); border-radius: 12px; box-shadow: var(--sh3), 0 0 0 .5px var(--sep);
+  padding: 5px; text-align: left; z-index: 5; transform-origin: top center; transition: opacity 160ms var(--ease), scale 200ms var(--ease); }
+@starting-style { .menu { opacity: 0; scale: .96; } }
+.menu[hidden] { display: none; }
+.menu button { width: 100%; display: flex; align-items: center; gap: 10px; font: 400 14px/1.3 var(--font-body); color: var(--text); background: none; border: 0; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.menu button:hover { background: var(--primary); color: var(--primary-ink); }
+.menu svg { width: 16px; height: 16px; }
+
+.group { margin-top: 16px; background: var(--surface); border-radius: 18px; box-shadow: var(--sh1); overflow: hidden; }
+.row { width: 100%; display: flex; align-items: center; justify-content: space-between; font: 590 13.5px/1.5 var(--font-body); color: var(--text);
+  background: none; border: 0; padding: 12px 18px; cursor: pointer; transition: background-color 160ms var(--ease); text-align: left; }
+.row:hover { background: var(--fill); }
+.row + .row, .row + .row-body + .row { border-top: 1px solid var(--sep); }
+.chev { width: 8px; height: 8px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); rotate: -45deg; transition: rotate 220ms var(--ease); flex: none; margin-right: 4px; }
+.row[aria-expanded="true"] .chev { rotate: 45deg; }
+.row-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 320ms var(--ease); }
+.row-body > div { overflow: hidden; }
+.row-body > div > div { padding: 0 18px 14px; color: var(--muted); opacity: 0; transition: opacity 240ms var(--ease); }
+.row-body.open { grid-template-rows: 1fr; }
+.row-body.open > div > div { opacity: 1; }
+.row-body p { margin: 0 0 8px; }
+
+/* ---------- Preparing ---------- */
+.prep { text-align: center; }
+.prep .spinner { width: 28px; height: 28px; margin: 0 auto 14px; border-radius: 50%; border: 2.5px solid var(--track); border-top-color: var(--primary); animation: spin 900ms linear infinite; }
+@keyframes spin { to { rotate: 360deg; } }
+.reduced .prep .spinner { animation: none; border-color: var(--track); }
+
+/* ---------- Staged / Sending card ---------- */
+.head { text-align: center; margin-bottom: 18px; }
+.head p { margin: 4px 0 0; }
+.card { background: var(--surface); border-radius: 24px; box-shadow: var(--sh2); padding: 22px; display: grid; grid-template-columns: 216px 1fr; gap: 24px; align-items: center; }
+.slot { width: 216px; height: 216px; position: relative; }
+.qr { width: 216px; height: 216px; background: #FFFFFF; border-radius: 16px; padding: 12px; box-shadow: 0 0 0 .5px var(--sep); }
+.qr img { width: 100%; height: 100%; image-rendering: pixelated; display: block; -webkit-user-drag: none; }
+.qr { transition: opacity 300ms var(--ease), scale 420ms var(--ease); }
+@starting-style { .qr { opacity: 0; scale: .94; } }
+
+.ring { width: 216px; height: 216px; display: grid; place-items: center; position: relative; transition: opacity 300ms var(--ease), scale 420ms var(--ease); }
+@starting-style { .ring { opacity: 0; scale: .94; } }
+.ring svg { position: absolute; inset: 0; rotate: -90deg; }
+.ring circle { fill: none; stroke-width: 10; }
+.ring .track { stroke: var(--track); }
+.ring .fill { stroke: var(--primary); stroke-linecap: round; transition: stroke-dashoffset 400ms var(--ease); }
+.ring .pct { font: 650 34px/1 var(--font-display); letter-spacing: -.022em; font-variant-numeric: tabular-nums; }
+.ring .pct small { font-size: 18px; color: var(--muted); margin-left: 1px; }
+
+.item { display: flex; gap: 12px; align-items: flex-start; }
+.item__icon { width: 40px; height: 40px; border-radius: 10px; background: var(--fill); color: var(--muted); display: grid; place-items: center; flex: none; }
+.item__icon svg { width: 20px; height: 20px; }
+.item__name { font: 650 17px/1.3 var(--font-display); letter-spacing: -.012em; margin: 0; overflow-wrap: anywhere; }
+.item__meta { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+.actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 320ms var(--ease), margin-top 320ms var(--ease); margin-top: 0; }
+.reveal.open { grid-template-rows: 1fr; margin-top: 10px; }
+.reveal > div { overflow: hidden; }
+.url { font: 400 12px/1.45 var(--font-code); color: var(--text); background: var(--fill); border-radius: 9px; padding: 9px 11px; overflow-wrap: anywhere; user-select: all; opacity: 0; translate: 0 -4px;
+  transition: opacity 220ms var(--ease), translate 320ms var(--ease); border: 1px solid var(--ctl); }
+.reveal.open .url { opacity: 1; translate: 0 0; }
+.caveats { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; font-size: 12.5px; color: var(--muted); }
+.caveats li { display: flex; gap: 7px; align-items: flex-start; }
+.caveats svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+
+.stats { margin-top: 14px; display: flex; gap: 22px; }
+.stat b { display: block; font: 590 15px/1.3 var(--font-body); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+
+.foot { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; }
+.helpbox { margin-top: 8px; }
+.link { font: 590 13px/1 var(--font-body); color: var(--muted); background: none; border: 0; padding: 8px 6px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.link:hover { color: var(--text); background: var(--fill); }
+.link .chev { width: 6px; height: 6px; }
+.link[aria-expanded="true"] .chev { rotate: 45deg; }
+.helpbox .row-body > div > div { padding: 4px 6px 4px; }
+
+/* ---------- Done / Error ---------- */
+.done { text-align: center; display: flex; flex-direction: column; align-items: center; background: var(--surface); border-radius: 24px; box-shadow: var(--sh2); padding: 48px 32px 40px; }
+.done .h-display { font-size: 30px; }
+.disc { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 20px;
+  transition: opacity 300ms var(--ease), scale 520ms var(--ease); }
+@starting-style { .disc { opacity: 0; scale: .7; } }
+.disc--ok { background: var(--success-tint); color: var(--success); }
+.disc--err { background: var(--error-tint); color: var(--error); font: 700 34px/1 var(--font-display); }
+.disc svg { width: 46px; height: 46px; }
+.check { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 32; stroke-dashoffset: 0;
+  transition: stroke-dashoffset 520ms var(--ease) 180ms; }
+@starting-style { .check { stroke-dashoffset: 32; } }
+.receipt { margin: 12px 0 0; display: inline-flex; align-items: center; gap: 8px; background: var(--fill); border-radius: 999px; padding: 6px 14px 6px 8px; max-width: 100%; }
+.receipt svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.receipt b { font-weight: 590; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.done .btns { display: flex; gap: 10px; margin-top: 28px; }
+.done p.msg { margin: 8px 0 0; max-width: 420px; }
+
+@media (max-width: 700px) {
+  .card { grid-template-columns: 1fr; justify-items: center; }
+  .card .details { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="harness">
+  <h1>FairDrop — Epic 9 approved proposal</h1>
+  <p class="sub">A working prototype at the real 1024×768 window size. Click through it: choose a file, reveal or copy the link, simulate the receiver scanning, and finish.</p>
+
+  <div class="bar">
+    <span><span class="seg-label">Jump to</span>
+      <span class="seg" id="jump">
+        <button data-go="idle" aria-pressed="true">Idle</button><button data-go="staged">Ready</button><button data-go="sending">Sending</button><button data-go="done">Sent</button><button data-go="error">Error: retry</button><button data-go="errgone">Error: item gone</button>
+      </span></span>
+    <span><span class="seg-label">Theme</span>
+      <span class="seg" id="theme"><button data-v="light">Light</button><button data-v="dark" aria-pressed="true">Dark</button></span></span>
+    <span><span class="seg-label">Motion</span>
+      <span class="seg" id="motion"><button data-v="full" aria-pressed="true">Full</button><button data-v="reduced">Reduced</button></span></span>
+    <button class="hbtn" id="scan" disabled>Simulate receiver scan</button>
+    <button class="hbtn" id="drag">Simulate drag over</button>
+  </div>
+
+  <div class="stage-wrap" id="wrap">
+    <div class="win" id="win">
+      <div class="titlebar"><i></i><i></i><i></i></div>
+      <div class="app" id="app"></div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><h3>Everywhere</h3><ul>
+      <li>Every screen fades and rises in (~350ms, the existing decelerate curve).</li>
+      <li>Motion is built with CSS transitions, so older macOS WebKit just shows the screen instantly.</li>
+      <li>Reduced Motion drops all movement and keeps every state cue.</li>
+    </ul></div>
+    <div class="note"><h3>Ready</h3><ul>
+      <li>The QR code is the hero. The link stays hidden until you ask: <b>Copy Link</b> or <b>Show Link</b>.</li>
+      <li>The five paragraphs become two one-line notes. Firewall and receiver help move into “Trouble connecting?”.</li>
+      <li>The FILE tab and “Show full name” button are gone: long names wrap instead.</li>
+    </ul></div>
+    <div class="note"><h3>Errors</h3><ul>
+      <li>If the same item can simply be sent again, <b>Try Again</b> re-prepares that exact file and makes a fresh code. No picker.</li>
+      <li>If retrying can’t help (the item is gone or unsupported), the button becomes <b>Choose Another</b>.</li>
+      <li>If only a restart helps, there is just <b>Dismiss</b>.</li>
+    </ul></div>
+    <div class="note"><h3>Sending → Sent</h3><ul>
+      <li>The QR slot becomes a progress ring in the same place, so the card keeps its shape.</li>
+      <li>“Wire bytes” and the metric boxes become two plain figures.</li>
+      <li>Sent is one centred composition: the check draws, one receipt line, <b>Send Another</b> and <b>Done</b>. It no longer stacks on top of the drop zone.</li>
+    </ul></div>
+  </div>
+</div>
+
+<template id="t-idle">
+  <div class="view col">
+    <div class="drop" id="dropzone"><div class="drop__inner">
+      <div class="drop__icon rise" style="--i:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div>
+      <h2 class="h-display rise" style="--i:1">Drop one file or folder</h2>
+      <p class="muted rise" style="--i:2">Sends to one browser on the same local network. No account or receiver app.</p>
+      <div class="browse rise" style="--i:3">
+        <button class="btn btn--primary btn--pill" data-act="menu" aria-haspopup="menu" aria-expanded="false">Choose File or Folder <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg></button>
+        <div class="menu" role="menu" hidden>
+          <button role="menuitem" data-act="pick-file"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 1.5h5l3 3v10H4z"/><path d="M9 1.5v3h3"/></svg>File</button>
+          <button role="menuitem" data-act="pick-folder"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.5 4a1 1 0 0 1 1-1h3.5l1.5 1.5h6a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z"/></svg>Folder</button>
+        </div>
+      </div>
+    </div></div>
+    <div class="group rise" style="--i:4">
+      <button class="row" aria-expanded="false" data-act="toggle">Local network access <span class="chev"></span></button>
+      <div class="row-body"><div><div>
+        <p>Your first transfer may ask to allow FairDrop on this local network.</p>
+        <p><b>Windows:</b> allow Private networks only. <b>macOS:</b> allow incoming connections.</p>
+      </div></div></div>
+      <button class="row" aria-expanded="false" data-act="toggle">Troubleshooting <span class="chev"></span></button>
+      <div class="row-body"><div><div>
+        <p>Make sure both devices are on the same Wi‑Fi. Guest networks can block device-to-device traffic.</p>
+        <p>If the firewall prompt was denied, allow FairDrop in your firewall settings, then try again.</p>
+      </div></div></div>
+    </div>
+  </div>
+</template>
+
+<template id="t-prep">
+  <div class="view col prep">
+    <div class="spinner"></div>
+    <h2 class="h-headline">Preparing your file…</h2>
+    <div style="margin-top:18px"><button class="btn btn--quiet" data-go="idle">Cancel</button></div>
+  </div>
+</template>
+
+<template id="t-staged">
+  <div class="view col">
+    <div class="head"><h1 class="h-display">Ready to send</h1><p class="muted">Scan the code with the receiving device’s camera.</p></div>
+    <div class="card">
+      <div class="slot"><div class="qr"><img alt="Download QR code for dev-environment-guide.html" draggable="false" src="data:image/png;base64,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"></div></div>
+      <div class="details">
+        <div class="item rise" style="--i:1">
+          <div class="item__icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2.5h6.5L15.5 6.5v11H5z"/><path d="M11.5 2.5v4h4"/></svg></div>
+          <div><p class="item__name">dev-environment-guide.html</p><p class="item__meta">File · 32.6 KB</p></div>
+        </div>
+        <div class="actions rise" style="--i:2">
+          <button class="btn btn--primary" data-act="copy"><span class="label-swap">
+            <span data-a><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 9.5a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0-4.2-4.2l-.7.7"/><path d="M9.5 6.5a3 3 0 0 0-4.2 0L3.2 8.6a3 3 0 0 0 4.2 4.2l.7-.7"/></svg>Copy Link</span>
+            <span data-b data-off><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 8.5 3 3 6-7"/></svg>Copied</span>
+          </span></button>
+          <button class="btn" data-act="reveal" aria-expanded="false">Show Link</button>
+        </div>
+        <div class="reveal"><div><div class="url">http://192.168.1.42:53817/d/3f9a1c7e4b2d8a6f0e5c9b1a7d3e2f4c</div></div></div>
+        <ul class="caveats rise" style="--i:3">
+          <li><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.2v3.8M8 5v.1" stroke-linecap="round"/></svg>Works once: the first device to open it gets the file.</li>
+          <li><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1"/></svg>Not encrypted. Use it only on a network you trust.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot rise" style="--i:4">
+      <button class="link" data-act="help" aria-expanded="false"><span class="chev"></span>Trouble connecting?</button>
+      <button class="btn btn--quiet" data-go="idle">Cancel</button>
+    </div>
+    <div class="helpbox"><div class="row-body"><div><div class="muted">
+      <p>FairDrop keeps no copy. The receiving device keeps what it downloads.</p>
+      <p>Link previews in chat apps can count as that first device, so paste the link straight into a browser.</p>
+      <p>Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.</p>
+      <p>Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.</p>
+      <p>Windows and macOS firewall recovery steps also appear here.</p>
+    </div></div></div></div>
+  </div>
+</template>
+
+<template id="t-sending">
+  <div class="view col">
+    <div class="head"><h1 class="h-display">Sending</h1></div>
+    <div class="card">
+      <div class="slot"><div class="ring" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <svg viewBox="0 0 216 216"><circle class="track" cx="108" cy="108" r="96"/><circle class="fill" cx="108" cy="108" r="96" stroke-dasharray="603.19" stroke-dashoffset="603.19"/></svg>
+        <div class="pct"><span id="pct">0</span><small>%</small></div>
+      </div></div>
+      <div class="details">
+        <div class="item">
+          <div class="item__icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2.5h6.5L15.5 6.5v11H5z"/><path d="M11.5 2.5v4h4"/></svg></div>
+          <div><p class="item__name">dev-environment-guide.html</p><p class="item__meta">File · 32.6 KB</p></div>
+        </div>
+        <div class="stats rise" style="--i:1">
+          <div class="stat"><b id="sent">0 KB of 32.6 KB</b><span>Sent</span></div>
+          <div class="stat"><b>1.2 MB/s</b><span>Speed</span></div>
+        </div>
+        <div style="margin-top:18px" class="rise" style="--i:2"><button class="btn" data-go="idle">Cancel</button></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="t-done">
+  <div class="view col done" tabindex="-1">
+    <div class="disc disc--ok"><svg viewBox="0 0 24 24"><path class="check" d="M5 12.5l4.3 4.3L19 7.5" pathLength="32"/></svg></div>
+    <h1 class="h-display rise" style="--i:2">Sent</h1>
+    <div class="receipt rise" style="--i:3"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2.5h6.5L15.5 6.5v11H5z"/><path d="M11.5 2.5v4h4"/></svg><b>dev-environment-guide.html</b><span class="muted">· 32.6 KB</span></div>
+    <div class="btns rise" style="--i:4">
+      <div class="browse"><button class="btn btn--primary btn--pill" data-act="menu" aria-haspopup="menu" aria-expanded="false">Send Another <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg></button>
+        <div class="menu" role="menu" hidden>
+          <button role="menuitem" data-act="pick-file">File</button><button role="menuitem" data-act="pick-folder">Folder</button>
+        </div></div>
+      <button class="btn btn--pill" data-go="idle">Done</button>
+    </div>
+  </div>
+</template>
+
+<template id="t-error">
+  <div class="view col done" tabindex="-1">
+    <div class="disc disc--err">!</div>
+    <h1 class="h-display rise" style="--i:2">Transfer stopped</h1>
+    <div class="receipt rise" style="--i:3"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2.5h6.5L15.5 6.5v11H5z"/><path d="M11.5 2.5v4h4"/></svg><b>dev-environment-guide.html</b><span class="muted">· 32.6 KB</span></div>
+    <p class="msg muted rise" style="--i:3">The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.</p>
+    <div class="btns rise" style="--i:4">
+      <button class="btn btn--primary btn--pill" data-act="retry"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2.5v2.5h-2.5"/></svg>Try Again</button>
+      <button class="btn btn--pill" data-go="idle">Dismiss</button>
+    </div>
+  </div>
+</template>
+
+<template id="t-errgone">
+  <div class="view col done" tabindex="-1">
+    <div class="disc disc--err">!</div>
+    <h1 class="h-display rise" style="--i:2">Item not found</h1>
+    <p class="msg muted rise" style="--i:3">That file or folder is no longer available. Choose it again.</p>
+    <div class="btns rise" style="--i:4">
+      <div class="browse"><button class="btn btn--primary btn--pill" data-act="menu" aria-haspopup="menu" aria-expanded="false">Choose Another <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg></button>
+        <div class="menu" role="menu" hidden>
+          <button role="menuitem" data-act="pick-file">File</button><button role="menuitem" data-act="pick-folder">Folder</button>
+        </div></div>
+      <button class="btn btn--pill" data-go="idle">Dismiss</button>
+    </div>
+  </div>
+</template>
+
+<script>
+const app = document.getElementById('app')
+const root = document.documentElement
+let state = 'idle', timer = null
+
+function fit() {
+  const wrap = document.getElementById('wrap'), win = document.getElementById('win')
+  const s = Math.min(1, wrap.clientWidth / 1024)
+  win.style.transform = `scale(${s})`
+  wrap.style.height = (720 * s) + 'px'
+}
+addEventListener('resize', fit); fit()
+
+function go(next) {
+  clearInterval(timer); timer = null
+  state = next
+  const tpl = document.getElementById('t-' + next)
+  app.replaceChildren(tpl.content.cloneNode(true))
+  document.querySelectorAll('#jump button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.go === next || (next === 'prep' && b.dataset.go === 'idle'))))
+  document.getElementById('scan').disabled = next !== 'staged'
+  document.getElementById('drag').disabled = next !== 'idle'
+  if (next === 'sending') runProgress()
+  if (next === 'prep') setTimeout(() => state === 'prep' && go('staged'), 700)
+}
+
+function runProgress() {
+  let p = 0
+  const fill = app.querySelector('.fill'), pct = app.querySelector('#pct'), sent = app.querySelector('#sent'), ring = app.querySelector('.ring')
+  const C = 603.19
+  timer = setInterval(() => {
+    p = Math.min(100, p + 7 + Math.random() * 9)
+    const v = Math.round(p)
+    fill.style.strokeDashoffset = String(C * (1 - p / 100))
+    pct.textContent = v; ring.setAttribute('aria-valuenow', v)
+    sent.textContent = (32.6 * p / 100).toFixed(1) + ' KB of 32.6 KB'
+    if (p >= 100) { clearInterval(timer); timer = null; setTimeout(() => state === 'sending' && go('done'), 550) }
+  }, 380)
+}
+
+app.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act],[data-go]')
+  if (!t) { app.querySelectorAll('.menu').forEach(m => { m.hidden = true; m.previousElementSibling?.setAttribute('aria-expanded', 'false') }); return }
+  if (t.dataset.go) return go(t.dataset.go)
+  const act = t.dataset.act
+  if (act === 'menu') {
+    const m = t.nextElementSibling; m.hidden = !m.hidden; t.setAttribute('aria-expanded', String(!m.hidden)); return
+  }
+  if (act === 'pick-file' || act === 'pick-folder' || act === 'retry') return go('prep')
+  if (act === 'toggle') { const o = t.getAttribute('aria-expanded') !== 'true'; t.setAttribute('aria-expanded', String(o)); t.nextElementSibling.classList.toggle('open', o); return }
+  if (act === 'help') { const o = t.getAttribute('aria-expanded') !== 'true'; t.setAttribute('aria-expanded', String(o)); app.querySelector('.helpbox .row-body').classList.toggle('open', o); return }
+  if (act === 'reveal') { const o = t.getAttribute('aria-expanded') !== 'true'; t.setAttribute('aria-expanded', String(o)); t.textContent = o ? 'Hide Link' : 'Show Link'; app.querySelector('.reveal').classList.toggle('open', o); return }
+  if (act === 'copy') {
+    const a = t.querySelector('[data-a]'), b = t.querySelector('[data-b]')
+    a.toggleAttribute('data-off', true); b.toggleAttribute('data-off', false); t.classList.add('btn--copied'); t.classList.remove('btn--primary')
+    t.addEventListener('blur', () => { a.toggleAttribute('data-off', false); b.toggleAttribute('data-off', true); t.classList.remove('btn--copied'); t.classList.add('btn--primary') }, {once: true})
+    t.focus()
+  }
+})
+
+document.getElementById('jump').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.go) })
+document.getElementById('scan').addEventListener('click', () => state === 'staged' && go('sending'))
+document.getElementById('drag').addEventListener('click', () => {
+  const d = app.querySelector('#dropzone'); if (!d) return
+  d.classList.add('is-over'); setTimeout(() => { d.classList.remove('is-over'); go('prep') }, 1100)
+})
+function segment(id, fn) {
+  const el = document.getElementById(id)
+  el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return
+    el.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); fn(b.dataset.v) })
+}
+segment('theme', v => root.dataset.theme = v)
+segment('motion', v => { root.classList.toggle('reduced', v === 'reduced') })
+go('idle')
+</script>
+</body>
+</html>

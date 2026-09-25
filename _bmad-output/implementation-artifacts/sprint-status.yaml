@@ -82,6 +82,15 @@ development_status:
   6-2-pin-what-ships-not-the-template: done
   6-3-verify-and-release-1-1-0: done
   epic-6-retrospective: done
+
+  epic-9: in-progress
+  9-1-build-the-motion-foundation: ready-for-dev
+  9-2-remember-the-item-so-an-error-can-retry-it: ready-for-dev
+  9-3-declutter-idle-and-drop-the-button-ellipses: backlog
+  9-4-rebuild-staged-around-the-code: backlog
+  9-5-rebuild-sending-around-a-ring: backlog
+  9-6-make-sent-and-error-one-card: backlog
+  9-7-prove-epic-9-on-both-platforms: backlog
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
     epic: 1
