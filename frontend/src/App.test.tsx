@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
     cancel: vi.fn(),
     reportCopyFailure: vi.fn(),
     dismissRetained: vi.fn(),
+    retry: vi.fn(),
+    stageFromOutcome: vi.fn(),
 }))
 
 vi.mock('../wailsjs/runtime/runtime', () => ({
@@ -199,6 +201,9 @@ const commands: ControllerCommands = {
     rejectSelection: mocks.rejectSelection,
     reportCopyFailure: mocks.reportCopyFailure,
     dismissRetained: mocks.dismissRetained,
+    retry: mocks.retry,
+    stageFromOutcome: mocks.stageFromOutcome,
+    canRetry: false,
 }
 
 function mountWith(state: TransferState) {

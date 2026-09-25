@@ -1,7 +1,9 @@
 import {describe, expect, it} from 'vitest'
-import {publicError} from './errors'
+import {publicError, transferErrorCodes} from './errors'
 import {
     selectCommandError,
+    selectEffectiveErrorAction,
+    selectErrorAction,
     selectMetadata,
     selectOutcome,
     selectPendingItemKind,
@@ -10,6 +12,7 @@ import {
     selectWarnings,
 } from './selectors'
 import type {TransferState} from './state'
+import type {ErrorAction, TransferErrorCode} from './types'
 import {parseProgressSnapshot} from './validation'
 
 const metadata = {
@@ -425,5 +428,154 @@ describe('terminal and retained outcomes', () => {
             cancelPending: false,
             commandError: null,
         })).toBeNull()
+    })
+
+    /*
+      Story 9.2 AC5: the retained item name is a pass-through, exactly like
+      the receipt above -- the selector computes nothing, it only forwards
+      whatever the reducer already retained.
+    */
+    it('forwards the retained item name for both a live and a retained Error outcome', () => {
+        const live = selectOutcome({
+            phase: 'error',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'error', error: publicError('transfer_failed'), itemName: 'secret-report.pdf'},
+        })
+        expect(live).toEqual({
+            kind: 'error', retained: false, error: publicError('transfer_failed'), itemName: 'secret-report.pdf',
+        })
+
+        const retained = selectOutcome({
+            phase: 'idle',
+            retainedOutcome: {kind: 'error', error: publicError('source_changed'), itemName: 'secret-report.pdf'},
+            commandError: null,
+        })
+        expect(retained).toEqual({
+            kind: 'error', retained: true, error: publicError('source_changed'), itemName: 'secret-report.pdf',
+        })
+    })
+
+    it('carries no item name for a Stage-time command failure, which never retained one', () => {
+        const outcome = selectOutcome({
+            phase: 'error',
+            session: {sessionId: metadata.sessionId, lastSeq: 4},
+            outcome: {kind: 'error', error: publicError('transfer_failed')},
+        })
+        expect(outcome?.kind).toBe('error')
+        expect(outcome && 'itemName' in outcome ? outcome.itemName : undefined).toBeUndefined()
+    })
+})
+
+/*
+  Story 9.2 AC2: the owner-approved code -> action table.
+
+  Written out as literals at the assertion site, per AGENTS.md's testing
+  standards -- asserting against the implementation's own table would let the
+  table drift with nothing to notice. Each code is checked individually
+  against its own literal so a mutation that moves one code to another row
+  fails naming that exact code, not just "the table changed somewhere".
+*/
+describe('selectErrorAction (Story 9.2 AC2)', () => {
+    const expected: Readonly<Record<TransferErrorCode, ErrorAction | null>> = {
+        busy: 'retry',
+        source_changed: 'retry',
+        network_unavailable: 'retry',
+        server_start_failed: 'retry',
+        qr_failed: 'retry',
+        setup_failed: 'retry',
+        transfer_failed: 'retry',
+        name_unsupported: 'retry',
+        invalid_selection: 'choose',
+        path_not_found: 'choose',
+        path_unsupported: 'choose',
+        chooser_failed: 'choose',
+        cleanup_unconfirmed: 'dismiss',
+        not_ready: 'dismiss',
+        shutting_down: 'dismiss',
+        cancelled: null,
+        clipboard_failed: null,
+        beacon_warning: null,
+        name_warning: null,
+    }
+
+    it('returns retry for busy, source_changed, network_unavailable, server_start_failed, qr_failed, setup_failed, transfer_failed, name_unsupported', () => {
+        expect(selectErrorAction('busy'), 'busy').toBe('retry')
+        expect(selectErrorAction('source_changed'), 'source_changed').toBe('retry')
+        expect(selectErrorAction('network_unavailable'), 'network_unavailable').toBe('retry')
+        expect(selectErrorAction('server_start_failed'), 'server_start_failed').toBe('retry')
+        expect(selectErrorAction('qr_failed'), 'qr_failed').toBe('retry')
+        expect(selectErrorAction('setup_failed'), 'setup_failed').toBe('retry')
+        expect(selectErrorAction('transfer_failed'), 'transfer_failed').toBe('retry')
+        expect(selectErrorAction('name_unsupported'), 'name_unsupported').toBe('retry')
+    })
+
+    it('returns choose for invalid_selection, path_not_found, path_unsupported, chooser_failed', () => {
+        expect(selectErrorAction('invalid_selection'), 'invalid_selection').toBe('choose')
+        expect(selectErrorAction('path_not_found'), 'path_not_found').toBe('choose')
+        expect(selectErrorAction('path_unsupported'), 'path_unsupported').toBe('choose')
+        expect(selectErrorAction('chooser_failed'), 'chooser_failed').toBe('choose')
+    })
+
+    it('returns dismiss for cleanup_unconfirmed, not_ready, shutting_down', () => {
+        expect(selectErrorAction('cleanup_unconfirmed'), 'cleanup_unconfirmed').toBe('dismiss')
+        expect(selectErrorAction('not_ready'), 'not_ready').toBe('dismiss')
+        expect(selectErrorAction('shutting_down'), 'shutting_down').toBe('dismiss')
+    })
+
+    it('returns no action for cancelled, clipboard_failed, beacon_warning, name_warning', () => {
+        expect(selectErrorAction('cancelled'), 'cancelled').toBeNull()
+        expect(selectErrorAction('clipboard_failed'), 'clipboard_failed').toBeNull()
+        expect(selectErrorAction('beacon_warning'), 'beacon_warning').toBeNull()
+        expect(selectErrorAction('name_warning'), 'name_warning').toBeNull()
+    })
+
+    // *Mutation:* move any one code to another row -> the per-code assertion
+    // above for that exact code fails and names it.
+    it('matches the fixture table above for every code the fixture knows about', () => {
+        for (const code of transferErrorCodes) {
+            expect(selectErrorAction(code), `selectErrorAction(${JSON.stringify(code)})`).toBe(expected[code])
+        }
+    })
+
+    /*
+      A new `TransferErrorCode` added to the registry without a row in
+      `errorActionByCode` fails *this* test, naming the code, independently of
+      the fixture `expected` map above (which a careless addition could leave
+      untouched) and independently of a type-check pass: the production
+      `Record<TransferErrorCode, ...>` in selectors.ts would also be a
+      compile-time error for the same omission, but this walks the live
+      canonical list (`transferErrorCodes`) at runtime, so the gap cannot hide
+      behind a build step nobody ran.
+
+      *Mutation:* add a code to `transferErrorCodes` (errors.ts) without a
+      matching row in `errorActionByCode` -> `selectErrorAction` returns
+      `undefined` for it and this test fails, naming that exact code.
+    */
+    it('never returns undefined for any code currently in the canonical registry', () => {
+        for (const code of transferErrorCodes) {
+            expect(
+                selectErrorAction(code),
+                `selectErrorAction(${JSON.stringify(code)}) is undefined -- add a row for this code`,
+            ).not.toBe(undefined)
+        }
+    })
+})
+
+describe('selectEffectiveErrorAction (Story 9.2 AC3)', () => {
+    it('downgrades a retry row to choose when no path is remembered to retry with', () => {
+        expect(selectEffectiveErrorAction('transfer_failed', false)).toBe('choose')
+        expect(selectEffectiveErrorAction('busy', false)).toBe('choose')
+    })
+
+    it('keeps retry when a path is remembered', () => {
+        expect(selectEffectiveErrorAction('transfer_failed', true)).toBe('retry')
+    })
+
+    it('leaves choose, dismiss, and no-action rows unaffected by canRetry either way', () => {
+        for (const canRetry of [true, false]) {
+            expect(selectEffectiveErrorAction('path_not_found', canRetry)).toBe('choose')
+            expect(selectEffectiveErrorAction('shutting_down', canRetry)).toBe('dismiss')
+            expect(selectEffectiveErrorAction('cancelled', canRetry)).toBeNull()
+        }
     })
 })
