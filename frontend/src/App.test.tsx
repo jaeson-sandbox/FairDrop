@@ -42,7 +42,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
 }))
 
 function zone(): HTMLElement | null {
-    return screen.getByRole('heading', {name: 'Drop one file or folder.'}).closest<HTMLElement>('.fd-drop-zone')
+    return screen.getByRole('heading', {name: 'Drop one file or folder'}).closest<HTMLElement>('.fd-drop-zone')
 }
 
 function isDropTarget(element: Element | null): boolean {
@@ -291,7 +291,7 @@ describe('one view per phase', () => {
 
         expect(phaseViews()).toEqual(['idle'])
         expect(screen.queryByText('Transfer canceled.')).toBeNull()
-        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Drop one file or folder.')
+        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Drop one file or folder')
         expect(document.querySelector('[data-outcome]')).toBeNull()
         // The one legitimate disagreement between the two phase-naming
         // attributes: the shell still mirrors the reducer's `error` phase
@@ -334,12 +334,12 @@ describe('controller wiring', () => {
     it('routes both kinds in the browse menu to their own command', () => {
         mountWith({phase: 'idle', retainedOutcome: null, commandError: null})
 
-        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Choose File or Folder'}))
         fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
         expect(mocks.selectFile).toHaveBeenCalledTimes(1)
         expect(mocks.selectDirectory).not.toHaveBeenCalled()
 
-        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Choose File or Folder'}))
         fireEvent.click(screen.getByRole('menuitem', {name: 'Folder'}))
         expect(mocks.selectDirectory).toHaveBeenCalledTimes(1)
         expect(mocks.stage).not.toHaveBeenCalled()
@@ -498,13 +498,13 @@ describe('announcer-owned transitions', () => {
             'Cancel requested during preparation',
             pendingState,
             {...pendingState, cancelPending: true} as TransferState,
-            'Canceling preparation…',
+            'Canceling preparation',
         ],
         [
             'Cancel requested from Staged',
             stagedState,
             {...stagedState, cancelPending: true} as TransferState,
-            'Canceling…',
+            'Canceling',
         ],
         ['beacon_warning', stagedState, warned(), discoveryWarning],
     ]
@@ -526,15 +526,15 @@ describe('announcer-owned transitions', () => {
 
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
 
-        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling…'}))
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling'}))
+        expect(announcer().textContent).toBe('Canceling')
     })
 
     it('replaces the announcer rather than appending to it', () => {
         const view = mountWith(stagedState)
 
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(announcer().textContent).toBe('Canceling')
 
         transitionTo(view, {...warned(), cancelPending: true} as TransferState)
 
@@ -641,7 +641,7 @@ describe('announcer-owned transitions', () => {
     /*
       Two owners for one moment, arriving in the wrong order.
 
-      `cancel-requested` is a spoken row: the announcer says "Canceling…" and
+      `cancel-requested` is a spoken row: the announcer says "Canceling" and
       that is the only acknowledgement the user gets that the request was
       heard. A clipboard command already in flight resolved a moment later and
       replaced it with "Copied" -- an answer to a question they had stopped
@@ -652,12 +652,12 @@ describe('announcer-owned transitions', () => {
         const view = mountWith(stagedState)
         const copy = screen.getByRole('button', {name: 'Copy download link'})
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(announcer().textContent).toBe('Canceling')
 
         await act(async () => { fireEvent.click(copy) })
 
         expect(mocks.copyToClipboard).toHaveBeenCalledWith(metadata.url)
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(announcer().textContent).toBe('Canceling')
     })
 
     it('hands the staged view the reporter a failed clipboard write needs', async () => {
@@ -675,7 +675,7 @@ describe('announcer-owned transitions', () => {
     it('empties the announcer again on the next focus-owned transition', () => {
         const view = mountWith(stagedState)
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(announcer().textContent).toBe('Canceling')
 
         transitionTo(view, {...transferringState, cancelPending: true} as TransferState)
 
@@ -875,8 +875,8 @@ describe('the routing table still works after mounting under StrictMode', () => 
 
         strictTransitionTo(view, {...stagedState, cancelPending: true} as TransferState)
 
-        expect(announcer().textContent).toBe('Canceling…')
-        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling…'}))
+        expect(announcer().textContent).toBe('Canceling')
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling'}))
     })
 })
 

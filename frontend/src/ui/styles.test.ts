@@ -918,6 +918,74 @@ describe('Story 7.3: rebuilding Idle', () => {
     })
 })
 
+describe('Story 9.3: declutter Idle and drop the button ellipses', () => {
+    it('gives the browse control a pill shape -- {rounded.full}, not the standard control radius', () => {
+        const pill = block('.fd-button--pill {')
+        expect(pill).toContain('border-radius: var(--radius-full);')
+    })
+
+    it('no longer stretches the browse control to the full width of its row (Story 9.3 reversal)', () => {
+        // Story 7.3 made this full-width, with a comment naming that as a
+        // reversal of Paper Relay's "quieter than the drop zone" rule. Story
+        // 9.3 reverses it a second time: the control now sits inside the
+        // drop zone as a centred, intrinsic-width pill, so `.fd-selection`
+        // no longer stretches its child to 100%. *Mutation:* restore
+        // `.fd-selection > .fd-button { width: 100%; }` -> this must fail.
+        const selection = block('.fd-selection {')
+        expect(selection).not.toContain('width: 100%')
+        expect(stylesheet).not.toContain('.fd-selection > .fd-button')
+    })
+
+    it('groups both Idle disclosures into one {rounded.xl} surface with a separator between rows', () => {
+        const group = block('.fd-idle-disclosures {')
+        expect(group).toContain('border-radius: var(--radius-xl);')
+        expect(group).toContain('box-shadow: var(--shadow-sh-1);')
+
+        // Each nested disclosure gives up its own card and shadow to the
+        // group wrapper -- otherwise Idle would paint a card inside a card.
+        const nested = block('.fd-idle-disclosures > .fd-disclosure {')
+        expect(nested).toContain('border-radius: 0;')
+        expect(nested).toContain('box-shadow: none;')
+
+        // The decorative separator, not the functional control-border token:
+        // this rule divides two rows of the same surface, it does not
+        // identify anything operable.
+        const separator = block('.fd-idle-disclosures > .fd-disclosure + .fd-disclosure {')
+        expect(separator).toContain('border-top: 1px solid var(--color-separator);')
+    })
+
+    /*
+      Defect fix, found by the orchestrator driving the built macOS binary of
+      the epic branch: Story 9.1 replaced native <summary> (whose containing
+      <h2> carried `flex: 1`, pushing the chevron to the row's trailing edge)
+      with a <button> that never got an equivalent rule, so the chevron drifted
+      to sit immediately after the label text instead of at the edge, as the
+      owner-approved prototype's `.row` shows.
+
+      *Mutation:* remove `justify-content: space-between;` from
+      `.fd-disclosure__summary` -> this must fail. The rendered-Chromium proof
+      that the chevron's right edge actually lands at the row's trailing edge
+      (not merely that this declaration exists in the stylesheet text) lives
+      in accessibility.test.tsx, "the disclosure chevron sits at the row's
+      trailing edge".
+    */
+    it("pushes the disclosure chevron to the row's trailing edge with justify-content: space-between", () => {
+        const summary = block('.fd-disclosure__summary {')
+        expect(summary).toContain('display: flex;')
+        expect(summary).toContain('justify-content: space-between;')
+    })
+
+    it('gives each browse menu item room for a leading glyph', () => {
+        const item = block('.fd-browse-menu .fd-button {')
+        expect(item).toContain('justify-content: flex-start;')
+        expect(item).toMatch(/gap:\s*var\(--spacing-\d\);/)
+
+        const icon = block('.fd-browse-menu-item__icon {')
+        expect(icon).toContain('width: 16px;')
+        expect(icon).toContain('height: 16px;')
+    })
+})
+
 describe('Story 7.7: compose the lifecycle region vertically', () => {
     it('grows the region to fill the available height rather than hugging its content', () => {
         // The mutation named in the acceptance criteria: remove the growth

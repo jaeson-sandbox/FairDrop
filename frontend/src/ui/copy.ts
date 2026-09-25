@@ -34,7 +34,15 @@ export const copy = {
         promise: 'Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.',
     },
     idle: {
-        instruction: 'Drop one file or folder.',
+        instruction: 'Drop one file or folder',
+        /**
+         * Story 9.3: the Idle-only short promise line, rendered inside the
+         * drop zone in place of `copy.external.promise`. That key keeps its
+         * longer wording for external use (README, store copy) -- see its
+         * own comment -- so this is a separate registered string rather than
+         * a second reading of the same one.
+         */
+        promise: 'Sends to one browser on the same local network. No account or receiver app.',
     },
     firewall: {
         preflight: 'Your first transfer may ask to allow FairDrop on this local network.',
@@ -87,9 +95,9 @@ export const copy = {
     },
     cancel: {
         preparation: 'Cancel preparation',
-        preparationPending: 'Canceling preparation…',
+        preparationPending: 'Canceling preparation',
         action: 'Cancel',
-        pending: 'Canceling…',
+        pending: 'Canceling',
         won: 'Transfer canceled. Ready for another file or folder.',
     },
     outcome: {
@@ -112,7 +120,7 @@ export const copy = {
          * (Story 4.1): the label names both kinds itself, and the menu it
          * opens is where the Windows/macOS dialog asymmetry is absorbed.
          */
-        chooseFileOrFolder: 'Choose a file or folder',
+        chooseFileOrFolder: 'Choose File or Folder',
         /** "Firewall Preflight and Recovery" bullet labels, in document order. */
         firewallHeading: 'Local network access',
         windows: 'Windows',
@@ -127,7 +135,7 @@ export const copy = {
          * first one, so this is a structural label rather than approved body
          * copy.
          */
-        recoveryHeading: 'Recovery help',
+        recoveryHeading: 'Troubleshooting',
         /** The approved item vocabulary: file, folder. */
         file: 'File',
         folder: 'Folder',

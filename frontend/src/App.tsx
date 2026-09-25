@@ -141,7 +141,7 @@ function App() {
         // an in-flight command belongs to the session that started it.
         if (current.phase !== 'staged' || current.session.sessionId !== sessionId) return
         // A retiring session has already been announced. `cancel-requested` is a
-        // spoken row -- "Canceling…" -- and a copy that resolves a moment later
+        // spoken row -- "Canceling" -- and a copy that resolves a moment later
         // would replace the one confirmation the user is waiting on with an
         // answer to a question they stopped asking.
         if (current.cancelPending) return

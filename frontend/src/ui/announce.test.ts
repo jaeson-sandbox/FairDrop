@@ -138,19 +138,19 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
         'Cancel requested during preparation',
         pending(),
         pending(true),
-        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling preparation…'},
+        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling preparation'},
     ],
     [
         'Cancel requested from Staged',
         staged(),
         staged({cancelPending: true}),
-        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling…'},
+        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling'},
     ],
     [
         'Cancel requested from Transferring',
         transferring(),
         transferring({cancelPending: true}),
-        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling…'},
+        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling'},
     ],
     [
         'Cancel-winning reset',

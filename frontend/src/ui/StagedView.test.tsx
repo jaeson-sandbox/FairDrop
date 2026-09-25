@@ -482,7 +482,7 @@ describe('cancellation and command failure', () => {
     it('changes the label while a cancellation is outstanding and keeps the item readable', () => {
         render(<StagedView state={staged({cancelPending: true})} onCancel={vi.fn()}/>)
 
-        expect(screen.getByRole('button', {name: 'Canceling…'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Canceling'})).toBeTruthy()
         expect(screen.getByRole('heading', {level: 2}).textContent).toBe('Travel Notes.pdf')
     })
 
@@ -578,7 +578,7 @@ describe('a pending cancellation', () => {
 
         rerender(<StagedView state={staged({cancelPending: true})} onCancel={onCancel}/>)
 
-        const pending = screen.getByRole('button', {name: 'Canceling…'})
+        const pending = screen.getByRole('button', {name: 'Canceling'})
         // The same element, so focus never left it -- which `disabled` would
         // have done, and `aria-disabled` does not.
         expect(pending).toBe(cancel)
