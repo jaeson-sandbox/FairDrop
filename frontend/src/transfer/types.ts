@@ -107,7 +107,22 @@ export interface RetainedDoneOutcome {
 export interface RetainedErrorOutcome {
     readonly kind: 'error'
     readonly error: PublicError
+    /**
+     * The failed item's display name, retained the same way Story 7.4 retained
+     * the Done receipt -- the name only, **never** `url` or `qrBase64` (Story
+     * 9.2). Present only for a terminal transfer error reached from a live
+     * session (Staged or Transferring failed); a Stage-time command failure
+     * never reached a session and carries none.
+     */
+    readonly itemName?: string
 }
 
 /** A terminal result after every session/capability field has been scrubbed. */
 export type RetainedOutcome = RetainedDoneOutcome | RetainedErrorOutcome
+
+/**
+ * The next action a sender can take from an error, keyed to the owner-approved
+ * table in `selectErrorAction` (Story 9.2). `null` (no row) means the error
+ * never reaches an outcome card at all.
+ */
+export type ErrorAction = 'retry' | 'choose' | 'dismiss'

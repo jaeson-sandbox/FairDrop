@@ -1,9 +1,11 @@
 import type {
     CompletionReceipt,
+    ErrorAction,
     FileMetadata,
     PendingItemKind,
     ProgressSnapshot,
     PublicError,
+    TransferErrorCode,
     Warning,
 } from './types'
 import type {TransferState} from './state'
@@ -101,7 +103,13 @@ export type OutcomePresentation =
         /** Scrubbed of the capability URL and its QR code -- see `CompletionReceipt`. */
         readonly receipt: CompletionReceipt
     }
-    | {readonly kind: 'error'; readonly retained: boolean; readonly error: PublicError}
+    | {
+        readonly kind: 'error'
+        readonly retained: boolean
+        readonly error: PublicError
+        /** The failed item's display name, when Story 9.2 retained one. */
+        readonly itemName?: string
+    }
 
 /**
  * The kind of item a pending Stage is preparing, or `null` outside Pending.
@@ -150,21 +158,78 @@ export function selectOutcome(state: TransferState): OutcomePresentation | null 
         case 'done':
             return {kind: 'done', retained: false, receipt: state.outcome.receipt}
         case 'error':
-            return outcomeError(state.outcome.error, false)
+            return outcomeError(state.outcome.error, false, state.outcome.itemName)
         case 'idle': {
             const retained = state.retainedOutcome
             if (retained === null) return null
             return retained.kind === 'done'
                 ? {kind: 'done', retained: true, receipt: retained.receipt}
-                : outcomeError(retained.error, true)
+                : outcomeError(retained.error, true, retained.itemName)
         }
         default:
             return null
     }
 }
 
-function outcomeError(error: PublicError, retained: boolean): OutcomePresentation | null {
-    return error.code === 'cancelled' ? null : {kind: 'error', retained, error}
+function outcomeError(error: PublicError, retained: boolean, itemName?: string): OutcomePresentation | null {
+    return error.code === 'cancelled' ? null : {kind: 'error', retained, error, itemName}
 }
 
 const emptyWarnings: readonly Warning[] = Object.freeze([])
+
+/**
+ * The owner-approved next action for a stable error code (Story 9.2 AC2).
+ *
+ * A pure function of `code` alone, so it is safe to call for both a terminal
+ * or retained outcome error and an Idle Stage-time command failure. `null`
+ * means the code never reaches an outcome card at all (`cancelled`,
+ * `clipboard_failed`, `beacon_warning`, `name_warning`).
+ *
+ * Written as an object keyed by every `TransferErrorCode` so that a new code
+ * added to the registry without a row here is a TypeScript error at the
+ * definition site, and `selectors.test.ts` additionally walks the canonical
+ * list at runtime so the same omission fails the suite by name even without
+ * a type-check pass.
+ */
+const errorActionByCode: Readonly<Record<TransferErrorCode, ErrorAction | null>> = {
+    busy: 'retry',
+    source_changed: 'retry',
+    network_unavailable: 'retry',
+    server_start_failed: 'retry',
+    qr_failed: 'retry',
+    setup_failed: 'retry',
+    transfer_failed: 'retry',
+    name_unsupported: 'retry',
+    invalid_selection: 'choose',
+    path_not_found: 'choose',
+    path_unsupported: 'choose',
+    chooser_failed: 'choose',
+    cleanup_unconfirmed: 'dismiss',
+    not_ready: 'dismiss',
+    shutting_down: 'dismiss',
+    cancelled: null,
+    clipboard_failed: null,
+    beacon_warning: null,
+    name_warning: null,
+}
+
+export function selectErrorAction(code: TransferErrorCode): ErrorAction | null {
+    return errorActionByCode[code]
+}
+
+/**
+ * `selectErrorAction`, downgraded to `choose` when no path is remembered to
+ * retry with (Story 9.2 AC3).
+ *
+ * `selectErrorAction` is deliberately a pure function of `code` alone -- the
+ * owner-approved table is asserted against literals with no other input --
+ * so it cannot itself know whether `useTransfer`'s controller is holding a
+ * remembered path. `canRetry` (`TransferController.canRetry`) is that missing
+ * half, supplied by the caller, so a `retry` row is never offered as the
+ * primary action when calling `retry()` would be a no-op. Every other row
+ * (`choose`, `dismiss`, `null`) is unaffected by `canRetry`.
+ */
+export function selectEffectiveErrorAction(code: TransferErrorCode, canRetry: boolean): ErrorAction | null {
+    const action = selectErrorAction(code)
+    return action === 'retry' && !canRetry ? 'choose' : action
+}
