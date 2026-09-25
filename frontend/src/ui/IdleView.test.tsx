@@ -212,26 +212,48 @@ describe('the drop zone carries the concentric inner rule', () => {
 })
 
 describe('the firewall preflight is a collapsed disclosure (Story 7.3, FR23 amendment)', () => {
-    it('renders as a <details> that is present but not open on first paint', () => {
+    it('renders as a controlled disclosure that is present but not open on first paint', () => {
         show()
 
         const preflight = document.querySelector('.fd-preflight')!
-        expect(preflight.tagName).toBe('DETAILS')
-        expect(preflight.hasAttribute('open')).toBe(false)
+        // Story 9.1: no longer native <details> -- see Disclosure.tsx and
+        // DESIGN.md's Disclosure row for why (a native <details> open cannot
+        // smoothly animate across both engines this product ships to). The
+        // open/closed state now lives in aria-expanded on the trigger button
+        // rather than the presence of an `open` attribute on this element.
+        expect(preflight.tagName).toBe('DIV')
+        const trigger = preflight.querySelector('.fd-disclosure__summary')!
+        expect(trigger.getAttribute('aria-expanded')).toBe('false')
         // Present on first paint, per FR23 amended to "present and preceding"
         // rather than "expanded and preceding": the guidance text exists in
         // the document even while the disclosure reads as closed.
         expect(screen.getByText('Your first transfer may ask to allow FairDrop on this local network.')).toBeTruthy()
     })
 
-    it('names the topic in a keyboard-operable summary', () => {
+    it('names the topic in a keyboard-operable trigger', () => {
         show()
 
-        const summary = document.querySelector('.fd-preflight > summary')!
+        const summary = document.querySelector('.fd-preflight .fd-disclosure__summary')!
         expect(summary.textContent).toContain('Local network access')
-        // Native <summary> is a Tab stop and answers Enter/Space by itself --
-        // no keydown handler is wired here, which is the point.
-        expect(summary.tagName).toBe('SUMMARY')
+        // Story 9.1: a <button>, not a <summary> -- still a native Tab stop
+        // that answers Enter and Space by itself, no keydown handler wired
+        // here for either, which is the point.
+        expect(summary.tagName).toBe('BUTTON')
+        expect(summary.getAttribute('type')).toBe('button')
+    })
+
+    it('names the same trigger id in the heading that wraps it, since <button> cannot itself contain a heading', () => {
+        // Story 9.1: <button>'s content model is phrasing content only, so
+        // the <h2> now wraps the button (the WAI-ARIA APG accordion pattern)
+        // instead of sitting inside it the way it sat inside <summary>.
+        // `getByRole('heading', ...)` below still finds it either way -- a
+        // heading's accessible name is computed from its full text content,
+        // descending into the button same as it descended into <summary>.
+        show()
+
+        const heading = screen.getByRole('heading', {name: 'Local network access'})
+        expect(heading.tagName).toBe('H2')
+        expect(heading.querySelector('.fd-disclosure__summary')).toBeTruthy()
     })
 
     it('follows the browse control (Story 7.8), unlike the always-open preflight, which preceded it', () => {
@@ -242,9 +264,52 @@ describe('the firewall preflight is a collapsed disclosure (Story 7.3, FR23 amen
     })
 })
 
+describe('the disclosure opens and closes via its controlled region (Story 9.1)', () => {
+    // The click.contains toggle is the whole state machine now that this is
+    // a controlled <button>/region pair rather than native <details>: a
+    // native summary answered Enter/Space itself, and a real click routes
+    // through the same onClick handler jsdom's fireEvent.click exercises
+    // here.
+    it('flips aria-expanded and the region\'s data-open together, and back again', () => {
+        show()
+        const trigger = document.querySelector('.fd-preflight .fd-disclosure__summary') as HTMLElement
+        const region = document.querySelector('.fd-preflight .fd-disclosure__region') as HTMLElement
+        expect(trigger.getAttribute('aria-expanded')).toBe('false')
+        expect(region.hasAttribute('data-open')).toBe(false)
+
+        fireEvent.click(trigger)
+        expect(trigger.getAttribute('aria-expanded')).toBe('true')
+        expect(region.hasAttribute('data-open')).toBe(true)
+
+        fireEvent.click(trigger)
+        expect(trigger.getAttribute('aria-expanded')).toBe('false')
+        expect(region.hasAttribute('data-open')).toBe(false)
+    })
+
+    it("names the region with aria-controls, so assistive technology can find what the trigger expands", () => {
+        show()
+        const trigger = document.querySelector('.fd-preflight .fd-disclosure__summary') as HTMLElement
+        const region = document.querySelector('.fd-preflight .fd-disclosure__region') as HTMLElement
+        expect(trigger.getAttribute('aria-controls')).toBe(region.id)
+        expect(region.id).toBeTruthy()
+    })
+
+    it('keeps every string RecoveryHelpContent and the firewall preflight carry in the DOM regardless of open state (Mutation: drop a string -> the earlier per-string tests fail naming it)', () => {
+        // The region stays mounted whether open or closed -- Story 9.1's
+        // collapsed-content guarantee is a transitioned CSS visibility
+        // (styles.test.ts), never an unmount, which is what this asserts at
+        // the DOM level: the text is here before any click at all.
+        show()
+        expect(document.querySelector('.fd-preflight .fd-disclosure__region')?.textContent)
+            .toContain('Your first transfer may ask to allow FairDrop on this local network.')
+        expect(document.querySelector('.fd-help .fd-disclosure__region')?.textContent)
+            .toContain('Windows recovery')
+    })
+})
+
 /*
   Change 1's second Escape path: a keyboard-operable control with no menu
-  open at all. `<details>`/`<summary>` has no native Escape behaviour to
+  open at all. The disclosure trigger has no native Escape behaviour to
   preserve -- there is nothing to dismiss -- so this is purely "Escape
   clears focus" in isolation, proving the fix is not merely an accident of
   BrowseControl's own dismissal logic.
@@ -252,7 +317,7 @@ describe('the firewall preflight is a collapsed disclosure (Story 7.3, FR23 amen
 describe('Escape clears focus on a focused disclosure summary, with no menu open', () => {
     it('blurs the firewall summary on Escape', () => {
         show()
-        const summary = document.querySelector('.fd-preflight > summary') as HTMLElement
+        const summary = document.querySelector('.fd-preflight .fd-disclosure__summary') as HTMLElement
         summary.focus()
         expect(document.activeElement).toBe(summary)
 
@@ -278,13 +343,16 @@ describe('Escape clears focus on a focused disclosure summary, with no menu open
 })
 
 describe('recovery guidance is a second collapsed disclosure', () => {
-    it('renders as a <details>, closed by default, distinct from the preflight disclosure', () => {
+    it('renders as a controlled disclosure, closed by default, distinct from the preflight disclosure', () => {
         show()
 
         const help = document.querySelector('.fd-help')!
-        expect(help.tagName).toBe('DETAILS')
-        expect(help.hasAttribute('open')).toBe(false)
-        expect(document.querySelector('.fd-help > summary')?.textContent).toContain('Recovery help')
+        // Story 9.1: see the equivalent preflight assertion above for why
+        // this is no longer <details>/[open].
+        expect(help.tagName).toBe('DIV')
+        const trigger = help.querySelector('.fd-disclosure__summary')!
+        expect(trigger.getAttribute('aria-expanded')).toBe('false')
+        expect(document.querySelector('.fd-help .fd-disclosure__summary')?.textContent).toContain('Recovery help')
     })
 
     /*

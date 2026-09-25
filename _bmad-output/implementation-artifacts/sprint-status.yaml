@@ -84,9 +84,9 @@ development_status:
   epic-6-retrospective: done
 
   epic-9: in-progress
-  9-1-build-the-motion-foundation: ready-for-dev
-  9-2-remember-the-item-so-an-error-can-retry-it: review
-  9-3-declutter-idle-and-drop-the-button-ellipses: backlog
+  9-1-build-the-motion-foundation: done
+  9-2-remember-the-item-so-an-error-can-retry-it: done
+  9-3-declutter-idle-and-drop-the-button-ellipses: ready-for-dev
   9-4-rebuild-staged-around-the-code: backlog
   9-5-rebuild-sending-around-a-ring: backlog
   9-6-make-sent-and-error-one-card: backlog

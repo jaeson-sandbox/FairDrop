@@ -304,6 +304,77 @@ body {
 }
 
 /*
+  Story 9.1's motion foundation: every one of the five views -- Idle,
+  Pending, Staged, Transferring and the outcome panel when it is the phase
+  view -- carries `data-phase-view` (see IdleView.tsx, StagePendingCard.tsx,
+  StagedView.tsx, TransferringView.tsx and OutcomePanel.tsx's `phaseView`
+  prop), and this one attribute selector is what makes every one of them
+  enter the same way: a fade plus a 10px rise, never an exit -- there is no
+  matching "leaving" state anywhere in this sheet, because the outgoing view
+  is simply replaced, not animated off. Keeping an unmounted view's DOM alive
+  long enough to animate it out would give one moment two nodes both
+  claiming to be the current view, which is exactly what the "one retained
+  node" identity rule (App.focus.test.tsx) exists to prevent.
+
+  `opacity` and `translate` are declared explicitly at rest (not left to
+  their implicit defaults) so a mutation that flips the resting value is
+  something a test can catch rather than something that would only ever show
+  up as "no different from doing nothing" -- see the rendered-Chromium proof
+  in accessibility.test.tsx that a phase view's computed resting state is
+  fully opaque and untranslated once its transition settles.
+
+  This degrades by construction on an engine with no `@starting-style`
+  support: without it, the rule below simply never applies, so a view is
+  opaque and untranslated from its very first paint -- the "instant" half of
+  progressive enhancement DESIGN.md's Motion section requires, with nothing
+  here to detect or branch on.
+*/
+[data-phase-view] {
+    opacity: 1;
+    translate: none;
+    transition:
+        opacity 340ms var(--ease-decelerate),
+        translate 420ms var(--ease-decelerate);
+}
+
+@starting-style {
+    [data-phase-view] {
+        opacity: 0;
+        translate: 0 10px;
+    }
+}
+
+/*
+  The optional per-child stagger DESIGN.md's Motion section describes,
+  consumed by Stories 9.3-9.6 rather than applied to anything yet: a child
+  inside an entering view opts in with `.fd-rise` and sets `--fd-stagger` to
+  its position in the group (0, 1, 2, ...). It rises with the same fade-plus-
+  10px entrance as a phase view, just delayed by its place in the queue.
+
+  `min()` caps the multiplier at 5 so a long list can never push a straggler
+  past ~275ms behind the view it belongs to, and the delay is neutralised
+  the same way every other delay in this sheet is: the universal
+  `transition-delay: 0ms !important` rule under `prefers-reduced-motion`
+  below overrides this calculation outright, so a staggered entrance
+  collapses to instant, unstaggered, exactly like everything else does.
+*/
+.fd-rise {
+    opacity: 1;
+    translate: none;
+    transition:
+        opacity 380ms var(--ease-decelerate),
+        translate 460ms var(--ease-decelerate);
+    transition-delay: calc(min(var(--fd-stagger, 0), 5) * 55ms);
+}
+
+@starting-style {
+    .fd-rise {
+        opacity: 0;
+        translate: 0 8px;
+    }
+}
+
+/*
   Pending, Transferring, and a terminal Done/Error rendered as the phase view
   (DESIGN.md, Vertical composition): short, single-purpose states with no
   reason to anchor to the top edge, so the region centres vertically instead
@@ -801,11 +872,19 @@ body {
 
 /*
   DESIGN.md's Disclosure component: a {rounded.xl} surface at {elevation.sh-1}
-  with a leading tinted icon, a chevron that rotates when open, and a hover
-  fill. Native <details>/<summary> supplies the keyboard operability and the
-  open/closed state; this only paints it. `list-style: none` plus the
-  `::-webkit-details-marker` rule below remove the browser's own default
-  disclosure triangle so the authored chevron is the only one.
+  with a chevron that rotates when open and a hover fill.
+
+  Story 9.1: this used to be native <details>/<summary>, which supplied
+  keyboard operability and open/closed state for free but cannot smoothly
+  expand or collapse in both engines this product ships to. It is now a
+  controlled <button aria-expanded> (`.fd-disclosure__summary`, wrapped in an
+  `<h2>` because a button's content model does not permit a heading child)
+  plus a region (`.fd-disclosure__region`) that expands and collapses with
+  the `grid-template-rows: 0fr <-> 1fr` technique below -- broader engine
+  support than an animated <details> open, and the same technique the owner-
+  approved prototype uses for every expand/collapse in the product. See
+  Disclosure.tsx for the fuller trade-off and DESIGN.md's Disclosure row for
+  the recorded choice.
 */
 .fd-disclosure {
     border-radius: var(--radius-xl);
@@ -813,19 +892,28 @@ body {
     box-shadow: var(--shadow-sh-1);
 }
 
+.fd-disclosure__heading {
+    margin: 0;
+    font: inherit;
+    font-weight: inherit;
+}
+
 .fd-disclosure__summary {
     display: flex;
     align-items: center;
+    width: 100%;
     gap: var(--spacing-3);
     padding: var(--spacing-4);
-    list-style: none;
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    font-size: var(--text-body-strong);
+    font-weight: var(--font-weight-body-strong);
+    line-height: var(--leading-body-strong);
+    text-align: start;
     cursor: pointer;
     border-radius: var(--radius-xl);
     transition: background-color 150ms var(--ease-decelerate);
-}
-
-.fd-disclosure__summary::-webkit-details-marker {
-    display: none;
 }
 
 .fd-disclosure__summary:hover {
@@ -834,9 +922,9 @@ body {
 
 /*
   Story 7.11: same two-tone ring as `.fd-button:focus-visible` above -- see
-  that rule's comment for the gap/ring reasoning. `<details>`/`<summary>` is
-  natively Tab-reachable and click-activatable, so `:focus-visible` is the
-  right pseudo-class here for the same reason it is on the trigger: a plain
+  that rule's comment for the gap/ring reasoning. A <button> is natively
+  Tab-reachable and click-activatable, so `:focus-visible` is the right
+  pseudo-class here for the same reason it is on the browse trigger: a plain
   `:focus` rule would repaint after a mouse click.
 */
 .fd-disclosure__summary:focus-visible {
@@ -845,15 +933,6 @@ body {
     box-shadow:
         0 0 0 var(--focus-ring-offset) var(--color-surface),
         0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
-}
-
-.fd-disclosure__heading {
-    flex: 1;
-    margin: 0;
-    color: var(--color-text);
-    font-size: var(--text-body-strong);
-    font-weight: var(--font-weight-body-strong);
-    line-height: var(--leading-body-strong);
 }
 
 .fd-disclosure__chevron {
@@ -866,7 +945,7 @@ body {
     transition: transform 200ms var(--ease-decelerate);
 }
 
-.fd-disclosure[open] > .fd-disclosure__summary .fd-disclosure__chevron {
+.fd-disclosure[data-open] > .fd-disclosure__heading .fd-disclosure__summary .fd-disclosure__chevron {
     transform: rotate(45deg);
 }
 
@@ -883,6 +962,50 @@ body {
 */
 .fd-disclosure__body {
     padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
+}
+
+/*
+  Story 9.1: the expand/collapse mechanism. `grid-template-rows` animates
+  between an intrinsic-content `1fr` and a collapsed `0fr` -- this is what
+  lets the region grow and shrink with no fixed height to measure and no
+  JavaScript to read one, and it degrades gracefully on an engine that cannot
+  interpolate `fr` tracks: the value still changes, just without a visible
+  transition, so the collapsed/expanded states are still correct.
+
+  `.fd-disclosure__region-inner`'s `overflow: hidden` is what keeps the body
+  clipped to that animating row while it is short of `1fr`.
+
+  `visibility` is transitioned, not toggled, and in different directions on
+  each side of the state, which is what makes collapsed content neither
+  focusable nor exposed to assistive technology without an unmount: opening
+  makes the region visible immediately (a 0s-delay transition) so content is
+  never hidden while it grows in; closing keeps it visible until the height
+  collapse finishes (a transition-duration-length delay) so nothing vanishes
+  out from under the shrinking box, then removes it from the accessibility
+  tree and the tab order once there is nothing left to show. `inert` is not
+  used here: it is unsupported on the older macOS WebKit this product's
+  compatibility range includes.
+*/
+.fd-disclosure__region {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition:
+        grid-template-rows 320ms var(--ease-decelerate),
+        visibility 0s linear 320ms;
+}
+
+.fd-disclosure__region[data-open] {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition:
+        grid-template-rows 320ms var(--ease-decelerate),
+        visibility 0s linear 0s;
+}
+
+.fd-disclosure__region-inner {
+    overflow: hidden;
+    min-height: 0;
 }
 
 /*
@@ -948,6 +1071,26 @@ body {
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sh-3);
+    /*
+      Story 9.1: fade plus a scale-up from ~0.96, anchored at the corner the
+      menu actually hangs from (`inset-inline-start: 0` above, flush with the
+      trigger's own leading edge -- the owner-approved prototype centres its
+      menu under a centred trigger instead, so its `top center` origin does
+      not apply to this left-anchored layout).
+    */
+    opacity: 1;
+    scale: 1;
+    transform-origin: top left;
+    transition:
+        opacity 160ms var(--ease-decelerate),
+        scale 200ms var(--ease-decelerate);
+}
+
+@starting-style {
+    .fd-browse-menu {
+        opacity: 0;
+        scale: 0.96;
+    }
 }
 
 .fd-browse-menu .fd-button {
@@ -1166,8 +1309,9 @@ body {
 /*
   :not(.fd-disclosure) scopes this to the always-open form StagedView renders
   (a plain <div>, RecoveryHelp's own wrapper). Idle's form is the same class
-  on a <details> that also carries .fd-disclosure (IdleView.tsx), and takes
-  its surface styling from the shared .fd-disclosure rule above instead --
+  on the controlled-disclosure <div> that also carries .fd-disclosure
+  (IdleView.tsx via Disclosure.tsx), and takes its surface styling from the
+  shared .fd-disclosure rule above instead --
   DESIGN.md's Disclosure component "replaces the always-open firewall and
   recovery blocks", but only where Story 7.3 actually rebuilt them, which is
   Idle. Staged is unchanged.
@@ -1779,12 +1923,23 @@ body {
 /*
   Reduced motion.
 
-  The app declares no animation or transition today -- the unknown-progress
-  pattern is a static gradient, and state swaps are immediate -- so this is a
-  standing guarantee rather than a correction: any motion a later edit adds is
-  neutralised here before it can sweep, shimmer, blink, or move a lifecycle
-  region through space. Text, pattern, wire bytes and state are untouched,
-  because none of them is carried by movement.
+  Every duration and delay collapses to effectively nothing here before it
+  can sweep, shimmer, blink, or move a lifecycle region through space; the
+  unknown-progress pattern stays a static gradient regardless, because it was
+  never animated in the first place. Text, pattern, wire bytes and state are
+  untouched, because none of them is carried by movement.
+
+  Story 9.1 adds `translate` and `scale` explicitly (`!important`, matching
+  every other declaration in this block) rather than relying on the
+  duration/delay collapse alone: a 1ms transition from `translate: 0 10px` to
+  `none` still, for that 1ms, translates -- imperceptible in practice, but
+  "no element translates or scales on entrance" is a rule about the resting
+  value, not about how long the trip there takes, and a test can hold that
+  distinction where a screen cannot. Neither property touches
+  `.fd-button:active`'s own 0.975 press feedback, which is authored as
+  `transform: scale(0.975)` -- a different CSS property from the standalone
+  `scale` reset here -- and is therefore untouched by this rule, exactly as
+  DESIGN.md's Motion section still asks for.
 */
 @media (prefers-reduced-motion: reduce) {
     *,
@@ -1796,5 +1951,7 @@ body {
         transition-delay: 0ms !important;
         transition-duration: 1ms !important;
         scroll-behavior: auto !important;
+        translate: none !important;
+        scale: none !important;
     }
 }

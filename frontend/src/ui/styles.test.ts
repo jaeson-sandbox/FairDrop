@@ -333,6 +333,121 @@ describe('reduced motion', () => {
             expect(reducedMotion, forbidden).not.toContain(forbidden)
         }
     })
+
+    it('removes translate and scale from every entrance outright, not only by collapsing their duration (Story 9.1)', () => {
+        // Mutation named in Story 9.1's acceptance criteria: delete these two
+        // lines, leaving only the duration/delay collapse above -> must fail.
+        // A 1ms transition from `translate: 0 10px` to `none` still, for that
+        // 1ms, translates; "no element translates or scales on entrance" is a
+        // rule about the resting value reached, which only an explicit
+        // override -- not a faster trip there -- can guarantee.
+        expect(reducedMotion).toContain('translate: none !important;')
+        expect(reducedMotion).toContain('scale: none !important;')
+    })
+
+    it("does not touch the button press accent, which is a different CSS property (Story 9.1)", () => {
+        // `.fd-button:active` presses via `transform: scale(0.975)`, not the
+        // standalone `scale` property reset above -- the two compose
+        // independently in the Transforms spec, so neutralising `scale`
+        // cannot also silently flatten the press feedback DESIGN.md's Motion
+        // section still asks for.
+        expect(reducedMotion).not.toMatch(/transform:\s*none/)
+        const press = block('.fd-button:active {')
+        expect(press).toContain('transform: scale(0.975);')
+    })
+})
+
+describe('Story 9.1: the motion foundation', () => {
+    it('enters every phase view with a fade and a 10px rise via @starting-style, with no keyframe and no JavaScript', () => {
+        // Mutation 1 (acceptance criteria): delete the @starting-style block
+        // -> must fail naming it -- proved by asserting its exact content
+        // below, not merely that the string "@starting-style" occurs
+        // somewhere in the file.
+        // Mutation 2: implement it with a keyframe instead -> must fail --
+        // proved by the sheet-wide ban already enforced in "progress
+        // presentation" above and re-asserted here for locality.
+        const rule = block('[data-phase-view] {')
+        expect(rule).toContain('opacity: 1;')
+        expect(rule).toContain('translate: none;')
+        expect(rule).toMatch(/transition:\s*\n?\s*opacity 340ms var\(--ease-decelerate\),\s*\n?\s*translate 420ms var\(--ease-decelerate\);/)
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\[data-phase-view\] \{\s*opacity: 0;\s*translate: 0 10px;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for [data-phase-view]').toBeTruthy()
+
+        expect(stylesheet).not.toContain('@keyframes')
+        expect(stylesheet).not.toContain('animation:')
+    })
+
+    it('names all five views by data-phase-view, so the entrance rule reaches every one of them', () => {
+        // Not a CSS assertion -- a cross-check that the selector above
+        // actually has five readers, so a view that quietly stopped setting
+        // the attribute would not just silently lose its entrance unnoticed.
+        const readers = [
+            ['IdleView.tsx', "data-phase-view=\"idle\""],
+            ['StagePendingCard.tsx', "data-phase-view=\"pending\""],
+            ['StagedView.tsx', "data-phase-view=\"staged\""],
+            ['TransferringView.tsx', "data-phase-view=\"transferring\""],
+            ['OutcomePanel.tsx', "phaseView ? 'outcome' : undefined"],
+        ] as const
+        for (const [file, needle] of readers) {
+            const source = readFileSync(resolve(projectRoot, 'src/ui', file), 'utf8')
+            expect(source, `${file} carries data-phase-view`).toContain(needle)
+        }
+    })
+
+    it('never gives an exit transition to anything -- views animate in and never out', () => {
+        // The spine rule: there is no exit-selector counterpart to
+        // [data-phase-view] or .fd-rise anywhere in the sheet -- no
+        // .fd-leaving, .fd-exit or [data-phase-view-leaving] class or
+        // attribute for a later edit to have quietly wired up. An outgoing
+        // view is replaced, not animated off -- keeping one mounted long
+        // enough to animate out would give one moment two DOM nodes both
+        // claiming to be the current view, breaking the retained-node
+        // identity rule App.focus.test.tsx pins.
+        for (const exitSelector of ['.fd-leaving', '.fd-exit', '-leaving]', '-exit]']) {
+            expect(stylesheet, exitSelector).not.toContain(exitSelector)
+        }
+    })
+
+    it('provides a capped, reduced-motion-neutral per-child stagger helper, declared exactly once', () => {
+        // Two occurrences by design, not one: the live rule and its
+        // @starting-style companion -- the same shape every other entrance
+        // in this sheet takes ([data-phase-view], .fd-browse-menu). "Exists
+        // once in the sheet" (the acceptance criterion) means one *helper*,
+        // not a duplicated live rule -- a third occurrence would be that.
+        const occurrences = [...stylesheet.matchAll(/\.fd-rise\s*\{/g)]
+        expect(occurrences).toHaveLength(2)
+
+        const rise = block('.fd-rise {')
+        expect(rise).toMatch(/transition-delay:\s*calc\(min\(var\(--fd-stagger,\s*0\),\s*5\)\s*\*\s*55ms\);/)
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\.fd-rise \{\s*opacity: 0;\s*translate: 0 8px;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for .fd-rise').toBeTruthy()
+
+        // Neutralised the same way every other delay in this sheet is: the
+        // universal transition-delay: 0ms !important rule under reduced
+        // motion overrides this calc() outright. Proved directly rather than
+        // by re-deriving the cascade: reduced motion's own describe block
+        // above already pins that override exists and applies to every
+        // element via the universal *, *::before, *::after selector.
+        expect(reducedMotion).toContain('transition-delay: 0ms !important;')
+    })
+
+    it('scales and fades the browse menu in from ~0.96 at its own corner, via @starting-style, in <=200ms', () => {
+        const menu = block('.fd-browse-menu {')
+        expect(menu).toContain('scale: 1;')
+        expect(menu).toContain('transform-origin: top left;')
+        expect(menu).toMatch(/transition:\s*\n?\s*opacity 160ms var\(--ease-decelerate\),\s*\n?\s*scale 200ms var\(--ease-decelerate\);/)
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\.fd-browse-menu \{\s*opacity: 0;\s*scale: 0\.96;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for .fd-browse-menu').toBeTruthy()
+    })
 })
 
 describe('the focus indicator', () => {
@@ -670,14 +785,64 @@ describe('Story 7.3: rebuilding Idle', () => {
         expect(disclosure).toContain('border-radius: var(--radius-xl);')
         expect(disclosure).toContain('box-shadow: var(--shadow-sh-1);')
 
+        // Story 9.1: the summary is a <button> now, not a <summary> --
+        // `list-style: none` and the `::-webkit-details-marker` suppression
+        // it used to sit beside were <summary>-only UA resets with no reader
+        // on a button, and both are gone rather than shipped as dead CSS.
+        // `cursor: pointer` is what survives from that assertion.
         const summary = block('.fd-disclosure__summary {')
-        expect(summary).toContain('list-style: none;')
+        expect(summary).toContain('cursor: pointer;')
+        expect(stylesheet).not.toContain('list-style: none;')
+        expect(stylesheet).not.toContain('::-webkit-details-marker')
 
         expect(stylesheet).toContain('.fd-disclosure__summary:hover {')
 
+        // Story 9.1: keyed to `[data-open]` on the controlled wrapper, not
+        // native `<details>`'s `[open]` attribute -- see Disclosure.tsx and
+        // the DOM-structure comment above `.fd-disclosure__region` in
+        // style.css for why the heading now sits between `.fd-disclosure`
+        // and `.fd-disclosure__summary` in the selector chain.
         expect(stylesheet).toMatch(
-            /\.fd-disclosure\[open\] > \.fd-disclosure__summary \.fd-disclosure__chevron \{\s*transform: rotate\(45deg\);\s*\}/,
+            /\.fd-disclosure\[data-open\] > \.fd-disclosure__heading \.fd-disclosure__summary \.fd-disclosure__chevron \{\s*transform: rotate\(45deg\);\s*\}/,
         )
+    })
+
+    it("expands and collapses the disclosure region with grid-template-rows, not a fixed height (Story 9.1)", () => {
+        // The mutation named in Story 9.1's acceptance criteria: the region
+        // has to animate between a collapsed and an expanded state in both
+        // Chromium and WebKit with no fixed height to measure and no
+        // JavaScript reading one. grid-template-rows interpolating between
+        // 0fr and 1fr is what does that; a fixed max-height or a JS-measured
+        // scrollHeight would both be a regression to a mechanism this story
+        // deliberately avoided.
+        const region = block('.fd-disclosure__region {')
+        expect(region).toContain('display: grid;')
+        expect(region).toContain('grid-template-rows: 0fr;')
+        expect(region).toMatch(/transition:\s*\n?\s*grid-template-rows 320ms var\(--ease-decelerate\)/)
+        expect(region).not.toMatch(/max-height|max-block-size/)
+
+        const open = block('.fd-disclosure__region[data-open] {')
+        expect(open).toContain('grid-template-rows: 1fr;')
+
+        const inner = block('.fd-disclosure__region-inner {')
+        expect(inner).toContain('overflow: hidden;')
+    })
+
+    it('keeps collapsed disclosure content out of the tab order and the accessibility tree via a transitioned visibility, not inert (Story 9.1)', () => {
+        // `inert` is unsupported on the older macOS WebKit this product's
+        // compatibility range includes (AGENTS.md), which is why the
+        // acceptance criteria name a transitioned `visibility: hidden`
+        // specifically. Closed: visible until the collapse transition
+        // finishes (a 320ms-delayed hide), so nothing vanishes mid-shrink.
+        // Open: visible immediately (a 0-delay show), so content is never
+        // hidden while it grows in.
+        const closed = block('.fd-disclosure__region {')
+        expect(closed).toContain('visibility: hidden;')
+        expect(closed).toMatch(/visibility 0s linear 320ms/)
+
+        const open = block('.fd-disclosure__region[data-open] {')
+        expect(open).toContain('visibility: visible;')
+        expect(open).toMatch(/visibility 0s linear 0s/)
     })
 
     it("gives the open disclosure's body enough top padding to clear the focus ring, expressed as a token, not a magic number", () => {
@@ -745,9 +910,10 @@ describe('Story 7.3: rebuilding Idle', () => {
 
     it('keeps the always-open recovery block styled separately from the Idle disclosure form', () => {
         // Both share the fd-help class name -- StagedView's plain <div> and
-        // IdleView's <details> -- so the box styling has to be scoped away
-        // from the disclosure form, or Idle would paint both a card and a
-        // disclosure surface on the same element.
+        // IdleView's controlled disclosure (Story 9.1: a <div>/<button>/
+        // region, not native <details>) -- so the box styling has to be
+        // scoped away from the disclosure form, or Idle would paint both a
+        // card and a disclosure surface on the same element.
         expect(stylesheet).toContain('.fd-help:not(.fd-disclosure) {')
     })
 })
@@ -1826,7 +1992,17 @@ describe('rules the components can only reference by name', () => {
     it('dims nothing with opacity, because a composited pair publishes no figure', () => {
         const opacities = [...stylesheet.matchAll(/^\s*opacity:\s*([^;]+);/gm)].map((match) => match[1].trim())
 
-        expect(opacities.filter((value) => value !== '1'), 'fractional opacity declarations').toEqual([])
+        // Story 9.1: `0` joins the allowed set alongside `1`, and only those
+        // two -- an entrance's `opacity: 0` in @starting-style (and its
+        // resting `opacity: 1` counterpart) is binary presence/absence, not
+        // the fractional composite this test exists to forbid. Nothing ever
+        // *renders* at `opacity: 0`; it is the pre-paint state a view
+        // transitions away from before a user reads anything, never a
+        // dimmed pair sitting on screen the way `aria-disabled`'s old
+        // `opacity: 0.7` did. Any value strictly between 0 and 1 remains
+        // exactly as forbidden as before.
+        const fractional = opacities.filter((value) => value !== '1' && value !== '0')
+        expect(fractional, 'fractional opacity declarations').toEqual([])
     })
 })
 
