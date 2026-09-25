@@ -117,12 +117,45 @@ function transferring(overrides: Partial<TransferringTransferState> = {}): Trans
     }
 }
 
-function renderStaged(): HTMLElement {
-    return render(<StagedView state={staged()} onCancel={() => undefined}/>).container
+/*
+  Story 9.1: every phase view now fades and rises in on mount
+  ([data-phase-view]'s @starting-style entrance in style.css, plus the browse
+  menu's own scale-and-fade when it is open), so a rendered-geometry
+  measurement taken the instant after `render()` can read a mid-transition
+  size rather than the settled one -- reported directly on the browse
+  trigger's height (43.999984... vs the required 44, a sub-pixel remnant of
+  measuring while an ancestor's `translate` was still interpolating) before
+  this helper existed and every render below started waiting for it. It is
+  flaky, not reliably wrong, precisely because it is a race: whether a given
+  synchronous measurement lands before or after the browser's next paint is
+  not deterministic from here.
+*/
+async function waitForEntranceToSettle(element: Element): Promise<void> {
+    // getAnimations() only returns a running Web Animation once the browser
+    // has actually started one, which needs at least one paint after the
+    // element's entrance state is first committed -- two rAFs is the same
+    // "definitely past the next paint" margin `staged-url-field.test.tsx`
+    // already uses elsewhere in this suite for a comparable reason.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    // {subtree: true} from the render root, not from any one descendant, so
+    // this waits out both the phase view's own entrance and a nested one
+    // (the browse menu) in a single call -- waiting on the menu alone once
+    // missed the ancestor region's still-running translate entirely, which
+    // is exactly how the flake above reached a shipped assertion.
+    await Promise.all(element.getAnimations({subtree: true}).map((animation) => animation.finished))
 }
 
-function renderTransferring(): HTMLElement {
-    return render(<TransferringView state={transferring()} onCancel={() => undefined}/>).container
+async function renderStaged(): Promise<HTMLElement> {
+    const {container} = render(<StagedView state={staged()} onCancel={() => undefined}/>)
+    await waitForEntranceToSettle(container)
+    return container
+}
+
+async function renderTransferring(): Promise<HTMLElement> {
+    const {container} = render(<TransferringView state={transferring()} onCancel={() => undefined}/>)
+    await waitForEntranceToSettle(container)
+    return container
 }
 
 const dropTargetStyle = {'--wails-drop-target': 'drop'} as CSSProperties
@@ -132,7 +165,7 @@ function idle(): IdleTransferState {
 }
 
 /** Idle with the browse menu already open -- the surface these checks measure. */
-function renderIdleMenuOpen(): HTMLElement {
+async function renderIdleMenuOpen(): Promise<HTMLElement> {
     const {container} = render(
         <IdleView
             state={idle()}
@@ -143,6 +176,7 @@ function renderIdleMenuOpen(): HTMLElement {
         />,
     )
     fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+    await waitForEntranceToSettle(container)
     return container
 }
 
@@ -288,7 +322,21 @@ function assertTextSpacingIsInEffect(container: HTMLElement): void {
  * at any text size; "clipped" is their entire job, not a bug 200% text could
  * cause.
  *
- * Counted rather than assumed: with those three excluded, the views render
+ * A fourth case, added Story 9.1: a *collapsed* `.fd-disclosure__region`
+ * (one with no `data-open`) is excluded the same way, and only while
+ * collapsed -- an open one is not, and still has to grow. Before this story
+ * a closed disclosure's content sat behind native `<details>`'s own
+ * `display: none`, which reports a matching zero scrollHeight and
+ * clientHeight and so never tripped this loop at all; the controlled
+ * region that replaced it keeps the same content mounted and measurable so
+ * `grid-template-rows` has something to animate, which means it legitimately
+ * clips to zero height while closed -- that is the collapse working, not a
+ * fixed-height bug. `.closest()` catches the region and everything nested
+ * inside it (`.fd-disclosure__region-inner`, `.fd-disclosure__body`, every
+ * string underneath), because the whole subtree is equally and deliberately
+ * clipped for the same reason.
+ *
+ * Counted rather than assumed: with those four excluded, the views render
  * **no** element whose computed overflow is hidden today, so this loop reaches
  * its expect zero times. That is the correct answer and not a passing test --
  * it is a standing guard, and it is proved armed by a mutation: giving
@@ -302,7 +350,8 @@ function assertNoFixedHeightClipsGrownText(container: HTMLElement): void {
         if (
             element.classList.contains('fd-clamp') ||
             element.classList.contains('fd-status-announcer') ||
-            element.classList.contains('fd-visually-hidden')
+            element.classList.contains('fd-visually-hidden') ||
+            element.closest('.fd-disclosure__region:not([data-open])') !== null
         ) continue
 
         const style = getComputedStyle(element)
@@ -351,17 +400,17 @@ async function setForcedColorsActive(active: boolean): Promise<void> {
 describe('reflow at 320 CSS pixels (D-068)', () => {
     it('keeps Staged scrolling only vertically, with nothing clipped', async () => {
         await page.viewport(320, 900)
-        assertNoHorizontalOverflow(renderStaged())
+        assertNoHorizontalOverflow(await renderStaged())
     })
 
     it('keeps Transferring scrolling only vertically, with nothing clipped', async () => {
         await page.viewport(320, 900)
-        assertNoHorizontalOverflow(renderTransferring())
+        assertNoHorizontalOverflow(await renderTransferring())
     })
 
     it('keeps the open browse menu scrolling only vertically, with nothing clipped', async () => {
         await page.viewport(320, 900)
-        const container = renderIdleMenuOpen()
+        const container = await renderIdleMenuOpen()
         assertNoHorizontalOverflow(container)
         // The name promised "nothing clipped" and only the overflow half was
         // measured. Both halves now are.
@@ -373,7 +422,7 @@ describe('200% text (D-068)', () => {
     it('grows Staged without a horizontal scrollbar or a clipped container', async () => {
         await page.viewport(1024, 900)
         doubleTextTokens()
-        const container = renderStaged()
+        const container = await renderStaged()
         assertNoHorizontalOverflow(container)
         assertNoFixedHeightClipsGrownText(container)
     })
@@ -381,7 +430,7 @@ describe('200% text (D-068)', () => {
     it('grows Transferring without a horizontal scrollbar or a clipped container', async () => {
         await page.viewport(1024, 900)
         doubleTextTokens()
-        const container = renderTransferring()
+        const container = await renderTransferring()
         assertNoHorizontalOverflow(container)
         assertNoFixedHeightClipsGrownText(container)
     })
@@ -405,7 +454,7 @@ describe('WCAG 1.4.12 text-spacing overrides (D-068)', () => {
     it('keeps Staged unclipped under all four overrides', async () => {
         await page.viewport(1024, 900)
         applyTextSpacingOverrides()
-        const container = renderStaged()
+        const container = await renderStaged()
 
         assertTextSpacingIsInEffect(container)
         assertNoHorizontalOverflow(container)
@@ -415,7 +464,7 @@ describe('WCAG 1.4.12 text-spacing overrides (D-068)', () => {
     it('keeps Transferring unclipped under all four overrides', async () => {
         await page.viewport(1024, 900)
         applyTextSpacingOverrides()
-        const container = renderTransferring()
+        const container = await renderTransferring()
 
         assertTextSpacingIsInEffect(container)
         assertNoHorizontalOverflow(container)
@@ -425,7 +474,7 @@ describe('WCAG 1.4.12 text-spacing overrides (D-068)', () => {
     it('keeps Staged unclipped with the overrides at the 320-pixel reflow floor', async () => {
         await page.viewport(320, 900)
         applyTextSpacingOverrides()
-        const container = renderStaged()
+        const container = await renderStaged()
 
         assertTextSpacingIsInEffect(container)
         assertNoHorizontalOverflow(container)
@@ -436,7 +485,7 @@ describe('WCAG 1.4.12 text-spacing overrides (D-068)', () => {
         await page.viewport(1024, 900)
         doubleTextTokens()
         applyTextSpacingOverrides()
-        const container = renderStaged()
+        const container = await renderStaged()
 
         assertTextSpacingIsInEffect(container)
         assertNoHorizontalOverflow(container)
@@ -461,7 +510,7 @@ describe('the browse menu at the sizes the app really runs at (D-068)', () => {
     it('survives 200% text without overflowing or clipping', async () => {
         await page.viewport(1024, 900)
         doubleTextTokens()
-        const container = renderIdleMenuOpen()
+        const container = await renderIdleMenuOpen()
 
         assertNoHorizontalOverflow(container)
         assertNoFixedHeightClipsGrownText(container)
@@ -486,7 +535,7 @@ describe('the browse menu at the sizes the app really runs at (D-068)', () => {
     */
     it('hangs off its control and fits the 640x480 minimum main.go sets', async () => {
         await page.viewport(640, 480)
-        const container = renderIdleMenuOpen()
+        const container = await renderIdleMenuOpen()
 
         assertNoHorizontalOverflow(container)
 
@@ -516,17 +565,17 @@ describe('the browse menu at the sizes the app really runs at (D-068)', () => {
 describe('the 44px activation floor (D-068)', () => {
     it('measures every Staged control at or above 44x44 CSS pixels', async () => {
         await page.viewport(1024, 900)
-        assertEveryTargetMeetsTheFloor(renderStaged())
+        assertEveryTargetMeetsTheFloor(await renderStaged())
     })
 
     it('measures every Transferring control at or above 44x44 CSS pixels', async () => {
         await page.viewport(1024, 900)
-        assertEveryTargetMeetsTheFloor(renderTransferring())
+        assertEveryTargetMeetsTheFloor(await renderTransferring())
     })
 
     it('measures the browse control and every open menu item at or above 44x44 CSS pixels', async () => {
         await page.viewport(1024, 900)
-        assertEveryTargetMeetsTheFloor(renderIdleMenuOpen())
+        assertEveryTargetMeetsTheFloor(await renderIdleMenuOpen())
     })
 })
 
@@ -534,7 +583,7 @@ describe('forced colors (D-065)', () => {
     it('keeps the forced-color-adjust exemption on the QR substrate and nowhere else', async () => {
         await page.viewport(1024, 900)
         await setForcedColorsActive(true)
-        const container = renderStaged()
+        const container = await renderStaged()
 
         for (const element of container.querySelectorAll<HTMLElement>('*')) {
             const adjust = getComputedStyle(element).getPropertyValue('forced-color-adjust')
@@ -554,7 +603,7 @@ describe('forced colors (D-065)', () => {
     it('keeps the open browse menu inside the system palette, with no exemption of its own', async () => {
         await page.viewport(1024, 900)
         await setForcedColorsActive(true)
-        const container = renderIdleMenuOpen()
+        const container = await renderIdleMenuOpen()
 
         for (const element of container.querySelectorAll<HTMLElement>('*')) {
             const adjust = getComputedStyle(element).getPropertyValue('forced-color-adjust')
@@ -569,7 +618,7 @@ describe('forced colors (D-065)', () => {
     it('captures the QR panel under forced colors -- a rendered capture, not a scan', async () => {
         await page.viewport(1024, 900)
         await setForcedColorsActive(true)
-        const container = renderStaged()
+        const container = await renderStaged()
         const panel = container.querySelector('.fd-qr-panel')
         if (panel === null) throw new Error('.fd-qr-panel did not render')
 
@@ -613,8 +662,8 @@ describe('QR drag source is disabled (macOS drag-and-drop crash)', () => {
       property WebKit actually honours for `<img>` regardless of the
       attribute). Losing either one re-opens the crash.
     */
-    it('marks the QR image non-draggable both ways, so WebKit never starts a drag pasteboard', () => {
-        const container = renderStaged()
+    it('marks the QR image non-draggable both ways, so WebKit never starts a drag pasteboard', async () => {
+        const container = await renderStaged()
         const qr = container.querySelector<HTMLImageElement>('.fd-qr')
         if (qr === null) throw new Error('.fd-qr did not render')
 
@@ -631,5 +680,56 @@ describe('QR drag source is disabled (macOS drag-and-drop crash)', () => {
                 'that crashes the app (fileSystemRepresentation on a non-file NSURL in WailsWebView.m ' +
                 'performDragOperation:); add -webkit-user-drag: none to .fd-qr',
         ).toBe('none')
+    })
+})
+
+describe('a phase view settles to a fully opaque, untranslated resting state (Story 9.1)', () => {
+    /*
+      styles.test.ts proves the entrance rule's text -- the resting `opacity:
+      1`/`translate: none` declaration and its @starting-style counterpart --
+      but jsdom evaluates no transition and settles no @starting-style state
+      at all, so it cannot prove a view actually *arrives* rather than
+      getting stranded partway. This is that proof, in real Chromium layout:
+      mount a phase view, wait for its entrance transition to run to
+      completion, and read what the browser actually computed.
+
+      Mutation (acceptance criteria): make the resting rule `opacity: 0` --
+      i.e. change the *end* state a transition settles to, not merely the
+      @starting-style it begins from -- and this must fail: a view that never
+      finishes arriving is exactly the defect an entrance rule must not be
+      able to produce. `waitForEntranceToSettle` is the same helper
+      `renderIdleMenuOpen` above uses to wait out the browse menu's own
+      entrance, reused rather than redefined.
+    */
+    it('leaves the Idle phase view fully opaque and untranslated once its entrance settles', async () => {
+        const {container} = render(
+            <IdleView
+                state={idle()}
+                dropTargetStyle={dropTargetStyle}
+                cancelWon={false}
+                onSelectFile={() => undefined}
+                onSelectDirectory={() => undefined}
+            />,
+        )
+        const view = container.querySelector('[data-phase-view="idle"]')
+        if (view === null) throw new Error('[data-phase-view="idle"] did not render')
+
+        await waitForEntranceToSettle(view)
+
+        const style = getComputedStyle(view)
+        expect(style.opacity).toBe('1')
+        expect(style.translate).toBe('none')
+    })
+
+    it('leaves the Staged phase view fully opaque and untranslated once its entrance settles', async () => {
+        const container = await renderStaged()
+        const view = container.querySelector('[data-phase-view="staged"]')
+        if (view === null) throw new Error('[data-phase-view="staged"] did not render')
+
+        await waitForEntranceToSettle(view)
+
+        const style = getComputedStyle(view)
+        expect(style.opacity).toBe('1')
+        expect(style.translate).toBe('none')
     })
 })
