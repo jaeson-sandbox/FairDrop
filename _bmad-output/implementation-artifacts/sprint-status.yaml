@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-23-2026 15:18
-last_updated: 09-20-2026 03:44
+last_updated: 09-25-2026 18:00
 project: FairDrop
 project_key: NOKEY
 tracking_system: file-system
@@ -86,7 +86,7 @@ development_status:
   epic-9: in-progress
   9-1-build-the-motion-foundation: done
   9-2-remember-the-item-so-an-error-can-retry-it: done
-  9-3-declutter-idle-and-drop-the-button-ellipses: ready-for-dev
+  9-3-declutter-idle-and-drop-the-button-ellipses: review
   9-4-rebuild-staged-around-the-code: backlog
   9-5-rebuild-sending-around-a-ring: backlog
   9-6-make-sent-and-error-one-card: backlog
@@ -307,9 +307,9 @@ action_items:
     epic: 4
     action: "Extract BrowseControl from IdleView.tsx when a second floating surface
       appears, not before."
-    owner: "a future story"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+    owner: "Story 9.3"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/evidence-9-3-declutter-idle-and-drop-the-button-ellipses.md"
   - id: "epic-5-retro-item-29-give-parallel-review-agents-their-own-gi"
     epic: 5
     action: "Give parallel review agents their own git worktrees. Three layers shared
