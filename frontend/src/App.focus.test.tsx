@@ -61,6 +61,9 @@ const commands: ControllerCommands = {
     rejectSelection: mocks.noop,
     reportCopyFailure: mocks.noop,
     dismissRetained: mocks.noop,
+    retry: mocks.noop,
+    stageFromOutcome: mocks.noop,
+    canRetry: false,
 }
 
 function mountWith(state: TransferState) {
