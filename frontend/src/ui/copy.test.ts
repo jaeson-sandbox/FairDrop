@@ -17,7 +17,10 @@ describe('approved product copy', () => {
             'Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.',
         )
         expect(copy.idle.instruction, 'copy.idle.instruction').toBe(
-            'Drop one file or folder.',
+            'Drop one file or folder',
+        )
+        expect(copy.idle.promise, 'copy.idle.promise').toBe(
+            'Sends to one browser on the same local network. No account or receiver app.',
         )
         expect(copy.firewall.preflight, 'copy.firewall.preflight').toBe(
             'Your first transfer may ask to allow FairDrop on this local network.',
@@ -92,13 +95,13 @@ describe('approved product copy', () => {
             'Cancel preparation',
         )
         expect(copy.cancel.preparationPending, 'copy.cancel.preparation_pending').toBe(
-            'Canceling preparation…',
+            'Canceling preparation',
         )
         expect(copy.cancel.action, 'copy.cancel.action').toBe(
             'Cancel',
         )
         expect(copy.cancel.pending, 'copy.cancel.pending').toBe(
-            'Canceling…',
+            'Canceling',
         )
         expect(copy.cancel.won, 'copy.cancel.won').toBe(
             'Transfer canceled. Ready for another file or folder.',
@@ -157,6 +160,7 @@ describe('approved product copy', () => {
             'help.differentLan',
             'help.receiverHttp',
             'idle.instruction',
+            'idle.promise',
             'label.chooseFileOrFolder',
             'label.directLinkHeading',
             'label.file',
@@ -199,8 +203,9 @@ describe('approved product copy', () => {
 
 describe('functional labels the spine names in prose', () => {
     it('holds the control, firewall, item and metric words used by the views', () => {
-        expect(copy.label.chooseFileOrFolder).toBe('Choose a file or folder')
+        expect(copy.label.chooseFileOrFolder).toBe('Choose File or Folder')
         expect(copy.label.firewallHeading).toBe('Local network access')
+        expect(copy.label.recoveryHeading).toBe('Troubleshooting')
         expect(copy.label.windows).toBe('Windows')
         expect(copy.label.macos).toBe('macOS')
         expect(copy.label.file).toBe('File')
@@ -360,7 +365,7 @@ describe('registry immutability', () => {
         expect(() => {
             mutable.instruction = 'Drop anything you like.'
         }).toThrow()
-        expect(copy.idle.instruction).toBe('Drop one file or folder.')
+        expect(copy.idle.instruction).toBe('Drop one file or folder')
     })
 
     it('refuses a write to a heading', () => {
@@ -450,7 +455,7 @@ describe('the spine table and the registry that quotes it', () => {
     */
     it('parses the table it is about to check', () => {
         expect(rows.length, 'rows parsed from the Voice and Tone table').toBeGreaterThan(30)
-        expect(rows).toContainEqual({id: 'copy.idle.instruction', value: 'Drop one file or folder.'})
+        expect(rows).toContainEqual({id: 'copy.idle.instruction', value: 'Drop one file or folder'})
     })
 
     it('quotes, in every row, the exact string the registry holds', () => {

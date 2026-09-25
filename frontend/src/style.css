@@ -598,6 +598,19 @@ body {
     background: var(--color-fill);
 }
 
+/*
+  Story 9.3: the pill shape, `{rounded.full}` -- DESIGN.md's Shapes section
+  now permits this on a single-action primary button (the Browse Control and,
+  later, an outcome card's own primary actions), amending its earlier "never
+  a button" wording. Wider inline padding than the standard control gives the
+  rounder shape room to read as a pill rather than a stretched rectangle, the
+  same proportion the owner-approved prototype's `.btn--pill` uses.
+*/
+.fd-button--pill {
+    border-radius: var(--radius-full);
+    padding-inline: var(--spacing-5);
+}
+
 /* Cancel and Dismiss: quiet text actions that still own a full target. */
 .fd-button--quiet {
     width: 100%;
@@ -705,8 +718,9 @@ body {
   disabled text."
 
   What carries the state instead is already there and costs no contrast: the
-  label itself changes (Cancel -> Canceling…, Cancel preparation -> Canceling
-  preparation…), the pointer stops being a pointer, and the rule below pins the
+  label itself changes (Cancel -> Canceling, Cancel preparation -> Canceling
+  preparation -- no ellipsis on either since Story 9.3's no-button-ellipsis
+  rule), the pointer stops being a pointer, and the rule below pins the
   control to its resting appearance so it visibly does not answer a hover.
   styles.test.ts refuses a fractional opacity on a text-bearing rule now, so a
   future dim has to publish its pair rather than quietly halve one.
@@ -747,8 +761,9 @@ body {
   flex: 1 1 auto (Story 7.7) makes .fd-idle consume the full height
   .fd-region grows to, which is what gives the drop zone below something to
   grow into. The other children here -- the cancel summary, the command-error
-  panel, the two disclosures, the browse control -- keep their default
-  flex: 0 1 auto, so only the drop zone actually grows.
+  panel, and the grouped disclosure list -- keep their default flex: 0 1 auto,
+  so only the drop zone actually grows. The browse control is no longer one
+  of this element's own children (Story 9.3 moved it inside the drop zone).
 */
 .fd-idle {
     display: flex;
@@ -898,9 +913,22 @@ body {
     font-weight: inherit;
 }
 
+/*
+  Defect fix (Story 9.3, found by hand on the built macOS binary after
+  Story 9.1 merged): the chevron sat immediately after the label text
+  instead of at the row's trailing edge, as it did in 1.2.1 and as the
+  owner-approved prototype's `.row` shows. Cause: Story 9.1 replaced
+  `<summary>` -- whose containing `<h2>` carried `flex: 1` and pushed the
+  chevron to the far end -- with this `<button>`, and nothing here replaced
+  that push. `justify-content: space-between` is the fix, matching the
+  prototype's `.row` rule exactly: the label (an anonymous flex item) and
+  the chevron are the button's only two flex children, so this alone spreads
+  them to opposite ends with no wrapping span required.
+*/
 .fd-disclosure__summary {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     width: 100%;
     gap: var(--spacing-3);
     padding: var(--spacing-4);
@@ -1009,17 +1037,47 @@ body {
 }
 
 /*
-  One control now, not a pair: position: relative anchors the menu below it,
-  and the trigger fills the row for the same visual rhythm the two-button
-  grid gave the section it sits in.
+  Story 9.3: Idle's two disclosures as one grouped list -- a single
+  {rounded.xl} surface at {elevation.sh-1}, the two rows divided by a
+  {colors.separator} rule -- rather than each disclosure carrying its own
+  card and shadow. `overflow: hidden` is what clips each row's rectangular
+  hover fill to the group's own rounded corners, since the nested
+  `.fd-disclosure` rows below give up their individual radius and elevation
+  to this wrapper. Staged's always-open `RecoveryHelp` form is untouched:
+  its box styling stays scoped to `.fd-help:not(.fd-disclosure)` below,
+  which this selector does not match.
+*/
+.fd-idle-disclosures {
+    border-radius: var(--radius-xl);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sh-1);
+    overflow: hidden;
+}
+
+.fd-idle-disclosures > .fd-disclosure {
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+
+.fd-idle-disclosures > .fd-disclosure + .fd-disclosure {
+    border-top: 1px solid var(--color-separator);
+}
+
+/*
+  One control now, not a pair: position: relative anchors the menu below it.
+
+  Story 9.3 reverses Story 7.3's full-width rule (DESIGN.md's Browse Control
+  row records the reversal): the control now sits *inside* the drop zone as
+  its one action, a centred pill of intrinsic width under the drop zone
+  inner wrapper's `place-items: center`, rather than a full-width row
+  stretched to the section below it. `.fd-selection` itself no longer
+  stretches its child to 100% width -- removing that is the mutation
+  `IdleView.test.tsx`'s inverted assertion names.
 */
 .fd-selection {
     position: relative;
     display: flex;
-}
-
-.fd-selection > .fd-button {
-    width: 100%;
 }
 
 /*
@@ -1095,10 +1153,24 @@ body {
 
 .fd-browse-menu .fd-button {
     width: 100%;
+    justify-content: flex-start;
+    gap: var(--spacing-2);
     text-align: start;
     border-color: transparent;
     background: transparent;
     border-radius: var(--radius-sm);
+}
+
+/*
+  Story 9.3: the decorative kind glyph beside each menu item's word ("File",
+  "Folder"), matching the owner-approved prototype. `aria-hidden` in the
+  markup (BrowseControl.tsx) is what keeps it out of the accessible name;
+  this is only its size and hit-box exemption.
+*/
+.fd-browse-menu-item__icon {
+    flex: none;
+    width: 16px;
+    height: 16px;
 }
 
 /*

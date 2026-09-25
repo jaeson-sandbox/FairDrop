@@ -227,7 +227,7 @@ describe('the transfer surface', () => {
         expect(onCancel).toHaveBeenCalledTimes(1)
 
         rerender(<TransferringView state={transferring(null, {cancelPending: true})} onCancel={onCancel}/>)
-        expect(screen.getByRole('button', {name: 'Canceling…'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Canceling'})).toBeTruthy()
     })
 
     it('is exactly one phase view', () => {
@@ -251,7 +251,7 @@ describe('the pending cancellation contract', () => {
 
         rerender(<TransferringView state={transferring(null, {cancelPending: true})} onCancel={onCancel}/>)
 
-        const outstanding = screen.getByRole('button', {name: 'Canceling…'})
+        const outstanding = screen.getByRole('button', {name: 'Canceling'})
         expect(outstanding).toBe(cancel)
         expect(document.activeElement).toBe(outstanding)
         expect(outstanding.getAttribute('aria-disabled')).toBe('true')

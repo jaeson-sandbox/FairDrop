@@ -84,7 +84,15 @@ afterEach(cleanup)
 describe('a focus target the screen does not carry', () => {
     it('never calls focus, and lets the transition complete anyway', () => {
         const view = mountWith(idle())
-        const anchor = screen.getByRole('button', {name: 'Choose a file or folder'})
+        // Story 9.3 renamed this control's label ('Choose a file or folder' ->
+        // 'Choose File or Folder') and its heading's copy (dropped the full
+        // stop) -- see copy.ts. Both literal strings below are updated to
+        // match; nothing else about this test's behaviour or structure
+        // changed. Flagged in evidence-9-3 as a deviation from this file's
+        // "passes unchanged" acceptance criterion, which is unavoidable once
+        // the query text a test uses to *find* an element is itself the copy
+        // that changed.
+        const anchor = screen.getByRole('button', {name: 'Choose File or Folder'})
         anchor.focus()
 
         // There is no outcome panel in Idle, so this target is absent.
@@ -95,13 +103,13 @@ describe('a focus target the screen does not carry', () => {
         // blind `.focus()` on a null would have thrown and taken the render
         // with it, and a `?.focus()` would have silently stranded the user.
         expect(document.activeElement).toBe(anchor)
-        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Drop one file or folder.')
+        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Drop one file or folder')
     })
 
     it('still empties the announcer, because the row is focus-owned either way', () => {
         const view = mountWith(idle())
-        transitionTo(view, idle(), {row: 'cancel-requested', owner: 'announcer', text: 'Canceling…'})
-        expect(document.querySelector('[role="status"]')?.textContent).toBe('Canceling…')
+        transitionTo(view, idle(), {row: 'cancel-requested', owner: 'announcer', text: 'Canceling'})
+        expect(document.querySelector('[role="status"]')?.textContent).toBe('Canceling')
 
         transitionTo(view, idle(), {row: 'terminal-outcome', owner: 'focus', target: 'outcome'})
 

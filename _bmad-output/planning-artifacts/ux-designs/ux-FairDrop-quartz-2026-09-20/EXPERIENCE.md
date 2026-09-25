@@ -75,7 +75,8 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | Stable key | Context | Approved copy |
 |---|---|---|
 | `copy.external.promise` | Approved external promise | “Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.” |
-| `copy.idle.instruction` | Idle instruction | “Drop one file or folder.” |
+| `copy.idle.instruction` | Idle instruction | “Drop one file or folder” |
+| `copy.idle.promise` | Idle-only short promise, inside the drop zone (Story 9.3) | “Sends to one browser on the same local network. No account or receiver app.” |
 | `copy.firewall.preflight` | Firewall preflight | “Your first transfer may ask to allow FairDrop on this local network.” |
 | `copy.firewall.windows` | Windows prompt guidance | “Allow FairDrop on Private networks only. Leave Public networks off.” |
 | `copy.firewall.macos` | macOS prompt guidance | “Allow incoming connections for FairDrop.” |
@@ -89,7 +90,7 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.qr.alt` | QR accessible-name template | “Download QR code for [item name]” |
 | `copy.folder.note` | Folder note | “This folder downloads as a ZIP.” |
 | `copy.direct_link.action` | Direct-link action | “Copy download link” |
-| `copy.label.choose_file_or_folder` | Browse control | “Choose a file or folder” |
+| `copy.label.choose_file_or_folder` | Browse control | “Choose File or Folder” |
 | `copy.label.file` | Item kind, file | “File” |
 | `copy.label.folder` | Item kind, folder | “Folder” |
 | `copy.direct_link.helper` | Direct-link helper | “Open this link directly in the receiving device’s browser.” |
@@ -103,9 +104,9 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.done.heading` | Done heading | “Transfer finished” |
 | `copy.done.body` | Done body | “FairDrop finished sending the item.” |
 | `copy.cancel.preparation` | Cancel preparation action | “Cancel preparation” |
-| `copy.cancel.preparation_pending` | Pending preparation cancellation | “Canceling preparation…” |
+| `copy.cancel.preparation_pending` | Pending preparation cancellation | “Canceling preparation” |
 | `copy.cancel.action` | Transfer cancellation action | “Cancel” |
-| `copy.cancel.pending` | Pending cancellation | “Canceling…” |
+| `copy.cancel.pending` | Pending cancellation | “Canceling” |
 | `copy.cancel.won` | Cancel-winning reset | “Transfer canceled. Ready for another file or folder.” |
 | `copy.outcome.dismiss` | Retained-outcome action | “Dismiss” |
 | `copy.name.show_full` | Full-name disclosure action | “Show full name” |

@@ -164,6 +164,21 @@ function idle(): IdleTransferState {
     return {phase: 'idle', retainedOutcome: null, commandError: null}
 }
 
+/** Plain Idle, menu closed -- for measurements that do not involve the menu. */
+async function renderIdle(): Promise<HTMLElement> {
+    const {container} = render(
+        <IdleView
+            state={idle()}
+            dropTargetStyle={dropTargetStyle}
+            cancelWon={false}
+            onSelectFile={() => undefined}
+            onSelectDirectory={() => undefined}
+        />,
+    )
+    await waitForEntranceToSettle(container)
+    return container
+}
+
 /** Idle with the browse menu already open -- the surface these checks measure. */
 async function renderIdleMenuOpen(): Promise<HTMLElement> {
     const {container} = render(
@@ -175,7 +190,7 @@ async function renderIdleMenuOpen(): Promise<HTMLElement> {
             onSelectDirectory={() => undefined}
         />,
     )
-    fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+    fireEvent.click(screen.getByRole('button', {name: 'Choose File or Folder'}))
     await waitForEntranceToSettle(container)
     return container
 }
@@ -541,7 +556,7 @@ describe('the browse menu at the sizes the app really runs at (D-068)', () => {
 
         const menu = container.querySelector<HTMLElement>('.fd-browse-menu')
         if (menu === null) throw new Error('.fd-browse-menu did not render')
-        const trigger = screen.getByRole('button', {name: 'Choose a file or folder'})
+        const trigger = screen.getByRole('button', {name: 'Choose File or Folder'})
         const gap = menu.getBoundingClientRect().top - trigger.getBoundingClientRect().bottom
 
         expect(
@@ -680,6 +695,61 @@ describe('QR drag source is disabled (macOS drag-and-drop crash)', () => {
                 'that crashes the app (fileSystemRepresentation on a non-file NSURL in WailsWebView.m ' +
                 'performDragOperation:); add -webkit-user-drag: none to .fd-qr',
         ).toBe('none')
+    })
+})
+
+/*
+  Defect found by the orchestrator driving the built macOS binary of the
+  epic branch, after Story 9.1 merged: the disclosure chevron sat
+  immediately after the label text ("Local network access >") instead of at
+  the row's right edge, as it did in 1.2.1 and as the owner-approved
+  prototype's `.row` shows. Cause: Story 9.1 replaced <summary> (whose
+  containing <h2> carried `flex: 1`, pushing the chevron to the far end)
+  with a <button> that never got an equivalent rule.
+
+  styles.test.ts already pins the fix's *text* (`justify-content:
+  space-between` on `.fd-disclosure__summary`); this is the rendered proof
+  that the fix actually lands the chevron at the edge, in real Chromium
+  layout, not merely that the declaration exists in the sheet.
+*/
+describe("the disclosure chevron sits at the row's trailing edge (Story 9.3 defect fix)", () => {
+    it('keeps the chevron within the row\'s own right padding of the summary\'s right edge', async () => {
+        await page.viewport(1024, 900)
+        const container = await renderIdle()
+
+        const summary = container.querySelector<HTMLElement>('.fd-preflight .fd-disclosure__summary')
+        if (summary === null) throw new Error('.fd-preflight .fd-disclosure__summary did not render')
+        const chevron = summary.querySelector<HTMLElement>('.fd-disclosure__chevron')
+        if (chevron === null) throw new Error('.fd-disclosure__chevron did not render')
+
+        const paddingRight = Number.parseFloat(getComputedStyle(summary).paddingRight)
+        expect(paddingRight, 'a resolved right padding to measure the gap against').toBeGreaterThan(0)
+
+        const gap = summary.getBoundingClientRect().right - chevron.getBoundingClientRect().right
+        const rowWidth = summary.getBoundingClientRect().width
+
+        /*
+          Not a tight match against the padding token: the chevron is a 12px
+          box rotated 45deg, and a rotated box's own bounding rect is its
+          diagonal (~17px), not its unrotated side -- so the measured gap
+          runs a few pixels inside the padding value itself, consistently,
+          which a tight tolerance would flag as noise. What actually
+          distinguishes "at the row's trailing edge" from the defect is
+          scale: fixed, the gap is on the order of the row's own padding
+          (well under half the row's width); broken (chevron packed right
+          after the label with `justify-content` back at its flex-start
+          default), the gap is most of the row's remaining width instead.
+          Mutation: remove `justify-content: space-between` from
+          `.fd-disclosure__summary` -> the gap grows past this bound and the
+          assertion fails, naming the measured value.
+        */
+        expect(
+            gap,
+            `the chevron's right edge sits ${gap.toFixed(1)}px inside the ${rowWidth.toFixed(1)}px-wide ` +
+                `summary's own right edge (right padding: ${paddingRight.toFixed(1)}px) -- too far from the ` +
+                'edge to read as "trailing", which is what a chevron packed right after the label instead would look like',
+        ).toBeLessThanOrEqual(paddingRight + 6)
+        expect(gap, 'the chevron must not sit flush against or past the summary\'s own edge').toBeGreaterThanOrEqual(0)
     })
 })
 
