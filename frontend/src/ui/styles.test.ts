@@ -1530,45 +1530,76 @@ describe('the copy control takes the success tint (Story 7.2)', () => {
     })
 })
 
-describe('the progress card and meter (Story 7.5)', () => {
-    it('is a rounded.xxl surface at sh-3, the same step as the packet and the browse menu', () => {
-        const card = block('.fd-transfer-view {')
-        expect(card).toContain('border-radius: var(--radius-xxl);')
-        expect(card).toContain('box-shadow: var(--shadow-sh-3);')
-    })
-
-    it('keeps the pending card at its own radius, unaffected by the progress card split', () => {
-        // The two selectors shared one rule before this story; splitting them
-        // is what lets the progress card take sh-3/xxl without moving the
-        // stage-pending card, which Story 7.5 does not own.
+describe('the progress ring (Story 9.5, retiring the Story 7.5 progress card and meter)', () => {
+    it('keeps the pending card at its own radius, unaffected by the ring rebuild', () => {
+        // Unaffected carry-forward from Story 7.5: the stage-pending card
+        // was already split from the (now-removed) `.fd-transfer-view` onto
+        // its own rule, and this story does not own it either.
         const pending = block('.fd-pending-card {')
         expect(pending).toContain('border-radius: var(--radius-lg);')
         expect(pending).not.toContain('box-shadow')
     })
 
-    it('is an 8px rounded.full track with a functional boundary', () => {
-        const meter = block('.fd-meter {')
-        expect(meter).toContain('height: 8px;')
-        expect(meter).toContain('border-radius: var(--radius-full);')
-        expect(meter).toContain('var(--color-control-border)')
+    it('sizes the ring panel to Staged’s own ~216px slot and reflows it the same way below 759px', () => {
+        const panel = block('.fd-ring-panel {')
+        expect(panel).toContain('width: min(216px, 100%);')
+
+        const narrow = block('@media (max-width: 759px) {')
+        expect(narrow).toContain('.fd-qr-panel,')
+        expect(narrow).toContain('.fd-ring-panel {')
     })
 
-    it('fills the track solid -- the single-gradient rule is absolute and the button already spends it', () => {
-        const fill = block('.fd-meter__fill {')
-        expect(fill).toContain('background: var(--color-primary);')
+    it('enters with the same fade-and-scale-from-0.94 as the QR panel it replaces, unstaggered', () => {
+        const panel = block('.fd-ring-panel {')
+        expect(panel).toContain('opacity 300ms var(--ease-decelerate)')
+        expect(panel).toContain('scale 420ms var(--ease-decelerate)')
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\.fd-ring-panel \{\s*opacity: 0;\s*scale: 0\.94;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for .fd-ring-panel').toBeTruthy()
+    })
+
+    it('draws its own functional-boundary edge, distinct from the decorative track fill', () => {
+        const track = block('.fd-ring__track {')
+        expect(track).toContain('stroke: var(--color-track);')
+
+        const edge = block('.fd-ring__edge {')
+        expect(edge).toContain('stroke: var(--color-control-border);')
+        expect(edge).not.toContain('var(--color-separator)')
+    })
+
+    it('fills the ring solid -- the single-gradient rule is absolute and the button already spends it', () => {
+        const fill = block('.fd-ring__fill {')
+        expect(fill).toContain('stroke: var(--color-primary);')
         expect(fill).not.toContain('gradient')
     })
 
-    it('renders the percentage in {typography.numeric} with tabular numerals', () => {
-        const percent = block('.fd-progress-percent {')
+    it('transitions the determinate fill’s stroke-dashoffset over 400ms, never a keyframe', () => {
+        const fill = block('.fd-ring__fill {')
+        expect(fill).toContain('transition: stroke-dashoffset 400ms var(--ease-decelerate);')
+        expect(fill).not.toContain('@keyframes')
+    })
+
+    it('renders the percentage in {typography.numeric} with tabular numerals, centred over the ring', () => {
+        const percent = block('.fd-ring__pct {')
+        expect(percent).toContain('position: absolute;')
+        expect(percent).toContain('inset: 0;')
         expect(percent).toContain('font-size: var(--text-numeric);')
         expect(percent).toContain('font-variant-numeric: tabular-nums;')
+    })
+
+    it('gives the ring a fixed, static drawing orientation rather than an animated rotation', () => {
+        const ring = block('.fd-ring {')
+        expect(ring).toContain('rotate: -90deg;')
+        expect(ring).not.toContain('transition:')
+        expect(ring).not.toContain('animation:')
     })
 })
 
 describe('progress presentation', () => {
-    it('keeps the unknown pattern static: no sweep, shimmer, or blink', () => {
-        expect(stylesheet).toMatch(/\.fd-meter--unknown \{[^}]*repeating-linear-gradient\(/)
+    it('keeps the unknown ring static: a dashed stroke, no sweep, shimmer, blink, or rotation of its own', () => {
+        expect(stylesheet).toMatch(/\.fd-ring__fill--unknown \{[^}]*stroke-dasharray:/)
         expect(stylesheet).not.toContain('@keyframes')
         expect(stylesheet).not.toContain('animation:')
     })
@@ -2022,7 +2053,10 @@ describe('the decorative edge stays decorative', () => {
         '.fd-button',
         '.fd-qr-panel',
         '.fd-url',
-        '.fd-meter',
+        // Story 9.5 retired `.fd-meter` (the linear progress track) for
+        // `.fd-ring__edge` -- the ring's own functional-boundary stroke, the
+        // same role this list already checked on the old element.
+        '.fd-ring__edge',
         '.fd-browse-menu',
         '.fd-drop-zone__inner',
     ]

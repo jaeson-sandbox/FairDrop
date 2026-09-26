@@ -1143,3 +1143,115 @@ describe('the Staged foot row keeps "Trouble connecting?" and Cancel on one row 
         expect(rect.height, `the disclosure trigger is ${rect.height.toFixed(1)}px tall`).toBeGreaterThanOrEqual(44)
     })
 })
+
+/**
+ * Story 9.5: Sending reuses Staged's own card geometry (`.fd-hero`'s fixed
+ * 216px/`minmax(0, 1fr)` grid), with a progress ring in the QR's slot instead
+ * of the QR bitmap. `styles.test.ts` already proves the CSS text declares that
+ * template -- what it cannot prove is which element the browser actually put
+ * in the fixed track, which is exactly the class of defect the Story 9.4
+ * review above this one found (a swapped column order, and a foot row that
+ * wrapped) with every text-only suite green. Rendered here in the real
+ * `.fd-app` shell, at both sizes the Story 9.4 defect-fix tests already use.
+ */
+async function renderTransferringInAppShell(overrides: Partial<TransferringTransferState> = {}): Promise<HTMLElement> {
+    const {container} = render(
+        <div className="fd-app" style={{height: '100vh'}}>
+            <TransferringView state={transferring(overrides)} onCancel={() => undefined}/>
+        </div>,
+    )
+    await waitForEntranceToSettle(container)
+    return container
+}
+
+describe('the sending card keeps the ring in Staged’s fixed column (Story 9.5)', () => {
+    it.each([[1024, 768], [640, 480]])(
+        'gives the ring a ~216px column narrower than the details beside it at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderTransferringInAppShell()
+
+            const ring = container.querySelector('.fd-ring-panel')
+            const details = container.querySelector('.fd-hero__details')
+            if (ring === null || details === null) throw new Error('.fd-ring-panel or .fd-hero__details did not render')
+
+            const ringWidth = ring.getBoundingClientRect().width
+            const detailsWidth = details.getBoundingClientRect().width
+
+            expect(
+                ringWidth,
+                `the ring column is ${ringWidth.toFixed(1)}px, not the ~216px Staged's QR slot uses at ${width}x${height}`,
+            ).toBeGreaterThan(190)
+            expect(ringWidth).toBeLessThan(230)
+            expect(
+                detailsWidth,
+                `the details column (${detailsWidth.toFixed(1)}px) is not wider than the ring ` +
+                    `(${ringWidth.toFixed(1)}px) at ${width}x${height} -- the fixed 216px track landed on the ` +
+                    'wrong element',
+            ).toBeGreaterThan(ringWidth)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'keeps a realistic item name on one line at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderTransferringInAppShell({metadata: metadata({name: 'dev-environment-guide.html'})})
+
+            const isolate = container.querySelector('#fd-item-name bdi')
+            if (isolate === null) throw new Error('#fd-item-name bdi did not render')
+
+            expect(
+                isSingleLine(isolate),
+                `"dev-environment-guide.html" wraps across more than one line at ${width}x${height}`,
+            ).toBe(true)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'centres the determinate percentage inside the ring at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderTransferringInAppShell()
+
+            const frame = container.querySelector('.fd-ring-frame')
+            const pct = container.querySelector('.fd-ring__pct')
+            if (frame === null || pct === null) throw new Error('.fd-ring-frame or .fd-ring__pct did not render')
+
+            const frameRect = frame.getBoundingClientRect()
+            const pctRect = pct.getBoundingClientRect()
+            const frameCenterX = frameRect.left + frameRect.width / 2
+            const frameCenterY = frameRect.top + frameRect.height / 2
+            const pctCenterX = pctRect.left + pctRect.width / 2
+            const pctCenterY = pctRect.top + pctRect.height / 2
+
+            expect(
+                Math.abs(pctCenterX - frameCenterX),
+                `the percentage is not horizontally centred in the ring at ${width}x${height}`,
+            ).toBeLessThanOrEqual(4)
+            expect(
+                Math.abs(pctCenterY - frameCenterY),
+                `the percentage is not vertically centred in the ring at ${width}x${height}`,
+            ).toBeLessThanOrEqual(4)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'keeps the whole card within the viewport with nothing overflowing at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderTransferringInAppShell()
+
+            const card = container.querySelector('.fd-packet')
+            if (card === null) throw new Error('.fd-packet did not render')
+
+            const rect = card.getBoundingClientRect()
+            expect(rect.left, `the card overflows the left edge at ${width}x${height} (left ${rect.left.toFixed(1)})`)
+                .toBeGreaterThanOrEqual(-1)
+            expect(
+                rect.right,
+                `the card overflows the right edge at ${width}x${height} (right ${rect.right.toFixed(1)}, viewport ${width})`,
+            ).toBeLessThanOrEqual(width + 1)
+        },
+    )
+})
