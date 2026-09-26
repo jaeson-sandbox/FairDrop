@@ -273,3 +273,231 @@ one cross-story key collision found while running the full suite is
 resolved without touching Story 9.6's files, and recorded as a deliberate,
 reported deviation from the AC's literal key names (the displayed strings
 match exactly). Native verification is the orchestrator's, as scoped.
+
+## Review follow-up (branch `fix-9-5-sending-details`, from `origin/epic-9-motion-and-clarity` @ `9eb0702`)
+
+After Story 9.5 merged, the orchestrator's rendered check at 1024x768
+against the owner-approved prototype (`mockups/epic-9-proposal.html`,
+`t-sending`, `.ring .pct`, `.stats`, `.stat`) found four visual defects
+neither the jsdom suite nor the existing rendered describe block caught.
+All four are pure layout/visual bugs the text-only suites cannot see, so
+this follow-up adds rendered-Chromium coverage for each, following the
+defect-fix carve-out: rendered test extended/added, fix applied, mutation
+confirming the test actually catches the regression.
+
+### Defect 1: the percentage and its "%" sign rendered on two separate lines, one above the ring's centre and one near its bottom edge
+
+**Cause, two independent bugs in the same rule.**
+
+1. `.fd-ring__pct` was `display: grid; place-items: center` with two direct
+   children (the number `<span>` and the `<small>` "%" sign) and no
+   declared `grid-template-columns`. An implicit grid with no explicit
+   column count packs multiple children into separate rows by default
+   (`grid-auto-flow: row`, one implicit column), so the number centred on
+   its own row while "%" centred on a second row down.
+2. `.fd-ring__pct` was also `position: absolute; inset: 0` -- stretched to
+   fill the entire 216px frame -- with the centring applied *inside* that
+   already-full-size box. Fixing bug 1 alone (switching to `display: flex;
+   align-items: baseline`) put both children on one line, but the line
+   still rendered flush with the box's own cross-start edge rather than
+   centred in the 216px frame: measured at ~91px above the frame's true
+   centre, not a rounding difference.
+
+**Why the existing suite missed it.** The "centres the determinate
+percentage inside the ring" test (added with Story 9.5 itself) measured
+`.fd-ring__pct`'s own `getBoundingClientRect()` against the frame's --
+but that element was `position: absolute; inset: 0`, so its bounding box
+is *always* exactly the frame's own box by construction, regardless of how
+its children are laid out inside it. The test could not have caught either
+bug; it was proving the container was the container.
+
+**Fix.** Matches the owner-approved prototype's own structure exactly:
+`.fd-ring-frame` (the parent) becomes the `display: grid; place-items:
+center` container; `.fd-ring` (the `<svg>`) becomes `position: absolute;
+inset: 0` so it never participates in the frame's grid layout (matching
+the prototype's own `.ring svg`); `.fd-ring__pct` drops its own
+`position`/`inset` and becomes a plain, content-sized, normal-flow grid
+item, with `display: flex; align-items: baseline` internally so the number
+and "%" share one text baseline. A content-sized item centred by its
+parent's `place-items: center` is centred on both axes by construction --
+there is no cross-axis guess left to get wrong.
+
+**New/extended test** (`browser/accessibility.test.tsx`, "keeps the
+percentage and its '%' sign on one baseline, centred together in the ring",
+replacing the reasoning gap in the pre-existing "centres the determinate
+percentage..." test, which is kept as-is alongside it): measures the
+number `<span class="fd-ring__pct-value">` and the `<small>` directly,
+not the stretched container -- same baseline (bottom edges within 5px,
+using bottom rather than centre-Y because a 30px number and a 12.5px "%"
+sharing a true baseline still have several pixels of centre-to-centre
+offset purely from the font-size difference), horizontally adjacent (gap
+between -1px and 6px), and their **combined** bounding box centred in the
+ring frame (within 4px, both axes).
+
+**Before/after measurements (1024x768 / 640x480, `renderTransferringInAppShell()`'s default known-positive state):**
+
+| Measurement | Before (broken) | After (fixed) |
+|---|---|---|
+| Number/`%` bottom-edge difference (same-baseline check) | 97.9px (both viewports -- two separate rows) | 3.1px (both viewports) |
+| Combined "43%" box vs. frame centre, horizontal | not measured (container-only test passed trivially) | 0.01px off (both viewports) |
+| Combined "43%" box vs. frame centre, vertical | 90.75px off (identical at both viewports) | 0.0px off (both viewports) |
+
+### Defect 2: the figures were still Story 7.5's bordered metric boxes, and the value repeated its own caption
+
+**Cause.** `.fd-metric` still carried Story 7.5's `padding`/`border: 1px
+solid var(--color-separator)`/`border-radius`/`background` -- never
+revisited when Story 9.5 moved the percentage into the ring and left these
+two figures as the card's only remaining Story 7.5 leftover. Separately,
+the "Sent" figure's value read `${formatBytes(bytesSent)} ${copy.label.sent}`
+(e.g. "14.0 KB sent") directly over its own "Sent" caption -- the value
+repeating the caption's word rather than adding a second fact.
+
+**Fix.** `.fd-metrics` becomes a plain flex row (`display: flex; flex-wrap:
+wrap; gap: var(--spacing-6)`, ~22px per the prototype's own `.stats`, the
+nearest design token) and `.fd-metric` drops every box property, becoming
+a flex column stacking the bold value over the muted caption with no
+border, fill, or padding -- matching the prototype's `.stats`/`.stat`
+exactly. `TransferMetrics` now reads sent-of-total for a known total
+(`copy.label.of`, already registered) -- "14.0 KB of 32.6 KB" -- which is
+new information the caption alone does not carry; an unknown total or an
+empty payload has no meaningful "of X" to add, so those two read the bare
+wire figure instead. Speed is unaffected (`formatRate`, captioned "Speed").
+The 639px reflow breakpoint, which used to reset `.fd-metrics`'s
+`grid-template-columns`, now switches its `flex-direction` to `column`
+instead (there is no longer a grid template to reset).
+
+**New/extended tests:** `browser/accessibility.test.tsx`, "gives each
+figure a plain, unboxed presentation whose value does not repeat its own
+caption" -- computed `borderWidth` is `0px` (not `borderStyle`, which
+Tailwind's preflight resets to `solid` globally regardless of whether a
+border is actually declared -- `borderWidth` is the property that
+distinguishes a real border from that reset), computed `backgroundColor`
+is transparent, and the figure's own text does not end with its caption's
+text. `styles.test.ts` gained matching CSS-text assertions (no
+`border`/`background`/`padding` on `.fd-metric`, `display: flex` not
+`grid-template-columns` on `.fd-metrics`, the 639px breakpoint folding to
+`flex-direction: column`). `TransferringView.test.tsx`'s existing mode
+tests updated for the new value text ("5.8 MB of 8.4 MB" for known
+positive, "48.2 MB"/"0 bytes" bare for unknown/known-empty).
+
+**Before/after measurements:** known-positive figure text "5.8 MB
+sentSent" (repeated word, concatenated with its own caption in the DOM) ->
+"5.8 MB of 8.4 MBSent" (new information, no repeat); `.fd-metric` computed
+`borderWidth` 1px -> 0px; computed `backgroundColor` `rgb(255, 255, 255)`
+(opaque `--color-surface`) -> `rgba(0, 0, 0, 0)` (transparent).
+
+### Defect 3: the known-empty status read as a bordered, filled box -- an inert control, not plain text
+
+**Cause.** `.fd-empty-status` carried the same Story 7.5-era
+`padding`/`border: 1px solid var(--color-control-border)`/`border-radius`/
+`background` as the old linear meter's own card-within-a-card styling,
+never revisited once Story 9.5 rebuilt the surrounding card.
+
+**Fix.** Drops `padding`/`border`/`border-radius`/`background` entirely,
+keeping only `margin: 0`, muted colour, and the existing body-strong
+size/weight -- the same visual weight class as `.fd-ring__status` (the
+unknown mode's own plain caption), per the follow-up's own instruction.
+The known-empty ring panel's own `aria-hidden`/no-`role` guarantee (Story
+9.5's original work) is untouched -- this is a purely visual change.
+
+**New test:** `browser/accessibility.test.tsx`, "gives the known-empty
+status plain text with no border or fill" -- same `borderWidth`/
+`backgroundColor` computed-style check as Defect 2, applied to
+`.fd-empty-status` after rendering with an explicit known-empty
+`ProgressSnapshot` override. `styles.test.ts` gained a matching CSS-text
+assertion.
+
+**Before/after measurements:** computed `borderWidth` 1px -> 0px;
+computed `backgroundColor` `rgb(255, 255, 255)` -> `rgba(0, 0, 0, 0)`.
+
+### Defect 4: Cancel rendered as a full-width bar instead of an intrinsic-width, left-aligned button
+
+**Cause.** Cancel is the sole block-level child at the foot of
+`.fd-hero__details` (a column flex container), so it inherited
+`.fd-button--quiet`'s shared `width: 100%` -- authored for Idle's and the
+old Staged Cancel, which really were the only child of their own
+containers -- and rendered as a full-width bar. `width: 100%` was also
+propped up by the flex container's own default `align-self: stretch`,
+which fills the cross axis (the container's width) for any item whose own
+`width` resolves to `auto`; overriding `width` alone would not have been
+enough.
+
+**Fix.** `.fd-hero__details .fd-button--quiet { width: auto; align-self:
+flex-start; }` -- the same two-part fix `.fd-staged-foot
+.fd-button--quiet` already applies for the identical shared rule, scoped
+here instead of shared with Staged's foot row because Transferring's
+Cancel has no disclosure beside it to share a row with.
+
+**New test:** `browser/accessibility.test.tsx`, "gives Cancel an intrinsic
+width well under half the details column" -- Cancel's rendered width
+compared against the details column's own width, at both viewports.
+`styles.test.ts` gained a matching CSS-text assertion for the new rule.
+
+**Before/after measurements (1024x768 / 640x480):** Cancel's rendered
+width equalled the details column's own width exactly (438.0px / 550.0px
+-- a literal full-width bar) before the fix; well under half of it
+afterward (comfortably passing `< detailsWidth / 2`, i.e. `< 219.0px` /
+`< 275.0px`).
+
+### Mutation table
+
+Each mutation was applied to the real working tree, confirmed to fail
+(naming the defect) via the rendered suite, then reverted -- confirmed
+clean afterward by re-running the affected test green. A matching
+CSS-text mutation was also run for each defect via `styles.test.ts` where
+one exists.
+
+| # | Mutation | Defect | File | Result |
+|---|---|---|---|---|
+| N1 | Reverted `.fd-ring-frame`/`.fd-ring`/`.fd-ring__pct` to the pre-fix rules (grid-with-no-columns, `.fd-ring__pct` stretched and self-centring) | 1 | `style.css` | KILLED -- rendered: "keeps the percentage and its '%' sign on one baseline, centred together in the ring" at both viewports, `expected 97.9375 to be less than or equal to 5` |
+| N2 | Reverted `.fd-metric` to Story 7.5's bordered/filled box | 2 | `style.css` | KILLED -- rendered: "gives each figure a plain, unboxed presentation..." at both viewports, `expected '1px' to be '0px'`; jsdom: `styles.test.ts`'s "gives the metrics row a plain flex layout..." also killed independently (`grid-template-columns` reintroduced) |
+| N3 | Reverted `TransferMetrics`'s value text to `${formatBytes(bytesSent)} ${copy.label.sent}` (the old repeated-caption form) unconditionally | 2 | `TransferringView.tsx` | KILLED -- rendered: "gives each figure a plain, unboxed presentation..." at both viewports, `expected true to be false` ("5.8 MB sent" repeats "Sent") |
+| N4 | Reverted `.fd-empty-status` to its bordered/filled box | 3 | `style.css` | KILLED -- rendered: "gives the known-empty status plain text with no border or fill" at both viewports, `expected '1px' to be '0px'` |
+| N5 | Removed the new `.fd-hero__details .fd-button--quiet` rule entirely | 4 | `style.css` | KILLED -- rendered: "gives Cancel an intrinsic width well under half the details column" at both viewports, `expected 438 to be less than 219` (1024x768) / `expected 550 to be less than 275` (640x480) |
+
+N1-N5 are exactly the five mutations the follow-up's own instructions ask
+for (one per defect, plus the JS-level half of Defect 2's two-part fix).
+Each was confirmed to fail naming the specific defect before being
+reverted; the full suite was green before and after the whole pass.
+
+### Gate transcripts (macOS arm64, native)
+
+Run in the order `.github/workflows/verify.yml` uses, after the mutation
+pass above and with the working tree back to its intended diff.
+
+- `wails build`: **PASS** -- `Built '.../fairdrop.app/Contents/MacOS/fairdrop' in 8.546s.` Same pre-existing linker warning as every prior run, unrelated to this change.
+- Bindings drift: **PASS** after `git checkout -- frontend/wailsjs` -- 0 insertions/0 deletions (mode-only churn). No exported `App` command surface touched.
+- `gofmt -l .`: **PASS**, no output.
+- `go vet ./...`: **PASS**, no output.
+- `go tool staticcheck ./...`: **PASS**, no output.
+- `go test -count=1 ./...`: **PASS** -- `ok` for all nine packages.
+- `CGO_ENABLED=1 go test -count=1 -race ./...`: **PASS** -- `ok` for all nine packages (`internal/stream` ~98s under the race detector).
+- `GOOS=darwin GOARCH=arm64 go build ./...`, `GOOS=linux GOARCH=amd64 go build ./...`, `GOOS=darwin GOARCH=arm64 staticcheck ./...`: **PASS**, all three. This follow-up touched no Go code.
+- `cd frontend && npm test` (`npx vitest run`): **PASS** -- 19 files, **755 tests** (5 more than the 750 the pre-follow-up evidence recorded: all 5 are new `it` blocks in `styles.test.ts` -- one split out of the rewritten "renders the percentage..." test plus the four-test "the Sending figures and Cancel read as plain text..." describe block. `TransferringView.test.tsx`'s changes are assertion rewrites inside existing `it`s, not new ones).
+- `cd frontend && npm run test:browser`: **PASS** -- 2 files, **57 tests** (8 new for this follow-up: 2 for Defect 1, 2 for Defect 2, 2 for Defect 3, 2 for Defect 4, each `it.each` across 1024x768/640x480).
+- Capture churn: none -- `git status --short` showed no change to `frontend/browser/captures/` after either browser-test run.
+- No content drift beyond the five files this follow-up touches (`frontend/src/ui/TransferringView.tsx`, `frontend/src/ui/TransferringView.test.tsx`, `frontend/src/style.css`, `frontend/src/ui/styles.test.ts`, `frontend/browser/accessibility.test.tsx`), confirmed via `git status --short` after the full gate.
+
+### One line per defect
+
+1. Percentage and "%" now share one baseline and centre together in the
+   ring, fixed by mirroring the prototype's own grid-centres-a-content-
+   sized-box structure rather than a stretched self-centring container.
+   **Done, mutation-verified (N1).**
+2. Figures are unboxed (no border/fill/padding), gapped ~22px as a flex
+   row, and the value no longer repeats its own caption (sent-of-total for
+   a known total, bare wire figure otherwise). **Done, mutation-verified
+   (N2, N3).**
+3. Known-empty status is plain, muted text with no border or fill,
+   matching the unknown mode's own caption weight; still never a
+   percentage-bearing progressbar (untouched). **Done, mutation-verified
+   (N4).**
+4. Cancel is intrinsic-width and left-aligned under the figures, keeping
+   the 44px floor, the pending "Canceling" label, focus retention and
+   `aria-disabled` (all pre-existing, unaffected by this purely visual
+   fix). **Done, mutation-verified (N5).**
+5. Full gate passes (above). **Done.**
+
+Files outside this follow-up's scope (`OutcomePanel.tsx`, `App.tsx`,
+`IdleView.tsx`, and Story 9.6's own outcome/receipt CSS and tests) were
+not touched.
