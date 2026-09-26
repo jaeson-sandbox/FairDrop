@@ -463,11 +463,19 @@ func (f *fakeServer) Start(
 	f.requests = append(f.requests, request)
 	f.authorizer = authorizer
 	f.startCtx = ctx
+	// A Start after a Stop gets a new lane of the same depth, as every real
+	// ServerPort.Start does. Reusing the closed one made a second session's
+	// drainer tear that session down -- see TestFakeServerHandsEachStartAnOpenLane.
+	if f.closed {
+		f.events = make(chan ServerEvent, cap(f.events))
+		f.closed = false
+	}
+	events := f.events
 	f.mu.Unlock()
 	if f.start != nil {
 		return f.start(ctx, request, authorizer)
 	}
-	return ServerHandle{Port: testPort, Events: f.events}, nil
+	return ServerHandle{Port: testPort, Events: events}, nil
 }
 
 func (f *fakeServer) Stop() error {
@@ -1101,5 +1109,39 @@ func (h *harness) awaitBoundResolvedAt(index int) {
 			h.t.Fatalf("the bound at index %d never resolved on its own (armed=%d)", index, len(calls))
 		}
 		time.Sleep(200 * time.Microsecond)
+	}
+}
+
+// The fake must hand every Start its own open lane, the way the real server
+// does: each ServerPort.Start builds a new eventLane. The fake used to keep one
+// channel for its whole life, so a second Stage after a Stop received the lane
+// the first Stop had already closed. The new session's drainer then read that
+// closed lane as the server ending and tore the new run down (D-042's
+// synthesised terminal outcome) -- a second ServerPort.Stop that no product
+// code caused, arriving whenever the scheduler happened to run the drainer.
+// That is how TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes
+// failed intermittently on the Linux race runner (run 36253748499).
+func TestFakeServerHandsEachStartAnOpenLane(t *testing.T) {
+	h := newHarness(t)
+
+	if _, err := h.server.Start(context.Background(), ServerStartRequest{}, nil); err != nil {
+		t.Fatalf("first Start = %v", err)
+	}
+	if err := h.server.Stop(); err != nil {
+		t.Fatalf("Stop = %v", err)
+	}
+	second, err := h.server.Start(context.Background(), ServerStartRequest{}, nil)
+	if err != nil {
+		t.Fatalf("second Start = %v", err)
+	}
+
+	select {
+	case _, open := <-second.Events:
+		if !open {
+			t.Fatal("the second Start handed over the lane the first Stop closed, " +
+				"so a new session's drainer would read the old session's teardown as its own")
+		}
+		t.Fatal("the second Start's lane carried an event nobody sent")
+	default:
 	}
 }
