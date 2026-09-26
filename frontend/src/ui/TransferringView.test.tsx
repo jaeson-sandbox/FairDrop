@@ -78,11 +78,14 @@ describe('known positive totals', () => {
         expect(screen.queryByText('68%')).toBeNull()
     })
 
-    it('reports wire bytes first and throughput second, captioned Sent and Speed', () => {
+    it('reports sent-of-total first and throughput second, captioned Sent and Speed', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
         const metrics = [...document.querySelectorAll('.fd-metric')].map((node) => node.textContent)
-        expect(metrics).toEqual(['5.8 MB sentSent', '4.7 MB/sSpeed'])
+        // Defect fix: the figure used to read "5.8 MB sent" over its own
+        // "Sent" caption -- the value repeating the caption's word rather
+        // than adding a fact. A known total now reads sent-of-total instead.
+        expect(metrics).toEqual(['5.8 MB of 8.4 MBSent', '4.7 MB/sSpeed'])
     })
 
     it('draws the ring from the byte pair, not from the wire-reported percent', () => {
@@ -126,10 +129,15 @@ describe('unknown totals', () => {
         expect(document.body.textContent).not.toMatch(/\d+%/)
     })
 
-    it('still reports the actual wire bytes and throughput', () => {
+    it('still reports the actual wire bytes and throughput, with no meaningful "of X" to add', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
-        expect(screen.getByText('48.2 MB sent')).toBeTruthy()
+        // Defect fix: an unknown total has no meaningful total to read
+        // "of", so the figure is the bare wire count -- not "48.2 MB sent"
+        // (repeating its own "Sent" caption) and not "48.2 MB of ..." (there
+        // is no total).
+        expect(screen.getByText('48.2 MB')).toBeTruthy()
+        expect(screen.queryByText('48.2 MB sent')).toBeNull()
         expect(screen.getByText('12.4 MB/s')).toBeTruthy()
     })
 
@@ -143,7 +151,7 @@ describe('unknown totals', () => {
         // carries the kind and the logical size, explicitly labelled so it
         // is never mistaken for the wire total the ZIP stream reports.
         expect(document.querySelector('.fd-meta')?.textContent).toBe('Folder · 36.8 MB logical size')
-        expect(screen.getByText('48.2 MB sent')).toBeTruthy()
+        expect(screen.getByText('48.2 MB')).toBeTruthy()
     })
 })
 
@@ -177,7 +185,7 @@ describe('known empty files', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
         const metrics = [...document.querySelectorAll('.fd-metric')].map((node) => node.textContent)
-        expect(metrics).toEqual(['0 bytes sentSent'])
+        expect(metrics).toEqual(['0 bytesSent'])
         expect(screen.queryByText('Speed')).toBeNull()
     })
 })
@@ -288,7 +296,7 @@ describe('the pending cancellation contract', () => {
         }
         render(<TransferringView state={transferring(snapshot, {cancelPending: true})} onCancel={vi.fn()}/>)
 
-        expect(screen.getByText('5.8 MB sent')).toBeTruthy()
+        expect(screen.getByText('5.8 MB of 8.4 MB')).toBeTruthy()
         expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('69')
     })
 

@@ -234,8 +234,20 @@ function ProgressRing({progress}: {readonly progress: ProgressSelection | null})
                         style={{strokeDashoffset: offset}}
                     />
                 </RingTrack>
+                {/*
+                  Defect fix (orchestrator's rendered 1024x768 review after
+                  Story 9.5 merged): `.fd-ring__pct` used to be a grid
+                  container with two direct children (this span and the
+                  `<small>`), and an implicit grid with no declared
+                  `grid-template-columns` packs multiple children into
+                  separate rows by default -- so the number centred on its
+                  own row while the "%" sign centred on a second row near
+                  the ring's bottom edge, each individually "centred" but
+                  never together. See the matching `.fd-ring__pct` rule in
+                  style.css (now flex, baseline-aligned) for the fix.
+                */}
                 <p className="fd-ring__pct">
-                    <span>{percent}</span><small>%</small>
+                    <span className="fd-ring__pct-value">{percent}</span><small>%</small>
                 </p>
             </div>
         </div>
@@ -278,14 +290,28 @@ function RingTrack({children}: {readonly children?: ReactNode}) {
  * Story 7.5), a different card this story does not touch. The figures
  * themselves are exactly what those captions described: actual wire bytes
  * and visual-only throughput, never a wire percentage or a logical size.
+ *
+ * Defect fix (orchestrator's rendered review after Story 9.5 merged): the
+ * "Sent" figure used to read `${bytesSent} sent` -- e.g. "14.0 KB sent" --
+ * over its own "Sent" caption, so the value repeated the caption's word
+ * rather than adding a second fact. A known total now reads sent-of-total
+ * (`copy.label.of`, already registered and already used by the pre-ring
+ * progress head this story's own predecessor rendered), which is new
+ * information the caption alone does not carry; an unknown total or an
+ * empty payload has no meaningful "of X" to add (an unknown ZIP's own total
+ * is not a number, and an empty file's total is a meaningless "of 0
+ * bytes"), so those two read the bare wire figure instead, matching the
+ * unknown-mode reading the acceptance criteria name.
  */
 function TransferMetrics({progress}: {readonly progress: ProgressSelection}) {
+    const sentValue = progress.mode === 'known-positive'
+        ? `${formatBytes(progress.bytesSent)} ${copy.label.of} ${formatBytes(progress.totalBytes)}`
+        : formatBytes(progress.bytesSent)
+
     return (
         <div className="fd-metrics">
             <div className="fd-metric">
-                <strong className="fd-metric__value">
-                    {`${formatBytes(progress.bytesSent)} ${copy.label.sent}`}
-                </strong>
+                <strong className="fd-metric__value">{sentValue}</strong>
                 <span className="fd-metric__caption">{copy.label.sentCaption}</span>
             </div>
             {progress.mode === 'known-empty' ? null : (
