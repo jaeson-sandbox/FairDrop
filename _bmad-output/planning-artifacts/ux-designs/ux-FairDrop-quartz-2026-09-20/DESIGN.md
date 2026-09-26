@@ -478,6 +478,11 @@ predates Story 9.3's approved prototype
 putting a pill button inside the drop zone; the row was written before that
 prototype existed and is corrected here rather than left contradicted.
 
+Story 9.6 adds one more use, informational rather than a button: the outcome
+card's own receipt line is a small pill-shaped chip (`{colors.fill}`), the same
+shape family as the item-kind pill it replaces on that card, not a fourth kind
+of container.
+
 Nested radii are concentric: an inner element's radius equals the parent's radius
 minus the padding between them. A 24px card with 7px inset padding takes a 17–18px
 inner radius. This is why the drop zone's dashed inner rule is 18px inside a 24px
@@ -507,9 +512,9 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 | **Progress Ring** | **Replaces the Progress Meter (Story 9.5).** A ~216px ring in Staged's own QR slot, so the card never changes shape moving from Staged to Sending. Two concentric strokes on the resting track: a 10px band at `{colors.track}` (kept at that token specifically so the determinate fill's contrast against it stays the already-proven `primary`-on-`track` pairing) plus a 1px edge at `{colors.control-border}` just outside it -- the "functional boundary" this row has always required, expressed as a second stroke rather than a `border` property because a ring, unlike the retired linear track, has no separate fill rectangle to frame. The determinate fill is **solid** `{colors.primary}`, never a gradient -- the single-gradient rule is absolute and the button already spends it -- drawn with `stroke-dashoffset`, transitioned 400ms, never a `@keyframes` rule. Its own tabular-numeral percentage sits centred inside the ring. The unknown mode is a static, non-directional dashed stroke (no sweep, shimmer, or rotation of its own beyond the ring's fixed -90deg orientation) with its status caption beneath it; the known-empty mode shows the track only, `aria-hidden`, with no percentage-bearing role anywhere on the card. No fake ZIP or empty-file percentage ever appears. |
 | **Transfer Metrics** | Two plain figure-over-caption pairs beside the ring, tabular numerals: wire bytes first (captioned `copy.label.sentCaption`, "Sent"), throughput second (captioned `copy.label.speedCaption`, "Speed") -- Story 9.5's own pair, distinct from the Completion Receipt's `copy.label.wireBytes`/`copy.label.throughput` ("Wire bytes"/"Throughput", unchanged), since that receipt is a different card. The figures themselves are unchanged: actual wire bytes and visual-only throughput. |
 | **Cancel Action** | Quiet text action at full target size; error-coloured on hover and focus. |
-| **Outcome Panel — Done** | Centred composition at `{elevation.sh-3}`: a 74px success-tint disc with a stroke-drawn check, `{typography.display}` heading, muted body, the **completion receipt**, then the primary next action and a quiet Dismiss. This is the state that previously rendered a heading and one line into a mostly empty window. |
-| **Completion Receipt** | Two cells on `{colors.fill}`, divided by a separator: the item name and the wire bytes actually sent. **Two cells, not three** — no elapsed-time cell exists, because no clock is tracked and `EXPERIENCE.md` forbids frontend lifecycle timers. Both values must come from retained state, never from a placeholder. |
-| **Outcome Panel — Error** | Same composition in the error pair, with a `!` glyph, the safe heading and message from the fixed registry, and recovery guidance. No raw diagnostics. Retained form adds Dismiss. |
+| **Outcome Panel — Done** | **Story 9.6 rebuild.** One centred card, column width -- never wider than the Staged card's own 720px column, live or retained -- at `{elevation.sh-3}`: a ~96px success-tint disc (up from 74px) with a stroke-drawn check that scales in from ~0.7, `{typography.display}` heading (`copy.done.heading`, "Sent"), the one-line **outcome receipt**, then two pill buttons: **Send Another** (primary, the extracted `BrowseControl`) and **Done** (quiet Dismiss). `copy.done.body` is retired -- the receipt now carries what completion means, and the sentence that used to spell it out was redundant beside it. |
+| **Outcome Receipt** | **Story 9.6 replaces the two-cell grid.** One pill-shaped line on `{colors.fill}`: a kind glyph, the item name, and `· <wire bytes actually sent>` for Done; the item name alone for an Error whose outcome retained one (Story 9.2). No elapsed-time figure anywhere -- no clock is tracked and `EXPERIENCE.md` forbids frontend lifecycle timers. Every value comes from retained state, never a placeholder; the name truncates with an ellipsis rather than wrapping or overflowing the pill. |
+| **Outcome Panel — Error** | **Story 9.6 rebuild**, the same one-card shape as Done: the error disc, the fixed heading and fixed `PublicError.message` from the registry (unchanged), the outcome receipt when an item name was retained, and the primary action `selectEffectiveErrorAction` (Story 9.2) chooses -- **Try Again** (a refresh glyph, calls `retry()`) for `retry`, **Choose Another** (the `BrowseControl` menu) for `choose`, or no primary for `dismiss`. Every error card also carries **Dismiss** (quiet unless it is the card's only control, matching the Done panel's weight rule). No raw diagnostics. |
 | **Status Announcer** | Visually hidden, pre-mounted, atomic, layout-free. Never duplicates focused content. |
 
 ### FR23 and the disclosures
@@ -596,6 +601,15 @@ Story 9.1 gives it a foundation every later Epic 9 story builds on.
   and the browse menu all animate in too -- but it remains the only moment marked
   by *drawing* rather than by fading or rising, which is still worth marking on its
   own terms.
+- **Story 9.6: the outcome card's own disc** scales in from ~0.7 (its own
+  fade-plus-scale rule, unstaggered -- the same "cards and discs" pattern the
+  QR tile uses), while the heading, receipt and actions row stagger in behind
+  it via `.fd-rise`. The check's own transition keeps its pre-existing 500ms
+  duration and no added delay -- `styles.test.ts` pins that declaration
+  literally -- so "the check draws after a short delay" is read from the
+  disc's own ~520ms scale-in rather than from a delay on the check itself:
+  the check is not legible until partway through that motion regardless of
+  when its own transition starts.
 - Buttons scale to 0.975 on `:active` via `transform: scale(0.975)` -- the one
   *interaction* accent that scales, and unaffected by the entrance motion above,
   which scales through the standalone `scale` property instead (the browse menu now,

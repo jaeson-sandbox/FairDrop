@@ -1613,10 +1613,10 @@ describe('the outcome panel (Story 7.5)', () => {
         expect(outcome).toMatch(/align-items:\s*center;/)
     })
 
-    it('gives the done and error discs their own tint, at the 74px DESIGN.md size', () => {
+    it('gives the done and error discs their own tint, at the ~96px Story 9.6 size', () => {
         const icon = block('.fd-outcome__icon {')
-        expect(icon).toContain('width: 74px;')
-        expect(icon).toContain('height: 74px;')
+        expect(icon).toContain('width: 96px;')
+        expect(icon).toContain('height: 96px;')
         expect(icon).toContain('border-radius: var(--radius-full);')
 
         const done = block('.fd-outcome__icon--done {')
@@ -1626,6 +1626,40 @@ describe('the outcome panel (Story 7.5)', () => {
         const error = block('.fd-outcome__icon--error {')
         expect(error).toContain('background: var(--color-error-tint);')
         expect(error).toContain('color: var(--color-error);')
+    })
+
+    // Story 9.6: the disc scales in from ~0.7, via @starting-style -- the
+    // same progressive-enhancement mechanism every phase view and the QR
+    // tile already use. *Mutation:* drop the @starting-style block or the
+    // scale figure -> must fail.
+    it('scales the disc in from ~0.7, via @starting-style', () => {
+        const icon = block('.fd-outcome__icon {')
+        expect(icon).toMatch(/transition:\s*opacity 300ms var\(--ease-decelerate\), scale 520ms var\(--ease-decelerate\);/)
+
+        // The @starting-style block immediately following .fd-outcome__icon's
+        // own rule -- not the first @starting-style in the file, which
+        // belongs to [data-phase-view] further up.
+        const iconStart = stylesheet.indexOf('.fd-outcome__icon {')
+        const startingStyleOpen = stylesheet.indexOf('@starting-style {\n    .fd-outcome__icon {', iconStart)
+        expect(startingStyleOpen, 'a @starting-style block for .fd-outcome__icon').toBeGreaterThan(-1)
+        const startingStyleClose = stylesheet.indexOf('\n}\n', startingStyleOpen)
+        const startingStyleBlock = stylesheet.slice(startingStyleOpen, startingStyleClose)
+        expect(startingStyleBlock).toContain('opacity: 0;')
+        expect(startingStyleBlock).toContain('scale: 0.7;')
+    })
+
+    it('never wraps the card wider than the Staged card\'s own column (720px)', () => {
+        // Story 9.6: one centred card, column width, for every shape it takes
+        // -- a live outcome, a retained outcome, or an Idle command failure --
+        // so the rule lives on the unqualified selector rather than only the
+        // live-phase-view-scoped one. *Mutation:* drop max-width -> must fail.
+        const outcome = block('.fd-outcome {')
+        expect(outcome).toContain('max-width: 720px;')
+        expect(outcome).toContain('margin-inline: auto;')
+
+        // And not duplicated onto the phase-view-scoped selector any more --
+        // the base rule alone covers every shape now.
+        expect(stylesheet).not.toMatch(/\.fd-app > \.fd-outcome\[data-phase-view='outcome'\]\s*\{[^}]*max-width/)
     })
 
     it('mutes the body copy', () => {
@@ -1659,27 +1693,39 @@ describe('the outcome panel (Story 7.5)', () => {
     })
 })
 
-describe('the completion receipt (Story 7.5)', () => {
-    it('is two cells on {colors.fill}, divided by a separator', () => {
-        const receipt = block('.fd-receipt {')
+describe('the outcome receipt (Story 9.6 replaces Story 7.4/7.5\'s two-cell grid)', () => {
+    it('is one pill-shaped line on {colors.fill}, not a two-cell grid', () => {
+        const receipt = block('.fd-outcome__receipt {')
         expect(receipt).toContain('background: var(--color-fill);')
-        expect(receipt).toContain('grid-template-columns: 1fr 1fr;')
-
-        const divider = block('.fd-receipt__cell + .fd-receipt__cell {')
-        expect(divider).toContain('var(--color-separator)')
+        expect(receipt).toContain('border-radius: var(--radius-full);')
+        expect(receipt).toContain('display: inline-flex;')
+        // *Mutation:* reintroduce the two-cell grid on the receipt itself ->
+        // must fail, naming it. (`.fd-metrics`, Transfer Metrics, is a
+        // different component that legitimately keeps its own 2-column grid
+        // -- this checks the receipt's own rule, not the whole sheet.)
+        expect(receipt).not.toContain('grid-template-columns')
+        expect(stylesheet).not.toMatch(/\.fd-receipt\b/)
     })
 
     it('carries no duration cell and no third column', () => {
         // The mutation this guards against is the worst possible outcome of
         // this story: inventing a displayed duration. Nothing in the sheet
-        // may name a third receipt cell or a duration/elapsed rule.
-        expect(stylesheet).not.toMatch(/\.fd-receipt__cell--(duration|elapsed|time)/)
+        // may name a duration/elapsed rule anywhere near the receipt.
+        expect(stylesheet).not.toMatch(/\.fd-outcome__receipt.*--(duration|elapsed|time)/)
         expect(stylesheet).not.toContain('grid-template-columns: 1fr 1fr 1fr')
     })
 
-    it('renders the receipt figures with tabular numerals, like the percentage', () => {
-        const value = block('.fd-receipt__value {')
-        expect(value).toContain('font-variant-numeric: tabular-nums;')
+    it('truncates a long name with an ellipsis rather than wrapping or overflowing the pill', () => {
+        // *Mutation:* drop text-overflow/white-space -> must fail.
+        const name = block('.fd-outcome__receipt-name {')
+        expect(name).toContain('overflow: hidden;')
+        expect(name).toContain('text-overflow: ellipsis;')
+        expect(name).toContain('white-space: nowrap;')
+    })
+
+    it('renders the wire-bytes figure with tabular numerals, like the percentage', () => {
+        const meta = block('.fd-outcome__receipt-meta {')
+        expect(meta).toContain('font-variant-numeric: tabular-nums;')
     })
 })
 

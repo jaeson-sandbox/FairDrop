@@ -199,8 +199,25 @@ export function transferReducer(state: TransferState, action: TransferAction): T
             }
             return {...state, commandError: publicError('clipboard_failed')}
 
+        /*
+          Story 9.6: this action now clears whichever Idle-level outcome is
+          currently showing -- a retained Done/Error, a Stage-time command
+          failure, or (the rare dual case `invalid-selection` can produce,
+          see "keeps retained terminal outcome when invalid selection
+          supplies the visible command error" above) both at once -- rather
+          than only a retained outcome. The one-card rebuild replaces the
+          whole Idle composition with whichever of the two is showing, and
+          every such card carries a working Dismiss (the AC's own words:
+          "every error card also has Dismiss"), so this is the one action
+          both "Done" (a retained/live Done outcome) and "Dismiss" (an Error
+          outcome or a command failure) call. The action name is kept
+          rather than renamed: it is still "dismiss whatever is retained at
+          the Idle level," just no longer scoped to `retainedOutcome` alone.
+        */
         case 'dismiss-retained':
-            if (state.phase !== 'idle' || state.retainedOutcome === null) return state
+            if (state.phase !== 'idle' || (state.retainedOutcome === null && state.commandError === null)) {
+                return state
+            }
             return createInitialTransferState()
     }
 }

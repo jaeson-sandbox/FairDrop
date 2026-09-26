@@ -89,7 +89,7 @@ development_status:
   9-3-declutter-idle-and-drop-the-button-ellipses: done
   9-4-rebuild-staged-around-the-code: done
   9-5-rebuild-sending-around-a-ring: review
-  9-6-make-sent-and-error-one-card: backlog
+  9-6-make-sent-and-error-one-card: review
   9-7-prove-epic-9-on-both-platforms: backlog
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"

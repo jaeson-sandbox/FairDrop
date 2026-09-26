@@ -178,7 +178,15 @@ function toIdle(previous: TransferState, next: IdleTransferState): Announcement 
     if (isNewCommandError(previousError, next.commandError)) return focusRow('command-failure', 'command-error')
 
     if (previous.phase === 'idle') {
-        return previous.retainedOutcome !== null && next.retainedOutcome === null
+        // Story 9.6: Dismiss now clears a Stage-time command failure too, not
+        // only a retained outcome (state.ts's 'dismiss-retained' case), and
+        // both land here on the same focus target -- "Dismiss/Done focuses
+        // the Idle heading" applies to every outcome card the one-card
+        // rebuild shows, not only the retained-outcome one this row already
+        // covered.
+        const dismissedRetainedOutcome = previous.retainedOutcome !== null && next.retainedOutcome === null
+        const dismissedCommandFailure = previous.commandError !== null && next.commandError === null
+        return dismissedRetainedOutcome || dismissedCommandFailure
             ? focusRow('dismiss-retained', 'idle-instruction')
             : null
     }

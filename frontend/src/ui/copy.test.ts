@@ -92,10 +92,13 @@ describe('approved product copy', () => {
             'Empty file — 0 bytes to transfer',
         )
         expect(copy.done.heading, 'copy.done.heading').toBe(
-            'Transfer finished',
+            'Sent',
         )
-        expect(copy.done.body, 'copy.done.body').toBe(
-            'FairDrop finished sending the item.',
+        expect(copy.done.sendAnother, 'copy.done.send_another').toBe(
+            'Send Another',
+        )
+        expect(copy.done.dismiss, 'copy.done.dismiss').toBe(
+            'Done',
         )
         expect(copy.cancel.preparation, 'copy.cancel.preparation').toBe(
             'Cancel preparation',
@@ -114,6 +117,12 @@ describe('approved product copy', () => {
         )
         expect(copy.outcome.dismiss, 'copy.outcome.dismiss').toBe(
             'Dismiss',
+        )
+        expect(copy.outcome.tryAgain, 'copy.outcome.try_again').toBe(
+            'Try Again',
+        )
+        expect(copy.outcome.chooseAnother, 'copy.outcome.choose_another').toBe(
+            'Choose Another',
         )
         expect(copy.help.heading, 'copy.help.heading').toBe(
             'Trouble connecting?',
@@ -154,8 +163,9 @@ describe('approved product copy', () => {
             'directLink.hide',
             'directLink.show',
             'discovery.warning',
-            'done.body',
+            'done.dismiss',
             'done.heading',
+            'done.sendAnother',
             'external.promise',
             'firewall.macos',
             'firewall.macosRecovery',
@@ -191,7 +201,9 @@ describe('approved product copy', () => {
             'label.wireBytes',
             'localCopy.disclosure',
             'network.disclosure',
+            'outcome.chooseAnother',
             'outcome.dismiss',
+            'outcome.tryAgain',
             'progress.knownEmpty',
             'progress.unknown',
             'qr.alt',

@@ -115,6 +115,7 @@ describe('no button or menu item ends in an ellipsis (Epic 9, owner rule 2026-09
                 cancelWon={false}
                 onSelectFile={() => undefined}
                 onSelectDirectory={() => undefined}
+                commandErrorPanelProps={{}}
             />,
         )
         assertNoTrailingEllipsis(container, 'Idle at rest')
@@ -128,6 +129,7 @@ describe('no button or menu item ends in an ellipsis (Epic 9, owner rule 2026-09
                 cancelWon={false}
                 onSelectFile={() => undefined}
                 onSelectDirectory={() => undefined}
+                commandErrorPanelProps={{}}
             />,
         )
         fireEvent.click(screen.getByRole('button', {name: 'Choose File or Folder'}))
@@ -142,9 +144,28 @@ describe('no button or menu item ends in an ellipsis (Epic 9, owner rule 2026-09
                 cancelWon={false}
                 onSelectFile={() => undefined}
                 onSelectDirectory={() => undefined}
+                commandErrorPanelProps={{
+                    onDismiss: () => undefined,
+                    browse: {label: 'Choose Another', onSelectFile: () => undefined, onSelectDirectory: () => undefined},
+                }}
             />,
         )
+        fireEvent.click(screen.getByRole('button', {name: 'Choose Another'}))
         assertNoTrailingEllipsis(container, 'Idle with a command failure')
+    })
+
+    it('Idle with a Stage-time command failure whose action is retry', () => {
+        const {container} = render(
+            <IdleView
+                state={idle({commandError: {code: 'busy', message: 'FairDrop is still finishing the last item.'}})}
+                dropTargetStyle={dropTargetStyle}
+                cancelWon={false}
+                onSelectFile={() => undefined}
+                onSelectDirectory={() => undefined}
+                commandErrorPanelProps={{onDismiss: () => undefined, onRetry: () => undefined}}
+            />,
+        )
+        assertNoTrailingEllipsis(container, 'Idle with a retry-actioned command failure')
     })
 
     it('Stage Pending, cancellation not yet requested', () => {

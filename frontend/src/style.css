@@ -386,18 +386,18 @@ body {
   *retained* outcome (data-phase-view is undefined on that one, per
   OutcomePanel.tsx's phaseView prop) on purpose: a retained panel keeps its
   natural height and never grows or centres.
+
+  The column-width rule (width/max-width/margin-inline) that used to live in
+  a second block scoped to this same selector is gone -- Story 9.6 moved it
+  onto the unqualified `.fd-outcome` rule itself, since every shape the card
+  now takes (live, retained, or an Idle command failure) needs the same
+  720px cap, not only the live phase-view one this selector names.
 */
 .fd-region[data-phase-view='pending'],
 .fd-region[data-phase-view='transferring'],
 .fd-app > .fd-outcome[data-phase-view='outcome'] {
     flex: 1 1 auto;
     justify-content: center;
-}
-
-.fd-app > .fd-outcome[data-phase-view='outcome'] {
-    width: 100%;
-    max-width: 720px;
-    margin-inline: auto;
 }
 
 .fd-state-heading {
@@ -2112,12 +2112,28 @@ body {
 /* ---------------------------------------------------------------- Outcomes */
 
 /*
-  Outcome Panel (Story 7.5): a centred composition at rounded.xxl / sh-3, the
-  same elevation step as the progress card and the packet -- the focal object
-  of the Done/Error lifecycle state.
+  Outcome Panel (Story 7.5; rebuilt as one card by Story 9.6): a centred
+  composition at rounded.xxl / sh-3, the same elevation step as the progress
+  card and the packet -- the focal object of the Done/Error lifecycle state.
+
+  Story 9.6: column width, never wider than the Staged card -- `.fd-region`
+  (Staged's own wrapper) caps at 720px, so this rule matches that figure
+  directly rather than reading it back out of another selector. This applies
+  to every shape the card takes: a live outcome (App's top-level slot, still
+  `.fd-app`'s direct child), a retained outcome or an Idle command failure
+  (also `.fd-app`'s child once IdleView stops rendering its own composition
+  around it -- see IdleView.tsx). Deliberately does not touch `flex` or
+  `justify-content`: those stay scoped to the `[data-phase-view='outcome']`
+  rule below, which is what keeps a retained or command-failure card at its
+  own natural height rather than growing/centering the way the live phase
+  view does (styles.test.ts's "excludes a retained outcome from growth or
+  centering" pins the base rule's exclusion).
 */
 .fd-outcome {
     display: flex;
+    width: 100%;
+    max-width: 720px;
+    margin-inline: auto;
     flex-direction: column;
     align-items: center;
     gap: var(--spacing-3);
@@ -2130,19 +2146,34 @@ body {
 }
 
 /*
-  The 74px tinted disc. Color is never the only cue: the done disc also
-  carries the stroke-drawn check, the error disc the literal "!" glyph, and
-  both panels additionally differ by heading and body text.
+  The ~96px tinted disc (Story 9.6, up from 74px: DESIGN.md's Outcome Panel
+  row now calls for a larger disc now that it anchors a one-card composition
+  with its own actions row, rather than sharing weight with a longer body
+  paragraph this story removes). Color is never the only cue: the done disc
+  also carries the stroke-drawn check, the error disc the literal "!" glyph,
+  and both panels additionally differ by heading and message text.
+
+  Story 9.6: the disc itself now scales in from ~0.7, unstaggered -- like the
+  QR tile in Story 9.4, it is the card's own focal object entering with the
+  card, not a queued `.fd-rise` child behind it.
 */
 .fd-outcome__icon {
     display: grid;
-    width: 74px;
-    height: 74px;
+    width: 96px;
+    height: 96px;
     flex-shrink: 0;
     place-items: center;
     border-radius: var(--radius-full);
     font-size: 32px;
     font-weight: var(--font-weight-label);
+    transition: opacity 300ms var(--ease-decelerate), scale 520ms var(--ease-decelerate);
+}
+
+@starting-style {
+    .fd-outcome__icon {
+        opacity: 0;
+        scale: 0.7;
+    }
 }
 
 .fd-outcome__icon--done {
@@ -2170,10 +2201,18 @@ body {
   `transition-duration: 1ms !important` rule already collapses this
   transition like every other one in the sheet, landing on the same fully
   drawn `stroke-dashoffset: 0` this rule pins as the resting value.
+
+  Story 9.6 leaves this rule's own duration and the absence of a delay
+  untouched on purpose -- styles.test.ts pins the exact declaration text, and
+  the AC that asks for the check to draw "after a short delay" is met by the
+  disc's own ~520ms scale-in above instead: the check is not legible until
+  partway through that motion regardless of when its own transition starts,
+  and the two started at the same moment already reads as the check
+  following the disc rather than the two competing for attention at once.
 */
 .fd-outcome__check {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
 }
 
 .fd-outcome__check-path {
@@ -2191,6 +2230,7 @@ body {
     stroke-dashoffset: 0;
 }
 
+/* Story 9.6: the Error card's fixed message. Done no longer has a body paragraph at all (`copy.done.body` is removed). */
 .fd-outcome__body {
     margin: 0;
     max-width: 44ch;
@@ -2198,44 +2238,75 @@ body {
 }
 
 /*
-  Completion Receipt (Story 7.5): two cells on {colors.fill}, divided by a
-  separator. Two cells, not three -- no elapsed-time cell exists here or
-  anywhere else, because no clock is tracked in the frontend and
-  EXPERIENCE.md forbids a frontend lifecycle timer. Both values are read out
-  of `CompletionReceipt`, never recomputed.
+  The receipt (Story 9.6 replaces Story 7.4/7.5's two-cell grid with one
+  line): a pill-shaped chip on {colors.fill} holding a kind glyph (Done only),
+  the item name, and -- for Done -- the wire bytes actually sent. Never a
+  third cell and never an elapsed-time figure: no clock is tracked anywhere
+  in the frontend and EXPERIENCE.md forbids a frontend lifecycle timer.
+  `receipt.bytesSent` is the wire count the terminal `ProgressSnapshot`
+  reported (Story 7.4's retained state), never `metadata.size`. An Error's
+  receipt (when Story 9.2 retained an item name) carries the name alone --
+  `RetainedErrorOutcome` has no kind or byte count to show beside it.
 */
-.fd-receipt {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 1fr 1fr;
+.fd-outcome__receipt {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: var(--spacing-2);
     margin: 0;
-    border-radius: var(--radius-md);
+    padding: var(--spacing-2) var(--spacing-4) var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-full);
     background: var(--color-fill);
-    text-align: start;
-}
-
-.fd-receipt__cell {
-    min-inline-size: 0;
-    padding: var(--spacing-3) var(--spacing-4);
-}
-
-.fd-receipt__cell + .fd-receipt__cell {
-    border-inline-start: 1px solid var(--color-separator);
-}
-
-.fd-receipt__caption {
-    margin: 0;
-    color: var(--color-muted);
-    font-size: var(--text-meta);
-    line-height: var(--leading-meta);
-}
-
-.fd-receipt__value {
-    margin: 0;
-    overflow-wrap: anywhere;
-    font-size: var(--text-body-strong);
+    color: var(--color-text);
     font-weight: var(--font-weight-body-strong);
+}
+
+.fd-outcome__receipt-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    color: var(--color-muted);
+}
+
+.fd-outcome__receipt-glyph {
+    width: 18px;
+    height: 18px;
+}
+
+.fd-outcome__receipt-name {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fd-outcome__receipt-meta {
+    flex: none;
+    color: var(--color-muted);
+    font-weight: var(--font-weight-body);
     font-variant-numeric: tabular-nums;
+}
+
+/* Story 9.6: the two pill buttons (Send Another/Done, Try Again/Choose Another/Dismiss). */
+.fd-outcome__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-3);
+}
+
+/*
+  Defect fix, found rendered: `.fd-button--quiet`'s own `width: 100%` assumes
+  it is the only, block-level child of its container (see the identical
+  override and comment on `.fd-staged-foot .fd-button--quiet` above) -- here
+  Done/Dismiss shares a wrapping flex row with the primary action, so the
+  quiet button forced itself onto its own line, measured 56px below Send
+  Another/Try Again rather than beside it. Scoped to this one composition,
+  same as Staged's foot row; the shared rule still governs every other lone
+  Cancel/Dismiss button.
+*/
+.fd-outcome__actions .fd-button--quiet {
+    width: auto;
 }
 
 /* ---------------------------------------------------------------- Reflow */

@@ -4,6 +4,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {IdleTransferState} from '../transfer/state'
 import type {PublicError} from '../transfer/types'
 import {IdleView} from './IdleView'
+import type {OutcomeCardProps} from './OutcomePanel'
 
 afterEach(cleanup)
 
@@ -19,6 +20,7 @@ function show(
     state: IdleTransferState = idle(),
     handlers: Record<string, () => void> = {},
     cancelWon = false,
+    commandErrorPanelProps: OutcomeCardProps = {},
 ) {
     const onSelectFile = handlers.onSelectFile ?? vi.fn()
     const onSelectDirectory = handlers.onSelectDirectory ?? vi.fn()
@@ -29,6 +31,7 @@ function show(
             cancelWon={cancelWon}
             onSelectFile={onSelectFile}
             onSelectDirectory={onSelectDirectory}
+            commandErrorPanelProps={commandErrorPanelProps}
         />,
     )
     return {view, onSelectFile, onSelectDirectory}
@@ -87,7 +90,7 @@ describe('the drop target is only a drop target', () => {
 })
 
 describe('Idle at rest', () => {
-    it('leads with the drop target, puts the grouped disclosure list after it and after any command failure', () => {
+    it('leads with the drop target, puts the grouped disclosure list after it (no command failure showing)', () => {
         const {view} = show()
 
         const regions = [...view.container.querySelectorAll(
@@ -97,8 +100,8 @@ describe('Idle at rest', () => {
             .toEqual(['fd-drop-zone', 'fd-selection', 'fd-preflight', 'fd-help'])
     })
 
-    it('opens the outline on the h1, not on the preflight or a command failure', () => {
-        show(idle({commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}}))
+    it('opens the outline on the h1 when nothing else is showing', () => {
+        show()
 
         const headings = [...document.querySelectorAll('h1, h2, h3')]
         expect(headings[0].tagName).toBe('H1')
@@ -420,15 +423,13 @@ describe('recovery guidance is a second collapsed disclosure', () => {
     })
 })
 
-describe('Idle with a command failure', () => {
+describe('Idle with a command failure (Story 9.6: the card replaces the whole composition)', () => {
     it('renders the fixed invalid-selection panel and stages nothing', () => {
         const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
         show(idle({commandError: error}))
 
         expect(screen.getByRole('heading', {name: 'Choose one item'})).toBeTruthy()
         expect(screen.getByText('Choose exactly one file or folder.')).toBeTruthy()
-        // The failure sits beside Idle, which stays fully usable.
-        expect(screen.getByRole('button', {name: 'Choose File or Folder'})).toBeTruthy()
     })
 
     it('never dresses a cancellation up as an Error', () => {
@@ -439,12 +440,22 @@ describe('Idle with a command failure', () => {
         expect(screen.queryByText('Transfer canceled.')).toBeNull()
     })
 
-    it('renders the outcome panel between the drop zone and the disclosure group', () => {
-        const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
-        const {view} = show(idle({commandError: error}))
+    /*
+      *Mutation:* render the drop zone/pill/disclosures alongside the card ->
+      each assertion below fails naming the element that should not be there.
+      Story 9.6 AC2's own words: "the drop zone, the browse pill and the
+      grouped disclosures are not rendered while it shows."
+    */
+    it('replaces the drop zone, the browse pill and the grouped disclosures -- none of them render', () => {
+        show(idle({commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}}))
 
-        const order = [...view.container.querySelectorAll('.fd-drop-zone, .fd-outcome, .fd-idle-disclosures')]
-        expect(order.map((el) => el.className.split(' ')[0])).toEqual(['fd-drop-zone', 'fd-outcome', 'fd-idle-disclosures'])
+        expect(document.querySelector('.fd-drop-zone')).toBeNull()
+        expect(screen.queryByRole('button', {name: 'Choose File or Folder'})).toBeNull()
+        expect(document.querySelector('.fd-idle-disclosures')).toBeNull()
+        expect(screen.queryByRole('heading', {name: 'Drop one file or folder'})).toBeNull()
+        // Exactly one thing renders as the Idle phase view: the card.
+        expect(document.querySelectorAll('[data-phase-view]')).toHaveLength(1)
+        expect(document.querySelector('.fd-outcome')).toBeTruthy()
     })
 
     it('keeps the command-error focus target unchanged', () => {
@@ -454,6 +465,24 @@ describe('Idle with a command failure', () => {
         const target = document.querySelector('[data-focus-target="command-error"]')
         expect(target).toBeTruthy()
         expect(target?.getAttribute('tabindex')).toBe('-1')
+    })
+
+    it('carries the caller-supplied drop-target style and action wiring on the card', () => {
+        const error: PublicError = {code: 'path_not_found', message: 'x'}
+        const onSelectFile = vi.fn()
+        const onSelectDirectory = vi.fn()
+        show(idle({commandError: error}), {}, false, {
+            dropTargetStyle,
+            onDismiss: vi.fn(),
+            browse: {label: 'Choose Another', onSelectFile, onSelectDirectory},
+        })
+
+        const outcome = document.querySelector('.fd-outcome') as HTMLElement
+        expect(outcome.style.getPropertyValue('--wails-drop-target')).toBe('drop')
+        const chooseAnother = screen.getByRole('button', {name: 'Choose Another'})
+        fireEvent.click(chooseAnother)
+        fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
+        expect(onSelectFile).toHaveBeenCalledTimes(1)
     })
 })
 
@@ -508,11 +537,14 @@ describe('Idle after a cancellation won its race', () => {
         expect(instruction.getAttribute('tabindex')).toBe('-1')
     })
 
-    it('gives a command failure its own focus target, distinct from the instruction', () => {
+    // Story 9.6: the command-failure card replaces the whole composition, so
+    // the Idle instruction's own target is not on the screen at all while it
+    // shows -- there is exactly one target, the card's own.
+    it('gives a command failure its own focus target, with no idle-instruction target underneath it', () => {
         show(idle({commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}}))
 
         const targets = [...document.querySelectorAll('[data-focus-target]')]
             .map((element) => element.getAttribute('data-focus-target'))
-        expect(targets).toEqual(['idle-instruction', 'command-error'])
+        expect(targets).toEqual(['command-error'])
     })
 })

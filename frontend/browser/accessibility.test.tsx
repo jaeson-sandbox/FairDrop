@@ -6,6 +6,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {IdleTransferState, StagedTransferState, TransferringTransferState} from '../src/transfer/state'
 import type {FileMetadata, ProgressSnapshot} from '../src/transfer/types'
 import {IdleView} from '../src/ui/IdleView'
+import {OutcomePanel} from '../src/ui/OutcomePanel'
 import {StagedView} from '../src/ui/StagedView'
 import {TransferringView} from '../src/ui/TransferringView'
 import '../src/style.css'
@@ -201,6 +202,7 @@ async function renderIdle(): Promise<HTMLElement> {
             cancelWon={false}
             onSelectFile={() => undefined}
             onSelectDirectory={() => undefined}
+            commandErrorPanelProps={{}}
         />,
     )
     await waitForEntranceToSettle(container)
@@ -232,6 +234,76 @@ async function renderIdleInAppShell(): Promise<HTMLElement> {
                 cancelWon={false}
                 onSelectFile={() => undefined}
                 onSelectDirectory={() => undefined}
+                commandErrorPanelProps={{}}
+            />
+        </div>,
+    )
+    await waitForEntranceToSettle(container)
+    return container
+}
+
+/**
+ * A retained Done outcome, wrapped in the same `.fd-app` stand-in
+ * `renderIdleInAppShell` uses -- Story 9.6's card replaces Idle's own
+ * composition, so this is what actually renders in Idle once one is showing.
+ */
+async function renderRetainedDoneOutcome(name = 'report.pdf'): Promise<HTMLElement> {
+    const {container} = render(
+        <div className="fd-app" style={{height: '100vh'}}>
+            <OutcomePanel
+                outcome={{kind: 'done', retained: true, receipt: {name, isDir: false, bytesSent: 8_400_000}}}
+                dropTargetStyle={dropTargetStyle}
+                onDismiss={() => undefined}
+                browse={{label: 'Send Another', onSelectFile: () => undefined, onSelectDirectory: () => undefined}}
+            />
+        </div>,
+    )
+    await waitForEntranceToSettle(container)
+    return container
+}
+
+/** A live terminal Error outcome (the App-level phase view, `phaseView`/`level=1`), Try Again plus Dismiss. */
+async function renderLiveErrorOutcome(): Promise<HTMLElement> {
+    const {container} = render(
+        <div className="fd-app" style={{height: '100vh'}}>
+            <OutcomePanel
+                outcome={{
+                    kind: 'error',
+                    retained: false,
+                    error: {code: 'transfer_failed', message: 'x'},
+                    itemName: 'report.pdf',
+                }}
+                level={1}
+                phaseView
+                dropTargetStyle={dropTargetStyle}
+                onDismiss={() => undefined}
+                onRetry={() => undefined}
+            />
+        </div>,
+    )
+    await waitForEntranceToSettle(container)
+    return container
+}
+
+/** An Idle Stage-time command failure -- the card that replaces Idle's whole composition (Story 9.6). */
+async function renderIdleCommandFailure(): Promise<HTMLElement> {
+    const {container} = render(
+        <div className="fd-app" style={{height: '100vh'}}>
+            <IdleView
+                state={{
+                    phase: 'idle',
+                    retainedOutcome: null,
+                    commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+                }}
+                dropTargetStyle={dropTargetStyle}
+                cancelWon={false}
+                onSelectFile={() => undefined}
+                onSelectDirectory={() => undefined}
+                commandErrorPanelProps={{
+                    dropTargetStyle,
+                    onDismiss: () => undefined,
+                    browse: {label: 'Choose Another', onSelectFile: () => undefined, onSelectDirectory: () => undefined},
+                }}
             />
         </div>,
     )
@@ -248,6 +320,7 @@ async function renderIdleMenuOpen(): Promise<HTMLElement> {
             cancelWon={false}
             onSelectFile={() => undefined}
             onSelectDirectory={() => undefined}
+            commandErrorPanelProps={{}}
         />,
     )
     fireEvent.click(screen.getByRole('button', {name: 'Choose File or Folder'}))
@@ -974,6 +1047,7 @@ describe('a phase view settles to a fully opaque, untranslated resting state (St
                 cancelWon={false}
                 onSelectFile={() => undefined}
                 onSelectDirectory={() => undefined}
+                commandErrorPanelProps={{}}
             />,
         )
         const view = container.querySelector('[data-phase-view="idle"]')
@@ -1252,6 +1326,136 @@ describe('the sending card keeps the ring in Staged’s fixed column (Story 9.5)
                 rect.right,
                 `the card overflows the right edge at ${width}x${height} (right ${rect.right.toFixed(1)}, viewport ${width})`,
             ).toBeLessThanOrEqual(width + 1)
+        },
+    )
+})
+
+/*
+  Story 9.6's own rendered-layout requirement: the outcome card (live,
+  retained, or an Idle command failure) is one centred card, never wider than
+  the Staged card's own column, with its contents centred and its two action
+  buttons on one row -- and a long receipt name never overflows it. jsdom
+  performs no layout, so `styles.test.ts` can only prove the stylesheet text
+  contains a 720px cap; it cannot prove which element actually receives it,
+  the same class of gap Story 9.4's own defect-fix section documents.
+*/
+describe('the outcome card is one centred, column-width card (Story 9.6)', () => {
+    it.each([[1024, 768], [640, 480]])(
+        'never renders wider than the Staged card\'s own column at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const stagedContainer = await renderStaged()
+            const stagedRegion = stagedContainer.querySelector('.fd-region')
+            if (stagedRegion === null) throw new Error('.fd-region did not render for Staged')
+            const stagedWidth = stagedRegion.getBoundingClientRect().width
+            cleanup()
+
+            for (const renderCard of [renderRetainedDoneOutcome, renderLiveErrorOutcome, renderIdleCommandFailure]) {
+                const container = await renderCard()
+                const card = container.querySelector('.fd-outcome')
+                if (card === null) throw new Error(`.fd-outcome did not render for ${renderCard.name}`)
+                const cardWidth = card.getBoundingClientRect().width
+                expect(
+                    cardWidth,
+                    `${renderCard.name}'s card (${cardWidth.toFixed(1)}px) is wider than Staged's own column ` +
+                        `(${stagedWidth.toFixed(1)}px) at ${width}x${height}`,
+                ).toBeLessThanOrEqual(stagedWidth + 0.5)
+                cleanup()
+            }
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'centres the card horizontally in the window at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+
+            for (const renderCard of [renderRetainedDoneOutcome, renderLiveErrorOutcome, renderIdleCommandFailure]) {
+                const container = await renderCard()
+                const card = container.querySelector('.fd-outcome')
+                if (card === null) throw new Error(`.fd-outcome did not render for ${renderCard.name}`)
+                const rect = card.getBoundingClientRect()
+                const leftGap = rect.left
+                const rightGap = document.documentElement.clientWidth - rect.right
+                expect(
+                    Math.abs(leftGap - rightGap),
+                    `${renderCard.name}'s card sits ${leftGap.toFixed(1)}px from the left and ` +
+                        `${rightGap.toFixed(1)}px from the right at ${width}x${height} -- not centred`,
+                ).toBeLessThanOrEqual(2)
+                cleanup()
+            }
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'keeps the two pill buttons on one row at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+
+            await renderRetainedDoneOutcome()
+            const sendAnother = screen.getByRole('button', {name: 'Send Another'})
+            const done = screen.getByRole('button', {name: 'Done'})
+            const doneRowDiff = Math.abs(
+                sendAnother.getBoundingClientRect().top - done.getBoundingClientRect().top,
+            )
+            expect(
+                doneRowDiff,
+                `Send Another and Done are not on the same row at ${width}x${height} ` +
+                    `(top difference ${doneRowDiff.toFixed(1)}px)`,
+            ).toBeLessThanOrEqual(2)
+            cleanup()
+
+            await renderLiveErrorOutcome()
+            const tryAgain = screen.getByRole('button', {name: 'Try Again'})
+            const dismiss = screen.getByRole('button', {name: 'Dismiss'})
+            const errorRowDiff = Math.abs(
+                tryAgain.getBoundingClientRect().top - dismiss.getBoundingClientRect().top,
+            )
+            expect(
+                errorRowDiff,
+                `Try Again and Dismiss are not on the same row at ${width}x${height} ` +
+                    `(top difference ${errorRowDiff.toFixed(1)}px)`,
+            ).toBeLessThanOrEqual(2)
+            cleanup()
+
+            await renderIdleCommandFailure()
+            const chooseAnother = screen.getByRole('button', {name: 'Choose Another'})
+            const commandDismiss = screen.getByRole('button', {name: 'Dismiss'})
+            const commandRowDiff = Math.abs(
+                chooseAnother.getBoundingClientRect().top - commandDismiss.getBoundingClientRect().top,
+            )
+            expect(
+                commandRowDiff,
+                `Choose Another and Dismiss are not on the same row at ${width}x${height} ` +
+                    `(top difference ${commandRowDiff.toFixed(1)}px)`,
+            ).toBeLessThanOrEqual(2)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'never lets a long receipt name push the pill past the card\'s own width at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const longName = 'a-very-long-descriptive-file-name-that-would-otherwise-overflow-the-pill.pdf'
+            const container = await renderRetainedDoneOutcome(longName)
+
+            const card = container.querySelector('.fd-outcome') as HTMLElement
+            const receipt = container.querySelector('.fd-outcome__receipt') as HTMLElement
+            if (receipt === null) throw new Error('.fd-outcome__receipt did not render')
+
+            const cardRect = card.getBoundingClientRect()
+            const receiptRect = receipt.getBoundingClientRect()
+            expect(
+                receiptRect.right,
+                `the receipt (${receiptRect.right.toFixed(1)}px) extends past the card's own right edge ` +
+                    `(${cardRect.right.toFixed(1)}px) at ${width}x${height}`,
+            ).toBeLessThanOrEqual(cardRect.right + 0.5)
+            expect(
+                receiptRect.left,
+                `the receipt (${receiptRect.left.toFixed(1)}px) extends past the card's own left edge ` +
+                    `(${cardRect.left.toFixed(1)}px) at ${width}x${height}`,
+            ).toBeGreaterThanOrEqual(cardRect.left - 0.5)
+            assertNoHorizontalOverflow(container)
         },
     )
 })
