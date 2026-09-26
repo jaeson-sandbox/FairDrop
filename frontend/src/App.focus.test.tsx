@@ -63,6 +63,7 @@ const commands: ControllerCommands = {
     dismissRetained: mocks.noop,
     retry: mocks.noop,
     stageFromOutcome: mocks.noop,
+    selectFromOutcome: mocks.noop,
     canRetry: false,
 }
 

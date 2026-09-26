@@ -377,16 +377,39 @@ state it is:
 - **Pending, Transferring, and a terminal Done or Error rendered as the phase
   view** are short, single-purpose states with no reason to anchor to the top
   edge, so the region is centred vertically instead.
-- **Staged is the one exception, and stays top-aligned.** It is content-rich --
+- **Staged is now centred too (Story 9.6 review follow-up reverses the
+  original exception below).** The owner-approved prototype centres every
+  state (`.app { display: grid; place-items: center }`), Staged included, and
+  the rendered-Chromium reflow proof (below) confirms the same monotonic-loss
+  property the top-aligned exception existed to protect still holds: at the
+  640×480 floor, content that exceeds the window scrolls from the top rather
+  than clipping it, so centring costs nothing the exception was written to
+  avoid.
+  ~~Staged is the one exception, and stays top-aligned. It is content-rich --
   packet, hero, QR, direct-link row, disclosures -- and centring a tall column
   moves content upward as the window shortens; the QR is the first thing that
   leaves the viewport when it does, because it sits nearest the vertical
   centre of a hero-heavy layout. Top alignment keeps the loss monotonic: content
   is lost from the bottom, through the permitted vertical scroll, rather than
-  from wherever centring happens to put the QR.
-- A retained outcome rendered above Idle keeps its natural height regardless of
-  the rule above; only the phase's own region grows or centres. The drop zone's
-  minimum height is a floor the retained panel cannot push it under.
+  from wherever centring happens to put the QR.~~ (superseded; kept struck
+  through rather than deleted, since `styles.test.ts`'s history references it.)
+- **The outcome card -- live, retained, or an Idle Stage-time command failure
+  -- is centred by its own `margin-block: auto`, not by growing itself with
+  `flex: 1 1 auto` and centring its own children.** This is a Story 9.6 review
+  fix: the live phase-view form used to grow to fill the whole region (a
+  ~560px-tall card with its content floating inside it) and centre its
+  children within that grown box, so the same node visibly collapsed and
+  jumped to the top the moment `transfer-reset` made it retained (the flex
+  rule stopped applying, since only the live form carried
+  `data-phase-view='outcome'`). An auto-margin item, by contrast, keeps its
+  own natural height in every form and is centred by consuming the
+  container's free space instead of its own -- the same node, same height,
+  same position, whichever of the three forms it currently is. The container
+  it centres within is `.fd-app` for the live/retained top-level card and the
+  phase's own region (already grown by the rule above) for an Idle command
+  failure, both already tall enough for the auto margin to have something to
+  consume. The drop zone's minimum height is still a floor nothing here can
+  push it under.
 
 At the 640×480 native minimum, a 320 CSS pixel content width, 200% text zoom,
 and the WCAG text-spacing overrides, the drop zone's growth is the first thing

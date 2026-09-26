@@ -1,10 +1,9 @@
 import {useEffect, useRef, useState} from 'react'
 import type {CSSProperties, ReactElement} from 'react'
-import {SelectDirectory, SelectFile} from '../wailsjs/go/main/App'
 import {OnFileDrop, OnFileDropOff} from '../wailsjs/runtime/runtime'
 import {selectCommandError, selectEffectiveErrorAction, selectOutcome, selectProgressSnapshot} from './transfer/selectors'
 import {createInitialTransferState, type IdleTransferState, type TransferState} from './transfer/state'
-import type {PendingItemKind, PublicError} from './transfer/types'
+import type {PublicError} from './transfer/types'
 import {useTransfer, type TransferController} from './transfer/useTransfer'
 import {focusSelector, routeTransition, type FocusTarget} from './ui/announce'
 import {nextProgressSpeech, type ProgressSpeechMemory} from './ui/progressSpeech'
@@ -59,34 +58,21 @@ function App() {
     const [outcomeActionPending, setOutcomeActionPending] = useState(false)
 
     /**
-     * Picks a path through the native chooser and stages it via
-     * `stageFromOutcome` -- "Send Another"/"Choose Another"'s own action, and
-     * (via `stageDroppedPath` below) the same primitive a native drop uses.
-     * Called directly against the Go-bound chooser rather than through
-     * `selectFile()`/`selectDirectory()`: those refuse to run outside Idle
-     * (`useTransfer.ts`'s `browse()` guard), and this needs to open the
-     * chooser from a live Done/Error card too, before `stageFromOutcome` has
-     * released that card's lease.
-     *
-     * A rejected chooser call is swallowed rather than surfaced. Idle's own
-     * browse control turns that same rejection into a fresh `commandError`
-     * (`chooser_failed`) through `browse()`'s own dedicated handling; this
-     * bypass has no such state to carry one into, and reintroducing a second
-     * call path with its own dedupe and error handling for a native dialog
-     * failing to open -- already a rare case -- was judged out of proportion
-     * to this story's scope. Recorded as a known gap in the evidence file
-     * rather than hidden.
+     * "Send Another"/"Choose Another"'s own action: `transfer.selectFromOutcome`
+     * (Story 9.6 review follow-up) releases a live outcome's lease first if
+     * one is showing, then runs the ordinary `selectFile`/`selectDirectory`
+     * path unchanged -- so a cancelled chooser is the same quiet no-op it
+     * always is, a rejected chooser surfaces `chooser_failed` through the
+     * normal Idle command-error card exactly as Idle's own browse control
+     * does, and a chosen path stages through the normal `stage()` path.
+     * This used to call the Go-bound choosers directly, which bypassed
+     * `browse()`'s generation guard and its `chooser_failed` reporting
+     * entirely -- fixed by routing through the controller instead.
      */
-    async function pickForOutcome(opener: () => Promise<string>, kind: PendingItemKind): Promise<void> {
+    async function chooseForOutcome(kind: 'file' | 'directory'): Promise<void> {
         setOutcomeActionPending(true)
         try {
-            const selected = await Promise.resolve().then(opener)
-            if (typeof selected === 'string' && selected.trim() !== '') {
-                await transfer.stageFromOutcome(selected, kind)
-            }
-        } catch {
-            // See the doc comment above: a failed chooser call from an
-            // outcome card is a known, accepted gap, not silently discarded.
+            await transfer.selectFromOutcome(kind)
         } finally {
             setOutcomeActionPending(false)
         }
@@ -122,8 +108,8 @@ function App() {
     function outcomeBrowseAction(label: string): OutcomeBrowseAction {
         return {
             label,
-            onSelectFile: () => void pickForOutcome(SelectFile, 'file'),
-            onSelectDirectory: () => void pickForOutcome(SelectDirectory, 'directory'),
+            onSelectFile: () => void chooseForOutcome('file'),
+            onSelectDirectory: () => void chooseForOutcome('directory'),
         }
     }
 

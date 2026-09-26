@@ -43,6 +43,23 @@ export interface TransferController {
      */
     readonly stageFromOutcome: (absolutePath: string, itemKind?: PendingItemKind) => Promise<void>
     /**
+     * Opens the native chooser from an outcome card ("Send Another"/"Choose
+     * Another"), releasing a live terminal outcome's backend lease first if
+     * one is still showing -- the same primitive as `stageFromOutcome`, but
+     * for a chooser rather than an already-known path. Once nothing live is
+     * showing (immediately, if nothing was), this runs the ordinary
+     * `selectFile`/`selectDirectory` path unchanged: a cancelled chooser is
+     * the same quiet no-op it always is (so a retained outcome stays
+     * showing), a rejected chooser surfaces `chooser_failed` through the
+     * normal Idle command-error card exactly as Idle's own browse control
+     * does, and a chosen path stages through the normal `stage()` path
+     * (which already dismisses whatever was retained). Story 9.6 calls this
+     * for "Send Another" and "Choose Another" instead of importing the Go
+     * chooser bindings directly, which bypassed `browse()`'s own generation
+     * guard and its `chooser_failed` reporting entirely.
+     */
+    readonly selectFromOutcome: (itemKind: 'file' | 'directory') => Promise<void>
+    /**
      * Re-stages the item remembered from the last Stage, through the ordinary
      * `stage()` path, when the current outcome's or Stage-time command
      * failure's action is `retry` (Story 9.2 AC3). A no-op otherwise --
@@ -399,6 +416,19 @@ export function useTransfer(): TransferController {
         await stage(absolutePath, itemKind)
     }, [cancel, stage])
 
+    const selectFromOutcome = useCallback(async (itemKind: 'file' | 'directory'): Promise<void> => {
+        if (stateRef.current.phase === 'done' || stateRef.current.phase === 'error') {
+            // Same D-059 lease release as stageFromOutcome, ahead of opening
+            // the chooser rather than ahead of staging a path already in
+            // hand -- neither SelectFile nor SelectDirectory is called until
+            // this settles.
+            await cancel()
+            await waitForIdle()
+        }
+        if (!mountedRef.current) return
+        await (itemKind === 'file' ? selectFile() : selectDirectory())
+    }, [cancel, selectFile, selectDirectory])
+
     const retry = useCallback(async (): Promise<void> => {
         const path = rememberedPathRef.current
         if (path === null) return
@@ -409,7 +439,7 @@ export function useTransfer(): TransferController {
 
     return {
         state, stage, selectFile, selectDirectory, cancel, rejectSelection, reportCopyFailure, dismissRetained,
-        stageFromOutcome, retry, canRetry: rememberedPathRef.current !== null,
+        stageFromOutcome, selectFromOutcome, retry, canRetry: rememberedPathRef.current !== null,
     }
 
     function waitForIdle(): Promise<void> {

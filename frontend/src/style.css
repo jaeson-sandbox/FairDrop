@@ -375,29 +375,65 @@ body {
 }
 
 /*
-  Pending, Transferring, and a terminal Done/Error rendered as the phase view
-  (DESIGN.md, Vertical composition): short, single-purpose states with no
-  reason to anchor to the top edge, so the region centres vertically instead
-  of hugging its content from the top.
+  Pending, Transferring, and (Story 9.6 review follow-up) Staged: short or
+  content-rich, but none of them anchor to the top edge any more -- the
+  region centres vertically instead of hugging its content from the top.
+  Staged used to be the one exception (DESIGN.md's Vertical composition
+  section carries the struck-through original reasoning and why it no
+  longer applies); the owner-approved prototype centres every state, Staged
+  included.
 
-  The terminal outcome panel is not wrapped in .fd-region -- App.tsx renders
-  it directly as .fd-app's child, sharing the growth rule above so the same
-  centering can apply to it. The attribute selector below excludes a
-  *retained* outcome (data-phase-view is undefined on that one, per
-  OutcomePanel.tsx's phaseView prop) on purpose: a retained panel keeps its
-  natural height and never grows or centres.
+  The terminal outcome panel used to be named here too
+  (`.fd-app > .fd-outcome[data-phase-view='outcome']`), sharing this rule's
+  growth so the *centering* half could apply to it -- but growing the card
+  itself to fill the region and then centring its own children inside that
+  grown box is what made it visibly collapse and jump to the top the moment
+  `transfer-reset` made it retained (data-phase-view is only ever present on
+  the live phase-view form). It is centred a different way now -- see
+  ".fd-app > .fd-outcome" and ".fd-region > .fd-outcome:only-child" below,
+  which apply to every form of the card identically and never change its own
+  size.
 
   The column-width rule (width/max-width/margin-inline) that used to live in
   a second block scoped to this same selector is gone -- Story 9.6 moved it
   onto the unqualified `.fd-outcome` rule itself, since every shape the card
   now takes (live, retained, or an Idle command failure) needs the same
-  720px cap, not only the live phase-view one this selector names.
+  720px cap, not only the live phase-view one this selector named.
 */
 .fd-region[data-phase-view='pending'],
 .fd-region[data-phase-view='transferring'],
-.fd-app > .fd-outcome[data-phase-view='outcome'] {
+.fd-region[data-phase-view='staged'] {
     flex: 1 1 auto;
     justify-content: center;
+}
+
+/*
+  The outcome card's own centering (Story 9.6 review follow-up), an auto
+  margin rather than flex-grow-plus-justify-content on the card itself: an
+  auto margin consumes the *container's* leftover space, so the card keeps
+  its own natural height in every one of its three forms (live, retained, an
+  Idle command failure) and never jumps size or position when a live
+  terminal outcome becomes a retained one -- only its container's free space
+  is what centres it, never its own.
+
+  Two selectors, not one, because the card sits in two different places
+  depending on which form it is: `.fd-app > .fd-outcome` is the top-level
+  slot App.tsx renders a live or retained outcome into directly (a sibling of
+  the phase's own region, not a child of it); `.fd-region > .fd-outcome`
+  is an Idle Stage-time command failure, which IdleView.tsx renders as the
+  *sole* content of its own region once it replaces Idle's usual composition
+  (`:only-child` is what keeps this from also matching Staged's or
+  Transferring's own nested `commandError` panel, which sits alongside other
+  content in its region and keeps its existing inline treatment unchanged --
+  see those views' own comments for why that one is not an outcome card).
+  Both containers are already at least as tall as the window by the time this
+  applies: `.fd-app` has `min-height: 100%`, and `.fd-region` already grows
+  via the unconditional `flex: 1 1 auto` above -- so the auto margin always
+  has real free space to consume.
+*/
+.fd-app > .fd-outcome,
+.fd-region > .fd-outcome:only-child {
+    margin-block: auto;
 }
 
 .fd-state-heading {
@@ -2123,11 +2159,12 @@ body {
   `.fd-app`'s direct child), a retained outcome or an Idle command failure
   (also `.fd-app`'s child once IdleView stops rendering its own composition
   around it -- see IdleView.tsx). Deliberately does not touch `flex` or
-  `justify-content`: those stay scoped to the `[data-phase-view='outcome']`
-  rule below, which is what keeps a retained or command-failure card at its
-  own natural height rather than growing/centering the way the live phase
-  view does (styles.test.ts's "excludes a retained outcome from growth or
-  centering" pins the base rule's exclusion).
+  `justify-content`: this rule fixes the card's own width and never its
+  height, which is left to size to its own content in every one of its three
+  forms. Vertical centering is a *container* concern instead -- see the
+  `margin-block: auto` rule earlier in this file (the "App Shell" section,
+  near `.fd-region`'s own vertical-composition rules) for how the card is
+  positioned without ever changing its own size.
 */
 .fd-outcome {
     display: flex;

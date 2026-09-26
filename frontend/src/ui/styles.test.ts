@@ -1083,38 +1083,51 @@ describe('Story 7.7: compose the lifecycle region vertically', () => {
         expect(region).toMatch(/flex:\s*1 1 auto;/)
     })
 
-    it('centres Pending, Transferring and the terminal outcome-as-phase-view, never Idle or Staged', () => {
+    it('centres Pending, Transferring and Staged, never Idle (Story 9.6 review follow-up reverses the earlier Staged exception)', () => {
         // Mutation: top-align any of the three named states -> must fail.
         const centered = block(".fd-region[data-phase-view='pending'],")
         expect(centered).toContain("data-phase-view='transferring'")
-        expect(centered).toContain(".fd-app > .fd-outcome[data-phase-view='outcome']")
+        expect(centered).toContain("data-phase-view='staged'")
         expect(centered).toContain('justify-content: center;')
 
-        // Idle and Staged are not named by the centering selector at all --
-        // top alignment is the flex default, so their absence here is what
-        // keeps them top-aligned. DESIGN.md states the Staged exception
-        // explicitly rather than leaving it as CSS silence.
+        // Idle alone is not named by the centering selector -- top alignment
+        // is the flex default, so its absence here is what keeps it
+        // top-aligned; its drop zone grows to fill the slack instead (the
+        // next test). The outcome card is no longer named here at all: it
+        // used to share this rule's growth so its centering half could
+        // apply, but growing the card itself (rather than its container) is
+        // what made it jump size and position between its live and retained
+        // forms -- see the next-but-one test for its own centering rule.
         expect(centered).not.toContain("data-phase-view='idle'")
-        expect(centered).not.toContain("data-phase-view='staged'")
+        expect(centered).not.toContain('.fd-outcome')
 
         const designSpine = readFileSync(designSpinePath(), 'utf8')
-        expect(designSpine).toMatch(/Staged is the one exception, and stays top-aligned/)
+        expect(designSpine).toMatch(/Staged is now centred too/)
     })
 
-    it('excludes a retained outcome from growth or centering, so it keeps its natural height', () => {
-        // OutcomePanel.tsx only sets data-phase-view when `phaseView` is true;
-        // a retained outcome above Idle renders without it, and a
-        // command-failure panel (also OutcomePanel, also phaseView=false)
-        // renders *inside* .fd-idle, not as .fd-app's direct child at all --
-        // so the growth/centering rule has to key off the base .fd-outcome
-        // class doing nothing on its own. Growth belongs only on the two
-        // qualified selectors this describe block already pins:
-        // .fd-app > .fd-outcome[data-phase-view='outcome'] for the terminal
-        // phase view, and nothing for a retained or command-failure panel.
+    /*
+      Story 9.6 review follow-up: the outcome card is centred by its own
+      `margin-block: auto`, never by growing itself with `flex: 1 1 auto` and
+      centring its own children -- the previous approach made the live
+      phase-view form (the only one that carried `flex: 1 1 auto`) grow to
+      fill the whole region and then centre its content inside that grown
+      box, so the same node visibly collapsed and jumped to the top the
+      moment reset made it retained, since only the live form's selector
+      matched. An auto-margin item keeps its own natural height regardless of
+      which of the card's three forms is currently showing.
+      *Mutation:* restore the old `.fd-app > .fd-outcome[data-phase-view=...]`
+      grow-and-centre rule (or drop the margin-block: auto rule below) ->
+      the rendered "does not jump size or position at reset" test must fail.
+    */
+    it('centres the outcome card by margin-block: auto on the card itself, never by growing it', () => {
         const base = block('.fd-outcome {')
         expect(base).not.toMatch(/flex:\s*1/)
         expect(base).not.toContain('justify-content: center;')
         expect(stylesheet).not.toMatch(/\.fd-app > \.fd-outcome\s*\{[^}]*flex:\s*1/)
+
+        const margin = block('.fd-app > .fd-outcome,')
+        expect(margin).toContain('.fd-region > .fd-outcome:only-child')
+        expect(margin).toContain('margin-block: auto;')
     })
 
     it('grows the drop zone into Idle\'s slack with a bounded flexible height, never a fixed one', () => {
