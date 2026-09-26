@@ -417,3 +417,55 @@ assertion weakened. See `evidence-flaky-teardown-bound-test-fix.md`.
 The draft was published on the owner's standing instruction to release, given 2026-09-22.
 `release.yml` creates a draft on purpose — "publishing a release is a human act on this public
 repository" — and recording who decided is the point of this line.
+
+## v1.3.0 — PUBLISHED 2026-09-26
+
+A minor release for Epic 9, "Motion and Clarity": entrance motion throughout; Idle decluttered
+with the browse control inside the drop zone; Staged rebuilt around the QR code with the link
+revealed only on request; Sending as a progress ring; Sent and Error as one centred card whose
+next action fits the failure, where **Try Again** re-prepares the same item. It also fixes a
+macOS defect present in every earlier release: a pointer click on Copy Link copied correctly
+but never showed "Copied", because WebKit does not focus a clicked button (AGENTS.md fact 3).
+Transfer behavior is unchanged from 1.2.1.
+
+**Verification.** Tag `v1.3.0` points at `dd56e96` (the release merge on `main`). That
+commit's verify run is **36256415581**, read with `gh run view --json conclusion,jobs`:
+`verify (windows-latest)` success, `verify (macos-latest)` success, `Linux adapter
+verification` success. Release run **36257594447** on the tag: all six jobs success — the
+shared gate on both native runners and Linux, `build (windows-latest)`, `build
+(macos-latest)`, and `release`. Each platform built its own artifact; no cross-build.
+Published assets: `fairdrop.exe` (13,824,512 bytes) and `fairdrop-macos.zip` (6,241,727
+bytes), each with its `.sha256`. Both checksums were re-verified against downloaded copies
+of the draft before publication, and the downloaded `fairdrop.app` reports
+`CFBundleShortVersionString` 1.3.0.
+
+**A failed gate blocked the epic once, and was fixed rather than retried.** Run
+**36253748499** against the docs-only `fc94b36` failed the Linux race step:
+`TestTimedOutServerStopFencesNewSessionsUntilTheProductionCallCompletes` saw two
+`ServerPort.Stop` calls. The cause was the test harness, not the coordinator: the fake
+server handed every `Start` the one event lane its first `Stop` had closed, so a second
+session's drainer read the old teardown as its own. Reproduced 5/5 with a probe delay,
+pinned by a new harness test that failed first. Test-only change. See
+`evidence-fake-server-lane-reuse-fix.md`.
+
+**Driven on a built macOS binary** (the epic tip, and again after the Copied fix): a real
+2.4 MB transfer to `curl` as the receiver arrived byte-identical; Show/Copy Link, Send
+Another, forced `source_changed` (Try Again → same item re-staged) and forced
+`path_not_found` (Choose Another, no Try Again) all behaved as specified. Full record in
+`evidence-9-7-prove-epic-9-on-both-platforms.md`.
+
+**Still unverified at publication, and not softened:**
+
+- **Light appearance and Reduce Motion were not observed on a built binary.** Both are system
+  settings the orchestrator does not change; they were checked only in rendered Chromium
+  previews and through the suites' assertions.
+- **No native drag-and-drop was performed** during the walkthrough; staging used the chooser.
+- **No Windows binary has been driven interactively**, for this release or any other. The gate
+  proves build, vet, staticcheck, unit, race and both frontend suites there.
+- **No binary built from `dd56e96` has been launched by a person**; the walkthrough used local
+  builds of the epic branch, whose code is identical apart from the version bump and docs.
+- The standing optional manual rows remain unrun: browser combinations, screen readers, a real
+  Windows High Contrast session, and a camera-scanned QR.
+
+The draft was published on the owner's instruction "Merge and do the release", given
+2026-09-26.
