@@ -6,23 +6,24 @@ Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged cop
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: v1.2.1.** A patch over 1.2.0, which rebuilt FairDrop's interface on
-the Quartz spine. 1.2.1 fixes a macOS crash: dragging the QR code on the staged screen
-terminated the app, and did so in 1.0.0 and 1.1.0 as well. Transfer behavior remains the
-same complete FR1-FR24 scope proven for v1.0.0: one file or folder, one receiver, plain
-HTTP on a trusted LAN, nothing persisted.
+**Current release: v1.3.0.** A redesign of every screen on the Quartz spine that 1.2.0
+introduced: smooth entrance motion, a Ready screen built around the QR code with the link
+revealed only when asked for, a progress ring, and one clear card when a transfer finishes
+or fails — where **Try Again** re-prepares the same item instead of sending you back to
+the chooser. Transfer behavior remains the same complete FR1-FR24 scope proven for v1.0.0:
+one file or folder, one receiver, plain HTTP on a trusted LAN, nothing persisted.
 
 ## Using it
 
 1. Launch FairDrop. The first run asks for firewall access — allow it on **Private networks
    only**, and leave Public off. Only one copy runs at a time; launching it again restores the
    window you already have.
-2. Give it one file or folder, either by dropping it on the zone at the top or through the
-   **Choose a file or folder** control. That control opens a small menu because Windows' native
-   dialog cannot offer both kinds at once; either item leads to the matching chooser.
-3. Scan the QR code from a browser on the same Wi-Fi, or open the direct link. **The first
-   device to open the link gets the download** — including a link preview, so avoid pasting it
-   into a chat that fetches URLs.
+2. Give it one file or folder, either by dropping it on the drop zone or through the
+   **Choose File or Folder** button inside it. That button opens a small menu because Windows'
+   native dialog cannot offer both kinds at once; either item leads to the matching chooser.
+3. Scan the QR code from a browser on the same Wi-Fi, or use **Copy Link** or **Show Link** to
+   open the direct link instead. **The first device to open the link gets the download** —
+   including a link preview, so avoid pasting it into a chat that fetches URLs.
 4. A folder arrives as a ZIP, streamed rather than staged, so nothing extra is written on the
    sending side.
 
