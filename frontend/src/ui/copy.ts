@@ -162,9 +162,25 @@ export const copy = {
         directLinkHeading: 'Direct download link',
         /** Transferring state heading, from the transferring production reference. */
         sending: 'Sending',
-        /** Transfer Metrics: wire bytes first, throughput second. */
+        /**
+         * Completion Receipt (Story 7.5, `OutcomePanel.tsx`): wire bytes
+         * first, throughput second. Left exactly as it was -- Story 9.5 needs
+         * its own, differently-worded captions on the Sending card
+         * (`sentCaption`/`speedCaption` below) rather than renaming these,
+         * because the Done receipt reads this same pair and 9.5's scope is
+         * Sending only.
+         */
         wireBytes: 'Wire bytes',
         throughput: 'Throughput',
+        /**
+         * Transfer Metrics (Story 9.5, `TransferringView.tsx` only): the
+         * Sending card's own two figure captions, plainer than the receipt's
+         * "Wire bytes"/"Throughput" above -- the owner-approved prototype's
+         * own wording. The figures underneath are unchanged (actual wire
+         * bytes; visual-only throughput).
+         */
+        sentCaption: 'Sent',
+        speedCaption: 'Speed',
         sent: 'sent',
         of: 'of',
         metaSeparator: ' · ',
