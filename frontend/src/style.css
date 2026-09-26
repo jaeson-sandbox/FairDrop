@@ -454,20 +454,6 @@ body {
     white-space: nowrap;
 }
 
-/*
-  The two-line visual clamp DESIGN.md permits for a long item name. It is a box
-  limit, never a JavaScript truncation: the complete value stays in the DOM, the
-  persistent Show-full-name control expands it, and the assistive description
-  carries it in full either way.
-*/
-.fd-clamp {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-}
-
 /* ----------------------------------------------------------------- Controls */
 
 /*
@@ -748,11 +734,50 @@ body {
 
 /*
   The copy action keeps its box when its label becomes "Copied". Without this
-  the grid's auto column shrinks to the shorter word and the URL beside it
-  reflows -- the layout shift DESIGN.md's Copy Feedback row rules out.
+  the row's auto-sized flex item shrinks to the shorter word and the button
+  itself resizes -- the layout shift DESIGN.md's Copy Feedback row rules out.
+  Story 9.4: this also covers Show/Hide Link, whose own label length changes
+  by one character; a shared minimum keeps both direct-row buttons the same
+  width regardless of which label either one currently shows.
 */
 .fd-direct-row .fd-button {
     min-inline-size: 168px;
+}
+
+/*
+  Copy Feedback (Story 9.4): both faces of the swap sit in the same grid
+  cell, `1 / 1`, so the crossfade never affects layout -- the button's own
+  `min-inline-size` above is what actually prevents a reflow; this is what
+  lets the two faces overlap smoothly while it does. The inactive face is
+  `aria-hidden="true"` (`StagedView.tsx`), which is also what keeps the
+  button's accessible name at exactly one string rather than both
+  concatenated -- see the transition rule below apply equally to opacity and
+  translate on each face, keyed off that same attribute.
+*/
+.fd-button__swap {
+    display: grid;
+}
+
+.fd-button__swap-face {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    transition:
+        opacity 200ms var(--ease-decelerate),
+        translate 260ms var(--ease-decelerate);
+}
+
+.fd-button__swap-face[aria-hidden='true'] {
+    opacity: 0;
+    translate: 0 6px;
+}
+
+.fd-button__glyph {
+    width: 16px;
+    height: 16px;
+    flex: none;
 }
 
 /* --------------------------------------------------------------------- Idle */
@@ -1043,9 +1068,10 @@ body {
   card and shadow. `overflow: hidden` is what clips each row's rectangular
   hover fill to the group's own rounded corners, since the nested
   `.fd-disclosure` rows below give up their individual radius and elevation
-  to this wrapper. Staged's always-open `RecoveryHelp` form is untouched:
-  its box styling stays scoped to `.fd-help:not(.fd-disclosure)` below,
-  which this selector does not match.
+  to this wrapper. (Story 9.4 retired the once-different Staged form this
+  comment used to except -- both Idle's and Staged's recovery content are
+  `.fd-disclosure` now, so there is no longer a second box-styling scope to
+  keep separate from this one.)
 */
 .fd-idle-disclosures {
     border-radius: var(--radius-xl);
@@ -1356,9 +1382,23 @@ body {
     box-shadow: var(--shadow-sh-3);
 }
 
+/*
+  Story 9.4: the centred heading and one-line instruction that sit above the
+  card -- DESIGN.md's App Shell composition still centres the whole region,
+  but this element only needs to centre its own two lines of text.
+*/
+.fd-staged-head {
+    text-align: center;
+}
+
 .fd-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 224px;
+    /*
+      216px, not 224 -- Story 9.4's acceptance criteria name "~216px" for the
+      QR tile, matching the owner-approved prototype's `.slot`/`.qr` (216x216).
+      `.fd-qr-panel` below carries the same figure.
+    */
+    grid-template-columns: minmax(0, 1fr) 216px;
     gap: var(--spacing-7);
     align-items: start;
 }
@@ -1367,36 +1407,46 @@ body {
     display: flex;
     min-inline-size: 0;
     flex-direction: column;
-    gap: var(--spacing-2);
+    gap: var(--spacing-4);
 }
 
-/* The full-name control sits with the name, not stretched across the column. */
-.fd-name-toggle {
-    align-self: start;
-    padding-block: var(--spacing-2);
+/*
+  The item row: a kind glyph beside the name and meta line (Story 9.4). This
+  replaces the removed `fd-packet-tab` kind label and the "Show full name"
+  toggle -- the name now simply wraps (`.fd-headline`'s own
+  `overflow-wrap: anywhere`, unchanged) rather than clamping to two lines
+  behind a persistent control.
+*/
+.fd-item {
+    display: flex;
+    gap: var(--spacing-3);
+    align-items: flex-start;
+}
+
+.fd-item__icon {
+    display: grid;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border-radius: var(--radius-md);
+    background: var(--color-fill);
+    color: var(--color-muted);
+}
+
+.fd-item__glyph {
+    width: 20px;
+    height: 20px;
+}
+
+.fd-item__text {
+    display: flex;
+    min-inline-size: 0;
+    flex-direction: column;
+    gap: var(--spacing-1);
 }
 
 /* ----------------------------------------- Recovery help (Idle and Staged) */
-
-/*
-  :not(.fd-disclosure) scopes this to the always-open form StagedView renders
-  (a plain <div>, RecoveryHelp's own wrapper). Idle's form is the same class
-  on the controlled-disclosure <div> that also carries .fd-disclosure
-  (IdleView.tsx via Disclosure.tsx), and takes its surface styling from the
-  shared .fd-disclosure rule above instead --
-  DESIGN.md's Disclosure component "replaces the always-open firewall and
-  recovery blocks", but only where Story 7.3 actually rebuilt them, which is
-  Idle. Staged is unchanged.
-*/
-.fd-help:not(.fd-disclosure) {
-    display: grid;
-    gap: var(--spacing-3);
-    padding: var(--spacing-4);
-    border: 1px solid var(--color-separator);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-text);
-}
 
 .fd-help__platforms {
     display: grid;
@@ -1417,14 +1467,43 @@ body {
 
 .fd-qr-panel {
     display: grid;
-    width: min(224px, 100%);
+    /*
+      Story 9.4: ~216px at `{rounded.lg}`, matching the owner-approved
+      prototype's `.qr` tile -- was 224px at `{rounded.xs}` (a nearly-square
+      corner) when the QR shared visual weight with the always-visible link
+      row beside it; now that the QR is "the whole point of the screen" (the
+      story's own words), it takes the same generous corner radius the rest
+      of Quartz's raised surfaces use.
+    */
+    width: min(216px, 100%);
     aspect-ratio: 1;
     place-items: center;
     padding: var(--spacing-4);
     border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-xs);
+    border-radius: var(--radius-lg);
     background: var(--color-qr-surface);
     color: var(--color-qr-ink);
+    /*
+      Story 9.4's own entrance, not the generic `.fd-rise` stagger: DESIGN.md's
+      Motion section names "cards and discs in the stories that follow" the
+      browse menu's fade-plus-scale pattern, and the owner-approved
+      prototype's `.qr`/`.ring` enter this way, unstaggered, at the same time
+      as the view itself -- the QR is the view's focal object, not a child
+      queued behind it. Timings match the prototype's own `.qr` rule (300ms
+      opacity, 420ms scale) rather than the browse menu's shorter ones.
+    */
+    opacity: 1;
+    scale: 1;
+    transition:
+        opacity 300ms var(--ease-decelerate),
+        scale 420ms var(--ease-decelerate);
+}
+
+@starting-style {
+    .fd-qr-panel {
+        opacity: 0;
+        scale: 0.94;
+    }
 }
 
 .fd-qr {
@@ -1446,18 +1525,55 @@ body {
 
 /* --------------------------------------------------------- Direct URL Row */
 
-.fd-handoff {
+/*
+  Story 9.4: Copy Link and Show/Hide Link, side by side -- the field they
+  used to sit beside is gone from this row entirely; it lives in
+  `.fd-url-reveal` below instead, mounted only once requested. A wrapping
+  flex row rather than the old two-column grid: two buttons of modest,
+  roughly-equal width have no track-sizing problem a grid was solving, and
+  `flex-wrap` alone is enough to keep both reachable at the 320px reflow
+  floor without a dedicated breakpoint override.
+*/
+.fd-direct-row {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--spacing-2);
-    margin-top: var(--spacing-2);
 }
 
-.fd-direct-row {
+/*
+  Story 9.4: the link is not rendered until Show Link is activated. This is
+  the same transitioned `grid-template-rows: 0fr <-> 1fr` plus transitioned
+  `visibility` technique `.fd-disclosure__region` uses (see that rule's own
+  comment for the fuller reasoning) -- kept as its own rule rather than
+  reusing the Disclosure component itself, because the trigger here is a
+  plain button beside Copy Link, not a heading-wrapped disclosure summary.
+  Staying mounted either way is what lets it animate closed as well as open,
+  and what keeps Story 7.9's CSS-grid mirror sizing untouched underneath.
+*/
+.fd-url-reveal {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--spacing-2);
-    align-items: stretch;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition:
+        grid-template-rows 320ms var(--ease-decelerate),
+        visibility 0s linear 320ms;
+}
+
+.fd-url-reveal[data-open] {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition:
+        grid-template-rows 320ms var(--ease-decelerate),
+        visibility 0s linear 0s;
+}
+
+.fd-url-reveal__inner {
+    overflow: hidden;
+    min-height: 0;
+}
+
+.fd-url-reveal__body {
+    padding-top: var(--spacing-3);
 }
 
 /*
@@ -1601,15 +1717,6 @@ body {
 
 /* ------------------------------------------- Disclosures, notices, warnings */
 
-.fd-notice {
-    margin: 0;
-    padding: var(--spacing-3);
-    border: 1px solid var(--color-warning);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-warning);
-}
-
 .fd-warning-banner {
     display: flex;
     flex-direction: column;
@@ -1621,32 +1728,66 @@ body {
     color: var(--color-warning);
 }
 
-.fd-trust {
+/*
+  Story 9.4: the caveat lines -- first-opener and network stay visible on the
+  card (an info glyph and a lock glyph respectively, both inline SVG in
+  `StagedView.tsx`, `aria-hidden`), replacing the old trusted-LAN paragraph
+  pair and its single generated "!" marker. The folder note, when present, is
+  a third line with no glyph of its own (`.fd-caveats__plain`).
+*/
+.fd-caveats {
     display: grid;
     gap: var(--spacing-2);
+    margin: 0;
     padding-top: var(--spacing-4);
     border-top: 1px solid var(--color-separator);
+    list-style: none;
     color: var(--color-muted);
+    font-size: var(--text-meta);
+}
+
+.fd-caveats li {
+    display: flex;
+    gap: var(--spacing-2);
+    align-items: flex-start;
+}
+
+.fd-caveats__glyph {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-top: 2px;
+}
+
+.fd-caveats__plain {
+    padding-inline-start: calc(14px + var(--spacing-2));
 }
 
 /*
-  One marker, on the not-encrypted disclosure only: DESIGN.md gives the
-  trusted-LAN note a single warning marker, and the no-extra-copy sentence is a
-  neutral statement of fact rather than a caution.
+  Story 9.4: the row below the card -- "Trouble connecting?" on the left,
+  Cancel on the right. `.fd-disclosure` (the `Disclosure` component's own
+  surface rule) sizes to its own content as a flex item here rather than
+  stretching to the row's full width, which is what leaves Cancel room on
+  the same line.
 */
-.fd-trust p:first-child::before {
-    content: "!";
-    display: inline-grid;
-    width: 18px;
-    height: 18px;
-    margin-right: var(--spacing-2);
-    place-items: center;
-    border: 1px solid var(--color-warning);
-    border-radius: var(--radius-full);
-    color: var(--color-warning);
-    font-size: var(--text-label);
-    font-weight: var(--font-weight-label);
-    vertical-align: 1px;
+.fd-staged-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-3);
+    align-items: center;
+    justify-content: space-between;
+}
+
+/*
+  `.fd-button--quiet`'s own `width: 100%` assumes it is the only, block-level
+  child of its container (Idle's and the old Staged's Cancel both were). Here
+  it shares a flex row with the disclosure trigger, so it needs its intrinsic
+  width instead -- a targeted override scoped to this one composition rather
+  than a change to the shared rule, which every other Cancel/Dismiss button
+  still relies on for its own full-width layout.
+*/
+.fd-staged-foot .fd-button--quiet {
+    width: auto;
 }
 
 /* ------------------------------------------------------------- Transferring */
@@ -1874,9 +2015,13 @@ body {
         margin-inline: auto;
     }
 
-    .fd-direct-row {
-        grid-template-columns: minmax(0, 1fr);
-    }
+    /*
+      Story 9.4: `.fd-direct-row` no longer holds the field beside the copy
+      action -- it is a wrapping flex row of two buttons now (see its own
+      rule above), which needs no width-specific override to stay usable
+      down to the 320px reflow floor. This breakpoint reflows only `.fd-hero`
+      and `.fd-qr-panel`'s ordering.
+    */
 }
 
 @media (max-width: 639px) {

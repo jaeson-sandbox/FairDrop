@@ -448,6 +448,29 @@ describe('Story 9.1: the motion foundation', () => {
         )
         expect(starting, 'the @starting-style block for .fd-browse-menu').toBeTruthy()
     })
+
+    /*
+      Story 9.4: DESIGN.md's Motion section names "cards and discs in the
+      stories that follow" the browse menu's own fade-plus-scale pattern --
+      this is the first of them. Unlike `.fd-rise`'s children, the QR tile is
+      not staggered behind the view: it enters at the same time as the view
+      itself, which is why this is its own rule rather than another `.fd-rise`
+      caller (mutation: giving `.fd-qr-panel` the `fd-rise` class instead
+      would still fade it in, but with an 8px translate rather than a scale,
+      and staggered a step behind the item row -- exactly the regression this
+      test's literal `scale`/`opacity` pair, not merely "it animates in",
+      would catch).
+    */
+    it('scales and fades the Staged QR tile in from ~0.94, via @starting-style, unstaggered (Story 9.4)', () => {
+        const panel = block('.fd-qr-panel {')
+        expect(panel).toContain('scale: 1;')
+        expect(panel).toMatch(/transition:\s*\n?\s*opacity 300ms var\(--ease-decelerate\),\s*\n?\s*scale 420ms var\(--ease-decelerate\);/)
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\.fd-qr-panel \{\s*opacity: 0;\s*scale: 0\.94;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for .fd-qr-panel').toBeTruthy()
+    })
 })
 
 describe('the focus indicator', () => {
@@ -683,17 +706,26 @@ describe('activation targets', () => {
 
 describe('reflow to 320 CSS pixels', () => {
     it('keeps details beside the QR only above the 760px content width', () => {
-        expect(stylesheet).toMatch(/\.fd-hero \{[^}]*grid-template-columns: minmax\(0, 1fr\) 224px;/)
+        // Story 9.4: 216px, not 224 -- the QR tile's own acceptance criterion
+        // ("~216px", matching the owner-approved prototype's 216x216 `.qr`).
+        expect(stylesheet).toMatch(/\.fd-hero \{[^}]*grid-template-columns: minmax\(0, 1fr\) 216px;/)
         expect(stylesheet).toContain('@media (max-width: 759px)')
     })
 
-    it('stacks the QR above the URL row and its action below 760px', () => {
+    it('stacks the QR above the item details below 760px', () => {
         const narrow = block('@media (max-width: 759px) {')
         expect(narrow).toContain('.fd-hero')
         expect(narrow).toContain('grid-template-columns: minmax(0, 1fr);')
         expect(narrow).toContain('.fd-qr-panel')
         expect(narrow).toContain('order: -1;')
-        expect(narrow).toContain('.fd-direct-row')
+        // Story 9.4: `.fd-direct-row` no longer holds the field beside the
+        // copy action -- it is a wrapping flex row of two buttons now (Copy
+        // Link, Show/Hide Link), which needs no width-specific override of
+        // its own, so this breakpoint no longer touches it. The dropped
+        // `.fd-direct-row` expectation this replaces is exactly that: a
+        // premise the new layout no longer has, not a coverage loss -- the
+        // field's own reflow is proven separately in
+        // `browser/staged-url-field.test.tsx`'s continuous sweep.
     })
 
     it('collapses the remaining pair into one column below 640px', () => {
@@ -790,9 +822,15 @@ describe('Story 7.3: rebuilding Idle', () => {
         // it used to sit beside were <summary>-only UA resets with no reader
         // on a button, and both are gone rather than shipped as dead CSS.
         // `cursor: pointer` is what survives from that assertion.
+        //
+        // Story 9.4 gives `list-style: none` a new, unrelated reader --
+        // `.fd-caveats`, a genuine `<ul>` -- so the blanket whole-stylesheet
+        // check this used to be would now fail for a reason that has nothing
+        // to do with `<summary>`. Scoped to the summary rule itself instead,
+        // which is what the mutation this guards against actually touches.
         const summary = block('.fd-disclosure__summary {')
         expect(summary).toContain('cursor: pointer;')
-        expect(stylesheet).not.toContain('list-style: none;')
+        expect(summary).not.toContain('list-style: none;')
         expect(stylesheet).not.toContain('::-webkit-details-marker')
 
         expect(stylesheet).toContain('.fd-disclosure__summary:hover {')
@@ -841,6 +879,42 @@ describe('Story 7.3: rebuilding Idle', () => {
         expect(closed).toMatch(/visibility 0s linear 320ms/)
 
         const open = block('.fd-disclosure__region[data-open] {')
+        expect(open).toContain('visibility: visible;')
+        expect(open).toMatch(/visibility 0s linear 0s/)
+    })
+
+    /*
+      Story 9.4: Staged's direct-link field is hidden until Show Link is
+      activated, using the identical grid-template-rows/transitioned-
+      visibility mechanism proven above for `.fd-disclosure__region` -- see
+      `.fd-url-reveal` in style.css and `StagedView.tsx`'s own comment on it.
+      It is a separate rule rather than a reuse of the Disclosure component,
+      because the trigger is a plain button beside Copy Link, not a
+      heading-wrapped disclosure summary -- but the mechanism, and the
+      mutation it guards against (a fixed max-height, or an unmount that
+      would make Story 7.9's CSS-grid mirror sizing meaningless), is exactly
+      the same.
+    */
+    it('expands and collapses the Staged link-reveal region the same way, with no fixed height (Story 9.4)', () => {
+        const region = block('.fd-url-reveal {')
+        expect(region).toContain('display: grid;')
+        expect(region).toContain('grid-template-rows: 0fr;')
+        expect(region).toMatch(/transition:\s*\n?\s*grid-template-rows 320ms var\(--ease-decelerate\)/)
+        expect(region).not.toMatch(/max-height|max-block-size/)
+
+        const open = block('.fd-url-reveal[data-open] {')
+        expect(open).toContain('grid-template-rows: 1fr;')
+
+        const inner = block('.fd-url-reveal__inner {')
+        expect(inner).toContain('overflow: hidden;')
+    })
+
+    it('keeps the collapsed link field out of the tab order and the accessibility tree via a transitioned visibility (Story 9.4)', () => {
+        const closed = block('.fd-url-reveal {')
+        expect(closed).toContain('visibility: hidden;')
+        expect(closed).toMatch(/visibility 0s linear 320ms/)
+
+        const open = block('.fd-url-reveal[data-open] {')
         expect(open).toContain('visibility: visible;')
         expect(open).toMatch(/visibility 0s linear 0s/)
     })
@@ -908,13 +982,18 @@ describe('Story 7.3: rebuilding Idle', () => {
         expect(chevron).not.toContain('transform: rotate(-45deg);')
     })
 
-    it('keeps the always-open recovery block styled separately from the Idle disclosure form', () => {
-        // Both share the fd-help class name -- StagedView's plain <div> and
-        // IdleView's controlled disclosure (Story 9.1: a <div>/<button>/
-        // region, not native <details>) -- so the box styling has to be
-        // scoped away from the disclosure form, or Idle would paint both a
-        // card and a disclosure surface on the same element.
-        expect(stylesheet).toContain('.fd-help:not(.fd-disclosure) {')
+    /*
+      Story 9.4 removed Staged's always-open `RecoveryHelp` form -- its
+      "Trouble connecting?" content now lives behind the same controlled
+      `Disclosure` Idle's "Troubleshooting" row uses, so both consumers of
+      the `fd-help` class are `.fd-disclosure` now and the box-styling
+      scope this test used to require (`:not(.fd-disclosure)`, to keep an
+      always-open card from painting a second surface on the same element)
+      no longer has a second form to be scoped away from. This replaces the
+      old test with its mirror: the escape hatch is gone, not merely renamed.
+    */
+    it('no longer needs an escape hatch for an always-open recovery form (Story 9.4 removed it)', () => {
+        expect(stylesheet).not.toContain('.fd-help:not(.fd-disclosure)')
     })
 })
 
@@ -1104,12 +1183,20 @@ describe('guarantees a stylesheet edit could silently undo', () => {
         expect(attributes).toMatch(/^\*\.css text eol=lf$/m)
     })
 
-    it('marks only the not-encrypted disclosure, never the neutral one', () => {
-        // DESIGN.md gives the trusted-LAN note a single warning marker. Applied
-        // to every paragraph it also decorated "FairDrop does not upload or
-        // store an extra copy", which is a plain statement of fact.
-        expect(stylesheet).toContain('.fd-trust p:first-child::before');
-        expect(stylesheet).not.toMatch(/\.fd-trust p::before/)
+    it('replaces the single not-encrypted marker with per-line caveat glyphs (Story 9.4)', () => {
+        // The old `.fd-trust p:first-child::before` "!" marked one line via a
+        // CSS generated marker, applied to every paragraph until a fix scoped
+        // it to the first child only. Story 9.4 replaced that whole mechanism
+        // with inline SVG glyphs in StagedView.tsx (an info glyph on the
+        // first-opener caveat, a lock glyph on the network one) -- distinct
+        // icons a CSS `::before` selector could not express -- so what the
+        // stylesheet owns now is sizing and alignment (`.fd-caveats__glyph`),
+        // not the glyph choice itself. The old class must be fully gone, not
+        // merely superseded, or a future edit could resurrect a mismatched
+        // CSS marker alongside the new SVG icons.
+        expect(stylesheet).toContain('.fd-caveats {')
+        expect(stylesheet).toContain('.fd-caveats__glyph {')
+        expect(stylesheet).not.toContain('.fd-trust')
     })
 
     it('keeps the copy action a fixed width so its label swap cannot reflow the row', () => {
@@ -1603,8 +1690,10 @@ describe('the unrounded contrast proof', () => {
 
       "Placed together" means the views really put this foreground on this
       background. `.fd-button--quiet` is what puts muted and error on elevated,
-      because it drops the surface fill every other control keeps; `.fd-trust`'s
-      marker is what puts warning there.
+      because it drops the surface fill every other control keeps. (Story 9.4
+      removed the one bare `warning`-on-`elevated` placement, the old
+      `.fd-trust` marker, along with its row in the table below -- see the
+      comment beside that removal.)
     */
 
     function channel(value: number): number {
@@ -1688,7 +1777,14 @@ describe('the unrounded contrast proof', () => {
         ['primary', 'track', 3, true],
         ['primary', 'surface', 3, true],
         ['primary', 'elevated', 3, true],
-        ['warning', 'elevated', 3, true],
+        // Story 9.4 removed the last bare `warning`-on-`elevated` placement
+        // (the old `.fd-trust p:first-child::before` marker, which had no
+        // background of its own and sat directly on `.fd-packet`'s
+        // elevated fill): both remaining warning surfaces --
+        // `.fd-warning-banner` and `.fd-cancel-summary` -- paint their own
+        // `--color-surface` fill first, which is the `warning`-on-`surface`
+        // row above. Removed rather than left in place unplaced ("Placed
+        // together" is this table's own stated rule, further up this file).
         // Story 7.11: the focus ring is `--color-primary` itself now (no
         // separate `--color-focus` token), so its visibility against every
         // surface it can sit on is exactly the `primary` rows around it --
@@ -1974,11 +2070,19 @@ describe('rules the components can only reference by name', () => {
       them left all 462 green while the guarantee was gone.
     */
 
-    it('clamps the item name to two lines and hides the overflow', () => {
-        const clamp = block('.fd-clamp {')
-        expect(clamp).toContain('-webkit-line-clamp: 2;')
-        expect(clamp).toContain('line-clamp: 2;')
-        expect(clamp).toContain('overflow: hidden;')
+    /*
+      Story 9.4 removed the two-line clamp this test used to pin
+      (`.fd-clamp`, `-webkit-line-clamp: 2`) along with the "Show full name"
+      toggle it required: the item name always wraps now, so there is no
+      clamp rule left for a component to reference by name. Replaced with an
+      equivalent case from the same story: `.fd-caveats__glyph` sizes the
+      info/lock glyphs `StagedView.tsx` references only by class, which jsdom
+      cannot verify any other way.
+    */
+    it("sizes the caveat glyph via its own class, since jsdom applies no stylesheet (Story 9.4)", () => {
+        const glyph = block('.fd-caveats__glyph {')
+        expect(glyph).toContain('width: 14px;')
+        expect(glyph).toContain('height: 14px;')
     })
 
     it('keeps the full item name off screen rather than merely invisible', () => {

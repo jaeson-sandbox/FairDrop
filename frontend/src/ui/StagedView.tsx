@@ -1,11 +1,24 @@
-import {useRef, useState} from 'react'
+import type {CSSProperties} from 'react'
+import {useId, useRef, useState} from 'react'
 import {CopyToClipboard} from '../../wailsjs/go/main/App'
 import {selectCommandError, selectWarnings} from '../transfer/selectors'
 import type {StagedTransferState} from '../transfer/state'
+import {Disclosure} from './Disclosure'
 import {OutcomePanel} from './OutcomePanel'
-import {RecoveryHelp} from './RecoveryHelp'
+import {StagedHelpContent} from './RecoveryHelp'
 import {copy, errorHeadings, qrAltFor} from './copy'
 import {formatBytes} from './format'
+
+/**
+ * Story 9.1's per-child stagger, duplicated from `IdleView.tsx` rather than
+ * imported: the helper is trivial (one custom property) and nothing has
+ * extracted a shared motion module yet -- see that file's own comment on the
+ * same function. `--fd-stagger` is a custom property, which `CSSProperties`
+ * does not itself declare, so every caller needs its own cast somewhere.
+ */
+function rise(step: number): CSSProperties {
+    return {'--fd-stagger': step} as CSSProperties
+}
 
 interface StagedViewProps {
     readonly state: StagedTransferState
@@ -29,7 +42,16 @@ interface StagedViewProps {
 }
 
 /**
- * Staged: the QR is the handoff, the direct URL is the fallback.
+ * Staged: the QR is the whole point of the screen; the link is there only
+ * when the sender asks for it.
+ *
+ * Story 9.4 rebuilt this view around a single card (`.fd-packet`): the QR
+ * tile on one side, the item, its two link actions, the revealed link and
+ * the caveat lines on the other. Below the card, one row offers "Trouble
+ * connecting?" and Cancel. The `fd-packet-tab` kind label, the always-visible
+ * direct-link heading, the always-open `RecoveryHelp` block and the "Show
+ * full name" toggle are all gone -- see `_bmad-output/planning-artifacts/
+ * epics.md`'s Story 9.4 acceptance criteria.
  *
  * The capability token reaches the DOM exactly twice and both places are
  * inert: encoded inside the QR bitmap, and as the readonly value of the URL
@@ -48,7 +70,8 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
     // because the asynchronous clipboard callback below reads it after the
     // render that set it, and re-rendering on focus would buy nothing.
     const focusedRef = useRef(false)
-    const [showFullName, setShowFullName] = useState(false)
+    const [revealed, setRevealed] = useState(false)
+    const revealId = useId()
 
     const size = metadata.isDir
         ? `${formatBytes(metadata.size)} ${copy.label.logicalSize}`
@@ -88,6 +111,10 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
      * had a registry message and a heading since Story 3.11 and no way to reach
      * a user, which made a clipboard the OS refused indistinguishable from one
      * it accepted.
+     *
+     * Story 9.4: this copies the link without revealing it -- `revealed` is
+     * untouched here, matching the acceptance criterion that Copy Link and
+     * Show Link are two independent actions.
      */
     const handleCopy = () => {
         setCopied(false)
@@ -134,69 +161,139 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
 
     return (
         <div className="fd-region" data-phase-view="staged">
-            <h1
-                className="fd-state-heading"
-                tabIndex={-1}
-                data-focus-target="staged-heading"
-                aria-describedby={warningIds.length === 0 ? undefined : warningIds.join(' ')}
-            >
-                {copy.stage.heading}
-            </h1>
-            <p className="fd-meta">{copy.qr.instruction}</p>
+            <div className="fd-staged-head">
+                <h1
+                    className="fd-state-heading"
+                    tabIndex={-1}
+                    data-focus-target="staged-heading"
+                    aria-describedby={warningIds.length === 0 ? undefined : warningIds.join(' ')}
+                >
+                    {copy.stage.heading}
+                </h1>
+                <p className="fd-meta">{copy.qr.instruction}</p>
+            </div>
 
-            <div>
-                <span className="fd-packet-tab">{metadata.isDir ? copy.label.folder : copy.label.file}</span>
-                <section className="fd-packet">
-                    {warnings.map((warning, index) => (
-                        <aside
-                            key={`${warning.code}-${index}`}
-                            id={warningIds[index]}
-                            className="fd-warning-banner"
-                            data-warning-code={warning.code}
-                        >
-                            <strong className="fd-subheading">{errorHeadings[warning.code]}</strong>
-                            <span>{warning.message}</span>
-                        </aside>
-                    ))}
+            <section className="fd-packet">
+                {warnings.map((warning, index) => (
+                    <aside
+                        key={`${warning.code}-${index}`}
+                        id={warningIds[index]}
+                        className="fd-warning-banner"
+                        data-warning-code={warning.code}
+                    >
+                        <strong className="fd-subheading">{errorHeadings[warning.code]}</strong>
+                        <span>{warning.message}</span>
+                    </aside>
+                ))}
 
-                    <div className="fd-hero">
-                        <div className="fd-hero__details">
-                            <h2 className="fd-headline" id="fd-item-name">
-                                <bdi dir="auto" className={showFullName ? undefined : 'fd-clamp'}>
-                                    {metadata.name}
-                                </bdi>
-                            </h2>
-                            {/*
-                              The visual clamp above is allowed only beside a
-                              persistent keyboard-operable control that reaches
-                              the whole value, and an assistive description that
-                              carries it in full. The name is never cut by
-                              JavaScript; only its box is.
-                            */}
+                <div className="fd-hero">
+                    {/*
+                      Not `.fd-rise`: the QR is the view's own focal object,
+                      not a staggered child behind it -- DESIGN.md's Motion
+                      section ("cards and discs in the stories that follow")
+                      and the owner-approved prototype both enter it with its
+                      own fade-plus-scale-from-~0.94 at the same time as the
+                      view itself, unstaggered, while the details column's
+                      children stagger in behind it via `.fd-rise` below.
+                    */}
+                    <div className="fd-qr-panel">
+                        {/*
+                          Not draggable. The QR is a rendered bitmap of a
+                          one-shot capability URL, not a file and not a
+                          link -- there is no reason to drag it, and doing
+                          so is a crash vector: WebKit puts the `data:`
+                          image URL on the OS drag pasteboard as an NSURL,
+                          and the vendored Wails native drop handler
+                          (WailsWebView.m, performDragOperation:) calls
+                          fileSystemRepresentation on every NSURL on the
+                          pasteboard unconditionally, with no guard for a
+                          non-file URL. Both `draggable={false}` (the
+                          attribute WebKit's own drag-start check reads)
+                          and `-webkit-user-drag: none` in style.css (the
+                          CSS property WebKit actually honours for `<img>`)
+                          are needed -- see the pinning test beside
+                          "QR drag source is disabled" in
+                          accessibility.test.tsx.
+                        */}
+                        <img
+                            className="fd-qr"
+                            src={`data:image/png;base64,${metadata.qrBase64}`}
+                            alt={qrAltFor(metadata.name)}
+                            draggable={false}
+                        />
+                    </div>
+
+                    <div className="fd-hero__details">
+                        <div className="fd-item fd-rise" style={rise(0)}>
+                            <span className="fd-item__icon" aria-hidden="true">
+                                {metadata.isDir ? <FolderKindGlyph/> : <FileKindGlyph/>}
+                            </span>
+                            <div className="fd-item__text">
+                                <h2 className="fd-headline" id="fd-item-name">
+                                    <bdi dir="auto">{metadata.name}</bdi>
+                                </h2>
+                                <p className="fd-meta">
+                                    {(metadata.isDir ? copy.label.folder : copy.label.file) +
+                                        copy.label.metaSeparator + size}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="fd-direct-row fd-rise" style={rise(1)}>
                             <button
                                 type="button"
-                                className="fd-button fd-button--secondary fd-name-toggle fd-target"
-                                aria-expanded={showFullName}
-                                aria-controls="fd-item-name"
-                                aria-describedby="fd-item-name-full"
-                                onClick={() => setShowFullName((shown) => !shown)}
+                                className={`fd-button fd-target ${copied ? 'fd-button--copied' : 'fd-button--primary'}`}
+                                onClick={handleCopy}
+                                onFocus={() => { focusedRef.current = true }}
+                                onBlur={handleCopyBlur}
                             >
-                                {copy.name.showFull}
+                                {/*
+                                  Story 9.4: a non-reflowing crossfade, not a
+                                  jump cut -- both faces are always mounted in
+                                  the same grid cell (`.fd-button__swap` in
+                                  style.css) so the transition can run, and the
+                                  inactive one carries `aria-hidden="true"` so
+                                  the button's accessible name is always
+                                  exactly one of "Copy Link" or "Copied", never
+                                  both concatenated.
+                                */}
+                                <span className="fd-button__swap">
+                                    <span className="fd-button__swap-face" aria-hidden={copied || undefined}>
+                                        <LinkGlyph/>
+                                        {copy.directLink.action}
+                                    </span>
+                                    <span className="fd-button__swap-face" aria-hidden={copied ? undefined : true}>
+                                        <CheckGlyph/>
+                                        {copy.copy.confirmation}
+                                    </span>
+                                </span>
                             </button>
-                            <span id="fd-item-name-full" className="fd-visually-hidden">
-                                <bdi dir="auto">{metadata.name}</bdi>
-                            </span>
-                            <p className="fd-meta">
-                                {(metadata.isDir ? copy.label.folder : copy.label.file) +
-                                    copy.label.metaSeparator + size}
-                            </p>
-                            {metadata.isDir ? <p className="fd-subheading">{copy.folder.note}</p> : null}
+                            <button
+                                type="button"
+                                className="fd-button fd-button--secondary fd-target"
+                                aria-expanded={revealed}
+                                aria-controls={revealId}
+                                onClick={() => setRevealed((was) => !was)}
+                            >
+                                {revealed ? copy.directLink.hide : copy.directLink.show}
+                            </button>
+                        </div>
 
-                            <div className="fd-handoff">
-                                <h3 id="fd-direct-link-heading" className="fd-subheading">
-                                    {copy.label.directLinkHeading}
-                                </h3>
-                                <div className="fd-direct-row">
+                        {/*
+                          Story 9.4: the link is not rendered until requested.
+                          This region stays mounted either way -- the same
+                          transitioned grid-rows/visibility technique
+                          `Disclosure.tsx` uses (see `.fd-url-reveal` in
+                          style.css) rather than an unmount -- which is what
+                          lets it animate closed as well as open, and what
+                          keeps Story 7.9's CSS-grid mirror sizing untouched:
+                          the field beneath is exactly the one Story 7.9 built,
+                          just conditionally out of the accessibility tree and
+                          the tab order while collapsed.
+                        */}
+                        <div id={revealId} className="fd-url-reveal" data-open={revealed || undefined}>
+                            <div className="fd-url-reveal__inner">
+                                <div className="fd-url-reveal__body">
                                     {/*
                                       A readonly form control, not a div wearing
                                       a textbox role: assistive technology reads
@@ -218,19 +315,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
 
                                       The mirror is a real element carrying the text as its
                                       own content, not a `::after` reading it back from a
-                                      `data-*` attribute with `attr()`. That is what the spec
-                                      for this story originally proposed, and it works for an
-                                      author's own overrides -- but WCAG 1.4.12 (`.fd-url`
-                                      case of `accessibility.test.tsx`) simulates a *reader's*
-                                      text-spacing override the way the standard bookmarklet
-                                      does, with a bare `* { line-height: ... !important }`
-                                      rule, and a bare universal selector does not match
-                                      generated pseudo-element content -- so a `::after` mirror
-                                      would silently stop tracking the textarea's line-height
-                                      the moment such an override was in effect, and the field
-                                      would clip. A genuine sibling element is matched by that
-                                      same `*` rule exactly like the textarea is, so the two
-                                      stay in sync under it. See
+                                      `data-*` attribute with `attr()`. See
                                       `_bmad-output/implementation-artifacts/evidence-7-9-make-resizing-seamless.md`
                                       for the failing-test evidence this was found with.
                                     */}
@@ -243,7 +328,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                             readOnly
                                             rows={1}
                                             value={metadata.url}
-                                            aria-labelledby="fd-direct-link-heading"
+                                            aria-label={copy.label.directLinkHeading}
                                             onFocus={(event) => event.currentTarget.select()}
                                             onKeyDown={(event) => {
                                                 // Escape clears focus rather than leaving the field
@@ -265,68 +350,52 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                             }}
                                         />
                                     </div>
-                                    <button
-                                        type="button"
-                                        className={`fd-button fd-target ${copied ? 'fd-button--copied' : 'fd-button--primary'}`}
-                                        onClick={handleCopy}
-                                        onFocus={() => { focusedRef.current = true }}
-                                        onBlur={handleCopyBlur}
-                                    >
-                                        {copied ? copy.copy.confirmation : copy.directLink.action}
-                                    </button>
                                 </div>
-                                <p className="fd-meta">{copy.directLink.helper}</p>
                             </div>
                         </div>
 
-                        <div className="fd-qr-panel">
-                            {/*
-                              Not draggable. The QR is a rendered bitmap of a
-                              one-shot capability URL, not a file and not a
-                              link -- there is no reason to drag it, and doing
-                              so is a crash vector: WebKit puts the `data:`
-                              image URL on the OS drag pasteboard as an NSURL,
-                              and the vendored Wails native drop handler
-                              (WailsWebView.m, performDragOperation:) calls
-                              fileSystemRepresentation on every NSURL on the
-                              pasteboard unconditionally, with no guard for a
-                              non-file URL. Both `draggable={false}` (the
-                              attribute WebKit's own drag-start check reads)
-                              and `-webkit-user-drag: none` in style.css (the
-                              CSS property WebKit actually honours for `<img>`)
-                              are needed -- see the pinning test beside
-                              "QR drag source is disabled" in
-                              accessibility.test.tsx.
-                            */}
-                            <img
-                                className="fd-qr"
-                                src={`data:image/png;base64,${metadata.qrBase64}`}
-                                alt={qrAltFor(metadata.name)}
-                                draggable={false}
-                            />
-                        </div>
+                        {/*
+                          Story 9.4: the caveat lines. First-opener and network
+                          stay visible on the card -- an info glyph and a lock
+                          glyph respectively, per the acceptance criteria --
+                          while the local-copy line and the link-preview
+                          caveat move into "Trouble connecting?" below. The
+                          folder note (when present) is the third line, with
+                          no glyph of its own.
+                        */}
+                        <ul className="fd-caveats fd-rise" style={rise(2)}>
+                            <li>
+                                <InfoGlyph/>
+                                {copy.firstOpener.warning}
+                            </li>
+                            <li>
+                                <LockGlyph/>
+                                {copy.network.disclosure}
+                            </li>
+                            {metadata.isDir ? <li className="fd-caveats__plain">{copy.folder.note}</li> : null}
+                        </ul>
                     </div>
+                </div>
+            </section>
 
-                    <p className="fd-notice">{copy.firstOpener.warning}</p>
-
-                    <div className="fd-trust">
-                        <p>{copy.network.disclosure}</p>
-                        <p>{copy.localCopy.disclosure}</p>
-                    </div>
-
-                    <RecoveryHelp/>
-
-                    <button
-                        type="button"
-                        className="fd-button fd-button--quiet fd-target"
-                        aria-disabled={state.cancelPending || undefined}
-                        onClick={() => {
-                            if (!state.cancelPending) onCancel()
-                        }}
-                    >
-                        {state.cancelPending ? copy.cancel.pending : copy.cancel.action}
-                    </button>
-                </section>
+            <div className="fd-staged-foot fd-rise" style={rise(3)}>
+                <Disclosure
+                    className="fd-help"
+                    headingId="fd-staged-help-heading"
+                    summary={copy.help.heading}
+                >
+                    <StagedHelpContent/>
+                </Disclosure>
+                <button
+                    type="button"
+                    className="fd-button fd-button--quiet fd-target"
+                    aria-disabled={state.cancelPending || undefined}
+                    onClick={() => {
+                        if (!state.cancelPending) onCancel()
+                    }}
+                >
+                    {state.cancelPending ? copy.cancel.pending : copy.cancel.action}
+                </button>
             </div>
 
             {commandError === null ? null : (
@@ -336,5 +405,117 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                 />
             )}
         </div>
+    )
+}
+
+/** Decorative link-chain glyph on the resting Copy Link face (Story 9.4). */
+function LinkGlyph() {
+    return (
+        <svg
+            className="fd-button__glyph"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            aria-hidden="true"
+            focusable="false"
+        >
+            <path d="M6.5 9.5a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0-4.2-4.2l-.7.7"/>
+            <path d="M9.5 6.5a3 3 0 0 0-4.2 0L3.2 8.6a3 3 0 0 0 4.2 4.2l.7-.7"/>
+        </svg>
+    )
+}
+
+/** Decorative check glyph on the Copied face (Story 9.4). */
+function CheckGlyph() {
+    return (
+        <svg
+            className="fd-button__glyph"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+        >
+            <path d="m3.5 8.5 3 3 6-7"/>
+        </svg>
+    )
+}
+
+/** Decorative info glyph beside the first-opener caveat (Story 9.4). */
+function InfoGlyph() {
+    return (
+        <svg
+            className="fd-caveats__glyph"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+            focusable="false"
+        >
+            <circle cx="8" cy="8" r="6.2"/>
+            <path d="M8 7.2v3.8M8 5v.1" strokeLinecap="round"/>
+        </svg>
+    )
+}
+
+/** Decorative lock glyph beside the network caveat (Story 9.4). */
+function LockGlyph() {
+    return (
+        <svg
+            className="fd-caveats__glyph"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+        >
+            <rect x="3" y="7" width="10" height="7" rx="1.5"/>
+            <path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1"/>
+        </svg>
+    )
+}
+
+/** Decorative file-kind glyph beside the item name (Story 9.4). */
+function FileKindGlyph() {
+    return (
+        <svg
+            className="fd-item__glyph"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+        >
+            <path d="M5 2.5h6.5L15.5 6.5v11H5z"/>
+            <path d="M11.5 2.5v4h4"/>
+        </svg>
+    )
+}
+
+/** Decorative folder-kind glyph beside the item name (Story 9.4). */
+function FolderKindGlyph() {
+    return (
+        <svg
+            className="fd-item__glyph"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+        >
+            <path d="M2.5 5a1.2 1.2 0 0 1 1.2-1.2h4.2l1.8 1.8h7.1a1.2 1.2 0 0 1 1.2 1.2v8.2a1.2 1.2 0 0 1-1.2 1.2h-13a1.2 1.2 0 0 1-1.2-1.2z"/>
+        </svg>
     )
 }
