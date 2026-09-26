@@ -339,3 +339,182 @@ guarantee this story did not touch (Story 7.9's field-sizing mutations,
 `Disclosure.tsx`'s own contract, D-114's blur-revert). The three
 story-vs-prototype/spine disagreements are recorded above rather than
 resolved silently. Native verification is the orchestrator's, as scoped.
+
+## Review follow-up (branch `fix-9-4-staged-layout`, from `origin/epic-9-motion-and-clarity` @ `99df048`)
+
+After Story 9.4 merged, the orchestrator's rendered check at 1024x768
+found two layout defects neither suite caught. Both are pure CSS/layout
+bugs jsdom cannot evaluate (it performs no layout), so this follow-up adds
+rendered-Chromium coverage in `browser/accessibility.test.tsx` for both,
+following the defect-fix carve-out: failing test first, then the fix,
+then a mutation confirming the test actually catches the regression.
+
+### Defect 1: the hero card's fixed track was assigned to the wrong element
+
+**Cause.** `.fd-hero` declared `grid-template-columns: minmax(0, 1fr)
+216px;` -- the fixed track second -- but `StagedView.tsx`'s DOM order
+renders `.fd-qr-panel` first and `.fd-hero__details` second. CSS Grid
+assigns tracks to children strictly in DOM order, not by which element a
+reader would expect to get which track, so the QR landed in the large
+flexible track (and sat centred in the leftover space, per its own
+`min(216px, 100%)` width) while the item details were crushed into the
+216px track: the name wrapped mid-word, Copy Link and Show Link stacked
+vertically instead of sharing a row, and the caveats wrapped into narrow
+lines.
+
+**Why the suites missed it.** `styles.test.ts` only proves the stylesheet
+*text* contains a two-track template -- it does, just with the tracks in
+the wrong order -- and no rendered test measured which element actually
+ended up in which track. This is exactly the class of bug the story's own
+"Testing standards" section warns about: a CSS-text pin proves a rule
+exists, never that the right element receives it.
+
+**Fix.** `grid-template-columns: 216px minmax(0, 1fr);` (fixed track
+first, matching DOM order), `align-items: center` (was `start`, matching
+the owner-approved prototype's `.card`), and `gap: var(--spacing-6)` (24px,
+was `--spacing-7`/32px, also matching the prototype). `styles.test.ts`'s
+literal pin for the template updated to match, with a comment explaining
+why track order is DOM-order-dependent.
+
+**New tests** (`browser/accessibility.test.tsx`, describe "the hero card
+assigns its fixed track to the element the DOM actually puts there"),
+each run at 1024x768 and 640x480:
+
+- the details column's rendered width is greater than the QR tile's,
+- Copy Link and Show Link share the same rendered top (within 2px),
+- a realistic long name ("dev-environment-guide.html", the prototype's own
+  item) renders on exactly one visual line (`Range.getClientRects().length
+  <= 1` against the name's own text node -- a direct wrap measurement, not
+  an inference from element height).
+
+**Before/after measurements (1024x768, `renderStaged()`'s default 8.4MB
+"Travel Notes.pdf" state unless noted):**
+
+| Measurement | Before (broken) | After (fixed) |
+|---|---|---|
+| `.fd-qr-panel` width | 430.0px (the 1fr track) | 216.0px |
+| `.fd-hero__details` width | 216.0px (the fixed track) | 430.0px |
+| Copy Link / Show Link top | 158.7px / 210.7px (52px apart, stacked) | same row (<=2px apart) |
+| "dev-environment-guide.html" | wraps across 2 lines | 1 line |
+
+### Defect 2: the foot row was never actually one row
+
+**Cause, in two parts, both on `.fd-staged-foot .fd-disclosure`.**
+`.fd-disclosure__summary` (inside the `Disclosure` component, unscoped)
+fills its container's full width on its own, so the surrounding
+`.fd-disclosure` box had to be given a real, definite width for that
+child's own full-width behaviour to resolve against something other than
+the whole row. The rule this branch found in place, `flex: 1 1 auto`, does
+not do that: with an automatic flex-basis, a flex item's hypothetical size
+for the *line-wrap decision* in a wrapping flex container is its
+max-content extent, and `Disclosure`'s collapsed help region stays mounted
+at full content size even at zero rendered height (Story 9.1's
+collapsed-content-stays-mounted contract) -- so the disclosure's own
+max-content extent was that of its single longest unwrapped sentence (the
+macOS firewall recovery line), comfortably wider than the whole row. That
+alone forced the disclosure onto its own line, growing to fill it once
+alone there, with Cancel bumped onto a second line below -- rendering as a
+full-width card with a separate bordered-looking Cancel button beneath it,
+not the one row the acceptance criteria describe.
+
+**Why the suites missed it.** The same gap as Defect 1: nothing rendered
+and measured the foot row's actual geometry. The original comment on
+`.fd-staged-foot` asserted the disclosure "sizes to its own content as a
+flex item," a claim that was never measured against the real collapsed
+content it also carries.
+
+**Fix.** `.fd-staged-foot .fd-disclosure` gets `flex: 1` (grow 1, shrink 1,
+a *zero* basis -- not the shorthand's own auto basis) plus
+`min-inline-size: 0`, `background: none`, `box-shadow: none` (dropping the
+boxed `{rounded.xl}` card surface every other `Disclosure` keeps). Its
+summary gets quieter styling scoped the same way: auto width, muted color,
+a hover fill, a smaller chevron, and an explicit `min-block-size:
+var(--spacing-target-min)` decoupled from its own quieter padding so the
+44px activation floor survives the visual change. `.fd-staged-foot`
+itself changes `align-items` from `center` to `flex-start`, and Cancel
+(`.fd-staged-foot .fd-button--quiet`) gets `flex: none; align-self:
+flex-start`. All of this is scoped under `.fd-staged-foot .fd-disclosure*`
+so Idle's own grouped disclosure list is completely unaffected -- confirmed
+by the full existing `IdleView.test.tsx` suite passing unchanged throughout.
+
+One thing found and corrected while writing the mutation table: mutating
+`.fd-staged-foot`'s own `align-items` alone (reverting `flex-start` back
+to `center`) left every new test passing. Cancel's own `align-self:
+flex-start` is what actually pins its top edge regardless of the
+container's setting, not the container's `align-items` -- the code
+comment originally claimed otherwise and was corrected to say so once the
+mutation disproved it, rather than left as an unverified claim.
+
+**New tests** (`browser/accessibility.test.tsx`, describe "the Staged foot
+row keeps 'Trouble connecting?' and Cancel on one row"):
+
+- collapsed, the disclosure trigger and Cancel share the same rendered top
+  (within 2px) at 1024x768 and 640x480,
+- expanded, Cancel's top is unchanged (within 2px) from its collapsed
+  position, and the opened help region has non-zero rendered width/height
+  and contains every one of the six help strings (both firewall
+  recoveries, both `copy.help.*` strings, the local-copy disclosure, the
+  link-preview caveat),
+- the collapsed disclosure trigger still measures at or above the 44px
+  activation floor despite its quieter padding.
+
+**Before/after measurements (1024x768):**
+
+| Measurement | Before (broken) | After (fixed) |
+|---|---|---|
+| `.fd-staged-foot` rendered height | 100px (two rows: 44 + 12 gap + 44) | 44px (one row) |
+| Disclosure trigger / Cancel top | 355.9px / 411.9px (56px apart) | same row (<=2px apart) |
+| Cancel's top after expanding | 411.9px -> 686.1px (274px shift) | unchanged (<=2px) |
+
+### Mutation table
+
+Each mutation applied to the real working tree, confirmed to fail (naming
+the defect) via the exact test text above, then reverted.
+
+| # | Mutation | Defect | File | Result |
+|---|---|---|---|---|
+| N1 | Reverted `.fd-hero`'s template to `minmax(0, 1fr) 216px` (fixed track second) | 1 | `style.css` | KILLED -- 3 tests failed: "gives the details column more width..." (216.0 not > 216.0), "keeps Copy Link and Show Link on the same row..." (52px apart), "keeps a realistic item name on one line..." (wraps) |
+| N2 | Reverted `.fd-staged-foot .fd-disclosure`'s `flex: 1` to `flex: 1 1 auto` | 2 | `style.css` | KILLED -- 3 tests failed: "aligns the collapsed disclosure trigger and Cancel..." (56.0px apart) x2 viewports, "keeps Cancel's top unchanged when..." (274.1px shift) |
+| N3 | Reverted `.fd-staged-foot`'s `align-items` from `flex-start` to `center` (isolated from N2) | 2 (a claim in the code comment, not a defect) | `style.css` | NOT KILLED -- all 10 tests in both defect-fix describe blocks stayed passing, proving Cancel's own `align-self: flex-start` (not the container's `align-items`) is what pins its position; the code comment was rewritten to state this rather than the disproved original claim |
+
+N1 and N2 are the two acceptance mutations this follow-up's own instructions
+name ("revert each fix -> its test fails naming it"); both killed cleanly.
+N3 was not part of the assignment but was run anyway while writing the
+"why this works" comment for the `align-items` change, per this repo's own
+rule that an unverified claim in a comment is exactly the kind of thing a
+mutation should have caught before it shipped. Finding it unnecessary here
+and saying so is the same discipline as finding a mutation that kills.
+
+### Gate transcripts (macOS arm64, native)
+
+Run in the order `.github/workflows/verify.yml` uses, after the mutation
+pass above and with the working tree back to its intended diff.
+
+- `wails build`: **PASS** -- `Built '.../fairdrop.app/Contents/MacOS/fairdrop' in 9.041s.` Same pre-existing linker warning as before, unrelated to this change.
+- Bindings drift: **PASS** after `git checkout -- frontend/wailsjs` -- 0 insertions/0 deletions (mode-only churn). No exported `App` command surface touched.
+- `gofmt -l .`: **PASS**, no output.
+- `go vet ./...`: **PASS**, no output.
+- `go tool staticcheck ./...`: **PASS**, no output.
+- `go test -count=1 ./...`: **PASS** -- `ok` for all nine packages.
+- `CGO_ENABLED=1 go test -count=1 -race ./...`: **PASS** -- `ok` for all nine packages (`go env CGO_ENABLED` confirmed `1`; `internal/stream` ~99.6s under the race detector).
+- `cd frontend && npx vitest run`: **PASS** -- 19 files, **746 tests** (one pre-existing pin, `.fd-hero`'s grid-template-columns literal, updated for the new column order; no jsdom test added or removed here -- both defects are pure layout, provable only in the rendered suite below).
+- `cd frontend && npm run test:browser`: **PASS** -- 2 files, **41 tests**, **10 new** for this follow-up (6 for Defect 1: three `it.each` cases x2 viewports; 4 for Defect 2: one `it.each` case x2 viewports plus two single-viewport cases). The other 31 were already on this branch after the fetch: Story 9.4's own 27 plus the four already-merged Idle chevron/drop-zone defect-fix tests the coordinator's message named.
+- Capture churn: none this run -- `git status --short` showed no change to `frontend/browser/captures/`; the QR tile's own size/radius were untouched by this follow-up.
+- No content drift beyond the three files this follow-up touches (`frontend/src/style.css`, `frontend/src/ui/styles.test.ts`, `frontend/browser/accessibility.test.tsx`), confirmed via `git status --short` after the full gate.
+
+Two comments were rewritten a second time after the first draft tripped
+`styles.test.ts`'s own stylesheet-content scanners (`the Quartz token
+layer > reaches every component value through a token rather than a
+literal`, `reflow to 320 CSS pixels > declares no width that could force a
+page-level horizontal scrollbar`): both scan the raw stylesheet text,
+comments included, for color-literal words and `property: value`-shaped
+substrings followed by a large pixel figure before the next `;`/`}`. The
+first draft's prose used "stayed green" (a banned color word) and spelled
+out `flex-basis: auto`/`flex-basis: 0` with a literal, uncomparably-large
+"700px" later in the same unterminated sentence, which the second scanner
+read as a real declaration whose value exceeded the 320px reflow floor.
+Rewritten to describe the same mechanism without a colon-adjacent property
+name or a bare pixel figure over 320 in prose. Recorded here because it is
+itself a small instance of this repo's own rule: a test that scans raw
+text for meaning can be tripped by prose describing that text, and the fix
+is to write around the scanner, not loosen it.

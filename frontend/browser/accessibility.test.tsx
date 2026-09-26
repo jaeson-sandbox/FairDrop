@@ -152,6 +152,34 @@ async function renderStaged(): Promise<HTMLElement> {
     return container
 }
 
+/**
+ * Story 9.4 defect fix: the orchestrator's rendered 1024x768 review used
+ * "dev-environment-guide.html" (the owner-approved prototype's own item
+ * name) to observe the item name wrapping mid-word once the details column
+ * was crushed into the QR's 216px track. Kept as its own helper rather than
+ * a `staged()` override at each call site, so the name a defect was
+ * actually observed with is named once, here.
+ */
+async function renderStagedNamed(name: string): Promise<HTMLElement> {
+    const state = staged({metadata: metadata({name})})
+    const {container} = render(<StagedView state={state} onCancel={() => undefined}/>)
+    await waitForEntranceToSettle(container)
+    return container
+}
+
+/**
+ * True when every character of `element`'s text content renders on a single
+ * visual line -- a `Range` spanning its contents reports one client rect per
+ * line it wraps across, so more than one rect is a direct measurement of
+ * wrapping rather than an inference from height (which a taller font or
+ * line-height could satisfy by accident either way).
+ */
+function isSingleLine(element: Element): boolean {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    return range.getClientRects().length <= 1
+}
+
 async function renderTransferring(): Promise<HTMLElement> {
     const {container} = render(<TransferringView state={transferring()} onCancel={() => undefined}/>)
     await waitForEntranceToSettle(container)
@@ -968,5 +996,150 @@ describe('a phase view settles to a fully opaque, untranslated resting state (St
         const style = getComputedStyle(view)
         expect(style.opacity).toBe('1')
         expect(style.translate).toBe('none')
+    })
+})
+
+/*
+  Defect fix, orchestrator's rendered 1024x768 review after Story 9.4
+  merged (99df048): `.fd-hero`'s fixed track came *second*
+  (`minmax(0, 1fr) 216px`) while `StagedView.tsx`'s DOM order puts
+  `.fd-qr-panel` *first* -- grid assigns tracks to children in DOM order,
+  so the QR actually landed in the large `1fr` track (centred in the
+  leftover space) and the item details were crushed into 216px: the name
+  wrapped mid-word, Copy Link and Show Link stacked vertically, and the
+  caveats wrapped into narrow lines. None of the existing suites caught
+  this because `styles.test.ts` only proves the CSS text contains a
+  two-track template (it does, just in the wrong order) and no rendered
+  test measured which track either element actually occupied.
+*/
+describe('the hero card assigns its fixed track to the element the DOM actually puts there (Story 9.4 defect fix)', () => {
+    it.each([[1024, 768], [640, 480]])(
+        'gives the details column more width than the QR tile at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderStaged()
+
+            const qr = container.querySelector('.fd-qr-panel')
+            const details = container.querySelector('.fd-hero__details')
+            if (qr === null || details === null) throw new Error('.fd-qr-panel or .fd-hero__details did not render')
+
+            const qrWidth = qr.getBoundingClientRect().width
+            const detailsWidth = details.getBoundingClientRect().width
+            expect(
+                detailsWidth,
+                `the details column (${detailsWidth.toFixed(1)}px) is not wider than the QR tile ` +
+                    `(${qrWidth.toFixed(1)}px) at ${width}x${height} -- the fixed 216px track landed on the ` +
+                    'wrong element',
+            ).toBeGreaterThan(qrWidth)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'keeps Copy Link and Show Link on the same row at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            await renderStaged()
+
+            const copyTop = screen.getByRole('button', {name: 'Copy Link'}).getBoundingClientRect().top
+            const showTop = screen.getByRole('button', {name: 'Show Link'}).getBoundingClientRect().top
+            expect(
+                Math.abs(copyTop - showTop),
+                `Copy Link (top ${copyTop.toFixed(1)}) and Show Link (top ${showTop.toFixed(1)}) are not on ` +
+                    `the same row at ${width}x${height}`,
+            ).toBeLessThanOrEqual(2)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'keeps a realistic item name on one line at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderStagedNamed('dev-environment-guide.html')
+
+            const isolate = container.querySelector('#fd-item-name bdi')
+            if (isolate === null) throw new Error('#fd-item-name bdi did not render')
+
+            expect(
+                isSingleLine(isolate),
+                `"dev-environment-guide.html" wraps across more than one line at ${width}x${height}`,
+            ).toBe(true)
+        },
+    )
+})
+
+/*
+  Defect fix, same rendered review: the AC's "one row" for the foot
+  (the "Trouble connecting?" disclosure on the left, Cancel on the right)
+  was never actually one row. `.fd-disclosure__summary` carries its own
+  `width: 100%`, and a flex item whose only child demands that resolves, in
+  the engine this suite runs, by filling the whole row rather than hugging
+  the label text -- so the disclosure took the full row width and Cancel
+  wrapped onto its own line below it.
+*/
+describe('the Staged foot row keeps "Trouble connecting?" and Cancel on one row (Story 9.4 defect fix)', () => {
+    it.each([[1024, 768], [640, 480]])(
+        'aligns the collapsed disclosure trigger and Cancel at the same top at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            await renderStaged()
+
+            const trigger = screen.getByRole('button', {name: 'Trouble connecting?'})
+            const cancel = screen.getByRole('button', {name: 'Cancel'})
+            const diff = Math.abs(trigger.getBoundingClientRect().top - cancel.getBoundingClientRect().top)
+            expect(
+                diff,
+                `the disclosure trigger and Cancel are not on the same row at ${width}x${height} ` +
+                    `(top difference ${diff.toFixed(1)}px)`,
+            ).toBeLessThanOrEqual(2)
+        },
+    )
+
+    it('keeps Cancel’s top unchanged when "Trouble connecting?" expands, with every help string visible', async () => {
+        await page.viewport(1024, 768)
+        const container = await renderStaged()
+
+        const cancel = screen.getByRole('button', {name: 'Cancel'})
+        const topBefore = cancel.getBoundingClientRect().top
+
+        fireEvent.click(screen.getByRole('button', {name: 'Trouble connecting?'}))
+        await waitForEntranceToSettle(container)
+
+        const topAfter = cancel.getBoundingClientRect().top
+        expect(
+            Math.abs(topAfter - topBefore),
+            `Cancel moved from top ${topBefore.toFixed(1)} to ${topAfter.toFixed(1)} when the disclosure opened`,
+        ).toBeLessThanOrEqual(2)
+
+        // The region itself, not per-string getByText: every string below
+        // nests inside a <p>/<dd> whose own ancestors (the region, its
+        // inner wrapper, the body) also match a substring search on
+        // textContent, so a per-string element lookup finds more than one
+        // node. Checking the region's own rendered size once, then its
+        // aggregate text for each string, is unambiguous and exercises the
+        // same "did it actually become visible" question.
+        const region = document.querySelector('.fd-help .fd-disclosure__region') as HTMLElement
+        const regionRect = region.getBoundingClientRect()
+        expect(regionRect.width, 'the opened help region has zero rendered width').toBeGreaterThan(0)
+        expect(regionRect.height, 'the opened help region has zero rendered height').toBeGreaterThan(0)
+
+        for (const text of [
+            'Open Windows Firewall settings',
+            'Open System Settings',
+            'Not downloading?',
+            'Browser says Not Found',
+            'FairDrop keeps no copy.',
+            'Link previews in chat apps',
+        ]) {
+            expect(region.textContent, `"${text}" missing from the opened help region`).toContain(text)
+        }
+    })
+
+    it('keeps the collapsed disclosure trigger at or above the 44px activation floor despite its quieter padding', async () => {
+        await page.viewport(1024, 768)
+        await renderStaged()
+
+        const trigger = screen.getByRole('button', {name: 'Trouble connecting?'})
+        const rect = trigger.getBoundingClientRect()
+        expect(rect.height, `the disclosure trigger is ${rect.height.toFixed(1)}px tall`).toBeGreaterThanOrEqual(44)
     })
 })
