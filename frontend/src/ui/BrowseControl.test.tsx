@@ -656,3 +656,63 @@ describe('the menu items carry a leading glyph (Story 9.3)', () => {
         }
     })
 })
+
+/*
+  Story 9.6: an outcome card's own primary (Send Another/Choose Another) can
+  be busy while `stageFromOutcome`/`retry()` releases a live lease. The
+  trigger stays a normal Tab stop and keeps its accessible name throughout --
+  `aria-disabled`, never the native `disabled` attribute -- and both the
+  click and the keyboard-open path become no-ops.
+*/
+describe('the disabled prop (Story 9.6 busy state)', () => {
+    it('defaults to enabled -- Idle\'s own browse control never passes this prop', () => {
+        show()
+        const trigger = screen.getByRole('button', {name: LABEL})
+
+        expect(trigger.hasAttribute('aria-disabled')).toBe(false)
+        expect(trigger.hasAttribute('disabled')).toBe(false)
+    })
+
+    it('marks the trigger aria-disabled, never the native disabled attribute, while true', () => {
+        render(<BrowseControl label={LABEL} onSelectFile={vi.fn()} onSelectDirectory={vi.fn()} disabled/>)
+        const trigger = screen.getByRole('button', {name: LABEL})
+
+        expect(trigger.getAttribute('aria-disabled')).toBe('true')
+        expect(trigger.hasAttribute('disabled')).toBe(false)
+        // Still a valid focus target -- a screen reader must be able to reach
+        // it to discover the busy state at all.
+        trigger.focus()
+        expect(document.activeElement).toBe(trigger)
+    })
+
+    it('ignores a click on the trigger while disabled -- the menu never opens', () => {
+        render(<BrowseControl label={LABEL} onSelectFile={vi.fn()} onSelectDirectory={vi.fn()} disabled/>)
+
+        fireEvent.click(screen.getByRole('button', {name: LABEL}))
+
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('ignores ArrowDown on the trigger while disabled -- the keyboard-open path is a no-op too', () => {
+        render(<BrowseControl label={LABEL} onSelectFile={vi.fn()} onSelectDirectory={vi.fn()} disabled/>)
+        const trigger = screen.getByRole('button', {name: LABEL})
+        trigger.focus()
+
+        fireEvent.keyDown(trigger, {key: 'ArrowDown'})
+
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('re-enables the ordinary click-to-open behaviour once disabled clears', () => {
+        const {rerender} = render(
+            <BrowseControl label={LABEL} onSelectFile={vi.fn()} onSelectDirectory={vi.fn()} disabled/>,
+        )
+        rerender(<BrowseControl label={LABEL} onSelectFile={vi.fn()} onSelectDirectory={vi.fn()} disabled={false}/>)
+
+        const trigger = screen.getByRole('button', {name: LABEL})
+        expect(trigger.hasAttribute('aria-disabled')).toBe(false)
+        fireEvent.click(trigger)
+
+        expect(screen.getByRole('menu')).toBeTruthy()
+    })
+})

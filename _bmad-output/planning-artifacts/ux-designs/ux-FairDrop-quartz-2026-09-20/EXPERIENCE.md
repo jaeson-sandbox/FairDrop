@@ -103,14 +103,17 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.discovery.warning` | Discovery warning | “Device discovery isn’t available. The QR code and download link still work.” |
 | `copy.progress.unknown` | Unknown-total transfer | “Sending — total size unknown” |
 | `copy.progress.known_empty` | Known-empty transfer | “Empty file — 0 bytes to transfer” |
-| `copy.done.heading` | Done heading | “Transfer finished” |
-| `copy.done.body` | Done body | “FairDrop finished sending the item.” |
+| `copy.done.heading` | Done heading | “Sent” |
+| `copy.done.send_another` | Done card's primary action | “Send Another” |
+| `copy.done.dismiss` | Done card's own Dismiss | “Done” |
 | `copy.cancel.preparation` | Cancel preparation action | “Cancel preparation” |
 | `copy.cancel.preparation_pending` | Pending preparation cancellation | “Canceling preparation” |
 | `copy.cancel.action` | Transfer cancellation action | “Cancel” |
 | `copy.cancel.pending` | Pending cancellation | “Canceling” |
 | `copy.cancel.won` | Cancel-winning reset | “Transfer canceled. Ready for another file or folder.” |
-| `copy.outcome.dismiss` | Retained-outcome action | “Dismiss” |
+| `copy.outcome.dismiss` | Error card's own Dismiss (every outcome card carries one) | “Dismiss” |
+| `copy.outcome.try_again` | Error card's primary action when `selectEffectiveErrorAction` returns `retry` | “Try Again” |
+| `copy.outcome.choose_another` | Error card's primary action when `selectEffectiveErrorAction` returns `choose` | “Choose Another” |
 | `copy.help.heading` | Staged troubleshooting disclosure summary | “Trouble connecting?” |
 | `copy.help.different_lan` | Different-LAN help | “Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.” |
 | `copy.help.receiver_http` | Generic receiver-error help | “Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.” |
@@ -151,7 +154,7 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 
 | Component | Use | Behavioral rules |
 |---|---|---|
-| **App Shell** | Every desktop state | Renders one authoritative lifecycle presentation plus an optional retained terminal outcome in Idle; subscribes once to `transfer-*`; a second launch preserves the session and retained status. |
+| **App Shell** | Every desktop state | Renders one authoritative lifecycle presentation plus an optional retained terminal outcome in Idle; subscribes once to `transfer-*`; a second launch preserves the session and retained status. **Story 9.6 amendment:** a retained outcome, or an Idle Stage-time command failure, replaces Idle's own composition (the drop zone, the browse pill, the grouped disclosures) rather than rendering alongside it -- the outcome card itself carries the inherited `--wails-drop-target: drop`, so a native drop on it stages that item through the same release-then-stage path "Send Another"/"Choose Another" use. |
 | **DropZone** | Idle | Uses `OnFileDrop(callback, true)` and inherited `--wails-drop-target: drop`; no DOM drop handler. Rejects zero/multiple paths and stages exactly one. |
 | **Selection Controls** | Idle | One control labelled `copy.label.chooseFileOrFolder`, opening a `role="menu"` offering both kinds (spec-4-1) because Windows' `IFileOpenDialog` cannot; the item chosen runs the matching semantic `SelectFile()` / `SelectDirectory()`. Keyboard-operable, Escape closes the menu, and focus returns to the control on Escape or on a kind chosen; focus leaving the menu on its own (e.g. Tab) closes it without recapturing focus, since no focus trap is permitted outside an OS dialog. Non-empty result stages immediately; empty result stays quiet. Starting Stage dismisses a retained outcome. |
 | **Stage Pending Card** | Local command pending | Identifies item kind and preparation; includes semantic `copy.cancel.preparation`. No QR/session controls or authoritative-state badge. Obsolete promises cannot commit state. |
@@ -166,8 +169,8 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 | **Progress Meter** | Transferring | Three modes: known positive determinate; directory/unknown static-pattern unknown; known-empty text-only status with no percentage-bearing progressbar. |
 | **Transfer Metrics** | Transferring | Shows actual wire `bytesSent`; throughput is visual only. Known-empty shows 0 bytes and omits meaningless speed/percentage. |
 | **Cancel Action** | Stage Pending, Staged, Transferring | While cancellation is pending, the control retains focus, suppresses repeat activation with `aria-disabled="true"`, and changes its visible and accessible label to `copy.cancel.pending`; lifecycle and command authority determine the outcome. |
-| **Done Panel** | Done and retained Idle status | Says only that FairDrop finished sending. After reset the same visible node becomes non-session status with Dismiss and remains until dismissal or next Stage. |
-| **Error Panel** | Error, retained Idle status, command/validation failures | Uses the fixed table. Terminal Error persists after reset as dismissible non-session status. Focused errors are not simultaneously alerts. |
+| **Done Panel** | Done and retained Idle status | **Story 9.6 rebuild:** one centred card (disc, heading, a one-line receipt, "Send Another", "Done"), live or retained -- "Send Another" is unconditional, so the way forward never depends on whether the backend's reset already landed. After reset the same visible node becomes non-session status and remains until dismissal or the next Stage. |
+| **Error Panel** | Error, retained Idle status, command/validation failures | **Story 9.6 rebuild:** the same one-card shape as Done -- the fixed heading/message table, the retained item name when Story 9.2 kept one, and the primary action `selectEffectiveErrorAction` names (Try Again/Choose Another/none), plus Dismiss on every card. Terminal Error persists after reset as dismissible non-session status. Focused errors are not simultaneously alerts. |
 | **Status Announcer** | Non-focus status only | One pre-mounted `role="status" aria-live="polite" aria-atomic="true"`; never repeats content announced by focus and never becomes an event log. |
 
 ### Stage-preparation cancellation
@@ -191,7 +194,7 @@ State composition references: [Idle and local preparation](mockups/key-idle-prep
 | Dialog/open or cancel | OS owns focus; empty selection returns to invoking control with no message. |
 | Staging pending | Stage Pending Card plus Cancel preparation. Local command results govern pre-ack completion/cancellation. |
 | Staging/cancel pending | Use `copy.cancel.preparation_pending`; retain focus, suppress duplicates, and make no lifecycle-state claim. |
-| Stage command failure | Idle with focused safe Error Panel; no QR, URL, terminal lease, or lifecycle event. |
+| Stage command failure | **Story 9.6:** the focused safe Error Panel replaces Idle's own composition (the drop zone, the browse pill, the disclosures) rather than rendering beside it; no QR, URL, terminal lease, or lifecycle event. |
 | Staged/ready | Focused Staged heading; QR, item, the two link actions, the two always-visible caveats, "Trouble connecting?" (collapsed), and Cancel visible. The link itself is not rendered until Show Link is activated (Story 9.4). |
 | Staged/`beacon_warning` | Warning added and announced once; QR/link remain usable. |
 | Staged/copy success | Copy Feedback only; focus/state remain. |
@@ -201,8 +204,8 @@ State composition references: [Idle and local preparation](mockups/key-idle-prep
 | Staged or Transferring/cancel pending | `copy.cancel.pending` remains focused and readable; the winning backend event grammar governs. |
 | Done | Focused Done heading/panel; sender-observed transport copy only. |
 | Error | Focused safe Error heading/panel; fixed code/message only. |
-| Reset after Done/Error | Clear matching session and expose Idle controls while preserving the same visible outcome node. No announcement and no focus move; if focus is in the outcome, it remains there. |
-| Dismiss retained outcome | Remove sessionless status, focus Idle instruction, and use focus as the sole announcement owner. |
+| Reset after Done/Error | Clear the matching session. **Story 9.6 amends "expose Idle controls while preserving the same visible outcome node" to "the outcome node is preserved and itself offers the Idle actions"**: the retained card replaces Idle's composition rather than sitting above it, and its own Send Another/Choose Another (BrowseControl) and native-drop wiring are what let a sender start a fresh Stage, not a separately-rendered Idle underneath it. No announcement and no focus move; if focus is in the outcome, it remains there. |
+| Dismiss retained outcome | Remove sessionless status, focus Idle instruction, and use focus as the sole announcement owner. **Story 9.6:** the same Dismiss (labelled "Done" on a Done card) also clears a Stage-time command failure now, landing on the same target -- the failure was never a "retained outcome" by name, but is one of the outcome card's own three shapes, and every one of them dismisses the same way. |
 | Receiver/valid first claim | First device or software issuing exact-token GET starts attachment response; sender moves only on accepted backend start. |
 | Receiver/wrong method, route, or token | Generic browser 404; sender cannot diagnose it. Sender help covers wrong/expired link and creating a fresh one. |
 | Receiver/competing valid claim | Generic browser 423 while listener lives; first opener continues. Sender help explains another opener may have claimed it. |
@@ -241,7 +244,7 @@ Every transition has exactly one owner. Focused content is excluded from live/al
 | Cancel-winning reset | Focused Idle cancellation summary | One combined message; no live reset message. |
 | Complete or terminal Error | Focused outcome heading/panel | Move once; no polite/alert duplicate. |
 | Reset after terminal | None | No second focus move; retained node remains mounted. |
-| Dismiss retained outcome | Focused Idle instruction | Focus is the only owner. |
+| Dismiss retained outcome | Focused Idle instruction | Focus is the only owner. Story 9.6: the same row now also covers dismissing an Idle Stage-time command failure. |
 
 An actionable error may use `role="alert"` only if an exceptional implementation path does not move focus to it; the same transition can never use both mechanisms.
 

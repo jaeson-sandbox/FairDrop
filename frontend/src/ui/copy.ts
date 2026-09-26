@@ -105,8 +105,17 @@ export const copy = {
         knownEmpty: 'Empty file — 0 bytes to transfer',
     },
     done: {
-        heading: 'Transfer finished',
-        body: 'FairDrop finished sending the item.',
+        /**
+         * Story 9.6: the Done card's own heading. `copy.done.body` is
+         * removed -- the one-line receipt (kind glyph, name, wire bytes) now
+         * carries what completion means, and the sentence that used to spell
+         * it out is redundant beside it.
+         */
+        heading: 'Sent',
+        /** Story 9.6: the Done card's primary action -- the extracted BrowseControl, reused verbatim. */
+        sendAnother: 'Send Another',
+        /** Story 9.6: the Done card's own Dismiss, distinct wording from an Error card's. */
+        dismiss: 'Done',
     },
     cancel: {
         preparation: 'Cancel preparation',
@@ -117,6 +126,10 @@ export const copy = {
     },
     outcome: {
         dismiss: 'Dismiss',
+        /** Story 9.6: the Error card's primary action when `selectEffectiveErrorAction` returns `retry`. */
+        tryAgain: 'Try Again',
+        /** Story 9.6: the Error card's primary action when `selectEffectiveErrorAction` returns `choose`. */
+        chooseAnother: 'Choose Another',
     },
     help: {
         /**

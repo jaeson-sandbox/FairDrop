@@ -18,6 +18,16 @@ interface BrowseControlProps {
     readonly label: string
     readonly onSelectFile: () => void
     readonly onSelectDirectory: () => void
+    /**
+     * Story 9.6: true while an outcome card's own action is releasing a live
+     * lease (`stageFromOutcome`'s cancel-then-wait-for-idle window). The
+     * trigger gets `aria-disabled`, never the native `disabled` attribute --
+     * the control must keep taking focus so the busy state itself is
+     * perceivable and Tab order does not jump -- and both the click and
+     * keyboard-open paths become no-ops. Defaults to `false` so Idle's own
+     * browse control (which never passes this prop) is unaffected.
+     */
+    readonly disabled?: boolean
 }
 
 /**
@@ -36,7 +46,7 @@ interface BrowseControlProps {
  * not reducer state -- because nothing about it survives a re-render of Idle
  * or needs to be reconstructed from a lifecycle event.
  */
-export function BrowseControl({label, onSelectFile, onSelectDirectory}: BrowseControlProps) {
+export function BrowseControl({label, onSelectFile, onSelectDirectory, disabled = false}: BrowseControlProps) {
     const [open, setOpen] = useState(false)
     // Story 7.10: WebKit does not match `:focus-visible` for an element
     // focused by script (see the CSS comment above `.fd-button:focus-visible,
@@ -305,6 +315,7 @@ export function BrowseControl({label, onSelectFile, onSelectDirectory}: BrowseCo
             return
         }
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+        if (disabled) return
         event.preventDefault()
         if (open) {
             // Defensive fallback only -- see the doc comment above. Marks
@@ -333,6 +344,7 @@ export function BrowseControl({label, onSelectFile, onSelectDirectory}: BrowseCo
      * transition into `open`.
      */
     function handleTriggerClick(event: MouseEvent<HTMLButtonElement>): void {
+        if (disabled) return
         openedByRef.current = event.detail === 0 ? 'keyboard' : 'pointer'
         setOpen((was) => !was)
     }
@@ -376,6 +388,7 @@ export function BrowseControl({label, onSelectFile, onSelectDirectory}: BrowseCo
                 className="fd-button fd-button--primary fd-button--pill fd-target"
                 aria-haspopup="menu"
                 aria-expanded={open}
+                aria-disabled={disabled || undefined}
                 // Only while the menu exists: aria-controls names an element by
                 // id, and pointing at one that is not rendered is a dangling
                 // reference for anything that resolves it.

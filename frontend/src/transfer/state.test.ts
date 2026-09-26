@@ -473,6 +473,52 @@ describe('terminal receipt retention (Story 7.4)', () => {
         })).toEqual({phase: 'pending', generation: 2, itemKind: 'directory', cancelPending: false})
     })
 
+    /*
+      Story 9.6: 'dismiss-retained' now clears a Stage-time command failure
+      too, not only a retained outcome -- the one-card rebuild gives every
+      Idle-level outcome card (a retained Done/Error, or a command failure)
+      a working Dismiss, and both routes reuse the one action rather than
+      each inventing its own. *Mutation:* restrict the guard back to
+      `retainedOutcome === null` alone -> this must fail, since a pure
+      command-error state (`retainedOutcome: null`) would then be treated as
+      "nothing to dismiss" and returned unchanged.
+    */
+    it('clears a Stage-time command failure on dismiss-retained, not only a retained outcome', () => {
+        const pending = transferReducer(createInitialTransferState(), {
+            type: 'stage-requested', generation: 1, itemKind: 'file',
+        })
+        const failed = transferReducer(pending, {
+            type: 'stage-failed', generation: 1, error: {code: 'invalid_selection', message: 'x'},
+        })
+        expect(failed).toMatchObject({phase: 'idle', retainedOutcome: null})
+        expect((failed as {commandError: unknown}).commandError).not.toBeNull()
+
+        expect(transferReducer(failed, {type: 'dismiss-retained'})).toEqual(createInitialTransferState())
+    })
+
+    /*
+      The rare dual case "keeps retained terminal outcome when invalid
+      selection supplies the visible command error" (above) produces a state
+      carrying both a retained outcome and a command error at once. Dismiss
+      must clear both together -- there is only the one Dismiss control once
+      the retained outcome's own card replaces Idle's composition (Story 9.6),
+      so nothing would ever ask to clear only one half.
+    */
+    it('clears both halves of the rare retained-outcome-plus-command-error state at once', () => {
+        const dual: TransferState = {
+            phase: 'idle',
+            retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
+            commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+        }
+
+        expect(transferReducer(dual, {type: 'dismiss-retained'})).toEqual(createInitialTransferState())
+    })
+
+    it('still does nothing on dismiss-retained when Idle has neither a retained outcome nor a command failure', () => {
+        const plain = createInitialTransferState()
+        expect(transferReducer(plain, {type: 'dismiss-retained'})).toBe(plain)
+    })
+
     it('rewrites caller-supplied error copy rather than storing what it was handed', () => {
         const forged: PublicError = {code: 'busy', message: 'C:\\private\\report.pdf?token=fedcba98'}
         const registryCopy = 'FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.'

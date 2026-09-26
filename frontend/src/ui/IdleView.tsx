@@ -3,7 +3,7 @@ import {selectCommandError} from '../transfer/selectors'
 import type {IdleTransferState} from '../transfer/state'
 import {BrowseControl} from './BrowseControl'
 import {Disclosure} from './Disclosure'
-import {OutcomePanel} from './OutcomePanel'
+import {OutcomePanel, type OutcomeCardProps} from './OutcomePanel'
 import {RecoveryHelpContent} from './RecoveryHelp'
 import {copy} from './copy'
 
@@ -42,6 +42,15 @@ interface IdleViewProps {
     readonly cancelWon: boolean
     readonly onSelectFile: () => void
     readonly onSelectDirectory: () => void
+    /**
+     * Story 9.6: the Stage-time command-failure card's own action wiring
+     * (dropTargetStyle, onDismiss, browse/onRetry, busy) -- built by App using
+     * the same logic it applies to its own top-level outcome slot, since a
+     * command failure is one of this component's three "one card" shapes.
+     * Computed unconditionally by the caller; only read here when
+     * `selectCommandError(state)` is non-null.
+     */
+    readonly commandErrorPanelProps: OutcomeCardProps
 }
 
 /**
@@ -63,6 +72,15 @@ interface IdleViewProps {
  * A retained terminal outcome is not rendered here. App owns it, above this
  * region, so that reset keeps the identical DOM node rather than rebuilding one
  * that merely says the same thing.
+ *
+ * Story 9.6: a Stage-time command failure now **replaces** this whole
+ * composition rather than rendering inside it -- the drop zone, the browse
+ * pill and the grouped disclosure list are not rendered while it shows, and
+ * the card itself carries `--wails-drop-target: drop` (via
+ * `commandErrorPanelProps.dropTargetStyle`) so a native drop on it stages
+ * that item exactly as dropping on the zone does. This mirrors what App does
+ * for a retained outcome one level up: both are "one card replaces Idle",
+ * just at two different points the same composition can be interrupted.
  */
 export function IdleView({
     state,
@@ -70,8 +88,21 @@ export function IdleView({
     cancelWon,
     onSelectFile,
     onSelectDirectory,
+    commandErrorPanelProps,
 }: IdleViewProps) {
     const commandError = selectCommandError(state)
+
+    if (commandError !== null) {
+        return (
+            <div className="fd-region" data-phase-view="idle">
+                <OutcomePanel
+                    outcome={{kind: 'error', retained: false, error: commandError}}
+                    focusTarget="command-error"
+                    {...commandErrorPanelProps}
+                />
+            </div>
+        )
+    }
 
     return (
         <div className="fd-region" data-phase-view="idle">
@@ -167,13 +198,6 @@ export function IdleView({
                         </div>
                     </div>
                 </div>
-
-                {commandError === null ? null : (
-                    <OutcomePanel
-                        outcome={{kind: 'error', retained: false, error: commandError}}
-                        focusTarget="command-error"
-                    />
-                )}
 
                 {/*
                   Story 9.3: the two Idle disclosures are now one grouped

@@ -178,6 +178,17 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
         createInitialTransferState(),
         {row: 'dismiss-retained', owner: 'focus', target: 'idle-instruction'},
     ],
+    [
+        // Story 9.6: the same row and target as dismissing a retained
+        // outcome -- 'dismiss-retained' now clears a Stage-time command
+        // failure too (state.ts), and every outcome card Dismiss focuses the
+        // Idle heading the same way regardless of which of the three shapes
+        // it was showing.
+        'Dismiss Idle command failure',
+        idle({commandError: publicError('invalid_selection')}),
+        createInitialTransferState(),
+        {row: 'dismiss-retained', owner: 'focus', target: 'idle-instruction'},
+    ],
 ]
 
 describe('a cancellation that lands beside a command failure', () => {
