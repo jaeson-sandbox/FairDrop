@@ -74,3 +74,14 @@ it; it holds), and clicking elsewhere reverts the label to "Copy Link" (D-114). 
 proves the build and every suite on Windows; nobody clicked through the app there.
 `docs/release-policy.md` permits the automated gate alone, and this says so rather than implying
 otherwise.
+
+## CI on the epic's final code tip
+
+| Run | headSha | Job | Conclusion |
+|---|---|---|---|
+| 36252776598 | `e0ce076` (all of Epic 9, the walkthrough defect fix, and this evidence) | verify (windows-latest) | success |
+| 36252776598 | `e0ce076` | verify (macos-latest) | success |
+| 36252776598 | `e0ce076` | Linux adapter verification (not release proof) | success |
+
+The commit that adds this section changes only this file and `sprint-status.yaml`; its own run is
+the one the merge to `main` must cite.
