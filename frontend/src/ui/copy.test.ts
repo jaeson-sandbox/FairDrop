@@ -183,6 +183,8 @@ describe('approved product copy', () => {
             'label.recoveryHeading',
             'label.sending',
             'label.sent',
+            'label.sentCaption',
+            'label.speedCaption',
             'label.throughput',
             'label.windows',
             'label.windowsRecovery',
@@ -223,6 +225,8 @@ describe('functional labels the spine names in prose', () => {
         expect(copy.label.sending).toBe('Sending')
         expect(copy.label.wireBytes).toBe('Wire bytes')
         expect(copy.label.throughput).toBe('Throughput')
+        expect(copy.label.sentCaption).toBe('Sent')
+        expect(copy.label.speedCaption).toBe('Speed')
         expect(copy.label.sent).toBe('sent')
         expect(copy.label.of).toBe('of')
         expect(copy.label.metaSeparator).toBe(' \u00b7 ')

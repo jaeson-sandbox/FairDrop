@@ -1385,46 +1385,13 @@ body {
 }
 
 /*
-  Progress Card (Story 7.5): rounded.xxl at sh-3, the focal object of the
-  Transferring state alongside the packet and the open browse menu -- see
-  DESIGN.md's Elevation table.
+  Story 9.5 retired the standalone Progress Card (`.fd-transfer-view`, Story
+  7.5's own rounded.xxl/sh-3 surface), its head row (`.fd-progress-head`) and
+  its percentage (`.fd-progress-percent`) -- Sending now reuses `.fd-packet`
+  and `.fd-hero` verbatim (below), the same card Staged builds, with the
+  percentage moved inside the ring itself (`.fd-ring__pct`, in the
+  Transferring section further down). See DESIGN.md's Progress Card row.
 */
-.fd-transfer-view {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-4);
-    padding: var(--spacing-5);
-    border-radius: var(--radius-xxl);
-    background: var(--color-elevated);
-    color: var(--color-text);
-    box-shadow: var(--shadow-sh-3);
-}
-
-/*
-  The head above the track: the percentage or literal status on the left,
-  wire bytes and throughput beside it on the right. Both sit above the 8px
-  track per DESIGN.md's Progress Card row.
-*/
-.fd-progress-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--spacing-3) var(--spacing-4);
-}
-
-/*
-  {typography.numeric}: the transfer percentage. Tabular numerals so a
-  changing value does not reflow its own row (DESIGN.md, Typography).
-*/
-.fd-progress-percent {
-    font-family: var(--font-display);
-    font-size: var(--text-numeric);
-    font-weight: var(--font-weight-numeric);
-    letter-spacing: var(--tracking-numeric);
-    line-height: var(--leading-numeric);
-    font-variant-numeric: tabular-nums;
-}
 
 .fd-packet {
     display: flex;
@@ -1961,42 +1928,147 @@ body {
 
 /* ------------------------------------------------------------- Transferring */
 
-.fd-meter-label {
+/*
+  Story 9.5: the progress ring, in Staged's own 216px QR slot -- the card
+  never changes shape moving from Staged to Sending. Sized and positioned
+  exactly like `.fd-qr-panel` (`width: min(216px, 100%)`, the same reflow
+  behaviour at 759px and below), but with no light-substrate tile behind it:
+  the ring paints directly on the card's own surface, matching the
+  owner-approved prototype's `.ring` (as opposed to its `.qr`, which does
+  carry one).
+*/
+.fd-ring-panel {
     display: flex;
-    justify-content: space-between;
-    gap: var(--spacing-3);
-    margin-bottom: var(--spacing-2);
-    font-size: var(--text-body-strong);
-    font-weight: var(--font-weight-body-strong);
-    line-height: var(--leading-body-strong);
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-2);
+    width: min(216px, 100%);
+    opacity: 1;
+    scale: 1;
+    transition:
+        opacity 300ms var(--ease-decelerate),
+        scale 420ms var(--ease-decelerate);
 }
 
-.fd-meter {
-    position: relative;
-    height: 8px;
-    overflow: hidden;
-    border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-full);
-    background: var(--color-track);
+@starting-style {
+    .fd-ring-panel {
+        opacity: 0;
+        scale: 0.94;
+    }
 }
 
 /*
-  Unknown totals get a static non-directional pattern -- no sweep, no shimmer,
-  no direction. It reads the same with reduced motion because it never moves.
+  The 216x216 square the ring itself draws in, separate from `.fd-ring-panel`
+  so the unknown mode's status caption can sit *beneath* it (per Story 9.5's
+  acceptance criteria, "in the centre or beneath") without either stretching
+  the ring away from a true circle or overlapping its own stroke -- the
+  known-positive and known-empty modes render no caption, so their panel
+  stays exactly this one square with nothing added beneath it.
 */
-.fd-meter--unknown {
-    background-image: repeating-linear-gradient(
-        135deg,
-        transparent 0 8px,
-        var(--color-primary) 8px 12px,
-        transparent 12px 20px
-    );
+.fd-ring-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
 }
 
-.fd-meter__fill {
-    display: block;
+.fd-ring {
+    width: 100%;
     height: 100%;
-    background: var(--color-primary);
+    /*
+      A fixed, static orientation -- the fill starts drawing from 12 o'clock
+      rather than SVG's own 3 o'clock zero-angle -- never a transition or an
+      animation, so `prefers-reduced-motion` has nothing here to collapse.
+    */
+    rotate: -90deg;
+}
+
+.fd-ring__track {
+    fill: none;
+    stroke: var(--color-track);
+    stroke-width: 10px;
+}
+
+/*
+  The functional boundary DESIGN.md's Colors table requires on "the
+  progress-track outline" -- a thin ring exactly at the track band's own
+  outer edge (radius 96 + half its 10px width + this stroke's own half-width:
+  101), not a second, separately-positioned decoration. `--color-track` alone
+  clears only ~1.2:1 against `--color-surface`/`--color-elevated` (measured,
+  not assumed), nowhere near the 3:1 non-text floor -- exactly why the retired
+  linear meter (`.fd-meter`) carried a 1px `border` in this same token around
+  its own pale fill. A ring has no separate fill rectangle to frame, so the
+  edge is a second concentric stroke rather than a `border` property; moving
+  `.fd-ring__track` itself to `--color-control-border` instead was rejected --
+  it would have pulled the *fill-vs-track* adjacency `styles.test.ts` already
+  pins at 4.56/4.95 (`primary` on `track`) down to primary-on-control-border,
+  which measures only ~1.53/1.86 in the two authored modes and would have
+  made the filled and unfilled arcs hard to tell apart at the boundary that
+  matters most.
+*/
+.fd-ring__edge {
+    fill: none;
+    stroke: var(--color-control-border);
+    stroke-width: 1px;
+}
+
+/*
+  The determinate fill: solid `{colors.primary}`, never a gradient -- the
+  single-gradient rule is absolute and the primary button already spends it.
+  `stroke-dasharray` is set inline per render (the circle's own circumference,
+  a constant), so only `stroke-dashoffset` ever changes; transitioning that
+  alone is what animates the draw without a gradient or a keyframe.
+*/
+.fd-ring__fill {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: 10px;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 400ms var(--ease-decelerate);
+}
+
+/*
+  Unknown totals get a static, non-directional dashed pattern -- no sweep, no
+  shimmer, no rotation of its own beyond the track's fixed -90deg orientation
+  every mode shares. It reads the same with reduced motion because it never
+  moves in the first place, the same reasoning `.fd-meter--unknown` (Story
+  7.5's linear meter, retired by this story) used.
+*/
+.fd-ring__fill--unknown {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: 10px;
+    stroke-dasharray: 4 10;
+}
+
+/* {typography.numeric}: tabular numerals so a changing value never reflows. */
+.fd-ring__pct {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-numeric);
+    font-weight: var(--font-weight-numeric);
+    letter-spacing: var(--tracking-numeric);
+    line-height: var(--leading-numeric);
+    font-variant-numeric: tabular-nums;
+}
+
+.fd-ring__pct small {
+    font-size: var(--text-meta);
+    font-weight: var(--font-weight-meta);
+    color: var(--color-muted);
+    margin-inline-start: 1px;
+}
+
+/* The unknown-total status, a plain caption beneath `.fd-ring-frame`. */
+.fd-ring__status {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+    text-align: center;
 }
 
 .fd-empty-status {
@@ -2179,7 +2251,8 @@ body {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .fd-qr-panel {
+    .fd-qr-panel,
+    .fd-ring-panel {
         order: -1;
         margin-inline: auto;
     }
@@ -2190,6 +2263,10 @@ body {
       rule above), which needs no width-specific override to stay usable
       down to the 320px reflow floor. This breakpoint reflows only `.fd-hero`
       and `.fd-qr-panel`'s ordering.
+
+      Story 9.5: `.fd-ring-panel` shares the same fixed 216px track as
+      `.fd-qr-panel` in `.fd-hero` (both are Staged's own card geometry, just
+      with a ring or a QR bitmap in the slot), so it reflows identically.
     */
 }
 

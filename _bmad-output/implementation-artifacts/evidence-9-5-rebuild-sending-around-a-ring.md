@@ -1,0 +1,275 @@
+# Evidence: Story 9.5: Rebuild Sending Around a Ring
+
+## Summary
+
+Sending now reuses Staged's own card geometry verbatim: `.fd-packet`
+wrapping `.fd-hero`'s fixed 216px/`minmax(0, 1fr)` grid, with a 216px
+progress ring in the QR's own fixed slot instead of the QR bitmap. The
+`fd-packet-tab` kind label and the standalone `.fd-transfer-view` card are
+gone; the item row (kind glyph, name, meta) is the same one `StagedView.tsx`
+renders, unstaggered, since it is the one thing that does not change moving
+from Staged to Sending. The three progress modes -- known positive,
+unknown total, known empty -- are rewritten against the ring rather than
+the retired linear meter, each keeping its own mutation. `copy.label.sent`/
+`copy.label.of` and progress speech (`progressSpeech.ts`) are byte-for-byte
+unchanged.
+
+## What changed
+
+**`TransferringView.tsx` (full rewrite):**
+
+- `.fd-staged-head` (reused, unmodified rule) centres the "Sending" heading
+  alone -- no subtitle, per the story's own text.
+- `.fd-packet` > `.fd-hero` > `ProgressRing` (the fixed 216px slot) +
+  `.fd-hero__details` (item row, figures, Cancel), exactly Staged's DOM
+  shape.
+- `ProgressRing` renders one of four states from `ProgressSelection | null`:
+  - `null` (before the first accepted snapshot): a plain, undecorated
+    track, no `data-progress-mode`, no role -- the card's shape never jumps
+    once the first snapshot lands.
+  - `known-empty`: the track only, `aria-hidden="true"`, no `role`.
+  - `unknown`: a static, non-directional dashed fill
+    (`.fd-ring__fill--unknown`, `stroke-dasharray`, never a keyframe or a
+    rotation of its own), `role="progressbar"`, no `aria-valuenow`,
+    `copy.progress.unknown` beneath the ring via `aria-labelledby`.
+  - `known-positive`: a determinate ring, `role="progressbar"` with
+    `aria-valuenow`/`aria-valuemin`/`aria-valuemax`, the fill's
+    `stroke-dashoffset` computed from the byte pair (never the wire's own
+    rounded `percent` field, which `ProgressSelection` does not even
+    expose), and the tabular-numeral percentage centred inside the ring.
+- `TransferMetrics` unchanged in shape (two figure-over-caption pairs,
+  known-empty omitting the speed pair) but captioned with two **new** keys,
+  `copy.label.sentCaption`/`copy.label.speedCaption` ("Sent"/"Speed") --
+  see "Cross-story collision" below for why these are new keys rather than
+  a rename of the existing `wireBytes`/`throughput`.
+- Cancel: unchanged behaviour (pending label, `aria-disabled`, focus kept),
+  now inside `.fd-hero__details` with the item row and figures.
+- `FileKindGlyph`/`FolderKindGlyph` and the `rise()` stagger helper are
+  local, unexported duplicates of `StagedView.tsx`'s own (this repo's
+  established convention for a helper too trivial to extract yet -- see
+  that file's own comment on the same function).
+
+**`copy.ts`:** two new `label` keys, `sentCaption: 'Sent'`,
+`speedCaption: 'Speed'`. `wireBytes`/`throughput` ("Wire bytes"/
+"Throughput") are untouched. Neither pair needs an EXPERIENCE.md Voice and
+Tone table row -- both are `label` entries, the short functional words the
+spine names in prose rather than tabulates (copy.ts's own header comment,
+and `copy.test.ts`'s own worked example naming `throughput` specifically).
+
+**`style.css`:** `.fd-transfer-view`, `.fd-progress-head`,
+`.fd-progress-percent`, `.fd-meter`, `.fd-meter--unknown`,
+`.fd-meter__fill`, `.fd-meter-label` (all Story 7.5, all now dead --
+`.fd-meter` and friends were consumed only by the file this story rewrote)
+removed. New: `.fd-ring-panel` (the 216px slot, `.fd-qr-panel`'s own
+fade-plus-scale-from-0.94 entrance, same 759px reflow order swap),
+`.fd-ring-frame` (the 216x216 square the SVG draws in, separate from the
+panel so the unknown mode's caption can sit beneath it without stretching
+the ring oval), `.fd-ring`/`.fd-ring__track`/`.fd-ring__edge`/
+`.fd-ring__fill`/`.fd-ring__fill--unknown`/`.fd-ring__pct`/
+`.fd-ring__status`. `.fd-empty-status`/`.fd-metrics`/`.fd-metric*` are
+untouched (reused as-is). The 759px reflow breakpoint's `.fd-qr-panel`
+order rule now also names `.fd-ring-panel`.
+
+**`.fd-ring__track`/`.fd-ring__edge` -- two strokes, not one.** The ring's
+track needed both a decorative fill *and* a separate functional-boundary
+edge, the same two things the retired linear meter split across its
+`background`/`border`, for a reason found by measuring rather than
+assuming: `--color-track` alone is ~1.2:1 against `--color-surface`/
+`--color-elevated` in both authored modes (measured with the same
+relative-luminance formula `styles.test.ts` itself uses), nowhere near the
+3:1 DESIGN.md's Colors table requires on "the progress-track outline".
+Moving `.fd-ring__track` itself to `--color-control-border` instead was
+considered and rejected: `styles.test.ts` already pins `primary` on `track`
+at 4.56/4.95 (light/dark) -- the contrast between the determinate fill and
+the track it partially covers, the boundary a viewer actually needs to see
+-- and `primary` on `control-border` measures only ~1.53/1.86, which would
+have made the filled and unfilled arcs hard to tell apart at exactly the
+edge that matters. `.fd-ring__edge` is a second, thin (1px) concentric
+stroke at the track band's own outer radius instead, in
+`--color-control-border`, leaving the wide band's own color untouched.
+`styles.test.ts`'s existing "functional boundary" `controls` list, which
+used to include `.fd-meter`, now checks `.fd-ring__edge` in its place.
+
+**Cross-story collision, resolved without touching the other story's
+files.** The epics' own AC text names `copy.label.wireBytes` -> "Sent" and
+`copy.label.throughput` -> "Speed" as the keys to rename. Running the full
+suite after the first draft found `OutcomePanel.tsx` (Story 9.6's own scope,
+explicitly off-limits to this session) reads those same two keys for its
+Completion Receipt captions -- renaming them in place would have silently
+changed the Done receipt's wording too and broken
+`OutcomePanel.test.tsx`'s own literal "Wire bytes"/"Throughput"
+assertions, a file this session was told not to touch. Resolved by adding
+two new keys instead of renaming the shared ones: `wireBytes`/`throughput`
+keep their original values for the receipt; `sentCaption`/`speedCaption`
+are Sending's own pair. This is a deliberate, reported deviation from the
+AC's literal key names -- the *displayed* strings match the AC exactly
+("Sent"/"Speed"), only the registry key names differ from what the epics
+text specified.
+
+**`accessibility.test.tsx`:** new `renderTransferringInAppShell` helper
+(mirrors `renderIdleInAppShell`'s pattern -- `TransferringView` inside a
+real `.fd-app` shell with an explicit `height: 100vh`) and a new describe
+block, "the sending card keeps the ring in Staged's fixed column (Story
+9.5)", with four `it.each([[1024, 768], [640, 480]])` cases: the ring
+column's width and its being narrower than the details column, a realistic
+item name staying on one line, the percentage centred inside the ring, and
+the whole card staying within the viewport with nothing overflowing.
+
+### Files touched
+
+- `frontend/src/ui/TransferringView.tsx`, `frontend/src/ui/TransferringView.test.tsx`
+- `frontend/src/ui/copy.ts`, `frontend/src/ui/copy.test.ts`
+- `frontend/src/style.css`, `frontend/src/ui/styles.test.ts`
+- `frontend/browser/accessibility.test.tsx`
+- `_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-quartz-2026-09-20/EXPERIENCE.md`
+- `_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-quartz-2026-09-20/DESIGN.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (story -> `review`)
+
+No file listed in the parallel Story 9.6 assignment (`OutcomePanel.tsx`,
+`App.tsx`, `IdleView.tsx`, `OutcomePanel.test.tsx`, or the outcome/receipt
+rules in `style.css`) was touched.
+
+## Rendered measurements (1024x768 and 640x480, Chromium, `renderTransferringInAppShell`)
+
+| Measurement | 1024x768 | 640x480 |
+|---|---|---|
+| `.fd-ring-panel` width | 216.0px | 216.0px |
+| `.fd-hero__details` width | 438.0px | 550.0px |
+| Item name ("dev-environment-guide.html") wraps? | No (1 line) | No (1 line) |
+| Percentage horizontal offset from ring centre | 0.0px | 0.0px |
+| Percentage vertical offset from ring centre | 0.0px | 0.0px |
+| `.fd-packet` left/right edges | 152.0 / 872.0 (within 0..1024) | 24.0 / 616.0 (within 0..640) |
+
+Details is wider at 640x480 than at 1024x768 because the card crosses the
+759px reflow breakpoint below 640: the ring and details stack into one
+column there (details takes the near-full card width), while at 1024 the
+two-column grid still splits the card's own constrained width between the
+216px ring track and the `minmax(0, 1fr)` details track. Both numbers
+still clear the "details wider than ring" assertion the mutation table's
+M9 exercises.
+
+## Mutation table
+
+Each mutation was applied to the real working tree, confirmed to fail
+(naming the problem), then reverted -- confirmed clean afterward via
+`git diff --stat` / re-running the affected suite green.
+
+| # | Mutation | AC | File | Result |
+|---|---|---|---|---|
+| M1 | Removed `aria-valuenow={percent}` from the determinate ring | AC2 | `TransferringView.tsx` | KILLED -- 3 tests failed: "renders a determinate progress ring carrying the derived percentage" (`expected null` where `'69'` was wanted), "keeps the metrics readable while the cancellation is outstanding", "gives a known positive total a finite value between an explicit min and max" |
+| M2 | Rounded the fill's `stroke-dashoffset` from the already-rounded `percent` instead of the exact `progress.value` | AC2 | `TransferringView.tsx` | KILLED -- "draws the ring from the byte pair, not from the wire-reported percent": `expected 186.987... to be close to 186.700...`, difference 0.287, tolerance 5e-7 |
+| M3 | Added `role="progressbar"` to the known-empty ring | AC2 | `TransferringView.tsx` | KILLED -- "keeps a decorative ring that claims nothing": `expected true to be false` on `panel.hasAttribute('role')` |
+| M4 | Dropped the folder meta line's `copy.label.logicalSize` suffix (used `formatBytes` alone) | AC1 (card geometry, item row) | `TransferringView.tsx` | KILLED -- "keeps the folder identity, its logical size distinct from the wire total, and its ZIP note visible": `expected 'Folder · 36.8 MB' to be 'Folder · 36.8 MB logical size'` |
+| M5 | Removed `transition: stroke-dashoffset 400ms var(--ease-decelerate);` from `.fd-ring__fill` | AC2 | `style.css` | KILLED -- "transitions the determinate fill's stroke-dashoffset over 400ms, never a keyframe": rule no longer contained the transition |
+| M6 | Removed `stroke-dasharray: 4 10;` from `.fd-ring__fill--unknown` | AC2 | `style.css` | KILLED -- "progress presentation > keeps the unknown ring static": the dasharray regex no longer matched |
+| M7 | Changed `.fd-ring__edge`'s stroke from `--color-control-border` to `--color-separator` | AC2 (single-gradient/solid-stroke rule, and the pre-existing functional-boundary contrast guarantee) | `style.css` | KILLED -- 3 tests failed: "draws its own functional-boundary edge, distinct from the decorative track fill", plus both generic `controls`-list contrast tests ("%s draws its boundary with the functional token" and "never uses the decorative edge as the sole boundary") |
+| M8 | Changed `copy.label.sentCaption` from `'Sent'` to `'Wire bytes'` | AC3 | `copy.ts` | KILLED -- 2 tests failed: `copy.test.ts`'s literal assertion, and `TransferringView.test.tsx`'s "shows zero wire bytes and omits the meaningless speed" (`'0 bytes sentWire bytes'` where `'0 bytes sentSent'` was wanted) |
+| M9 | Reverted `.fd-hero`'s `grid-template-columns` to `minmax(0, 1fr) 216px` (fixed track second, the exact Story 9.4 defect) | AC1 | `style.css` | KILLED -- rendered (Chromium) "gives the ring a ~216px column narrower than the details beside it at 1024x768": `expected 216 to be greater than 216` |
+
+M1-M3 prove the three progress modes' own ARIA contract. M2 proves the
+determinate ring reads the authoritative byte pair rather than the wire's
+own rounded percentage -- the same guarantee Epic 1 retrospective item 7
+established for the linear meter, now re-proven for the ring at a
+precision (1e-6) tight enough to catch even a one-step rounding
+regression. M4 proves the item row's logical-size labelling survived the
+move from the old packet-tab design. M5/M6 prove the two CSS-level motion
+claims the acceptance criteria name explicitly (400ms transition; static,
+non-directional unknown pattern). M7 proves the two-stroke boundary design
+decision documented above is load-bearing, not decorative, and that the
+pre-existing sheet-wide contrast-boundary sweep still covers the ring.
+M8 proves the new caption keys are load-bearing copy, not dead strings. M9
+is the rendered-layout mutation the story's own instructions require
+("mutation-verify at least the column assertion"), reproducing the exact
+Story 9.4 defect this story's card geometry shares, now caught at the
+Sending card too.
+
+## Gate transcripts (macOS arm64, native)
+
+Run in the order `.github/workflows/verify.yml` uses, after the mutation
+pass above and with the working tree back to its intended diff.
+
+- `wails build`: **PASS** -- `Built '.../fairdrop.app/Contents/MacOS/fairdrop' in 12.995s.` One pre-existing linker warning (`object file ... built for newer 'macOS' version (13.0) than being linked (11.0)`), unrelated to this change.
+- Bindings drift: **PASS** after `git checkout -- frontend/wailsjs` -- `git diff --stat` showed 0 insertions/0 deletions (mode-only churn). No exported `App` command surface changed in this story.
+- `gofmt -l .`: **PASS**, no output.
+- `go vet ./...`: **PASS**, no output.
+- `go tool staticcheck ./...`: **PASS**, no output.
+- `go test -count=1 ./...`: **PASS** -- `ok` for `fairdrop`, `internal/network`, `internal/qr`, `internal/server`, `internal/source`, `internal/stream`, `internal/transfer`, `scripts`, `scripts/mutationverdict`.
+- `CGO_ENABLED=1 go test -count=1 -race ./...`: **PASS** -- `ok` for all nine packages (`go env CGO_ENABLED` confirmed `1` first; `internal/stream` ~98s under the race detector, the rest a few seconds each).
+- `GOOS=darwin GOARCH=arm64 go build ./...`: **PASS**. `GOOS=linux GOARCH=amd64 go build ./...`: **PASS**. `GOOS=darwin GOARCH=arm64 staticcheck ./...` (bare binary): **PASS**. This story touched no Go code; these three are the AGENTS.md-mandated pre-flight, run for completeness.
+- `cd frontend && npm test` (`npx vitest run`): **PASS** -- 19 files, **750 tests**.
+- `cd frontend && npm run test:browser`: **PASS** -- 2 files, **49 tests** (8 new for this story's rendered layout describe block).
+- `git checkout -- frontend/browser/captures/`: not needed -- `git status --short` showed no change to `frontend/browser/captures/` after either browser-test run.
+- No content drift beyond the nine files this story intentionally touched, confirmed via `git status --short` after the full gate.
+
+## One line per AC
+
+1. Sending reuses Staged's exact card geometry (`.fd-hero`'s fixed
+   216px/`minmax(0, 1fr)` grid): a ~216px ring in the QR's slot, the item
+   row, two figures, and Cancel beside it; the packet tab is gone.
+   **Done, mutation-verified (M9, rendered).**
+2. The three progress modes render exactly as specified -- determinate
+   ring with `role="progressbar"`/`aria-valuenow`, 400ms
+   `stroke-dashoffset` transition, tabular-numeral percentage centred
+   inside; static non-directional dashed ring for unknown, no
+   `aria-valuenow`; no percentage-bearing progressbar at all for
+   known-empty. The three existing mode-test describe blocks are rewritten
+   against the ring (every prior mutation's intent is kept, now expressed
+   against ring elements); the single-gradient rule holds (`.fd-ring__fill`
+   is a solid `stroke`, never a gradient). **Done, mutation-verified
+   (M1, M2, M3, M5, M6).**
+3. `copy.label.sentCaption`/`copy.label.speedCaption` ("Sent"/"Speed") caption
+   the two figure-over-caption pairs; the figures remain actual wire bytes
+   and visual-only throughput. **Done, mutation-verified (M8) -- see
+   "Cross-story collision" above for why these are new keys rather than a
+   rename of `copy.label.wireBytes`/`copy.label.throughput`.**
+4. `progressSpeech.ts` is untouched -- byte-for-byte identical to before
+   this story, confirmed by `git diff` showing no change to that file, and
+   its own test suite (`progressSpeech.test.ts`) passing unchanged. **Done.**
+5. Reduced motion: the determinate fill's transition collapses to the
+   sheet's universal 1ms under `prefers-reduced-motion: reduce` (the same
+   generic `*, *::before, *::after` rule every other transition in the
+   sheet already relies on); nothing on the ring rotates as an animation --
+   its `-90deg` orientation is a fixed, static value declared once, never a
+   transition or `@keyframes` target (pinned directly: "gives the ring a
+   fixed, static drawing orientation rather than an animated rotation").
+   **Done.**
+6. Full gate passes (above). **Done.**
+
+## Disagreements between the story text and the prototype
+
+- **The owner-approved prototype's `t-sending` item row carries no `rise`
+  stagger class**, while its `.stats` (`--i="1"`) and Cancel wrapper
+  (`--i="2"`) do. The story text does not specify stagger indices, so the
+  prototype's own choice was followed rather than treated as a
+  disagreement to flag: the item row enters unstaggered (matching Staged's
+  own item, which *does* stagger, is a difference between the two views
+  the prototype itself makes deliberately -- Sending's item is a
+  continuation of the same identity Staged already announced, so it does
+  not need re-announcing with a delay). Recorded here for visibility, not
+  as an unresolved conflict.
+- **Cross-story key collision** (`copy.label.wireBytes`/`copy.label.throughput`):
+  covered in full above under "Cross-story collision, resolved without
+  touching the other story's files." The AC's literal key names could not
+  be honoured without either breaking `OutcomePanel.test.tsx` (Story 9.6's
+  scope) or editing a file this session was told not to touch; the
+  *displayed* strings match the AC exactly via two new keys instead.
+
+## Native verification
+
+Pending -- orchestrator, per this story's own instructions ("Native checks
+are 'pending — orchestrator'"). This session drove the rendered-Chromium
+suite (`npm run test:browser`) and confirmed the ring's three modes, the
+column geometry, the centred percentage and the card's containment at
+1024x768 and 640x480 there, but did not drive the built macOS binary by
+hand. Per AGENTS.md's rule for anything WebKit-sensitive, the built binary
+should still be checked before this ships: a real transfer showing the
+ring animate from 0% to completion (both known and unknown totals if
+feasible to force), in both colour schemes and with Reduce Motion on.
+
+## Nothing else left open
+
+Every acceptance criterion is implemented and mutation-verified above. The
+one cross-story key collision found while running the full suite is
+resolved without touching Story 9.6's files, and recorded as a deliberate,
+reported deviation from the AC's literal key names (the displayed strings
+match exactly). Native verification is the orchestrator's, as scoped.
