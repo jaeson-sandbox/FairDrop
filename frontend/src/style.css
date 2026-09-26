@@ -816,6 +816,29 @@ body {
     flex: none;
 }
 
+/*
+  Defect fix, found rendered on the built binary: the refresh glyph on "Try
+  Again" sat flush against the "T" of the label, with no gap at all -- unlike
+  the browse pill's own trailing chevron (`.fd-browse-trigger__chevron`'s
+  `margin-inline-start` above) and unlike the Copy Link glyph in StagedView.
+  Copy Link's glyph is spaced for free: it lives inside `.fd-button__swap-face`,
+  and that element's own `gap` (just above) is what separates its glyph from
+  its text. RefreshGlyph in OutcomePanel.tsx is not wrapped in a swap face --
+  it is a direct child of the button -- so it never inherited that flex gap.
+
+  Scoped to a direct child (`.fd-button > .fd-button__glyph`), not every
+  `.fd-button__glyph` unconditionally, so the two swap-face glyphs -- already
+  spaced by their own parent's `gap` -- are left alone rather than gaining a
+  second, stacked margin on top of it.
+
+  Rendered proof: "Try Again's refresh glyph keeps clear of its own label"
+  in accessibility.test.tsx. Mutation: delete this rule -> that test fails,
+  naming the near-zero gap.
+*/
+.fd-button > .fd-button__glyph {
+    margin-inline-end: var(--spacing-2);
+}
+
 /* --------------------------------------------------------------------- Idle */
 
 /*

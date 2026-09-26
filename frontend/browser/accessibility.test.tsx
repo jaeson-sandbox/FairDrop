@@ -1625,6 +1625,51 @@ describe('the outcome card is one centred, column-width card (Story 9.6)', () =>
         },
     )
 
+    /*
+      Defect found by the orchestrator driving the built binary: the refresh
+      glyph on "Try Again" renders flush against the "T" of the label -- no
+      gap at all -- unlike "Send Another"/"Choose Another" (BrowseControl's
+      own trailing chevron carries `margin-inline-start`, see style.css) and
+      unlike the Copy Link glyph in StagedView, which sits inside
+      `.fd-button__swap-face` and inherits that element's own `gap`.
+      RefreshGlyph in OutcomePanel.tsx is a direct child of the button, not
+      wrapped the same way, so it never picked up any spacing.
+
+      Measured with a Range over the label's own text node, the same
+      technique the browse-pill chevron test above uses, rather than the
+      button's or glyph's bounding rect against the button -- both already
+      include the button's padding and would not distinguish "spaced from the
+      label" from "spaced from the button edge".
+
+      Mutation: delete `.fd-button > .fd-button__glyph`'s `margin-inline-end`
+      in style.css -> this fails, naming the near-zero gap.
+    */
+    it('keeps the refresh glyph clear of the "Try Again" label at 1024x768', async () => {
+        await page.viewport(1024, 768)
+        await renderLiveErrorOutcome()
+
+        const tryAgain = screen.getByRole('button', {name: 'Try Again'})
+        const glyph = tryAgain.querySelector<SVGElement>('.fd-button__glyph')
+        if (glyph === null) throw new Error('.fd-button__glyph did not render inside Try Again')
+
+        const textNode = [...tryAgain.childNodes].find((node) => node.nodeType === Node.TEXT_NODE)
+        if (textNode === undefined) {
+            throw new Error('expected the label\'s own text node as a direct child of Try Again')
+        }
+        const range = document.createRange()
+        range.selectNodeContents(textNode)
+        const textRect = range.getBoundingClientRect()
+        const glyphRect = glyph.getBoundingClientRect()
+
+        const gap = textRect.left - glyphRect.right
+        expect(
+            gap,
+            `the glyph's right edge sits ${gap.toFixed(1)}px from the label text's own left edge ` +
+                `(glyph right: ${glyphRect.right.toFixed(1)}px, text left: ${textRect.left.toFixed(1)}px) -- ` +
+                'anything under 5px reads as touching the label',
+        ).toBeGreaterThanOrEqual(5)
+    })
+
     it.each([[1024, 768], [640, 480]])(
         'never lets a long receipt name push the pill past the card\'s own width at %ix%i',
         async (width, height) => {
