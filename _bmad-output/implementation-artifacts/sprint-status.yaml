@@ -90,7 +90,7 @@ development_status:
   9-4-rebuild-staged-around-the-code: done
   9-5-rebuild-sending-around-a-ring: done
   9-6-make-sent-and-error-one-card: done
-  9-7-prove-epic-9-on-both-platforms: in-progress
+  9-7-prove-epic-9-on-both-platforms: review
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
     epic: 1
