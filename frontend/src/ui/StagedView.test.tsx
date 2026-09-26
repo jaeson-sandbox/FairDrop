@@ -806,6 +806,46 @@ describe('the announcer rows this view owns', () => {
 })
 
 /*
+  Defect fix, predates Epic 9 (same code in v1.2.1): the orchestrator observed
+  on the built macOS binary that clicking Copy Link with the mouse copies the
+  URL (verified with `pbpaste`) and the announcer speaks, but the button's
+  label never changes to "Copied" and never gets the success tint.
+
+  Cause: `handleCopy` only claims the confirmation while `focusedRef.current`
+  is true, and that ref is set only by the button's `onFocus`. On WebKit, a
+  pointer click never focuses a `<button>` at all (AGENTS.md's macOS WebKit
+  focus fact 3) -- so `onFocus` never fires for a mouse activation there, and
+  the control never has a chance to claim "Copied", nor to revert on blur,
+  since no blur is coming either.
+
+  Every existing test above passes anyway because jsdom (and Chromium) *do*
+  focus a clicked button -- `pressCopy()` even calls `button.focus()` itself
+  first, to state that precondition explicitly rather than rely on jsdom's
+  click doing it. That precondition is exactly the thing false on WebKit, so
+  this test states the opposite one: `fireEvent.click` with no prior focus,
+  `document.activeElement` left at `document.body`, the way a raw WebKit
+  pointer click actually behaves.
+
+  Mutation: remove the explicit `event.currentTarget.focus()` this fix adds
+  to `handleCopy` -> this fails, naming the label that never became "Copied".
+*/
+it('claims Copied after a pointer click that never focused the button first (WebKit)', async () => {
+    render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+    const button = screen.getByRole('button', {name: 'Copy Link'})
+    expect(document.activeElement).not.toBe(button)
+    expect(document.activeElement ?? document.body).toBe(document.body)
+
+    await act(async () => {
+        fireEvent.click(button)
+    })
+
+    expect(writeText).toHaveBeenCalledWith(capabilityURL)
+    expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
+    expect(screen.queryByRole('button', {name: 'Copy Link'})).toBeNull()
+})
+
+/*
  * What a real pointer press does, which fireEvent.click alone does not.
  *
  * jsdom's click moves no focus, so a test that only clicks leaves the control

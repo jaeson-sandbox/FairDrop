@@ -1,4 +1,4 @@
-import type {CSSProperties} from 'react'
+import type {CSSProperties, MouseEvent} from 'react'
 import {useId, useRef, useState} from 'react'
 import {CopyToClipboard} from '../../wailsjs/go/main/App'
 import {selectCommandError, selectWarnings} from '../transfer/selectors'
@@ -115,8 +115,37 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
      * Story 9.4: this copies the link without revealing it -- `revealed` is
      * untouched here, matching the acceptance criterion that Copy Link and
      * Show Link are two independent actions.
+     *
+     * Defect fix, predates Epic 9 (same code shipped in v1.2.1): the "only
+     * claim Copied while the control holds focus" rule above depends on
+     * `focusedRef.current`, which only `onFocus` sets. Chromium and jsdom
+     * focus a `<button>` on a pointer click by default, so that rule held
+     * for free there -- but WKWebView on macOS does not focus a `<button>`
+     * on click at all (AGENTS.md's WebKit focus fact 3), so `onFocus` never
+     * fired for a mouse activation and the label never changed, even though
+     * the clipboard write itself succeeded and the announcer spoke. Focusing
+     * the control explicitly here, on every activation regardless of input
+     * device, makes "the control holds focus after activation" true on
+     * WebKit exactly as it already was on the engines that focus on click --
+     * it does not add a second, unfocused path to "claim Copied", it makes
+     * the existing one's precondition hold everywhere. `onFocus` still fires
+     * synchronously from this call and sets the same ref this always read,
+     * so D-114's revert-on-blur and the "still retrying" click-while-focused
+     * case above are unaffected.
+     *
+     * This is the same target this component's own click handler already
+     * owns, not a different node borrowed from elsewhere -- unlike
+     * `BrowseControl`'s `closeAndReturnFocus`, which moves focus to a
+     * *different*, previously keyboard-focused element and needs Story
+     * 7.10's `[data-focus-return]` marker so WebKit's separate
+     * script-focused-`:focus-visible` gap (fact 2) does not hide the ring
+     * that keyboard modality earned. Here the click's own default action
+     * already puts focus-visible modality on this same button on every
+     * engine that focuses it on click; this call only makes WebKit do what
+     * those engines already did, so it needs no marker of its own.
      */
-    const handleCopy = () => {
+    const handleCopy = (event: MouseEvent<HTMLButtonElement>) => {
+        event.currentTarget.focus()
         setCopied(false)
         void Promise.resolve()
             .then(() => CopyToClipboard(metadata.url))
