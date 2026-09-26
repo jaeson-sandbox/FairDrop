@@ -708,7 +708,17 @@ describe('reflow to 320 CSS pixels', () => {
     it('keeps details beside the QR only above the 760px content width', () => {
         // Story 9.4: 216px, not 224 -- the QR tile's own acceptance criterion
         // ("~216px", matching the owner-approved prototype's 216x216 `.qr`).
-        expect(stylesheet).toMatch(/\.fd-hero \{[^}]*grid-template-columns: minmax\(0, 1fr\) 216px;/)
+        //
+        // Defect fix (orchestrator's rendered 1024x768 review after Story
+        // 9.4 merged): the fixed track has to come *first*, matching
+        // `StagedView.tsx`'s DOM order (`.fd-qr-panel` renders before
+        // `.fd-hero__details`) -- grid assigns tracks to children in DOM
+        // order, so a template with the fixed track second handed it to
+        // whichever element is second in the DOM, not to "the QR" by name.
+        // `browser/accessibility.test.tsx`'s rendered geometry test is what
+        // actually proves which element ends up in which track; this only
+        // pins the literal template text.
+        expect(stylesheet).toMatch(/\.fd-hero \{[^}]*grid-template-columns: 216px minmax\(0, 1fr\);/)
         expect(stylesheet).toContain('@media (max-width: 759px)')
     })
 

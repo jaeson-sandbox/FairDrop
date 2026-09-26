@@ -1452,10 +1452,24 @@ body {
       216px, not 224 -- Story 9.4's acceptance criteria name "~216px" for the
       QR tile, matching the owner-approved prototype's `.slot`/`.qr` (216x216).
       `.fd-qr-panel` below carries the same figure.
+
+      Defect fix (orchestrator's rendered 1024x768 review after Story 9.4
+      merged): the fixed track came *second* here while `StagedView.tsx`'s
+      DOM order puts `.fd-qr-panel` *first* -- grid places children into
+      tracks in DOM order regardless of visual expectation, so the QR
+      actually landed in the `minmax(0, 1fr)` track (and sat centred in the
+      leftover ~430px, per `.fd-qr-panel`'s own `width: min(216px, 100%)`)
+      while the item details were crushed into 216px, wrapping the name
+      mid-word and stacking the two link buttons. The fixed track has to
+      come first to match the DOM order it is actually assigned to.
+      `align-items: center` (was `start`) matches the owner-approved
+      prototype's `.card` and keeps the QR vertically centred beside a
+      details column of varying height rather than pinned to the top.
     */
-    grid-template-columns: minmax(0, 1fr) 216px;
-    gap: var(--spacing-7);
-    align-items: start;
+    grid-template-columns: 216px minmax(0, 1fr);
+    /* ~24px, matching the prototype's `.card` gap -- was --spacing-7 (32px). */
+    gap: var(--spacing-6);
+    align-items: center;
 }
 
 .fd-hero__details {
@@ -1820,17 +1834,112 @@ body {
 
 /*
   Story 9.4: the row below the card -- "Trouble connecting?" on the left,
-  Cancel on the right. `.fd-disclosure` (the `Disclosure` component's own
-  surface rule) sizes to its own content as a flex item here rather than
-  stretching to the row's full width, which is what leaves Cancel room on
-  the same line.
+  Cancel on the right.
+
+  Defect fix (orchestrator's rendered 1024x768 review after Story 9.4
+  merged): the original comment here claimed `.fd-disclosure` "sizes to its
+  own content as a flex item," which was never actually measured. It does
+  not, for two independent reasons, both fixed below on `.fd-disclosure`
+  itself (see that rule's own comment): its child `.fd-disclosure__summary`
+  is set to fill its container's full width on its own, and -- the one that
+  actually forced the wrap -- `Disclosure`'s collapsed help region stays
+  mounted at full content width even at zero height, and a multi-line flex
+  container's line-wrap decision is made from each item's un-shrunk
+  hypothetical size, which for an auto-sized flex item is that region's own
+  long, unwrapped max-content extent. Either alone was enough to make the
+  disclosure claim the whole row and bump Cancel onto its own line below it.
+
+  Pinning Cancel's own top edge while the disclosure below grows downward
+  is Cancel's `align-self` override further down, not this container's own
+  cross-axis alignment choice -- mutating this rule's value alone left
+  every test in the defect-fix suite passing, confirming it is not what
+  holds that guarantee. Kept at the row's leading edge anyway as the more
+  predictable default for two items of differing, changing heights sharing
+  one row, rather than reverted for no functional reason now that it is
+  known not to matter here.
 */
 .fd-staged-foot {
     display: flex;
     flex-wrap: wrap;
     gap: var(--spacing-3);
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+}
+
+/*
+  The foot's own Disclosure is a quiet, surfaceless trigger -- muted text, a
+  small chevron, a fill on hover -- not the boxed `{rounded.xl}` card every
+  other Disclosure renders (Idle's grouped list). Scoped to
+  `.fd-staged-foot .fd-disclosure` so Idle's own disclosures, and any future
+  card-style Disclosure, keep their surface untouched.
+
+  `flex: 1` -- grow 1, shrink 1, and a *zero* basis -- not the shorthand's
+  own `auto` basis (`flex: 1 1 auto`), and this one substitution is the fix
+  that actually mattered. An auto flex-basis makes a flex item's hypothetical
+  size for the *line-wrap decision* in a multi-line, wrapping container its
+  max-content extent, and `Disclosure`'s collapsed help region stays mounted
+  at full content size even while its rendered height is nothing (Story
+  9.1's collapsed-content-stays-mounted contract) -- so the disclosure's own
+  max-content extent was that of its single longest unwrapped sentence (the
+  macOS firewall recovery line, comfortably wider than this whole row), which
+  alone forced it onto its own line, growing to fill that line once alone
+  there, with Cancel bumped below. A zero basis makes the line-wrap decision
+  see a plain, definite nothing instead of that hidden content extent, so it
+  always fits this row; the grow factor then still expands the box normally
+  afterward. A matching shrink floor beside it is the ordinary flex
+  companion this needs. Confirmed by mutation: reverting to the shorthand's
+  own auto basis alone (with every other rule in this file unchanged)
+  reproduces the exact original defect, in both the "one row" and "Cancel's
+  top" tests below.
+
+  `.fd-disclosure__summary`'s own full-width rule (its base rule, unscoped)
+  never had to be fought once the wrap decision itself no longer keyed off
+  hidden content size -- it resolves against whatever space the flex
+  algorithm gives the parent `.fd-disclosure`, which is now correctly "this
+  row's space minus Cancel's and the gap," not "the whole row."
+*/
+.fd-staged-foot .fd-disclosure {
+    /*
+      `flex-basis: 0` (the `flex: 1` shorthand), not `auto`. The collapsed
+      help region stays mounted at zero *height* but full content width
+      (Story 9.1's collapsed-content-stays-mounted contract), and a
+      multi-line flex container's line-wrapping decision is made from each
+      item's un-shrunk hypothetical size -- which, at `flex-basis: auto`,
+      is the item's max-content width, including that mounted-but-invisible
+      region's longest unwrapped paragraph (the macOS firewall recovery
+      sentence, well over 700px on its own). That alone exceeded the row's
+      width and forced the disclosure onto its own line, growing to fill it,
+      with Cancel bumped below -- reproduced and confirmed by removing this
+      rule. A definite zero basis sidesteps the content-width contribution
+      entirely: the wrap decision sees 0, always fits this row, and
+      `flex-grow: 1` still grows the box normally afterward.
+    */
+    flex: 1;
+    min-inline-size: 0;
+    background: none;
+    box-shadow: none;
+}
+
+.fd-staged-foot .fd-disclosure__summary {
+    width: auto;
+    /* The 44px activation floor, decoupled from padding: this row's
+       quieter padding alone would fall under it. */
+    min-block-size: var(--spacing-target-min);
+    padding: var(--spacing-2) var(--spacing-1);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    font-size: var(--text-control);
+    font-weight: var(--font-weight-control);
+}
+
+.fd-staged-foot .fd-disclosure__summary:hover {
+    background: var(--color-fill);
+    color: var(--color-text);
+}
+
+.fd-staged-foot .fd-disclosure__chevron {
+    width: 8px;
+    height: 8px;
 }
 
 /*
@@ -1839,10 +1948,15 @@ body {
   it shares a flex row with the disclosure trigger, so it needs its intrinsic
   width instead -- a targeted override scoped to this one composition rather
   than a change to the shared rule, which every other Cancel/Dismiss button
-  still relies on for its own full-width layout.
+  still relies on for its own full-width layout. `flex: none` plus
+  `align-self: flex-start` (Defect fix) keep Cancel a fixed-width column
+  pinned to the row's top edge regardless of how tall the disclosure beside
+  it grows.
 */
 .fd-staged-foot .fd-button--quiet {
     width: auto;
+    flex: none;
+    align-self: flex-start;
 }
 
 /* ------------------------------------------------------------- Transferring */
