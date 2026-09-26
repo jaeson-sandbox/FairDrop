@@ -360,16 +360,15 @@ function assertTextSpacingIsInEffect(container: HTMLElement): void {
  * whose scrollHeight has grown past its clientHeight is exactly that failure,
  * named with both measurements.
  *
- * Three selectors are excluded on purpose, not by omission: `.fd-clamp` is
- * the one deliberate two-line clamp DESIGN.md permits, shipped with a
- * persistent keyboard control that reaches the full value (proven in
- * StagedView.test.tsx) -- flagging it here would fail a feature, not a
- * regression. `.fd-status-announcer` and `.fd-visually-hidden` are pinned to
- * 1x1px on purpose so their content never becomes visible to a sighted user
- * at any text size; "clipped" is their entire job, not a bug 200% text could
- * cause.
+ * Two selectors are excluded on purpose, not by omission: `.fd-status-announcer`
+ * and `.fd-visually-hidden` are pinned to 1x1px on purpose so their content
+ * never becomes visible to a sighted user at any text size; "clipped" is
+ * their entire job, not a bug 200% text could cause. (Story 9.4 removed a
+ * third case, `.fd-clamp` -- the two-line name clamp behind a persistent
+ * "Show full name" toggle -- along with the toggle itself: the item name
+ * now always wraps, so nothing needs an exemption for it any more.)
  *
- * A fourth case, added Story 9.1: a *collapsed* `.fd-disclosure__region`
+ * A third case, added Story 9.1: a *collapsed* `.fd-disclosure__region`
  * (one with no `data-open`) is excluded the same way, and only while
  * collapsed -- an open one is not, and still has to grow. Before this story
  * a closed disclosure's content sat behind native `<details>`'s own
@@ -383,6 +382,15 @@ function assertTextSpacingIsInEffect(container: HTMLElement): void {
  * string underneath), because the whole subtree is equally and deliberately
  * clipped for the same reason.
  *
+ * A fourth case, added Story 9.4: a *collapsed* `.fd-url-reveal` (Staged's
+ * hidden-until-requested direct-link field) is excluded for exactly the same
+ * reason and in exactly the same shape -- it is the identical
+ * grid-template-rows/visibility mechanism, just not wrapped in the
+ * `Disclosure` component itself (the reveal trigger is a plain button beside
+ * Copy Link, not a heading-wrapped summary). Revealed (`[data-open]`), it is
+ * not excluded and still has to grow -- Story 7.9's guarantee applies to the
+ * revealed field exactly as it always did.
+ *
  * Counted rather than assumed: with those four excluded, the views render
  * **no** element whose computed overflow is hidden today, so this loop reaches
  * its expect zero times. That is the correct answer and not a passing test --
@@ -395,10 +403,10 @@ function assertTextSpacingIsInEffect(container: HTMLElement): void {
 function assertNoFixedHeightClipsGrownText(container: HTMLElement): void {
     for (const element of container.querySelectorAll<HTMLElement>('*')) {
         if (
-            element.classList.contains('fd-clamp') ||
             element.classList.contains('fd-status-announcer') ||
             element.classList.contains('fd-visually-hidden') ||
-            element.closest('.fd-disclosure__region:not([data-open])') !== null
+            element.closest('.fd-disclosure__region:not([data-open])') !== null ||
+            element.closest('.fd-url-reveal:not([data-open])') !== null
         ) continue
 
         const style = getComputedStyle(element)
@@ -612,7 +620,17 @@ describe('the browse menu at the sizes the app really runs at (D-068)', () => {
 describe('the 44px activation floor (D-068)', () => {
     it('measures every Staged control at or above 44x44 CSS pixels', async () => {
         await page.viewport(1024, 900)
-        assertEveryTargetMeetsTheFloor(await renderStaged())
+        const container = await renderStaged()
+        // Story 9.4: the direct-link field is collapsed (`.fd-url-reveal`,
+        // no `data-open`) until Show Link is activated, and a collapsed
+        // `.fd-target` legitimately measures 0x0 -- that is the collapse
+        // working, not an activation floor regression. Reveal it first,
+        // and wait out its own expansion transition the same way the
+        // initial render's entrance is awaited above, so this measures the
+        // field's settled size rather than a mid-transition one.
+        fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
+        await waitForEntranceToSettle(container)
+        assertEveryTargetMeetsTheFloor(container)
     })
 
     it('measures every Transferring control at or above 44x44 CSS pixels', async () => {

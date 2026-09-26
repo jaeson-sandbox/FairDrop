@@ -553,7 +553,7 @@ describe('announcer-owned transitions', () => {
         let resolveCopy!: () => void
         mocks.copyToClipboard.mockReturnValue(new Promise<void>((resolve) => { resolveCopy = resolve }))
 
-        fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Copy Link'}))
         // The transfer starts while the clipboard command is still in flight.
         // That transition is focus-owned; announcing the copy as well would
         // give one moment two owners, which is the rule this story enforces.
@@ -596,7 +596,7 @@ describe('announcer-owned transitions', () => {
         let resolveCopy!: () => void
         mocks.copyToClipboard.mockReturnValue(new Promise<void>((resolve) => { resolveCopy = resolve }))
 
-        fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Copy Link'}))
         // Staged again, but a different session: the in-flight command belongs
         // to the one that started it, and the phase alone cannot tell them apart.
         transitionTo(view, {
@@ -610,7 +610,7 @@ describe('announcer-owned transitions', () => {
 
     it('re-announces a repeated message instead of going silent', async () => {
         mountWith(stagedState)
-        const copy = screen.getByRole('button', {name: 'Copy download link'})
+        const copy = screen.getByRole('button', {name: 'Copy Link'})
 
         await act(async () => { fireEvent.click(copy) })
         const first = announcer().firstElementChild
@@ -626,7 +626,7 @@ describe('announcer-owned transitions', () => {
 
     it('reports a copy success without moving focus or changing the lifecycle', async () => {
         mountWith(stagedState)
-        const copy = screen.getByRole('button', {name: 'Copy download link'})
+        const copy = screen.getByRole('button', {name: 'Copy Link'})
         copy.focus()
 
         await act(async () => {
@@ -650,7 +650,7 @@ describe('announcer-owned transitions', () => {
     */
     it('keeps the cancellation acknowledgement when a copy resolves behind it', async () => {
         const view = mountWith(stagedState)
-        const copy = screen.getByRole('button', {name: 'Copy download link'})
+        const copy = screen.getByRole('button', {name: 'Copy Link'})
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
         expect(announcer().textContent).toBe('Canceling')
 
@@ -665,7 +665,7 @@ describe('announcer-owned transitions', () => {
         mountWith(stagedState)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            fireEvent.click(screen.getByRole('button', {name: 'Copy Link'}))
         })
 
         expect(mocks.reportCopyFailure).toHaveBeenCalledWith(sessionId)

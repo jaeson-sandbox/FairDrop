@@ -47,10 +47,10 @@ describe('approved product copy', () => {
             'Preparing your item…',
         )
         expect(copy.stage.heading, 'copy.stage.heading').toBe(
-            'Ready to pass along',
+            'Ready to send',
         )
         expect(copy.qr.instruction, 'copy.qr.instruction').toBe(
-            'Scan this code on the receiving device to start the download.',
+            'Scan the code with the receiving device’s camera.',
         )
         expect(copy.qr.alt, 'copy.qr.alt').toBe(
             'Download QR code for [item name]',
@@ -59,19 +59,25 @@ describe('approved product copy', () => {
             'This folder downloads as a ZIP.',
         )
         expect(copy.directLink.action, 'copy.direct_link.action').toBe(
-            'Copy download link',
+            'Copy Link',
         )
-        expect(copy.directLink.helper, 'copy.direct_link.helper').toBe(
-            'Open this link directly in the receiving device’s browser.',
+        expect(copy.directLink.show, 'copy.direct_link.show').toBe(
+            'Show Link',
+        )
+        expect(copy.directLink.hide, 'copy.direct_link.hide').toBe(
+            'Hide Link',
         )
         expect(copy.firstOpener.warning, 'copy.first_opener.warning').toBe(
-            'One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.',
+            'Works once: the first device to open it gets the file.',
+        )
+        expect(copy.firstOpener.previews, 'copy.first_opener.previews').toBe(
+            'Link previews in chat apps can count as that first device, so paste the link straight into a browser.',
         )
         expect(copy.network.disclosure, 'copy.network.disclosure').toBe(
-            'Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.',
+            'Not encrypted. Use it only on a network you trust.',
         )
         expect(copy.localCopy.disclosure, 'copy.local_copy.disclosure').toBe(
-            'Sent directly over your local network. FairDrop does not upload or store an extra copy. The receiving device keeps the downloaded file.',
+            'FairDrop keeps no copy. The receiving device keeps what it downloads.',
         )
         expect(copy.copy.confirmation, 'copy.copy.confirmation').toBe(
             'Copied',
@@ -109,8 +115,8 @@ describe('approved product copy', () => {
         expect(copy.outcome.dismiss, 'copy.outcome.dismiss').toBe(
             'Dismiss',
         )
-        expect(copy.name.showFull, 'copy.name.show_full').toBe(
-            'Show full name',
+        expect(copy.help.heading, 'copy.help.heading').toBe(
+            'Trouble connecting?',
         )
         expect(copy.help.differentLan, 'copy.help.different_lan').toBe(
             'Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.',
@@ -145,7 +151,8 @@ describe('approved product copy', () => {
             'cancel.won',
             'copy.confirmation',
             'directLink.action',
-            'directLink.helper',
+            'directLink.hide',
+            'directLink.show',
             'discovery.warning',
             'done.body',
             'done.heading',
@@ -155,9 +162,11 @@ describe('approved product copy', () => {
             'firewall.preflight',
             'firewall.windows',
             'firewall.windowsRecovery',
+            'firstOpener.previews',
             'firstOpener.warning',
             'folder.note',
             'help.differentLan',
+            'help.heading',
             'help.receiverHttp',
             'idle.instruction',
             'idle.promise',
@@ -179,7 +188,6 @@ describe('approved product copy', () => {
             'label.windowsRecovery',
             'label.wireBytes',
             'localCopy.disclosure',
-            'name.showFull',
             'network.disclosure',
             'outcome.dismiss',
             'progress.knownEmpty',

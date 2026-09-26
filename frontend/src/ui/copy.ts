@@ -57,27 +57,42 @@ export const copy = {
             folder: 'Preparing your folder…',
             item: 'Preparing your item…',
         },
-        heading: 'Ready to pass along',
+        heading: 'Ready to send',
     },
     qr: {
-        instruction: 'Scan this code on the receiving device to start the download.',
+        instruction: 'Scan the code with the receiving device’s camera.',
         alt: 'Download QR code for [item name]',
     },
     folder: {
         note: 'This folder downloads as a ZIP.',
     },
     directLink: {
-        action: 'Copy download link',
-        helper: 'Open this link directly in the receiving device’s browser.',
+        action: 'Copy Link',
+        /**
+         * Story 9.4: the link is no longer rendered until the sender asks for
+         * it. These two toggle `aria-expanded` and the field's own grid-rows
+         * reveal (`.fd-url-reveal` in style.css, the same mechanism
+         * `Disclosure` uses); `copy.direct_link.helper` is retired alongside
+         * the always-visible field it used to sit beside.
+         */
+        show: 'Show Link',
+        hide: 'Hide Link',
     },
     firstOpener: {
-        warning: 'One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.',
+        warning: 'Works once: the first device to open it gets the file.',
+        /**
+         * Story 9.4: moved out of the always-visible card into "Trouble
+         * connecting?" -- a link preview is the one first-opener case a
+         * sender can actually act on, so it belongs beside the rest of the
+         * troubleshooting guidance rather than in the one-line visible caveat.
+         */
+        previews: 'Link previews in chat apps can count as that first device, so paste the link straight into a browser.',
     },
     network: {
-        disclosure: 'Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.',
+        disclosure: 'Not encrypted. Use it only on a network you trust.',
     },
     localCopy: {
-        disclosure: 'Sent directly over your local network. FairDrop does not upload or store an extra copy. The receiving device keeps the downloaded file.',
+        disclosure: 'FairDrop keeps no copy. The receiving device keeps what it downloads.',
     },
     copy: {
         confirmation: 'Copied',
@@ -103,10 +118,12 @@ export const copy = {
     outcome: {
         dismiss: 'Dismiss',
     },
-    name: {
-        showFull: 'Show full name',
-    },
     help: {
+        /**
+         * Story 9.4: the "Trouble connecting?" disclosure's own summary --
+         * the second thing Staged's foot row offers, beside Cancel.
+         */
+        heading: 'Trouble connecting?',
         differentLan: 'Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.',
         receiverHttp: 'Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.',
     },
