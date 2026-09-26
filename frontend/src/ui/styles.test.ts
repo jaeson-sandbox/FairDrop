@@ -741,7 +741,11 @@ describe('reflow to 320 CSS pixels', () => {
     it('collapses the remaining pair into one column below 640px', () => {
         const narrowest = block('@media (max-width: 639px) {')
         expect(narrowest).toContain('.fd-metrics')
-        expect(narrowest).toContain('grid-template-columns: minmax(0, 1fr);')
+        // Defect fix, Story 9.5 follow-up: `.fd-metrics` moved from a
+        // two-column grid to a flex row (see "the Sending figures and
+        // Cancel read as plain text" below), so the narrow-width collapse
+        // is now a flex-direction switch rather than a grid-template reset.
+        expect(narrowest).toContain('flex-direction: column;')
     })
 
     it('drops the single browse control out of the pair-collapse media query', () => {
@@ -1581,12 +1585,49 @@ describe('the progress ring (Story 9.5, retiring the Story 7.5 progress card and
         expect(fill).not.toContain('@keyframes')
     })
 
-    it('renders the percentage in {typography.numeric} with tabular numerals, centred over the ring', () => {
+    /*
+      Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+      merged): the percentage used to be centred by making `.fd-ring__pct`
+      itself `position: absolute; inset: 0` (stretched to the whole 216px
+      frame) and centring its content inside that already full-size box --
+      which put the text at the box's cross-start edge rather than centred
+      in the frame (measured ~91px off centre). Centring now happens the
+      way the owner-approved prototype does it: `.fd-ring-frame` (the
+      parent) is the `place-items: center` grid, and `.fd-ring__pct` is a
+      plain, content-sized, normal-flow item the grid centres as a whole --
+      both axes, by construction.
+    */
+    it('renders the percentage in {typography.numeric} with tabular numerals, centred by the frame’s own grid', () => {
+        const frame = block('.fd-ring-frame {')
+        expect(frame).toContain('display: grid;')
+        expect(frame).toContain('place-items: center;')
+
+        const svg = block('.fd-ring {')
+        expect(svg).toContain('position: absolute;')
+        expect(svg).toContain('inset: 0;')
+
         const percent = block('.fd-ring__pct {')
-        expect(percent).toContain('position: absolute;')
-        expect(percent).toContain('inset: 0;')
+        expect(percent).not.toContain('position: absolute')
         expect(percent).toContain('font-size: var(--text-numeric);')
         expect(percent).toContain('font-variant-numeric: tabular-nums;')
+    })
+
+    /*
+      Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+      merged): the number and its "%" sign rendered on two separate lines --
+      `place-items: center` on an implicit grid with no declared
+      `grid-template-columns` puts each of the two direct children in its
+      own row by default. `display: flex` with `align-items: baseline`
+      keeps both children on one line instead, sharing a text baseline. See
+      the rendered mutation in accessibility.test.tsx for the "% detaches
+      onto its own line" case this pins against reintroducing.
+    */
+    it('lays the percentage and its "%" sign out on one baseline, not one grid row each', () => {
+        const percent = block('.fd-ring__pct {')
+        expect(percent).toContain('display: flex;')
+        expect(percent).toContain('align-items: baseline;')
+        expect(percent).not.toContain('display: grid;')
+        expect(percent).not.toContain('place-items:')
     })
 
     it('gives the ring a fixed, static drawing orientation rather than an animated rotation', () => {
@@ -1602,6 +1643,46 @@ describe('progress presentation', () => {
         expect(stylesheet).toMatch(/\.fd-ring__fill--unknown \{[^}]*stroke-dasharray:/)
         expect(stylesheet).not.toContain('@keyframes')
         expect(stylesheet).not.toContain('animation:')
+    })
+})
+
+/*
+  Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+  merged, branch fix-9-5-sending-details): three further visual defects the
+  suites passed. See the matching rendered proof in accessibility.test.tsx
+  and the mutation table in evidence-9-5-rebuild-sending-around-a-ring.md's
+  "Review follow-up" section.
+*/
+describe('the Sending figures and Cancel read as plain text, not boxed controls (Story 9.5 defect fix)', () => {
+    it('gives the metrics row a plain flex layout with no border or fill on either figure', () => {
+        const metrics = block('.fd-metrics {')
+        expect(metrics).toContain('display: flex;')
+        expect(metrics).not.toContain('grid-template-columns')
+
+        const metric = block('.fd-metric {')
+        expect(metric).not.toContain('border')
+        expect(metric).not.toContain('background')
+        expect(metric).not.toContain('padding')
+    })
+
+    it('folds the metrics row to a column instead of resetting a grid template that no longer exists', () => {
+        const narrow = block('@media (max-width: 639px) {')
+        expect(narrow).toMatch(/\.fd-metrics \{\s*flex-direction: column;/)
+        expect(narrow).not.toContain('grid-template-columns')
+    })
+
+    it('gives the known-empty status plain text, no border or fill, the same weight as the unknown caption', () => {
+        const status = block('.fd-empty-status {')
+        expect(status).not.toContain('border')
+        expect(status).not.toContain('background')
+        expect(status).not.toContain('padding')
+        expect(status).toContain('color: var(--color-muted);')
+    })
+
+    it('gives Cancel an intrinsic width, left-aligned under the figures, not the shared full-width bar', () => {
+        const cancel = block('.fd-hero__details .fd-button--quiet {')
+        expect(cancel).toContain('width: auto;')
+        expect(cancel).toContain('align-self: flex-start;')
     })
 })
 

@@ -1330,6 +1330,178 @@ describe('the sending card keeps the ring in Staged’s fixed column (Story 9.5)
     )
 })
 
+/**
+ * Defect fix (orchestrator's rendered 1024x768 review against the
+ * owner-approved prototype, after the Story 9.5 merge, branch
+ * fix-9-5-sending-details): four further visual defects the text-only
+ * suites and the rendered describe block above both passed. See the
+ * "Review follow-up" section of
+ * evidence-9-5-rebuild-sending-around-a-ring.md for the full mutation
+ * table.
+ */
+describe('the Sending figures and Cancel read as plain text, not boxed controls (Story 9.5 defect fix)', () => {
+    it.each([[1024, 768], [640, 480]])(
+        'keeps the percentage and its "%" sign on one baseline, centred together in the ring at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderTransferringInAppShell()
+
+            const frame = container.querySelector('.fd-ring-frame')
+            const value = container.querySelector('.fd-ring__pct-value')
+            const sign = container.querySelector('.fd-ring__pct small')
+            if (frame === null || value === null || sign === null) {
+                throw new Error('.fd-ring-frame, .fd-ring__pct-value or .fd-ring__pct small did not render')
+            }
+
+            const frameRect = frame.getBoundingClientRect()
+            const valueRect = value.getBoundingClientRect()
+            const signRect = sign.getBoundingClientRect()
+
+            /*
+              Same line: the two boxes share a text baseline (`align-items:
+              baseline`), which for digits and "%" -- neither has a
+              descender -- sits at each box's own *bottom* edge, not its
+              centre: a 30px number and a 12.5px "%" aligned on one baseline
+              still have centres several pixels apart purely from the font-
+              size difference (measured here at ~6.9px, comfortably past a
+              naive centre-only tolerance), so bottom is the check that
+              actually distinguishes "same line" from "detached onto its own
+              row" without being fooled by that. The old "centres the
+              determinate percentage inside the ring" test above measured
+              `.fd-ring__pct` itself, which is `position: absolute; inset: 0`
+              and therefore always exactly the frame's own box regardless of
+              how its children are laid out inside it -- it could not have
+              caught the number and "%" landing on two separate rows, which
+              is exactly what happened.
+            */
+            expect(
+                Math.abs(valueRect.bottom - signRect.bottom),
+                `the number (bottom ${valueRect.bottom.toFixed(1)}) and "%" (bottom ${signRect.bottom.toFixed(1)}) ` +
+                    `are not on the same baseline at ${width}x${height}`,
+            ).toBeLessThanOrEqual(5)
+
+            // Horizontally adjacent: the "%" starts at or soon after the
+            // number's own right edge, not centred independently somewhere
+            // else in the frame.
+            const gap = signRect.left - valueRect.right
+            expect(
+                gap,
+                `the "%" sign (left ${signRect.left.toFixed(1)}) is not adjacent to the number's right edge ` +
+                    `(${valueRect.right.toFixed(1)}) at ${width}x${height} (gap ${gap.toFixed(1)}px)`,
+            ).toBeGreaterThanOrEqual(-1)
+            expect(gap).toBeLessThanOrEqual(6)
+
+            // The combined "43%" reads as centred in the ring as one unit.
+            const left = Math.min(valueRect.left, signRect.left)
+            const right = Math.max(valueRect.right, signRect.right)
+            const top = Math.min(valueRect.top, signRect.top)
+            const bottom = Math.max(valueRect.bottom, signRect.bottom)
+            const combinedCenterX = (left + right) / 2
+            const combinedCenterY = (top + bottom) / 2
+            const frameCenterX = frameRect.left + frameRect.width / 2
+            const frameCenterY = frameRect.top + frameRect.height / 2
+
+            expect(
+                Math.abs(combinedCenterX - frameCenterX),
+                `the combined "43%" is not horizontally centred in the ring at ${width}x${height}`,
+            ).toBeLessThanOrEqual(4)
+            expect(
+                Math.abs(combinedCenterY - frameCenterY),
+                `the combined "43%" is not vertically centred in the ring at ${width}x${height}`,
+            ).toBeLessThanOrEqual(4)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'gives each figure a plain, unboxed presentation whose value does not repeat its own caption at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderTransferringInAppShell()
+
+            const metrics = [...container.querySelectorAll('.fd-metric')]
+            expect(metrics.length, `no .fd-metric rendered at ${width}x${height}`).toBeGreaterThan(0)
+
+            for (const metric of metrics) {
+                const style = getComputedStyle(metric)
+                // Tailwind's preflight resets every element to
+                // `border-style: solid; border-width: 0`, so `borderStyle`
+                // itself always reads "solid" regardless of whether this
+                // rule declares a border -- `borderWidth` is the property
+                // that actually says whether one is visible.
+                expect(
+                    style.borderWidth,
+                    `a .fd-metric has a border (${style.borderWidth} ${style.borderStyle}) at ${width}x${height}`,
+                ).toBe('0px')
+                expect(
+                    style.backgroundColor,
+                    `a .fd-metric has a non-transparent background (${style.backgroundColor}) at ${width}x${height}`,
+                ).toMatch(/^rgba\(0, 0, 0, 0\)$|^transparent$/)
+
+                const value = metric.querySelector('.fd-metric__value')
+                const caption = metric.querySelector('.fd-metric__caption')
+                if (value === null || caption === null) {
+                    throw new Error('.fd-metric__value or .fd-metric__caption did not render')
+                }
+                const captionText = (caption.textContent ?? '').toLowerCase()
+                const valueText = (value.textContent ?? '').toLowerCase()
+                expect(
+                    valueText.endsWith(captionText) && captionText.length > 0,
+                    `the figure "${value.textContent}" repeats its own caption "${caption.textContent}" at ${width}x${height}`,
+                ).toBe(false)
+            }
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'gives the known-empty status plain text with no border or fill at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const knownEmpty: ProgressSnapshot = {
+                bytesSent: 0, totalBytes: 0, totalKnown: true, percent: 0, speedBytesPerSec: 0,
+            }
+            const container = await renderTransferringInAppShell({progress: knownEmpty})
+
+            const status = container.querySelector('.fd-empty-status')
+            if (status === null) throw new Error('.fd-empty-status did not render')
+
+            const style = getComputedStyle(status)
+            // See the matching comment on the .fd-metric case above:
+            // Tailwind's preflight makes `borderStyle` always read "solid",
+            // so `borderWidth` is the property that says whether a border
+            // is actually visible.
+            expect(
+                style.borderWidth,
+                `.fd-empty-status has a border (${style.borderWidth} ${style.borderStyle}) at ${width}x${height}`,
+            ).toBe('0px')
+            expect(
+                style.backgroundColor,
+                `.fd-empty-status has a non-transparent background (${style.backgroundColor}) at ${width}x${height}`,
+            ).toMatch(/^rgba\(0, 0, 0, 0\)$|^transparent$/)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'gives Cancel an intrinsic width well under half the details column at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderTransferringInAppShell()
+
+            const details = container.querySelector('.fd-hero__details')
+            const cancel = screen.getByRole('button', {name: 'Cancel'})
+            if (details === null) throw new Error('.fd-hero__details did not render')
+
+            const detailsWidth = details.getBoundingClientRect().width
+            const cancelWidth = cancel.getBoundingClientRect().width
+
+            expect(
+                cancelWidth,
+                `Cancel is ${cancelWidth.toFixed(1)}px wide, not less than half the details column ` +
+                    `(${detailsWidth.toFixed(1)}px) at ${width}x${height}`,
+            ).toBeLessThan(detailsWidth / 2)
+        },
+    )
+})
+
 /*
   Story 9.6's own rendered-layout requirement: the outcome card (live,
   retained, or an Idle command failure) is one centred card, never wider than

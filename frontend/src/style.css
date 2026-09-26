@@ -1964,14 +1964,40 @@ body {
   the ring away from a true circle or overlapping its own stroke -- the
   known-positive and known-empty modes render no caption, so their panel
   stays exactly this one square with nothing added beneath it.
+
+  Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+  merged): `display: grid; place-items: center` moved here (from
+  `.fd-ring__pct`, below) to match the owner-approved prototype's own
+  structure exactly -- its `.ring` is the `place-items: center` grid, and
+  its `.pct` is a plain, content-sized box the grid centres as a whole,
+  with the `<svg>` excluded from grid layout by its own `position:
+  absolute`. The previous version had it backwards: `.fd-ring__pct` was
+  itself `position: absolute; inset: 0` (i.e. stretched to fill the whole
+  216px frame) and tried to centre its own *content* inside that already
+  full-size box -- which put the percentage's line at the box's cross-start
+  edge rather than centred in the frame (measured ~91px above centre, not
+  the few pixels a rendering rounding difference would explain). Centring
+  a content-sized box via the parent's grid, the way the prototype does it,
+  has no such failure mode: a grid item that is not stretched is exactly as
+  tall as its own content, so `place-items: center` centres precisely that.
 */
 .fd-ring-frame {
     position: relative;
+    display: grid;
+    place-items: center;
     width: 100%;
     aspect-ratio: 1;
 }
 
 .fd-ring {
+    /*
+      Absolutely positioned so it never participates in `.fd-ring-frame`'s
+      grid layout (matching the prototype's own `.ring svg`) -- `.fd-ring__pct`
+      is the frame's one remaining, normal-flow grid item, sized to its own
+      content and centred by `place-items: center` above.
+    */
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     /*
@@ -2040,12 +2066,38 @@ body {
     stroke-dasharray: 4 10;
 }
 
-/* {typography.numeric}: tabular numerals so a changing value never reflows. */
+/*
+  {typography.numeric}: tabular numerals so a changing value never reflows.
+
+  Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+  merged), two bugs in the same rule:
+
+  1. This used to be `display: grid; place-items: center;` with two direct
+     children (the number `<span>` and the `<small>` "%" sign) and no
+     declared `grid-template-columns` -- an implicit grid with no explicit
+     column count packs multiple children into separate rows by default
+     (`grid-auto-flow: row`, one implicit column), so the number centred on
+     its own row while the "%" sign centred on a second row down near the
+     ring's bottom edge. `display: flex` with `align-items: baseline` puts
+     both children on one line instead, sharing a text baseline the way
+     "43" and a smaller trailing "%" unit actually should.
+  2. This element also used to be `position: absolute; inset: 0` (stretched
+     to fill the whole 216px frame) with the centring (`place-items`, then
+     `align-items`/`justify-content`) applied *inside* that already
+     full-size box -- which is why the existing "centres the determinate
+     percentage inside the ring" test in accessibility.test.tsx never
+     caught either bug: `.fd-ring__pct` itself always equalled the frame's
+     own bounding box regardless of how its children were laid out inside
+     it, so that test measured the container, not the text. Centring is
+     now done the way the owner-approved prototype does it: `.fd-ring-frame`
+     (the parent, above) is the `place-items: center` grid, and this stays
+     a plain, content-sized, normal-flow grid item that grid centres as a
+     whole -- both axes, by construction, not by guessing at cross-axis
+     behaviour for a box already stretched to its container's full size.
+*/
 .fd-ring__pct {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: baseline;
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-numeric);
@@ -2071,32 +2123,49 @@ body {
     text-align: center;
 }
 
+/*
+  Defect fix (orchestrator's rendered review after Story 9.5 merged): this
+  used to be a bordered, filled `{rounded.md}` box -- a stray survivor of
+  the retired linear meter's own card-within-a-card styling -- which reads
+  as an inert control rather than plain status text sitting in the details
+  column beside the item row and the figures. No border, no fill, no
+  padding: the same visual weight as `.fd-ring__status` (the unknown mode's
+  own plain, muted caption) rather than a boxed surface. It is still never
+  a percentage-bearing progressbar -- that guarantee lives entirely in
+  `ProgressRing`'s own markup (no `role` on the known-empty ring panel),
+  untouched by this purely visual change.
+*/
 .fd-empty-status {
     margin: 0;
-    padding: var(--spacing-3);
-    border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
+    color: var(--color-muted);
     font-size: var(--text-body-strong);
     font-weight: var(--font-weight-body-strong);
     line-height: var(--leading-body-strong);
 }
 
+/*
+  Defect fix (orchestrator's rendered review after Story 9.5 merged): this
+  used to be a two-column grid of bordered, filled `{rounded.sm}` boxes --
+  Story 7.5's own metric-card styling, never revisited when Story 9.5 moved
+  the percentage into the ring and left these two figures as the only
+  content. The acceptance criteria call for "two plain figure-over-caption
+  pairs", which the owner-approved prototype's own `.stats`/`.stat` render
+  as an unboxed flex row (~22px gap, `--spacing-6`'s 24px the nearest
+  token) of figure-over-caption stacks, not a bordered grid.
+*/
 .fd-metrics {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-6);
 }
 
 .fd-metric {
-    padding: var(--spacing-3);
-    border: 1px solid var(--color-separator);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
 }
 
 .fd-metric__value {
-    display: block;
     font-variant-numeric: tabular-nums;
     font-size: var(--text-body-strong);
     font-weight: var(--font-weight-body-strong);
@@ -2107,6 +2176,26 @@ body {
     color: var(--color-muted);
     font-size: var(--text-meta);
     line-height: var(--leading-meta);
+}
+
+/*
+  Defect fix (orchestrator's rendered review after Story 9.5 merged): Cancel
+  is the sole block-level child at the foot of `.fd-hero__details`, so it
+  inherited `.fd-button--quiet`'s shared `width: 100%` (authored for Idle's
+  and the old Staged Cancel, which really were the only child of their own
+  containers) and rendered as a full-width bar -- the owner-approved
+  prototype's own Sending template places an intrinsic-width Cancel, left-
+  aligned beneath the figures. `width: auto` alone is not enough:
+  `.fd-hero__details` is a column flex container, and a flex item's default
+  `align-self: stretch` still fills the cross axis (the container's width)
+  when its own `width` is `auto` -- the same two-part fix
+  `.fd-staged-foot .fd-button--quiet` already uses for the same shared
+  rule, scoped here instead because Transferring's Cancel has no disclosure
+  beside it to share a row with.
+*/
+.fd-hero__details .fd-button--quiet {
+    width: auto;
+    align-self: flex-start;
 }
 
 /* ---------------------------------------------------------------- Outcomes */
@@ -2346,9 +2435,13 @@ body {
       fd-selection dropped out of this collapse (spec-4-1): a single control
       has no pair of columns left to fold, and its menu is already absolutely
       positioned regardless of width.
+
+      Defect fix (Story 9.5 follow-up): `.fd-metrics` is a flex row now, not
+      a two-column grid, so the narrow-width override folds it to a column
+      instead of resetting a grid template that no longer exists.
     */
     .fd-metrics {
-        grid-template-columns: minmax(0, 1fr);
+        flex-direction: column;
     }
 }
 
