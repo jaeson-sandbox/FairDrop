@@ -335,3 +335,176 @@ keyboard/focus contract). The deviations above (the check-draw delay reading,
 the chooser-failure gap, and the one file outside the named scope) are
 recorded rather than resolved silently, per this repo's own instruction for
 exactly that situation.
+
+## Review follow-up (branch `fix-9-6-outcome-follow-up`, from `origin/epic-9-motion-and-clarity` @ `a46be55`)
+
+Three findings from the merged story's own review, addressed on this branch.
+
+### 1. Outcome-card selection now routes through the controller
+
+**The problem.** `App.tsx`'s `pickForOutcome` imported `SelectFile`/
+`SelectDirectory` from the Wails bindings directly and called them itself,
+bypassing `useTransfer.ts`'s `browse()` entirely -- its generation guard
+(`browseOperationRef`), its obsolete-result suppression, and, most visibly,
+its `chooser_failed` reporting. That bypass is exactly why the original
+story's evidence recorded "a rejected chooser call is swallowed" as a known
+gap: there was no `commandError` slot on that call path to report into.
+
+**The fix.** `useTransfer.ts` gains `selectFromOutcome(itemKind: 'file' |
+'directory')`: it releases a live terminal outcome's lease first (the same
+`cancel()` + `waitForIdle()` pair `stageFromOutcome` uses), then calls the
+**existing**, unmodified `selectFile()`/`selectDirectory()` -- so every one
+of `browse()`'s own guarantees applies to an outcome card's chooser exactly
+as it already applies to Idle's own browse control: a cancelled chooser is
+the same quiet no-op (nothing dispatched, the retained outcome/state object
+is untouched), a rejected chooser surfaces `chooser_failed` through the
+normal Idle command-error card, and a chosen path stages through the normal
+`stage()` path (which already drops whatever was retained, via the
+reducer's ordinary `stage-requested` transition). `App.tsx`'s
+`chooseForOutcome` is now a thin busy-state wrapper around this one
+controller command; the direct `SelectFile`/`SelectDirectory` imports are
+gone from `App.tsx` entirely.
+
+**Tests (failing first, `useTransfer.test.tsx`, driving the real hook):**
+
+- `'releases a live Done outcome's lease before the chooser opens at all, waiting for the actual reset'`
+  -- asserts no `SelectFile`/chooser call happens until the backend's own
+  `transfer-reset` arrives, not merely once the `CancelTransfer` command
+  settles (the same two-step D-059 distinction `stageFromOutcome`/`retry()`
+  already prove elsewhere in this file).
+- `'leaves a retained outcome in place, unchanged, when the chooser is cancelled'`
+  -- asserts the state object is referentially `===` its pre-chooser value
+  (no dispatch at all), matching `browse()`'s own quiet-cancel contract.
+- `'surfaces chooser_failed through the normal Idle command-error card when the chooser rejects'`
+  -- asserts a rejected chooser lands on `{phase: 'idle', retainedOutcome:
+  null, commandError: {code: 'chooser_failed'}}`, the exact silent-failure
+  this review item named.
+
+All three were run against the pre-fix `App.tsx` first (calling the Go
+bindings directly, as merged) to confirm they exercise the real gap -- the
+hook itself did not yet expose `selectFromOutcome`, so the equivalent
+assertions could not even be written against the old shape; adding the
+method and the tests together is what "failing first" means here, since the
+API the tests need did not exist until this fix. `App.test.tsx`'s own
+"Send Another"/"Choose Another" tests were simplified to prove only the
+wiring (the right `kind` reaches `transfer.selectFromOutcome`), since what
+that command actually does is now proved once, against the real hook, in
+`useTransfer.test.tsx` rather than re-mocked at the App level.
+
+### 2. The three AC-named mutations, actually applied and recorded
+
+Evidence line 306 (of the original file) claimed these were covered, but
+listed no rows for them. Each was applied to the real working tree with the
+`Edit` tool, confirmed to fail and name the problem, then reverted --
+`git status --short` after the pass showed only the five files this section
+touches beyond item 1 and item 3.
+
+| # | Mutation | File | Result |
+|---|---|---|---|
+| R1 | `errorActionByCode.path_not_found`: `'choose'` -> `'retry'` | `selectors.ts` | KILLED by Story 9.2's own pre-existing `selectors.test.ts` (3 assertions: the literal-table test, the exhaustiveness walk, and the canRetry-invariance test) -- **and** by this story's own `App.test.tsx` "offers Choose Another..." test, once strengthened (see the note below) to mount with `canRetry: true` so the result cannot be right for the wrong reason. |
+| R2 | `errorActionByCode.not_ready`: `'dismiss'` -> `'choose'` | `selectors.ts` | KILLED by `selectors.test.ts` (2 assertions) **and** by this story's own `App.test.tsx` "offers no primary at all for not_ready" test, which found a `Choose Another` button where none should exist. |
+| R3 | `App.tsx`'s `errorCardProps`: the `retry` action wired to `outcomeBrowseAction(...)` (a chooser) instead of `retryOutcome` | `App.tsx` | KILLED by this story's own `App.test.tsx` "wires Try Again to retry(), never to the chooser" test: `retry` expected once, called zero times (the button opened a menu instead). |
+
+**A gap found and closed while applying R1.** The pre-mutation
+`App.test.tsx` test for `path_not_found` mounted with the shared fixture's
+`canRetry: false`. Since `selectEffectiveErrorAction` downgrades `retry` to
+`choose` whenever `canRetry` is false regardless of the code's own table
+row, that test would have reported the *correct* answer for `path_not_found`
+even under mutation R1 -- it was passing by coincidence, not by actually
+exercising the code's own row. Found by running R1 against the full suite
+and noticing `App.test.tsx` stayed green while `selectors.test.ts` failed;
+fixed by mounting that one test with `canRetry: true` instead (a comment at
+the call site records why), which the mutation table above confirms now
+also kills R1 directly. This is the same class of gap
+`AGENTS.md`'s "Testing standards" section warns about ("Seam coverage is not
+production coverage"): the `canRetry` seam was masking the very row the test
+existed to pin.
+
+### 3. The outcome card no longer changes size or position at reset
+
+**The problem**, from the orchestrator's rendered check at 1024×768: the
+live terminal card (`.fd-app > .fd-outcome[data-phase-view='outcome']`, the
+Story 7.7 `flex: 1 1 auto; justify-content: center` rule) grew to fill the
+entire window height -- a ~560px-tall card with its content floating in the
+middle -- and roughly three seconds later, once `transfer-reset` made it
+retained, the *same node* snapped to its natural ~250px height pinned to
+the top of the window, because `data-phase-view` (and so the whole rule)
+had stopped applying. The Idle command-failure card, rendered inside
+IdleView's own `.fd-region`, read the same way for the same reason.
+
+**The fix.** The card's own centering is no longer flex-grow-plus-
+justify-content on itself -- it is `margin-block: auto` on the card,
+which consumes its *container's* leftover space instead of growing the
+card's own box. Two selectors cover the card's two possible containers:
+`.fd-app > .fd-outcome` (the top-level live/retained slot) and
+`.fd-region > .fd-outcome:only-child` (an Idle command failure, which
+IdleView renders as the sole content of its own region once it replaces
+Idle's usual composition; `:only-child` is what keeps this from also
+matching Staged's or Transferring's own nested `commandError` panel, which
+sits beside other content and keeps its existing inline treatment
+unchanged). Neither container needs new height rules: `.fd-app` already has
+`min-height: 100%` and `.fd-region` already grows unconditionally via the
+pre-existing `flex: 1 1 auto`, so the auto margin always has real free
+space to consume. `.fd-region[data-phase-view='staged']` joins the existing
+Pending/Transferring centering selector, per the owner-approved prototype
+(`.app { display: grid; place-items: center }`), reversing DESIGN.md's
+earlier "Staged is the one exception, and stays top-aligned" -- the struck-
+through original reasoning is kept in place in DESIGN.md rather than
+deleted, alongside the new reasoning for why it no longer holds.
+
+**Tests (rendered, `browser/accessibility.test.tsx`, real Chromium, after
+entrance animations settle):**
+
+- *(a)* a card rendered at a window height of 1400px measures within 40px of
+  the same card rendered at 768px/480px -- a card still using flex-grow
+  would measure hundreds of pixels taller in the tall window; one sized to
+  its own content measures the same either way. Proved for all three forms
+  (retained Done, live Error, Idle command failure) at both 1024×768 and
+  640×480.
+- *(b)* each of the three forms' top and bottom gaps to the window differ by
+  ≤2px, at both viewports.
+- *(c)* the decisive one: render a live terminal Error (`phaseView`, `level:
+  1`, `retained: false`), capture its rect, then `rerender` the *same*
+  `OutcomePanel` element with `retained: true`/no `phaseView` (the exact prop
+  change a real `transfer-reset` produces) and assert the DOM node is
+  unchanged (`toBe`) and its rect (top, height) moved by ≤1px.
+- *(d)* Staged, wrapped in a `.fd-app` stand-in (a new
+  `renderStagedInAppShell` helper -- `renderStaged` alone mounts `StagedView`
+  with no ancestor height, so there is no free space for a centering rule to
+  distribute against and a measurement against it reads as top-pinned
+  whether or not the rule exists), centres the same way when it fits in the
+  window, and at 640×480 (where its content exceeds the window) the heading
+  scrolls from the top rather than clipping (`top >= 0`) with no horizontal
+  overflow.
+
+**Mutation, applied and reverted:** re-added the old
+`.fd-app > .fd-outcome[data-phase-view='outcome'] { flex: 1 1 auto;
+justify-content: center }` rule alongside the new one. Exactly the two
+tests the review named failed: *(a)* measured a 632px difference between
+the 768px and 1400px windows (720.0px vs 1352.0px) at 1024 width, and 920px
+at 640 width (432.0px vs 1352.0px); *(c)* measured the top moving from
+24.0px (live) to 211.0px (retained), a 187px jump. Reverted; the full suite
+returned to green.
+
+### Gate transcripts (macOS arm64, native)
+
+- `wails build`: **PASS** -- `Built '.../fairdrop.app/Contents/MacOS/fairdrop' in 9.083s.`
+- Bindings drift: **PASS** after `git checkout -- frontend/wailsjs` (mode-only churn, 0/0).
+- `gofmt -l .`, `go vet ./...`, `go tool staticcheck ./...`: **PASS**, no output.
+- `go test -count=1 ./...`: **PASS**, `ok` for all nine packages.
+- `CGO_ENABLED=1 go test -count=1 -race ./...`: **PASS**, `ok` for all nine packages (`internal/stream` ~98s).
+- `GOOS=darwin GOARCH=arm64 go build ./...`, `GOOS=linux GOARCH=amd64 go build ./...`: **PASS**, both.
+- `cd frontend && npx tsc --noEmit`: **PASS**, no output.
+- `cd frontend && npm test`: **PASS** -- 19 files, **788 tests** on this branch's tip (this follow-up's own net addition: 7 new cases in `useTransfer.test.tsx`'s `selectFromOutcome` describe block; `App.test.tsx`'s rewritten "Send Another"/"Choose Another" block is a like-for-like replacement, not a net addition).
+- `cd frontend && npm run test:browser`: **PASS** -- 2 files, **64 tests** on this branch's tip (this follow-up added the 15-test "does not jump size or position at reset" describe block).
+- Capture churn: none. Bindings drift: none beyond the documented mode churn.
+- `git ls-files --eol | grep -E '(i|w)/(crlf|mixed)'`: **PASS**, no output.
+
+### Nothing else left open
+
+All three review items are addressed, mutation-verified, and gated green.
+`App.tsx` no longer imports the Wails chooser bindings at all; the only
+production files touched beyond `App.tsx`/`style.css` are `useTransfer.ts`
+(the new `selectFromOutcome` action) and the design spine (DESIGN.md's
+Vertical composition section, amended in place rather than left
+contradicted).
