@@ -179,6 +179,38 @@ async function renderIdle(): Promise<HTMLElement> {
     return container
 }
 
+/**
+ * Idle wrapped in a stand-in for `.fd-app` (`App.tsx`'s real shell, not
+ * reproduced by `renderIdle` above) with an explicit `100vh` height.
+ *
+ * `.fd-region` and `.fd-idle` both rely on `flex: 1 1 auto` to grow into
+ * whatever height `.fd-app` provides (`min-height: 100%`, which itself only
+ * resolves against a definite ancestor height) -- that is the vertical slack
+ * the drop-zone spacing defect below is actually about. `renderIdle` mounts
+ * `IdleView` as the render root with no such ancestor, so `.fd-app`'s
+ * `min-height: 100%` computes against an auto-height container and resolves
+ * to nothing: every flex-grow box up the chain then sizes to its own
+ * content, no free space exists to distribute, and the spacing bug this
+ * measures cannot reproduce at all. The explicit inline `height: 100vh` here
+ * is what gives that chain a real, viewport-relative height to grow into,
+ * the way the actual app shell does.
+ */
+async function renderIdleInAppShell(): Promise<HTMLElement> {
+    const {container} = render(
+        <div className="fd-app" style={{height: '100vh'}}>
+            <IdleView
+                state={idle()}
+                dropTargetStyle={dropTargetStyle}
+                cancelWon={false}
+                onSelectFile={() => undefined}
+                onSelectDirectory={() => undefined}
+            />
+        </div>,
+    )
+    await waitForEntranceToSettle(container)
+    return container
+}
+
 /** Idle with the browse menu already open -- the surface these checks measure. */
 async function renderIdleMenuOpen(): Promise<HTMLElement> {
     const {container} = render(
@@ -750,6 +782,123 @@ describe("the disclosure chevron sits at the row's trailing edge (Story 9.3 defe
                 'edge to read as "trailing", which is what a chevron packed right after the label instead would look like',
         ).toBeLessThanOrEqual(paddingRight + 6)
         expect(gap, 'the chevron must not sit flush against or past the summary\'s own edge').toBeGreaterThanOrEqual(0)
+    })
+})
+
+/*
+  Defect found by the orchestrator driving the built macOS binary after Story
+  9.3 merged: the centred Idle pill's trailing chevron (`.fd-browse-trigger__chevron`,
+  a 12x12 box rotated 45deg) rendered touching or overlapping the final "r" of
+  "Choose File or Folder". Cause: the chevron's only spacing rule was
+  `margin-inline-start: auto`, which produces a gap only when its flex
+  container (the button) has spare inline space to distribute to that auto
+  margin -- and the pill is `display: inline-flex` sized to its own content,
+  so there never is any spare space to distribute. A rotated 12px square's own
+  bounding box is its diagonal, ~17px, not its unrotated 12px side, so even the
+  near-zero gap `auto` degrades to reads as an overlap rather than a narrow
+  miss.
+
+  Measured against a Range over the label's own text node, not the button's
+  bounding rect, because the button's content box already includes the
+  chevron: measuring button-right-edge-to-chevron would always read as
+  whatever padding the button has, regardless of whether the chevron actually
+  clears the label.
+
+  Mutation: put `.fd-browse-trigger__chevron`'s `margin-inline-start` back to
+  `auto` -> the gap collapses to (near) 0px and this fails, naming the
+  measured value.
+*/
+describe('the browse pill keeps its chevron clear of its label (defect fix)', () => {
+    it.each([
+        ['the default viewport', 1024, 900],
+        ['the 640x480 minimum main.go sets', 640, 480],
+    ])('at %s, the chevron sits clear of the label and inside the button', async (_name, width, height) => {
+        await page.viewport(width, height)
+        await renderIdle()
+
+        const trigger = screen.getByRole('button', {name: 'Choose File or Folder'})
+        const chevron = trigger.querySelector<HTMLElement>('.fd-browse-trigger__chevron')
+        if (chevron === null) throw new Error('.fd-browse-trigger__chevron did not render')
+
+        const textNode = [...trigger.childNodes].find((node) => node.nodeType === Node.TEXT_NODE)
+        if (textNode === undefined) {
+            throw new Error('expected the label\'s own text node as a direct child of the trigger button')
+        }
+        const range = document.createRange()
+        range.selectNodeContents(textNode)
+        const textRect = range.getBoundingClientRect()
+        const chevronRect = chevron.getBoundingClientRect()
+        const triggerRect = trigger.getBoundingClientRect()
+
+        const gap = chevronRect.left - textRect.right
+        expect(
+            gap,
+            `the chevron's left edge sits ${gap.toFixed(1)}px past the label text's own right edge ` +
+                `(text right: ${textRect.right.toFixed(1)}px, chevron left: ${chevronRect.left.toFixed(1)}px): ` +
+                'a rotated 12px box has a ~17px diagonal, so anything under 6px reads as touching or ' +
+                'overlapping the label',
+        ).toBeGreaterThanOrEqual(6)
+
+        expect(
+            chevronRect.left,
+            'the chevron must not start left of the button it belongs to',
+        ).toBeGreaterThanOrEqual(triggerRect.left - 0.5)
+        expect(
+            chevronRect.right,
+            'the chevron must not spill past the button\'s right edge',
+        ).toBeLessThanOrEqual(triggerRect.right + 0.5)
+        expect(
+            chevronRect.top,
+            'the chevron must not spill above the button',
+        ).toBeGreaterThanOrEqual(triggerRect.top - 0.5)
+        expect(
+            chevronRect.bottom,
+            'the chevron must not spill below the button',
+        ).toBeLessThanOrEqual(triggerRect.bottom + 0.5)
+    })
+})
+
+/*
+  Defect found by the orchestrator driving the built macOS binary after Story
+  9.3 merged: Idle's drop zone contents (glyph, heading, promise line, browse
+  pill) read as spread out, with 50-70px gaps between the heading, the promise
+  line and the pill. Cause: `.fd-drop-zone__inner` is `display: grid` with no
+  `align-content` declared, so it computes to Grid's initial `normal`, which
+  behaves as `stretch` for auto-sized row tracks -- the container's free block
+  space (it grows to fill `.fd-drop-zone`, itself a flex item with `flex: 1 1
+  auto`) was distributed equally across the four implicit rows instead of
+  packing them together as a group.
+
+  Mutation: remove `align-content: center` from `.fd-drop-zone__inner` (or
+  widen the per-element margins pinned below back toward the original grid
+  default) -> the gaps this measures grow past their bound and this fails,
+  naming the measured value.
+*/
+describe('the drop zone packs its contents together instead of spreading them out (defect fix)', () => {
+    it.each([
+        ['the default viewport', 1024, 900],
+        ['the 640x480 minimum main.go sets', 640, 480],
+    ])('at %s, keeps the heading, promise line and pill close together', async (_name, width, height) => {
+        await page.viewport(width, height)
+        const container = await renderIdleInAppShell()
+
+        const heading = container.querySelector<HTMLElement>('.fd-state-heading')
+        if (heading === null) throw new Error('.fd-state-heading did not render')
+        const promise = container.querySelector<HTMLElement>('.fd-drop-zone__inner .fd-meta')
+        if (promise === null) throw new Error('.fd-drop-zone__inner .fd-meta did not render')
+        const pill = screen.getByRole('button', {name: 'Choose File or Folder'})
+
+        const headingToPromise = promise.getBoundingClientRect().top - heading.getBoundingClientRect().bottom
+        const promiseToPill = pill.getBoundingClientRect().top - promise.getBoundingClientRect().bottom
+
+        expect(
+            headingToPromise,
+            `the heading's bottom edge sits ${headingToPromise.toFixed(1)}px above the promise line's top edge`,
+        ).toBeLessThanOrEqual(12)
+        expect(
+            promiseToPill,
+            `the promise line's bottom edge sits ${promiseToPill.toFixed(1)}px above the pill's top edge`,
+        ).toBeLessThanOrEqual(32)
     })
 })
 

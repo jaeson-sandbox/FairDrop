@@ -843,11 +843,25 @@ body {
   --color-control-border happen to resolve to the same CanvasText today, which
   would break silently if either were ever given a different system color.
 */
+/*
+  Defect fix: `align-content` was left at its initial `normal`, which computes
+  to `stretch` for Grid's auto-sized row tracks -- so the free block space
+  `.fd-drop-zone`'s `flex: 1 1 auto` hands this element (see that rule's own
+  comment) was distributed equally across the four rows (glyph, heading,
+  promise line, browse pill) instead of the rows staying packed together.
+  That read as the group being spread out rather than centred as a unit,
+  with 50-70px gaps between rows on a tall window. `align-content: center`
+  packs the rows first, using only their own content and margins (below),
+  and centres that packed block within the extra height -- so growing the
+  window grows the gap above and below the group, not the gaps inside it.
+  See the rendered proof in accessibility.test.tsx.
+*/
 .fd-drop-zone__inner {
     display: grid;
     flex: 1 1 auto;
     min-block-size: 200px;
     place-items: center;
+    align-content: center;
     padding: var(--spacing-6);
     border: 2px dashed var(--color-control-border);
     border-radius: var(--radius-xl);
@@ -876,13 +890,42 @@ body {
     display: grid;
     width: 56px;
     height: 56px;
-    margin: 0 auto var(--spacing-3);
+    /*
+      Defect fix: was var(--spacing-3) (12px). Widened to var(--spacing-4)
+      (16px) as part of packing the drop zone's rows together under
+      `align-content: center` above -- see that rule's comment for why a
+      fixed gap here, rather than the grid's own free space, is what now
+      separates the glyph from the heading below it.
+    */
+    margin: 0 auto var(--spacing-4);
     place-items: center;
     border: 2px solid var(--color-primary);
     border-radius: var(--radius-xs);
     color: var(--color-primary);
     font-size: var(--text-display);
     transition: transform 150ms var(--ease-decelerate);
+}
+
+/*
+  Defect fix, the other two rows of the same packed group: `.fd-state-heading`
+  and `.fd-meta` are shared classes (Staged, Transferring, the outcome panel,
+  the pending card all use them too, each with their own spacing needs), so
+  these gaps are scoped to the drop zone rather than added to the shared
+  rules. Paired with `align-content: center` above and the widened glyph
+  margin, these are the fixed gaps that replace the grid's own free-space
+  distribution: heading to promise line, and promise line to the browse
+  pill. Neither is a spacing token -- DESIGN.md's ramp has nothing between
+  4px and 8px, and 6px is what the rendered proof in accessibility.test.tsx
+  requires here -- so both are written as literal pixel values, the same
+  convention this sheet already uses for the drop zone's own 7px inset and
+  the drop symbol's 3px lift.
+*/
+.fd-drop-zone__inner .fd-state-heading {
+    margin-bottom: 6px;
+}
+
+.fd-drop-zone__inner .fd-meta {
+    margin-bottom: var(--spacing-5);
 }
 
 /*
@@ -1101,7 +1144,19 @@ body {
     flex: none;
     width: 12px;
     height: 12px;
-    margin-inline-start: auto;
+    /*
+      Defect fix: this was `margin-inline-start: auto`, which only produces a
+      gap when the flex container (the button) has spare inline space to
+      distribute to that auto margin. `.fd-button--pill` is `display:
+      inline-flex` sized to its own content -- there is never any spare space
+      -- so the chevron rendered flush against the label, and a rotated 12px
+      box's own bounding box is its diagonal (~17px, not its unrotated 12px
+      side), which read as touching or overlapping the final letter rather
+      than merely sitting close. A fixed margin creates the gap unconditionally,
+      the same proportion the owner-approved prototype's `.btn` `gap: 7px`
+      reads as. See the rendered proof in accessibility.test.tsx.
+    */
+    margin-inline-start: var(--spacing-3);
     border-right: 2px solid var(--color-primary-ink);
     border-bottom: 2px solid var(--color-primary-ink);
     transform: rotate(45deg);
