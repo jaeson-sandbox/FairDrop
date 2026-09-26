@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {publicError} from './errors'
+import {fixedErrorMessages, publicError} from './errors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
 import type {FileMetadata, PublicError} from './types'
 
@@ -142,6 +142,9 @@ describe('authoritative lifecycle grammar', () => {
                     code: 'source_changed',
                     message: 'The item changed after it was prepared. Cancel and create a fresh link.',
                 },
+                // Story 9.2: a terminal transfer error also carries the failed
+                // item's display name (staged()'s default metadata name).
+                itemName: 'report.pdf',
             },
         })
 
@@ -431,14 +434,17 @@ describe('terminal receipt retention (Story 7.4)', () => {
         ).toEqual(['bytesSent', 'isDir', 'name'])
     })
 
-    it('adds nothing to the Error outcome shape: this story only retains a receipt for Done', () => {
+    it('adds nothing to the Error outcome shape beyond kind/error, plus Story 9.2\'s itemName', () => {
         let state = event(staged(), 'transfer-started', {sessionId, seq: 1})
         state = event(state, 'transfer-error', {
             sessionId, seq: 2, error: {code: 'transfer_failed', message: 'x'},
         })
 
         const outcomeKeys = state.phase === 'error' ? Object.keys(state.outcome).sort() : []
-        expect(outcomeKeys).toEqual(['error', 'kind'])
+        // *Mutation:* add any other key here (an elapsed-time field, for
+        // example) -> this must fail and name the extra key, the same
+        // guarantee Story 7.4 pins for Done.
+        expect(outcomeKeys).toEqual(['error', 'itemName', 'kind'])
     })
 
     it('keeps a scrubbed Error through reset until dismiss or the next Stage attempt', () => {
@@ -456,6 +462,7 @@ describe('terminal receipt retention (Story 7.4)', () => {
                     code: 'path_not_found',
                     message: 'That file or folder is no longer available. Choose it again.',
                 },
+                itemName: 'report.pdf',
             },
             commandError: null,
         })
@@ -464,6 +471,52 @@ describe('terminal receipt retention (Story 7.4)', () => {
         expect(transferReducer(state, {
             type: 'stage-requested', generation: 2, itemKind: 'directory',
         })).toEqual({phase: 'pending', generation: 2, itemKind: 'directory', cancelPending: false})
+    })
+
+    /*
+      Story 9.6: 'dismiss-retained' now clears a Stage-time command failure
+      too, not only a retained outcome -- the one-card rebuild gives every
+      Idle-level outcome card (a retained Done/Error, or a command failure)
+      a working Dismiss, and both routes reuse the one action rather than
+      each inventing its own. *Mutation:* restrict the guard back to
+      `retainedOutcome === null` alone -> this must fail, since a pure
+      command-error state (`retainedOutcome: null`) would then be treated as
+      "nothing to dismiss" and returned unchanged.
+    */
+    it('clears a Stage-time command failure on dismiss-retained, not only a retained outcome', () => {
+        const pending = transferReducer(createInitialTransferState(), {
+            type: 'stage-requested', generation: 1, itemKind: 'file',
+        })
+        const failed = transferReducer(pending, {
+            type: 'stage-failed', generation: 1, error: {code: 'invalid_selection', message: 'x'},
+        })
+        expect(failed).toMatchObject({phase: 'idle', retainedOutcome: null})
+        expect((failed as {commandError: unknown}).commandError).not.toBeNull()
+
+        expect(transferReducer(failed, {type: 'dismiss-retained'})).toEqual(createInitialTransferState())
+    })
+
+    /*
+      The rare dual case "keeps retained terminal outcome when invalid
+      selection supplies the visible command error" (above) produces a state
+      carrying both a retained outcome and a command error at once. Dismiss
+      must clear both together -- there is only the one Dismiss control once
+      the retained outcome's own card replaces Idle's composition (Story 9.6),
+      so nothing would ever ask to clear only one half.
+    */
+    it('clears both halves of the rare retained-outcome-plus-command-error state at once', () => {
+        const dual: TransferState = {
+            phase: 'idle',
+            retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
+            commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+        }
+
+        expect(transferReducer(dual, {type: 'dismiss-retained'})).toEqual(createInitialTransferState())
+    })
+
+    it('still does nothing on dismiss-retained when Idle has neither a retained outcome nor a command failure', () => {
+        const plain = createInitialTransferState()
+        expect(transferReducer(plain, {type: 'dismiss-retained'})).toBe(plain)
     })
 
     it('rewrites caller-supplied error copy rather than storing what it was handed', () => {
@@ -503,6 +556,110 @@ describe('terminal receipt retention (Story 7.4)', () => {
                 message: 'Choose exactly one file or folder.',
             },
         })
+    })
+})
+
+/*
+  A terminal transfer error also retains the failed item's display name --
+  the same shape of retention Story 7.4 gave a Done receipt, applied to
+  Error. Story 9.2's whole point is that a sender can retry without choosing
+  again, and 9.6's "Try Again" card needs the name to show what is being
+  retried.
+*/
+describe('terminal error item name retention (Story 9.2)', () => {
+    it('retains the failed item\'s display name on a terminal transfer error from Transferring', () => {
+        let state = event(staged({name: 'secret-report.pdf'}), 'transfer-started', {sessionId, seq: 1})
+        state = event(state, 'transfer-error', {
+            sessionId, seq: 2, error: {code: 'transfer_failed', message: 'x'},
+        })
+
+        expect(state).toMatchObject({
+            phase: 'error',
+            outcome: {kind: 'error', error: {code: 'transfer_failed'}, itemName: 'secret-report.pdf'},
+        })
+    })
+
+    it('retains the item name on the incoherent-snapshot terminal error from transfer-complete', () => {
+        let state = event(staged({name: 'secret-report.pdf'}), 'transfer-started', {sessionId, seq: 1})
+        // A disagreeing snapshot beside a terminal event still ends the
+        // session as an error, per the existing "never drops a terminal
+        // event" test above -- this is that same path, checked for itemName.
+        state = event(state, 'transfer-complete', {sessionId, seq: 2, progress: progress(50, 50)})
+
+        expect(state).toMatchObject({
+            phase: 'error',
+            outcome: {kind: 'error', error: {code: 'transfer_failed'}, itemName: 'secret-report.pdf'},
+        })
+    })
+
+    it('carries the same item name into the retained outcome after reset', () => {
+        let state = event(staged({name: 'secret-report.pdf'}), 'transfer-started', {sessionId, seq: 1})
+        state = event(state, 'transfer-error', {
+            sessionId, seq: 2, error: {code: 'transfer_failed', message: 'x'},
+        })
+        state = event(state, 'transfer-reset', {sessionId, seq: 3})
+
+        expect(state).toEqual({
+            phase: 'idle',
+            retainedOutcome: {
+                kind: 'error',
+                error: {code: 'transfer_failed', message: fixedErrorMessages.transfer_failed},
+                itemName: 'secret-report.pdf',
+            },
+            commandError: null,
+        })
+    })
+
+    /*
+      The product's ephemerality contract, exactly as Story 7.4 guards it for
+      Done: `FileMetadata.url` is the one-shot capability download link and
+      `qrBase64` is a scannable PNG of that same link -- retaining either on
+      the error outcome would let a sender-side surface re-present a dead
+      capability link well past the point FairDrop claims to have forgotten
+      it.
+
+      *Mutation:* retain the full `FileMetadata` on the outcome instead of
+      just `itemName` -> the key-shape assertion below must fail and name the
+      leak, the same as 7.4's equivalent for Done.
+    */
+    it('never retains the capability URL or its QR code on a terminal error outcome', () => {
+        let state = event(staged({name: 'secret-report.pdf'}), 'transfer-started', {sessionId, seq: 1})
+        state = event(state, 'transfer-error', {
+            sessionId, seq: 2, error: {code: 'transfer_failed', message: 'x'},
+        })
+
+        const serialized = JSON.stringify(state)
+        expect(
+            serialized,
+            'the terminal error outcome must not contain the one-shot capability URL',
+        ).not.toContain('fedcba9876543210fedcba9876543210')
+        expect(
+            serialized,
+            'the terminal error outcome must not contain the capability URL\'s QR code',
+        ).not.toContain(qrPNG)
+        expect(
+            state.phase === 'error' ? Object.keys(state.outcome).sort() : [],
+            'the error outcome must carry exactly error/itemName/kind -- no url, no qrBase64, no sessionId',
+        ).toEqual(['error', 'itemName', 'kind'])
+    })
+
+    it('carries no item name for a Stage-time command failure, which never reached a session', () => {
+        const pending = transferReducer(createInitialTransferState(), {
+            type: 'stage-requested', generation: 1, itemKind: 'file',
+        })
+        const failed = transferReducer(pending, {
+            type: 'stage-failed', generation: 1, error: publicError('busy'),
+        })
+
+        expect(failed).toEqual({
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: {
+                code: 'busy',
+                message: fixedErrorMessages.busy,
+            },
+        })
+        expect(JSON.stringify(failed)).not.toContain('itemName')
     })
 })
 

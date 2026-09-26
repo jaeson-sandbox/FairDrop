@@ -1952,3 +1952,149 @@ So that what shipped can be re-checked later rather than taken on trust.
 - Given the evidence, then it records honestly that **Windows was never driven interactively** for this release: no Windows host was available, the gate proves the build and the suites there, and nobody clicked through the app. `docs/release-policy.md` permits this and it is stated rather than implied.
 - Given the tag `v1.2.0`, then `release.yml` asserts it matches `wails.json`'s `productVersion` **before** `wails build` runs, so a mismatched tag fails without producing an artifact.
 - Given the full gate on both platforms, when it runs against the release commit, then it passes, and that run -- not an earlier one on an ancestor -- is the one the evidence cites. `verify.yml` cancels in-flight runs on a new push, so a completed green run can belong to a commit that is no longer the tip.
+
+## Epic 9: Motion and Clarity
+
+A sender moves through FairDrop's five states the way they move through a system sheet: each screen arrives rather than appears, the handoff screen shows the one thing that matters -- the code -- and a failed transfer can be retried without choosing the item again. Created 2026-09-25 from three owner observations on the built 1.2.1 binary, and approved the same day against an interactive prototype in both colour schemes and both motion settings: `_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-quartz-2026-09-20/mockups/epic-9-proposal.html`. **That prototype is the visual reference for every story in this epic.** Open it and click through it before changing a rule; where a story's text and the prototype disagree, the story's text wins and the disagreement is reported, not resolved silently.
+
+The owner's words, in order: the post-transfer screen "all looks a bit sloppy" (a Done panel wider than the column, stacked above the whole Idle composition); the Staged screen "also looks very sloppy... the link should be an option you click to reveal/copy and not always present... there's just so much text which is cluttered"; and "I want to make sure that we have very smooth animations". On review of the prototype the owner added two rules: **Try Again must retry the same item**, not reopen the chooser, and **no button label carries an ellipsis**.
+
+**Binding constraints carried forward from Epic 7, unchanged:** one look on both platforms (no macOS-only capability); the two-token border split (`separator` decorative, `control-border` on anything operable); every contrast figure derived by `styles.test.ts` and published unrounded; one gradient, on the primary button; `forced-colors` and `prefers-reduced-motion` supersede the authored palette and motion; the one-owner-per-transition routing table; `--wails-drop-target: drop` and never a DOM drop handler; clipboard through bound `CopyToClipboard`; the QR `<img>` stays non-draggable (`draggable={false}` **and** `-webkit-user-drag: none` -- AGENTS.md macOS fact 6, a real crash).
+
+**Motion is progressive enhancement, and this is the epic's central technical rule.** `build/darwin/Info.plist` declares `LSMinimumSystemVersion` 10.13, so the WKWebView FairDrop runs in ranges from engines with no `@starting-style` to current Safari. Every animation must therefore be written so that an engine which does not support it shows the finished state **instantly**, and no behaviour, focus move, announcement or state transition may wait on, be sequenced by, or be inferred from an animation. The `@keyframes`/`animation:` ban in `styles.test.ts` **stays**: entrance motion is built from CSS transitions and `@starting-style`, which need neither. **Views animate in and never animate out** -- an exit animation means keeping an unmounted view's DOM alive, which would give one moment two focus owners and break the "same retained node" rule. Nothing in this epic adds a JavaScript timer, an animation library, or `requestAnimationFrame`.
+
+**Copy is changing, and `copy.test.ts` enforces the registry against EXPERIENCE.md's Voice and Tone table.** Each story amends its own rows of that table **in the same commit** as `copy.ts`, before the view that uses them; nothing is re-worded in a view. The exact strings below are owner-approved and are quoted character for character. `PublicError.message` strings are **not** in scope for any story in this epic: they are a binding backend contract (`internal/transfer/errors_test.go`, `docs/fairdrop-contracts.md`), and the retry work changes which *button* an error offers, not what the error says.
+
+**No button ellipses (owner rule, 2026-09-25).** No visible or accessible name of a `<button>` or `role="menuitem"` ends in `…` or `...`. Status text that is not a control -- "Preparing your file…", the "Sending" heading -- is out of this rule and keeps its wording.
+
+**Parallel-safety.** Stories 9.1 and 9.2 touch disjoint files and may be built concurrently; 9.3 onward are sequential, because each rebuilds a view on top of 9.1's motion rules and they all edit `style.css`.
+
+**FRs covered:** no new FRs. FR23 (firewall preflight present before first Stage) is unaffected in substance: the preflight stays present on first paint in Idle.
+
+### Story 9.1: Build the Motion Foundation
+
+As a sender,
+I want every state to arrive with a short, consistent motion,
+So that FairDrop feels like one continuous tool rather than a set of screens swapping.
+
+**Scope:** `frontend/src/style.css`'s motion rules, `frontend/src/ui/Disclosure.tsx`, the browse menu's entrance, DESIGN.md's **Motion** section, and `styles.test.ts`. No view is re-laid-out; 9.3-9.6 consume what this story builds.
+
+**Acceptance Criteria:**
+
+- Given DESIGN.md's **Motion** section, then it is rewritten **before** the CSS to state: one curve (`--ease-decelerate`, unchanged); entrance = opacity 0->1 plus a 10px rise, ~340ms opacity / ~420ms translate; an optional per-child stagger of ~55ms, capped at five steps; views animate in and never out; motion is progressive enhancement (the finished state is what an unsupporting engine shows); the `@keyframes` ban and its reason; and the check-mark draw is no longer "the only entrance animation". The sentence that says so is removed rather than contradicted.
+- Given any element carrying `data-phase-view` (the five views, including the outcome panel when it is the phase view), then it enters with the entrance transition via `@starting-style`, with no `@keyframes`, no `animation:` and no JavaScript. *Mutation:* delete the `@starting-style` block -> must fail naming it. *Mutation:* implement it with `@keyframes` -> must fail (the existing ban).
+- Given a stagger helper (a custom property such as `--fd-stagger` read into `transition-delay`), then it exists once in the sheet, is capped, and is neutralised under reduced motion.
+- Given `prefers-reduced-motion: reduce`, then no element translates or scales on entrance, every duration collapses as it does today, and **nothing that carries meaning is removed** -- the check mark still ends fully drawn. The existing reduced-motion assertions pass unchanged. *Mutation:* leave the rise in place under reduced motion -> must fail.
+- Given the browse menu, then it enters with a fade and a scale from ~0.96, origin at its trigger, over <=200ms, via `@starting-style`.
+- Given a `Disclosure`, when it opens or closes, then its body expands and collapses smoothly in **both Chromium and WebKit**, and the chevron rotation stays in step with it. The implementer may keep native `<details>` if a smooth open is achievable there in both engines, or replace it with a `<button aria-expanded>` plus region using the `grid-template-rows: 0fr <-> 1fr` technique; **whichever is chosen, all of these must hold and be tested:** keyboard operable with Enter and Space; its expanded state exposed to assistive technology; collapsed content neither focusable nor exposed (if the region stays in the DOM, a transitioned `visibility: hidden` is the mechanism, not `inert`, which older macOS WebKit lacks); Escape still blurs the summary/trigger (the owner's "Escape removes any highlighting" rule); instant under reduced motion; and every existing `IdleView.test.tsx` assertion that finds a string inside a collapsed disclosure still finds it. Record the choice and why in DESIGN.md's Disclosure row.
+- Given `npm run test:browser` (real Chromium layout), then a new case proves a phase view's computed resting state is fully opaque and untranslated once transitions settle, so an entrance rule can never strand a view at `opacity: 0`. *Mutation:* make the resting rule `opacity: 0` -> must fail.
+- Given the full gate on both platforms, when it runs, then it passes. **Then drive the built macOS binary by hand** (AGENTS.md's rule for anything WebKit-sensitive) and record in the evidence file what was seen, in both colour schemes and with Reduce Motion on.
+
+### Story 9.2: Remember the Item So an Error Can Retry It
+
+As a sender whose transfer failed,
+I want Try Again to prepare the same file again,
+So that one dropped connection does not send me back through the chooser.
+
+**Scope:** `frontend/src/transfer/useTransfer.ts`, `state.ts`, `selectors.ts`, `types.ts` and their tests. **No UI** -- Story 9.6 wires the buttons. This story may run in parallel with 9.1.
+
+**Acceptance Criteria:**
+
+- Given any Stage started from a native drop or either chooser, then the controller remembers the absolute path it passed to `StageTransfer`, **in memory only** (a ref or reducer state; never `localStorage`, never a Go call, never a log line, never a DOM attribute). It is replaced by the next Stage, and cleared on Dismiss, on a completed Done, and when a Stage fails with a code whose action is not `retry`. *Mutation:* persist it anywhere outside JS memory, or render it -> must fail.
+- Given a new selector `selectErrorAction(code)`, then it returns exactly this table, which is owner-approved and must be written out as literals at the assertion site, not derived from the implementation:
+  - `retry` -- `busy`, `source_changed`, `network_unavailable`, `server_start_failed`, `qr_failed`, `setup_failed`, `transfer_failed`, `name_unsupported`
+  - `choose` -- `invalid_selection`, `path_not_found`, `path_unsupported`, `chooser_failed`
+  - `dismiss` -- `cleanup_unconfirmed`, `not_ready`, `shutting_down`
+  - and **no** action for `cancelled`, `clipboard_failed`, `beacon_warning`, `name_warning`, which never reach an outcome card. A new `TransferErrorCode` added later without a row must fail the suite, naming the code. *Mutation:* move any one code to another row -> must fail naming it.
+- Given a new controller action `retry()`, when the current outcome's action is `retry` and a path is remembered, then it stages **that same path** through the ordinary `stage()` path -- so Go re-validates it from scratch and a moved, changed or deleted item fails honestly -- and a fresh session, link and QR result. When no path is remembered, `retry()` does nothing and the selector reports `choose` instead, so the UI never offers a retry it cannot perform.
+- Given a **live** terminal outcome (the ~3s backend lease before `transfer-reset`), when `retry()` or a new Stage from the outcome card is requested, then the controller first releases the lease exactly as Dismiss does today (`cancel()`, D-059), and only then stages, so the attempt never surfaces `busy`. *Test:* drive a retry from a live terminal Error and assert no `busy` outcome and exactly one `StageTransfer` call with the remembered path.
+- Given a terminal transfer error (`transfer-error` from Staged or Transferring), then the error outcome also carries the item's display name, retained the same way Story 7.4 retained the Done receipt -- the name only, **never** `url` or `qrBase64`. A Stage-time command failure has no name and carries none. *Mutation:* retain the full `FileMetadata` -> must fail, as 7.4's equivalent does.
+- Given the full gate, when it runs, then it passes, with `state.test.ts`, `selectors.test.ts` and `useTransfer.test.tsx` extended rather than loosened.
+
+### Story 9.3: Declutter Idle and Drop the Button Ellipses
+
+As a sender opening FairDrop,
+I want Idle to show one clear action inside the drop zone,
+So that the first screen reads as a tool, not a page of text.
+
+**Scope:** `IdleView.tsx`, the extraction of `BrowseControl` into its own module (sprint-status action item `epic-4-retro-item-28`: "extract BrowseControl from IdleView.tsx when a second floating surface appears" -- Story 9.6's outcome card is that surface), `copy.ts` and EXPERIENCE.md's copy table, and the global no-ellipsis rule.
+
+**Acceptance Criteria:**
+
+- Given the drop zone, then it contains, in order: the glyph, the heading, one line of promise copy, and the browse control as a **centred pill-shaped primary button of intrinsic width** inside the zone. This deliberately reverses Story 7.3's full-width primary control; invert that assertion with a comment naming the reversal rather than deleting it. The drop zone itself still has no click handler and no tab stop.
+- Given the copy, then these rows change exactly: `copy.idle.instruction` -> "Drop one file or folder" (no full stop); `copy.label.chooseFileOrFolder` -> "Choose File or Folder"; the Idle promise line uses a new key `copy.idle.promise` -> "Sends to one browser on the same local network. No account or receiver app." (`copy.external.promise` keeps its wording for external use); `copy.label.recoveryHeading` -> "Troubleshooting".
+- Given the two disclosures, then they render as **one grouped list** -- one `{rounded.xl}` surface, the two rows divided by a separator -- in the order Local network access, Troubleshooting, with every string they carry today still present. *Mutation:* drop any recovery or firewall string -> must fail naming it.
+- Given `BrowseControl`, then it moves to its own module with its props extended to take its label, and **every existing BrowseControl test passes unchanged** apart from import paths. Its handlers and their comments move verbatim.
+- Given the menu items, then they read "File" and "Folder" (glyph + word), with no ellipsis.
+- Given the **no-button-ellipsis rule**, then `copy.cancel.pending` -> "Canceling" and `copy.cancel.preparationPending` -> "Canceling preparation", and a new test renders every view and fails if any `<button>` or `role="menuitem"` has an accessible name or text ending in `…` or `...`, naming it. *Mutation:* restore "Canceling…" -> must fail.
+- Given the cancel-won summary and a Stage-time command failure in Idle, then their document order and focus targets are unchanged by this story (9.6 rebuilds the outcome surface).
+- Given reflow to 320 CSS px, then no horizontal scroll and no clipped action. Given the full gate, when it runs, then it passes, and `App.focus.test.tsx` passes unchanged.
+
+### Story 9.4: Rebuild Staged Around the Code
+
+As a sender handing a file to a nearby phone,
+I want the QR code to be the whole point of the screen and the link to be there only when I ask,
+So that I can see at a glance what to do.
+
+**Scope:** `StagedView.tsx`, `RecoveryHelp.tsx` where Staged uses it, `copy.ts`, EXPERIENCE.md's StagedView / Item Summary / Direct URL Row / Copy Feedback / Trusted-LAN Note rows, and the matching DESIGN.md component rows. Built on 9.1 and 9.3.
+
+**Acceptance Criteria:**
+
+- Given the layout, then Staged is a centred heading and one-line instruction above **one card**: the QR tile (white substrate, ~216px, `{rounded.lg}`) on one side; on the other the item row (kind glyph, name, `File · 32.6 KB` meta), the two link actions, the revealed link when open, and the caveat lines. Below the card, one row: the "Trouble connecting?" disclosure on the left and Cancel (quiet) on the right. The card collapses to one column under the existing breakpoint with the QR first.
+- Given the removed chrome, then the `fd-packet-tab` label, the always-visible direct-link heading and helper, the always-open `RecoveryHelp` block, and the **Show full name** toggle are gone. Long names wrap (`overflow-wrap: anywhere`) and are never clipped, so the persistent full-name control the clamp required is no longer needed; `copy.name.showFull` is removed from the registry and the table. *Mutation:* reintroduce a clamp without the toggle -> must fail.
+- Given the link, then it is **not rendered** until requested. **Copy Link** (primary, link glyph) copies without revealing it, through bound `CopyToClipboard` exactly as today; **Show Link** (secondary, `aria-expanded`, `aria-controls`) reveals it with 9.1's smooth expansion and toggles to **Hide Link**. The revealed field keeps every Story 7.9 guarantee -- readonly `textarea`, CSS-grid mirror sizing, select-on-focus, Escape blurs, no anchor -- and `browser/staged-url-field.test.tsx` is kept passing against the revealed state. SPEC.md's "expose the QR code and URL" is met by the URL being one activation away; record that reading in EXPERIENCE.md's Direct URL Row.
+- Given Copy Feedback, then the label swap to "Copied" (with a check glyph and success tint) is a crossfade that cannot reflow the row, still reverts on blur (D-114), and is still announced once through the announcer exactly as today. The existing copy tests pass unchanged.
+- Given the copy, then these change exactly: `copy.stage.heading` -> "Ready to send"; `copy.qr.instruction` -> "Scan the code with the receiving device’s camera."; `copy.direct_link.action` -> "Copy Link"; new `copy.direct_link.show` -> "Show Link" and `copy.direct_link.hide` -> "Hide Link"; `copy.first_opener.warning` -> "Works once: the first device to open it gets the file."; `copy.network.disclosure` -> "Not encrypted. Use it only on a network you trust."; new `copy.help.heading` -> "Trouble connecting?"; new `copy.first_opener.previews` -> "Link previews in chat apps can count as that first device, so paste the link straight into a browser."; `copy.local_copy.disclosure` -> "FairDrop keeps no copy. The receiving device keeps what it downloads."; `copy.direct_link.helper` is removed. The two caveat lines (first-opener, network) stay **visible** on the card with an info glyph and a lock glyph respectively; the local-copy line, the preview caveat, both firewall recoveries and both `copy.help.*` strings live inside "Trouble connecting?". *Mutation:* move the not-encrypted line inside the disclosure -> must fail: it is the one security disclosure and stays visible.
+- Given a folder, then `copy.folder.note` still renders as a third caveat line, and the meta reads `Folder · <size> logical size` as today.
+- Given a `beacon_warning` or `name_warning`, then the warning banner still renders inside the card above the item row and still describes the heading.
+- Given the QR, then it enters with a fade and a scale from ~0.94 (9.1's rules) and keeps `draggable={false}` and `-webkit-user-drag: none`. The existing pins for both pass unchanged.
+- Given the full gate, when it runs, then it passes, and the rendered-Chromium accessibility suite passes at 640x480 and 200% text with no clipped action.
+
+### Story 9.5: Rebuild Sending Around a Ring
+
+As a sender watching a transfer,
+I want the code I scanned to become the progress,
+So that the card keeps its shape and I can read the state at a glance.
+
+**Scope:** `TransferringView.tsx`, `copy.ts`, EXPERIENCE.md's TransferView / Progress Meter / Transfer Metrics rows, DESIGN.md's Progress row. Built on 9.4's card.
+
+**Acceptance Criteria:**
+
+- Given the layout, then Sending uses the **same card geometry as Staged**: a ~216px ring in the QR's slot, and the item row, two figures and Cancel on the other side. The packet tab is gone.
+- Given the three progress modes, then: **known positive** -- a determinate ring (`role="progressbar"`, `aria-valuenow`), stroke-dashoffset transitioned over 400ms, a tabular-numeral percentage centred in it; **unknown total** -- a static, non-directional dashed ring, no `aria-valuenow`, and `copy.progress.unknown` in the centre or beneath; **known empty** -- no percentage-bearing progressbar at all, `copy.progress.knownEmpty` shown. The existing mode tests are rewritten against the ring, not deleted, and each keeps its mutation. The single-gradient rule still holds: the ring's stroke is solid.
+- Given the figures, then `copy.label.wireBytes` -> "Sent" and `copy.label.throughput` -> "Speed", shown as two plain figure-over-caption pairs; the figures remain actual wire bytes and visual-only throughput. Throughput is still never spoken.
+- Given progress speech, then `progressSpeech.ts`'s throttle and every announcement are unchanged.
+- Given reduced motion, then the ring updates without a transition and nothing rotates.
+- Given the full gate, when it runs, then it passes.
+
+### Story 9.6: Make Sent and Error One Card, with the Right Next Action
+
+As a sender who has just finished or failed,
+I want one clear card that says what happened and offers the one sensible next step,
+So that the end of a transfer looks as considered as the start.
+
+**Scope:** `OutcomePanel.tsx`, `App.tsx`'s outcome slot and Idle composition, `IdleView.tsx` where it renders a command error, `copy.ts`, EXPERIENCE.md's Done Panel / Error Panel / App Shell rows and its Reset/Dismiss state rows, DESIGN.md's Outcome row. Consumes 9.2's `retry()` and `selectErrorAction`, and 9.3's extracted `BrowseControl`.
+
+**Acceptance Criteria:**
+
+- Given a Done outcome, live or retained, then it is **one centred card the width of the column** -- never wider than the Staged card -- containing: the success disc (~96px) whose check draws once, the heading, one receipt line (kind glyph, name, `· <wire bytes>`), and two pill buttons: **Send Another** (primary; the extracted `BrowseControl` with its menu, keyboard behaviour and focus return unchanged) and **Done** (dismiss). `copy.done.heading` -> "Sent"; `copy.done.body` is removed; new `copy.done.sendAnother` -> "Send Another" and `copy.done.dismiss` -> "Done".
+- Given a retained outcome in Idle, then **the card replaces the Idle composition** rather than stacking above it: the drop zone, the browse pill and the grouped disclosures are not rendered while it shows, and **the card itself carries `--wails-drop-target: drop`**, so dropping a new item on it stages that item exactly as dropping on the zone does. *Test:* a native drop while a retained outcome shows stages the path and dismisses the outcome. **This amends EXPERIENCE.md's "expose Idle controls while preserving the same visible outcome node" to "the outcome node is preserved and itself offers the Idle actions"**; amend the row, do not leave it contradicted.
+- Given the retained-node rule, then reset still preserves **the same DOM node** with focus on it and no announcement, and `App.focus.test.tsx`'s retained-node assertions pass unchanged. Given Dismiss/Done, then focus goes to the Idle heading as today.
+- Given an Error outcome (terminal or a Stage-time command failure in Idle), then it is the same card with the error disc, the fixed heading and fixed `PublicError.message` (unchanged), the item name as a receipt line **when 9.2 retained one**, and the primary action chosen by `selectErrorAction`: `retry` -> **Try Again** (calls 9.2's `retry()`; a refresh glyph, no ellipsis); `choose` -> **Choose Another** (the `BrowseControl` menu); `dismiss` -> no primary. Every error card also has **Dismiss**. New keys: `copy.outcome.tryAgain` -> "Try Again", `copy.outcome.chooseAnother` -> "Choose Another". *Mutations:* offer Try Again for `path_not_found`; offer a primary for `not_ready`; have Try Again open the chooser -> each must fail.
+- Given the command-error panel inside Staged (`clipboard_failed`), then it keeps its current inline form: it is not an outcome card.
+- Given the cancel-won summary, then it is unchanged by this story.
+- Given motion, then the card enters per 9.1, the disc scales in from ~0.7, the check draws after a short delay, and the heading, receipt and actions stagger in; under reduced motion the check is present and fully drawn. The existing check-draw assertions pass unchanged.
+- Given the full gate, when it runs, then it passes, and every `routeTransition` row's owner and focus target is unchanged. *Test:* for each routed transition that lands on an outcome, the focused element exists before `.focus()` is called.
+
+### Story 9.7: Prove Epic 9 on Both Platforms
+
+As the owner,
+I want the rebuilt screens driven on the real binary,
+So that what the suites cannot see is still checked before it ships.
+
+**Acceptance Criteria:**
+
+- Given the epic branch tip, then `verify.yml` is green on Windows, macOS and Linux **on that tip's own run**, read with `gh run view --json conclusion,jobs`; a cancelled Windows job is an absence, not a pass.
+- Given the built macOS binary, then a person or the orchestrating session drives every state -- Idle, the browse menu by pointer and keyboard, a real drop, Staged with Copy Link and Show/Hide Link, a real receiver download, Sent, Send Another, a forced error with Try Again, Choose Another and Dismiss -- in light and dark and with Reduce Motion on, and the evidence file records what was seen, including anything that looked wrong.
+- Given Windows, then the evidence states honestly whether it was driven interactively; `docs/release-policy.md` permits the automated gate alone and says so.
+- Given AGENTS.md, then any new WebKit or WebView2 behaviour discovered during this epic is added to its platform-facts section, and nothing there is recorded from a synthetic keystroke's negative result alone.

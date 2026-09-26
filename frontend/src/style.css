@@ -304,29 +304,136 @@ body {
 }
 
 /*
-  Pending, Transferring, and a terminal Done/Error rendered as the phase view
-  (DESIGN.md, Vertical composition): short, single-purpose states with no
-  reason to anchor to the top edge, so the region centres vertically instead
-  of hugging its content from the top.
+  Story 9.1's motion foundation: every one of the five views -- Idle,
+  Pending, Staged, Transferring and the outcome panel when it is the phase
+  view -- carries `data-phase-view` (see IdleView.tsx, StagePendingCard.tsx,
+  StagedView.tsx, TransferringView.tsx and OutcomePanel.tsx's `phaseView`
+  prop), and this one attribute selector is what makes every one of them
+  enter the same way: a fade plus a 10px rise, never an exit -- there is no
+  matching "leaving" state anywhere in this sheet, because the outgoing view
+  is simply replaced, not animated off. Keeping an unmounted view's DOM alive
+  long enough to animate it out would give one moment two nodes both
+  claiming to be the current view, which is exactly what the "one retained
+  node" identity rule (App.focus.test.tsx) exists to prevent.
 
-  The terminal outcome panel is not wrapped in .fd-region -- App.tsx renders
-  it directly as .fd-app's child, sharing the growth rule above so the same
-  centering can apply to it. The attribute selector below excludes a
-  *retained* outcome (data-phase-view is undefined on that one, per
-  OutcomePanel.tsx's phaseView prop) on purpose: a retained panel keeps its
-  natural height and never grows or centres.
+  `opacity` and `translate` are declared explicitly at rest (not left to
+  their implicit defaults) so a mutation that flips the resting value is
+  something a test can catch rather than something that would only ever show
+  up as "no different from doing nothing" -- see the rendered-Chromium proof
+  in accessibility.test.tsx that a phase view's computed resting state is
+  fully opaque and untranslated once its transition settles.
+
+  This degrades by construction on an engine with no `@starting-style`
+  support: without it, the rule below simply never applies, so a view is
+  opaque and untranslated from its very first paint -- the "instant" half of
+  progressive enhancement DESIGN.md's Motion section requires, with nothing
+  here to detect or branch on.
+*/
+[data-phase-view] {
+    opacity: 1;
+    translate: none;
+    transition:
+        opacity 340ms var(--ease-decelerate),
+        translate 420ms var(--ease-decelerate);
+}
+
+@starting-style {
+    [data-phase-view] {
+        opacity: 0;
+        translate: 0 10px;
+    }
+}
+
+/*
+  The optional per-child stagger DESIGN.md's Motion section describes,
+  consumed by Stories 9.3-9.6 rather than applied to anything yet: a child
+  inside an entering view opts in with `.fd-rise` and sets `--fd-stagger` to
+  its position in the group (0, 1, 2, ...). It rises with the same fade-plus-
+  10px entrance as a phase view, just delayed by its place in the queue.
+
+  `min()` caps the multiplier at 5 so a long list can never push a straggler
+  past ~275ms behind the view it belongs to, and the delay is neutralised
+  the same way every other delay in this sheet is: the universal
+  `transition-delay: 0ms !important` rule under `prefers-reduced-motion`
+  below overrides this calculation outright, so a staggered entrance
+  collapses to instant, unstaggered, exactly like everything else does.
+*/
+.fd-rise {
+    opacity: 1;
+    translate: none;
+    transition:
+        opacity 380ms var(--ease-decelerate),
+        translate 460ms var(--ease-decelerate);
+    transition-delay: calc(min(var(--fd-stagger, 0), 5) * 55ms);
+}
+
+@starting-style {
+    .fd-rise {
+        opacity: 0;
+        translate: 0 8px;
+    }
+}
+
+/*
+  Pending, Transferring, and (Story 9.6 review follow-up) Staged: short or
+  content-rich, but none of them anchor to the top edge any more -- the
+  region centres vertically instead of hugging its content from the top.
+  Staged used to be the one exception (DESIGN.md's Vertical composition
+  section carries the struck-through original reasoning and why it no
+  longer applies); the owner-approved prototype centres every state, Staged
+  included.
+
+  The terminal outcome panel used to be named here too
+  (`.fd-app > .fd-outcome[data-phase-view='outcome']`), sharing this rule's
+  growth so the *centering* half could apply to it -- but growing the card
+  itself to fill the region and then centring its own children inside that
+  grown box is what made it visibly collapse and jump to the top the moment
+  `transfer-reset` made it retained (data-phase-view is only ever present on
+  the live phase-view form). It is centred a different way now -- see
+  ".fd-app > .fd-outcome" and ".fd-region > .fd-outcome:only-child" below,
+  which apply to every form of the card identically and never change its own
+  size.
+
+  The column-width rule (width/max-width/margin-inline) that used to live in
+  a second block scoped to this same selector is gone -- Story 9.6 moved it
+  onto the unqualified `.fd-outcome` rule itself, since every shape the card
+  now takes (live, retained, or an Idle command failure) needs the same
+  720px cap, not only the live phase-view one this selector named.
 */
 .fd-region[data-phase-view='pending'],
 .fd-region[data-phase-view='transferring'],
-.fd-app > .fd-outcome[data-phase-view='outcome'] {
+.fd-region[data-phase-view='staged'] {
     flex: 1 1 auto;
     justify-content: center;
 }
 
-.fd-app > .fd-outcome[data-phase-view='outcome'] {
-    width: 100%;
-    max-width: 720px;
-    margin-inline: auto;
+/*
+  The outcome card's own centering (Story 9.6 review follow-up), an auto
+  margin rather than flex-grow-plus-justify-content on the card itself: an
+  auto margin consumes the *container's* leftover space, so the card keeps
+  its own natural height in every one of its three forms (live, retained, an
+  Idle command failure) and never jumps size or position when a live
+  terminal outcome becomes a retained one -- only its container's free space
+  is what centres it, never its own.
+
+  Two selectors, not one, because the card sits in two different places
+  depending on which form it is: `.fd-app > .fd-outcome` is the top-level
+  slot App.tsx renders a live or retained outcome into directly (a sibling of
+  the phase's own region, not a child of it); `.fd-region > .fd-outcome`
+  is an Idle Stage-time command failure, which IdleView.tsx renders as the
+  *sole* content of its own region once it replaces Idle's usual composition
+  (`:only-child` is what keeps this from also matching Staged's or
+  Transferring's own nested `commandError` panel, which sits alongside other
+  content in its region and keeps its existing inline treatment unchanged --
+  see those views' own comments for why that one is not an outcome card).
+  Both containers are already at least as tall as the window by the time this
+  applies: `.fd-app` has `min-height: 100%`, and `.fd-region` already grows
+  via the unconditional `flex: 1 1 auto` above -- so the auto margin always
+  has real free space to consume.
+*/
+.fd-app > .fd-outcome,
+.fd-region > .fd-outcome:only-child {
+    margin-block: auto;
 }
 
 .fd-state-heading {
@@ -381,20 +488,6 @@ body {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-}
-
-/*
-  The two-line visual clamp DESIGN.md permits for a long item name. It is a box
-  limit, never a JavaScript truncation: the complete value stays in the DOM, the
-  persistent Show-full-name control expands it, and the assistive description
-  carries it in full either way.
-*/
-.fd-clamp {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
 }
 
 /* ----------------------------------------------------------------- Controls */
@@ -527,6 +620,19 @@ body {
     background: var(--color-fill);
 }
 
+/*
+  Story 9.3: the pill shape, `{rounded.full}` -- DESIGN.md's Shapes section
+  now permits this on a single-action primary button (the Browse Control and,
+  later, an outcome card's own primary actions), amending its earlier "never
+  a button" wording. Wider inline padding than the standard control gives the
+  rounder shape room to read as a pill rather than a stretched rectangle, the
+  same proportion the owner-approved prototype's `.btn--pill` uses.
+*/
+.fd-button--pill {
+    border-radius: var(--radius-full);
+    padding-inline: var(--spacing-5);
+}
+
 /* Cancel and Dismiss: quiet text actions that still own a full target. */
 .fd-button--quiet {
     width: 100%;
@@ -634,8 +740,9 @@ body {
   disabled text."
 
   What carries the state instead is already there and costs no contrast: the
-  label itself changes (Cancel -> Canceling…, Cancel preparation -> Canceling
-  preparation…), the pointer stops being a pointer, and the rule below pins the
+  label itself changes (Cancel -> Canceling, Cancel preparation -> Canceling
+  preparation -- no ellipsis on either since Story 9.3's no-button-ellipsis
+  rule), the pointer stops being a pointer, and the rule below pins the
   control to its resting appearance so it visibly does not answer a hover.
   styles.test.ts refuses a fractional opacity on a text-bearing rule now, so a
   future dim has to publish its pair rather than quietly halve one.
@@ -663,11 +770,73 @@ body {
 
 /*
   The copy action keeps its box when its label becomes "Copied". Without this
-  the grid's auto column shrinks to the shorter word and the URL beside it
-  reflows -- the layout shift DESIGN.md's Copy Feedback row rules out.
+  the row's auto-sized flex item shrinks to the shorter word and the button
+  itself resizes -- the layout shift DESIGN.md's Copy Feedback row rules out.
+  Story 9.4: this also covers Show/Hide Link, whose own label length changes
+  by one character; a shared minimum keeps both direct-row buttons the same
+  width regardless of which label either one currently shows.
 */
 .fd-direct-row .fd-button {
     min-inline-size: 168px;
+}
+
+/*
+  Copy Feedback (Story 9.4): both faces of the swap sit in the same grid
+  cell, `1 / 1`, so the crossfade never affects layout -- the button's own
+  `min-inline-size` above is what actually prevents a reflow; this is what
+  lets the two faces overlap smoothly while it does. The inactive face is
+  `aria-hidden="true"` (`StagedView.tsx`), which is also what keeps the
+  button's accessible name at exactly one string rather than both
+  concatenated -- see the transition rule below apply equally to opacity and
+  translate on each face, keyed off that same attribute.
+*/
+.fd-button__swap {
+    display: grid;
+}
+
+.fd-button__swap-face {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    transition:
+        opacity 200ms var(--ease-decelerate),
+        translate 260ms var(--ease-decelerate);
+}
+
+.fd-button__swap-face[aria-hidden='true'] {
+    opacity: 0;
+    translate: 0 6px;
+}
+
+.fd-button__glyph {
+    width: 16px;
+    height: 16px;
+    flex: none;
+}
+
+/*
+  Defect fix, found rendered on the built binary: the refresh glyph on "Try
+  Again" sat flush against the "T" of the label, with no gap at all -- unlike
+  the browse pill's own trailing chevron (`.fd-browse-trigger__chevron`'s
+  `margin-inline-start` above) and unlike the Copy Link glyph in StagedView.
+  Copy Link's glyph is spaced for free: it lives inside `.fd-button__swap-face`,
+  and that element's own `gap` (just above) is what separates its glyph from
+  its text. RefreshGlyph in OutcomePanel.tsx is not wrapped in a swap face --
+  it is a direct child of the button -- so it never inherited that flex gap.
+
+  Scoped to a direct child (`.fd-button > .fd-button__glyph`), not every
+  `.fd-button__glyph` unconditionally, so the two swap-face glyphs -- already
+  spaced by their own parent's `gap` -- are left alone rather than gaining a
+  second, stacked margin on top of it.
+
+  Rendered proof: "Try Again's refresh glyph keeps clear of its own label"
+  in accessibility.test.tsx. Mutation: delete this rule -> that test fails,
+  naming the near-zero gap.
+*/
+.fd-button > .fd-button__glyph {
+    margin-inline-end: var(--spacing-2);
 }
 
 /* --------------------------------------------------------------------- Idle */
@@ -676,8 +845,9 @@ body {
   flex: 1 1 auto (Story 7.7) makes .fd-idle consume the full height
   .fd-region grows to, which is what gives the drop zone below something to
   grow into. The other children here -- the cancel summary, the command-error
-  panel, the two disclosures, the browse control -- keep their default
-  flex: 0 1 auto, so only the drop zone actually grows.
+  panel, and the grouped disclosure list -- keep their default flex: 0 1 auto,
+  so only the drop zone actually grows. The browse control is no longer one
+  of this element's own children (Story 9.3 moved it inside the drop zone).
 */
 .fd-idle {
     display: flex;
@@ -757,11 +927,25 @@ body {
   --color-control-border happen to resolve to the same CanvasText today, which
   would break silently if either were ever given a different system color.
 */
+/*
+  Defect fix: `align-content` was left at its initial `normal`, which computes
+  to `stretch` for Grid's auto-sized row tracks -- so the free block space
+  `.fd-drop-zone`'s `flex: 1 1 auto` hands this element (see that rule's own
+  comment) was distributed equally across the four rows (glyph, heading,
+  promise line, browse pill) instead of the rows staying packed together.
+  That read as the group being spread out rather than centred as a unit,
+  with 50-70px gaps between rows on a tall window. `align-content: center`
+  packs the rows first, using only their own content and margins (below),
+  and centres that packed block within the extra height -- so growing the
+  window grows the gap above and below the group, not the gaps inside it.
+  See the rendered proof in accessibility.test.tsx.
+*/
 .fd-drop-zone__inner {
     display: grid;
     flex: 1 1 auto;
     min-block-size: 200px;
     place-items: center;
+    align-content: center;
     padding: var(--spacing-6);
     border: 2px dashed var(--color-control-border);
     border-radius: var(--radius-xl);
@@ -790,7 +974,14 @@ body {
     display: grid;
     width: 56px;
     height: 56px;
-    margin: 0 auto var(--spacing-3);
+    /*
+      Defect fix: was var(--spacing-3) (12px). Widened to var(--spacing-4)
+      (16px) as part of packing the drop zone's rows together under
+      `align-content: center` above -- see that rule's comment for why a
+      fixed gap here, rather than the grid's own free space, is what now
+      separates the glyph from the heading below it.
+    */
+    margin: 0 auto var(--spacing-4);
     place-items: center;
     border: 2px solid var(--color-primary);
     border-radius: var(--radius-xs);
@@ -800,12 +991,42 @@ body {
 }
 
 /*
+  Defect fix, the other two rows of the same packed group: `.fd-state-heading`
+  and `.fd-meta` are shared classes (Staged, Transferring, the outcome panel,
+  the pending card all use them too, each with their own spacing needs), so
+  these gaps are scoped to the drop zone rather than added to the shared
+  rules. Paired with `align-content: center` above and the widened glyph
+  margin, these are the fixed gaps that replace the grid's own free-space
+  distribution: heading to promise line, and promise line to the browse
+  pill. Neither is a spacing token -- DESIGN.md's ramp has nothing between
+  4px and 8px, and 6px is what the rendered proof in accessibility.test.tsx
+  requires here -- so both are written as literal pixel values, the same
+  convention this sheet already uses for the drop zone's own 7px inset and
+  the drop symbol's 3px lift.
+*/
+.fd-drop-zone__inner .fd-state-heading {
+    margin-bottom: 6px;
+}
+
+.fd-drop-zone__inner .fd-meta {
+    margin-bottom: var(--spacing-5);
+}
+
+/*
   DESIGN.md's Disclosure component: a {rounded.xl} surface at {elevation.sh-1}
-  with a leading tinted icon, a chevron that rotates when open, and a hover
-  fill. Native <details>/<summary> supplies the keyboard operability and the
-  open/closed state; this only paints it. `list-style: none` plus the
-  `::-webkit-details-marker` rule below remove the browser's own default
-  disclosure triangle so the authored chevron is the only one.
+  with a chevron that rotates when open and a hover fill.
+
+  Story 9.1: this used to be native <details>/<summary>, which supplied
+  keyboard operability and open/closed state for free but cannot smoothly
+  expand or collapse in both engines this product ships to. It is now a
+  controlled <button aria-expanded> (`.fd-disclosure__summary`, wrapped in an
+  `<h2>` because a button's content model does not permit a heading child)
+  plus a region (`.fd-disclosure__region`) that expands and collapses with
+  the `grid-template-rows: 0fr <-> 1fr` technique below -- broader engine
+  support than an animated <details> open, and the same technique the owner-
+  approved prototype uses for every expand/collapse in the product. See
+  Disclosure.tsx for the fuller trade-off and DESIGN.md's Disclosure row for
+  the recorded choice.
 */
 .fd-disclosure {
     border-radius: var(--radius-xl);
@@ -813,19 +1034,41 @@ body {
     box-shadow: var(--shadow-sh-1);
 }
 
+.fd-disclosure__heading {
+    margin: 0;
+    font: inherit;
+    font-weight: inherit;
+}
+
+/*
+  Defect fix (Story 9.3, found by hand on the built macOS binary after
+  Story 9.1 merged): the chevron sat immediately after the label text
+  instead of at the row's trailing edge, as it did in 1.2.1 and as the
+  owner-approved prototype's `.row` shows. Cause: Story 9.1 replaced
+  `<summary>` -- whose containing `<h2>` carried `flex: 1` and pushed the
+  chevron to the far end -- with this `<button>`, and nothing here replaced
+  that push. `justify-content: space-between` is the fix, matching the
+  prototype's `.row` rule exactly: the label (an anonymous flex item) and
+  the chevron are the button's only two flex children, so this alone spreads
+  them to opposite ends with no wrapping span required.
+*/
 .fd-disclosure__summary {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    width: 100%;
     gap: var(--spacing-3);
     padding: var(--spacing-4);
-    list-style: none;
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    font-size: var(--text-body-strong);
+    font-weight: var(--font-weight-body-strong);
+    line-height: var(--leading-body-strong);
+    text-align: start;
     cursor: pointer;
     border-radius: var(--radius-xl);
     transition: background-color 150ms var(--ease-decelerate);
-}
-
-.fd-disclosure__summary::-webkit-details-marker {
-    display: none;
 }
 
 .fd-disclosure__summary:hover {
@@ -834,9 +1077,9 @@ body {
 
 /*
   Story 7.11: same two-tone ring as `.fd-button:focus-visible` above -- see
-  that rule's comment for the gap/ring reasoning. `<details>`/`<summary>` is
-  natively Tab-reachable and click-activatable, so `:focus-visible` is the
-  right pseudo-class here for the same reason it is on the trigger: a plain
+  that rule's comment for the gap/ring reasoning. A <button> is natively
+  Tab-reachable and click-activatable, so `:focus-visible` is the right
+  pseudo-class here for the same reason it is on the browse trigger: a plain
   `:focus` rule would repaint after a mouse click.
 */
 .fd-disclosure__summary:focus-visible {
@@ -845,15 +1088,6 @@ body {
     box-shadow:
         0 0 0 var(--focus-ring-offset) var(--color-surface),
         0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-primary);
-}
-
-.fd-disclosure__heading {
-    flex: 1;
-    margin: 0;
-    color: var(--color-text);
-    font-size: var(--text-body-strong);
-    font-weight: var(--font-weight-body-strong);
-    line-height: var(--leading-body-strong);
 }
 
 .fd-disclosure__chevron {
@@ -866,7 +1100,7 @@ body {
     transition: transform 200ms var(--ease-decelerate);
 }
 
-.fd-disclosure[open] > .fd-disclosure__summary .fd-disclosure__chevron {
+.fd-disclosure[data-open] > .fd-disclosure__heading .fd-disclosure__summary .fd-disclosure__chevron {
     transform: rotate(45deg);
 }
 
@@ -886,17 +1120,92 @@ body {
 }
 
 /*
-  One control now, not a pair: position: relative anchors the menu below it,
-  and the trigger fills the row for the same visual rhythm the two-button
-  grid gave the section it sits in.
+  Story 9.1: the expand/collapse mechanism. `grid-template-rows` animates
+  between an intrinsic-content `1fr` and a collapsed `0fr` -- this is what
+  lets the region grow and shrink with no fixed height to measure and no
+  JavaScript to read one, and it degrades gracefully on an engine that cannot
+  interpolate `fr` tracks: the value still changes, just without a visible
+  transition, so the collapsed/expanded states are still correct.
+
+  `.fd-disclosure__region-inner`'s `overflow: hidden` is what keeps the body
+  clipped to that animating row while it is short of `1fr`.
+
+  `visibility` is transitioned, not toggled, and in different directions on
+  each side of the state, which is what makes collapsed content neither
+  focusable nor exposed to assistive technology without an unmount: opening
+  makes the region visible immediately (a 0s-delay transition) so content is
+  never hidden while it grows in; closing keeps it visible until the height
+  collapse finishes (a transition-duration-length delay) so nothing vanishes
+  out from under the shrinking box, then removes it from the accessibility
+  tree and the tab order once there is nothing left to show. `inert` is not
+  used here: it is unsupported on the older macOS WebKit this product's
+  compatibility range includes.
+*/
+.fd-disclosure__region {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition:
+        grid-template-rows 320ms var(--ease-decelerate),
+        visibility 0s linear 320ms;
+}
+
+.fd-disclosure__region[data-open] {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition:
+        grid-template-rows 320ms var(--ease-decelerate),
+        visibility 0s linear 0s;
+}
+
+.fd-disclosure__region-inner {
+    overflow: hidden;
+    min-height: 0;
+}
+
+/*
+  Story 9.3: Idle's two disclosures as one grouped list -- a single
+  {rounded.xl} surface at {elevation.sh-1}, the two rows divided by a
+  {colors.separator} rule -- rather than each disclosure carrying its own
+  card and shadow. `overflow: hidden` is what clips each row's rectangular
+  hover fill to the group's own rounded corners, since the nested
+  `.fd-disclosure` rows below give up their individual radius and elevation
+  to this wrapper. (Story 9.4 retired the once-different Staged form this
+  comment used to except -- both Idle's and Staged's recovery content are
+  `.fd-disclosure` now, so there is no longer a second box-styling scope to
+  keep separate from this one.)
+*/
+.fd-idle-disclosures {
+    border-radius: var(--radius-xl);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sh-1);
+    overflow: hidden;
+}
+
+.fd-idle-disclosures > .fd-disclosure {
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+
+.fd-idle-disclosures > .fd-disclosure + .fd-disclosure {
+    border-top: 1px solid var(--color-separator);
+}
+
+/*
+  One control now, not a pair: position: relative anchors the menu below it.
+
+  Story 9.3 reverses Story 7.3's full-width rule (DESIGN.md's Browse Control
+  row records the reversal): the control now sits *inside* the drop zone as
+  its one action, a centred pill of intrinsic width under the drop zone
+  inner wrapper's `place-items: center`, rather than a full-width row
+  stretched to the section below it. `.fd-selection` itself no longer
+  stretches its child to 100% width -- removing that is the mutation
+  `IdleView.test.tsx`'s inverted assertion names.
 */
 .fd-selection {
     position: relative;
     display: flex;
-}
-
-.fd-selection > .fd-button {
-    width: 100%;
 }
 
 /*
@@ -920,7 +1229,19 @@ body {
     flex: none;
     width: 12px;
     height: 12px;
-    margin-inline-start: auto;
+    /*
+      Defect fix: this was `margin-inline-start: auto`, which only produces a
+      gap when the flex container (the button) has spare inline space to
+      distribute to that auto margin. `.fd-button--pill` is `display:
+      inline-flex` sized to its own content -- there is never any spare space
+      -- so the chevron rendered flush against the label, and a rotated 12px
+      box's own bounding box is its diagonal (~17px, not its unrotated 12px
+      side), which read as touching or overlapping the final letter rather
+      than merely sitting close. A fixed margin creates the gap unconditionally,
+      the same proportion the owner-approved prototype's `.btn` `gap: 7px`
+      reads as. See the rendered proof in accessibility.test.tsx.
+    */
+    margin-inline-start: var(--spacing-3);
     border-right: 2px solid var(--color-primary-ink);
     border-bottom: 2px solid var(--color-primary-ink);
     transform: rotate(45deg);
@@ -948,14 +1269,48 @@ body {
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sh-3);
+    /*
+      Story 9.1: fade plus a scale-up from ~0.96, anchored at the corner the
+      menu actually hangs from (`inset-inline-start: 0` above, flush with the
+      trigger's own leading edge -- the owner-approved prototype centres its
+      menu under a centred trigger instead, so its `top center` origin does
+      not apply to this left-anchored layout).
+    */
+    opacity: 1;
+    scale: 1;
+    transform-origin: top left;
+    transition:
+        opacity 160ms var(--ease-decelerate),
+        scale 200ms var(--ease-decelerate);
+}
+
+@starting-style {
+    .fd-browse-menu {
+        opacity: 0;
+        scale: 0.96;
+    }
 }
 
 .fd-browse-menu .fd-button {
     width: 100%;
+    justify-content: flex-start;
+    gap: var(--spacing-2);
     text-align: start;
     border-color: transparent;
     background: transparent;
     border-radius: var(--radius-sm);
+}
+
+/*
+  Story 9.3: the decorative kind glyph beside each menu item's word ("File",
+  "Folder"), matching the owner-approved prototype. `aria-hidden` in the
+  markup (BrowseControl.tsx) is what keeps it out of the accessible name;
+  this is only its size and hit-box exemption.
+*/
+.fd-browse-menu-item__icon {
+    flex: none;
+    width: 16px;
+    height: 16px;
 }
 
 /*
@@ -1089,46 +1444,13 @@ body {
 }
 
 /*
-  Progress Card (Story 7.5): rounded.xxl at sh-3, the focal object of the
-  Transferring state alongside the packet and the open browse menu -- see
-  DESIGN.md's Elevation table.
+  Story 9.5 retired the standalone Progress Card (`.fd-transfer-view`, Story
+  7.5's own rounded.xxl/sh-3 surface), its head row (`.fd-progress-head`) and
+  its percentage (`.fd-progress-percent`) -- Sending now reuses `.fd-packet`
+  and `.fd-hero` verbatim (below), the same card Staged builds, with the
+  percentage moved inside the ring itself (`.fd-ring__pct`, in the
+  Transferring section further down). See DESIGN.md's Progress Card row.
 */
-.fd-transfer-view {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-4);
-    padding: var(--spacing-5);
-    border-radius: var(--radius-xxl);
-    background: var(--color-elevated);
-    color: var(--color-text);
-    box-shadow: var(--shadow-sh-3);
-}
-
-/*
-  The head above the track: the percentage or literal status on the left,
-  wire bytes and throughput beside it on the right. Both sit above the 8px
-  track per DESIGN.md's Progress Card row.
-*/
-.fd-progress-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--spacing-3) var(--spacing-4);
-}
-
-/*
-  {typography.numeric}: the transfer percentage. Tabular numerals so a
-  changing value does not reflow its own row (DESIGN.md, Typography).
-*/
-.fd-progress-percent {
-    font-family: var(--font-display);
-    font-size: var(--text-numeric);
-    font-weight: var(--font-weight-numeric);
-    letter-spacing: var(--tracking-numeric);
-    line-height: var(--leading-numeric);
-    font-variant-numeric: tabular-nums;
-}
 
 .fd-packet {
     display: flex;
@@ -1141,46 +1463,85 @@ body {
     box-shadow: var(--shadow-sh-3);
 }
 
+/*
+  Story 9.4: the centred heading and one-line instruction that sit above the
+  card -- DESIGN.md's App Shell composition still centres the whole region,
+  but this element only needs to centre its own two lines of text.
+*/
+.fd-staged-head {
+    text-align: center;
+}
+
 .fd-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 224px;
-    gap: var(--spacing-7);
-    align-items: start;
+    /*
+      216px, not 224 -- Story 9.4's acceptance criteria name "~216px" for the
+      QR tile, matching the owner-approved prototype's `.slot`/`.qr` (216x216).
+      `.fd-qr-panel` below carries the same figure.
+
+      Defect fix (orchestrator's rendered 1024x768 review after Story 9.4
+      merged): the fixed track came *second* here while `StagedView.tsx`'s
+      DOM order puts `.fd-qr-panel` *first* -- grid places children into
+      tracks in DOM order regardless of visual expectation, so the QR
+      actually landed in the `minmax(0, 1fr)` track (and sat centred in the
+      leftover ~430px, per `.fd-qr-panel`'s own `width: min(216px, 100%)`)
+      while the item details were crushed into 216px, wrapping the name
+      mid-word and stacking the two link buttons. The fixed track has to
+      come first to match the DOM order it is actually assigned to.
+      `align-items: center` (was `start`) matches the owner-approved
+      prototype's `.card` and keeps the QR vertically centred beside a
+      details column of varying height rather than pinned to the top.
+    */
+    grid-template-columns: 216px minmax(0, 1fr);
+    /* ~24px, matching the prototype's `.card` gap -- was --spacing-7 (32px). */
+    gap: var(--spacing-6);
+    align-items: center;
 }
 
 .fd-hero__details {
     display: flex;
     min-inline-size: 0;
     flex-direction: column;
-    gap: var(--spacing-2);
+    gap: var(--spacing-4);
 }
 
-/* The full-name control sits with the name, not stretched across the column. */
-.fd-name-toggle {
-    align-self: start;
-    padding-block: var(--spacing-2);
+/*
+  The item row: a kind glyph beside the name and meta line (Story 9.4). This
+  replaces the removed `fd-packet-tab` kind label and the "Show full name"
+  toggle -- the name now simply wraps (`.fd-headline`'s own
+  `overflow-wrap: anywhere`, unchanged) rather than clamping to two lines
+  behind a persistent control.
+*/
+.fd-item {
+    display: flex;
+    gap: var(--spacing-3);
+    align-items: flex-start;
+}
+
+.fd-item__icon {
+    display: grid;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border-radius: var(--radius-md);
+    background: var(--color-fill);
+    color: var(--color-muted);
+}
+
+.fd-item__glyph {
+    width: 20px;
+    height: 20px;
+}
+
+.fd-item__text {
+    display: flex;
+    min-inline-size: 0;
+    flex-direction: column;
+    gap: var(--spacing-1);
 }
 
 /* ----------------------------------------- Recovery help (Idle and Staged) */
-
-/*
-  :not(.fd-disclosure) scopes this to the always-open form StagedView renders
-  (a plain <div>, RecoveryHelp's own wrapper). Idle's form is the same class
-  on a <details> that also carries .fd-disclosure (IdleView.tsx), and takes
-  its surface styling from the shared .fd-disclosure rule above instead --
-  DESIGN.md's Disclosure component "replaces the always-open firewall and
-  recovery blocks", but only where Story 7.3 actually rebuilt them, which is
-  Idle. Staged is unchanged.
-*/
-.fd-help:not(.fd-disclosure) {
-    display: grid;
-    gap: var(--spacing-3);
-    padding: var(--spacing-4);
-    border: 1px solid var(--color-separator);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-text);
-}
 
 .fd-help__platforms {
     display: grid;
@@ -1201,14 +1562,43 @@ body {
 
 .fd-qr-panel {
     display: grid;
-    width: min(224px, 100%);
+    /*
+      Story 9.4: ~216px at `{rounded.lg}`, matching the owner-approved
+      prototype's `.qr` tile -- was 224px at `{rounded.xs}` (a nearly-square
+      corner) when the QR shared visual weight with the always-visible link
+      row beside it; now that the QR is "the whole point of the screen" (the
+      story's own words), it takes the same generous corner radius the rest
+      of Quartz's raised surfaces use.
+    */
+    width: min(216px, 100%);
     aspect-ratio: 1;
     place-items: center;
     padding: var(--spacing-4);
     border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-xs);
+    border-radius: var(--radius-lg);
     background: var(--color-qr-surface);
     color: var(--color-qr-ink);
+    /*
+      Story 9.4's own entrance, not the generic `.fd-rise` stagger: DESIGN.md's
+      Motion section names "cards and discs in the stories that follow" the
+      browse menu's fade-plus-scale pattern, and the owner-approved
+      prototype's `.qr`/`.ring` enter this way, unstaggered, at the same time
+      as the view itself -- the QR is the view's focal object, not a child
+      queued behind it. Timings match the prototype's own `.qr` rule (300ms
+      opacity, 420ms scale) rather than the browse menu's shorter ones.
+    */
+    opacity: 1;
+    scale: 1;
+    transition:
+        opacity 300ms var(--ease-decelerate),
+        scale 420ms var(--ease-decelerate);
+}
+
+@starting-style {
+    .fd-qr-panel {
+        opacity: 0;
+        scale: 0.94;
+    }
 }
 
 .fd-qr {
@@ -1230,18 +1620,55 @@ body {
 
 /* --------------------------------------------------------- Direct URL Row */
 
-.fd-handoff {
+/*
+  Story 9.4: Copy Link and Show/Hide Link, side by side -- the field they
+  used to sit beside is gone from this row entirely; it lives in
+  `.fd-url-reveal` below instead, mounted only once requested. A wrapping
+  flex row rather than the old two-column grid: two buttons of modest,
+  roughly-equal width have no track-sizing problem a grid was solving, and
+  `flex-wrap` alone is enough to keep both reachable at the 320px reflow
+  floor without a dedicated breakpoint override.
+*/
+.fd-direct-row {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--spacing-2);
-    margin-top: var(--spacing-2);
 }
 
-.fd-direct-row {
+/*
+  Story 9.4: the link is not rendered until Show Link is activated. This is
+  the same transitioned `grid-template-rows: 0fr <-> 1fr` plus transitioned
+  `visibility` technique `.fd-disclosure__region` uses (see that rule's own
+  comment for the fuller reasoning) -- kept as its own rule rather than
+  reusing the Disclosure component itself, because the trigger here is a
+  plain button beside Copy Link, not a heading-wrapped disclosure summary.
+  Staying mounted either way is what lets it animate closed as well as open,
+  and what keeps Story 7.9's CSS-grid mirror sizing untouched underneath.
+*/
+.fd-url-reveal {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--spacing-2);
-    align-items: stretch;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition:
+        grid-template-rows 320ms var(--ease-decelerate),
+        visibility 0s linear 320ms;
+}
+
+.fd-url-reveal[data-open] {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition:
+        grid-template-rows 320ms var(--ease-decelerate),
+        visibility 0s linear 0s;
+}
+
+.fd-url-reveal__inner {
+    overflow: hidden;
+    min-height: 0;
+}
+
+.fd-url-reveal__body {
+    padding-top: var(--spacing-3);
 }
 
 /*
@@ -1385,15 +1812,6 @@ body {
 
 /* ------------------------------------------- Disclosures, notices, warnings */
 
-.fd-notice {
-    margin: 0;
-    padding: var(--spacing-3);
-    border: 1px solid var(--color-warning);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-warning);
-}
-
 .fd-warning-banner {
     display: flex;
     flex-direction: column;
@@ -1405,100 +1823,408 @@ body {
     color: var(--color-warning);
 }
 
-.fd-trust {
+/*
+  Story 9.4: the caveat lines -- first-opener and network stay visible on the
+  card (an info glyph and a lock glyph respectively, both inline SVG in
+  `StagedView.tsx`, `aria-hidden`), replacing the old trusted-LAN paragraph
+  pair and its single generated "!" marker. The folder note, when present, is
+  a third line with no glyph of its own (`.fd-caveats__plain`).
+*/
+.fd-caveats {
     display: grid;
     gap: var(--spacing-2);
+    margin: 0;
     padding-top: var(--spacing-4);
     border-top: 1px solid var(--color-separator);
+    list-style: none;
     color: var(--color-muted);
+    font-size: var(--text-meta);
+}
+
+.fd-caveats li {
+    display: flex;
+    gap: var(--spacing-2);
+    align-items: flex-start;
+}
+
+.fd-caveats__glyph {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-top: 2px;
+}
+
+.fd-caveats__plain {
+    padding-inline-start: calc(14px + var(--spacing-2));
 }
 
 /*
-  One marker, on the not-encrypted disclosure only: DESIGN.md gives the
-  trusted-LAN note a single warning marker, and the no-extra-copy sentence is a
-  neutral statement of fact rather than a caution.
+  Story 9.4: the row below the card -- "Trouble connecting?" on the left,
+  Cancel on the right.
+
+  Defect fix (orchestrator's rendered 1024x768 review after Story 9.4
+  merged): the original comment here claimed `.fd-disclosure` "sizes to its
+  own content as a flex item," which was never actually measured. It does
+  not, for two independent reasons, both fixed below on `.fd-disclosure`
+  itself (see that rule's own comment): its child `.fd-disclosure__summary`
+  is set to fill its container's full width on its own, and -- the one that
+  actually forced the wrap -- `Disclosure`'s collapsed help region stays
+  mounted at full content width even at zero height, and a multi-line flex
+  container's line-wrap decision is made from each item's un-shrunk
+  hypothetical size, which for an auto-sized flex item is that region's own
+  long, unwrapped max-content extent. Either alone was enough to make the
+  disclosure claim the whole row and bump Cancel onto its own line below it.
+
+  Pinning Cancel's own top edge while the disclosure below grows downward
+  is Cancel's `align-self` override further down, not this container's own
+  cross-axis alignment choice -- mutating this rule's value alone left
+  every test in the defect-fix suite passing, confirming it is not what
+  holds that guarantee. Kept at the row's leading edge anyway as the more
+  predictable default for two items of differing, changing heights sharing
+  one row, rather than reverted for no functional reason now that it is
+  known not to matter here.
 */
-.fd-trust p:first-child::before {
-    content: "!";
-    display: inline-grid;
-    width: 18px;
-    height: 18px;
-    margin-right: var(--spacing-2);
-    place-items: center;
-    border: 1px solid var(--color-warning);
-    border-radius: var(--radius-full);
-    color: var(--color-warning);
-    font-size: var(--text-label);
-    font-weight: var(--font-weight-label);
-    vertical-align: 1px;
+.fd-staged-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-3);
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+/*
+  The foot's own Disclosure is a quiet, surfaceless trigger -- muted text, a
+  small chevron, a fill on hover -- not the boxed `{rounded.xl}` card every
+  other Disclosure renders (Idle's grouped list). Scoped to
+  `.fd-staged-foot .fd-disclosure` so Idle's own disclosures, and any future
+  card-style Disclosure, keep their surface untouched.
+
+  `flex: 1` -- grow 1, shrink 1, and a *zero* basis -- not the shorthand's
+  own `auto` basis (`flex: 1 1 auto`), and this one substitution is the fix
+  that actually mattered. An auto flex-basis makes a flex item's hypothetical
+  size for the *line-wrap decision* in a multi-line, wrapping container its
+  max-content extent, and `Disclosure`'s collapsed help region stays mounted
+  at full content size even while its rendered height is nothing (Story
+  9.1's collapsed-content-stays-mounted contract) -- so the disclosure's own
+  max-content extent was that of its single longest unwrapped sentence (the
+  macOS firewall recovery line, comfortably wider than this whole row), which
+  alone forced it onto its own line, growing to fill that line once alone
+  there, with Cancel bumped below. A zero basis makes the line-wrap decision
+  see a plain, definite nothing instead of that hidden content extent, so it
+  always fits this row; the grow factor then still expands the box normally
+  afterward. A matching shrink floor beside it is the ordinary flex
+  companion this needs. Confirmed by mutation: reverting to the shorthand's
+  own auto basis alone (with every other rule in this file unchanged)
+  reproduces the exact original defect, in both the "one row" and "Cancel's
+  top" tests below.
+
+  `.fd-disclosure__summary`'s own full-width rule (its base rule, unscoped)
+  never had to be fought once the wrap decision itself no longer keyed off
+  hidden content size -- it resolves against whatever space the flex
+  algorithm gives the parent `.fd-disclosure`, which is now correctly "this
+  row's space minus Cancel's and the gap," not "the whole row."
+*/
+.fd-staged-foot .fd-disclosure {
+    /*
+      `flex-basis: 0` (the `flex: 1` shorthand), not `auto`. The collapsed
+      help region stays mounted at zero *height* but full content width
+      (Story 9.1's collapsed-content-stays-mounted contract), and a
+      multi-line flex container's line-wrapping decision is made from each
+      item's un-shrunk hypothetical size -- which, at `flex-basis: auto`,
+      is the item's max-content width, including that mounted-but-invisible
+      region's longest unwrapped paragraph (the macOS firewall recovery
+      sentence, well over 700px on its own). That alone exceeded the row's
+      width and forced the disclosure onto its own line, growing to fill it,
+      with Cancel bumped below -- reproduced and confirmed by removing this
+      rule. A definite zero basis sidesteps the content-width contribution
+      entirely: the wrap decision sees 0, always fits this row, and
+      `flex-grow: 1` still grows the box normally afterward.
+    */
+    flex: 1;
+    min-inline-size: 0;
+    background: none;
+    box-shadow: none;
+}
+
+.fd-staged-foot .fd-disclosure__summary {
+    width: auto;
+    /* The 44px activation floor, decoupled from padding: this row's
+       quieter padding alone would fall under it. */
+    min-block-size: var(--spacing-target-min);
+    padding: var(--spacing-2) var(--spacing-1);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    font-size: var(--text-control);
+    font-weight: var(--font-weight-control);
+}
+
+.fd-staged-foot .fd-disclosure__summary:hover {
+    background: var(--color-fill);
+    color: var(--color-text);
+}
+
+.fd-staged-foot .fd-disclosure__chevron {
+    width: 8px;
+    height: 8px;
+}
+
+/*
+  `.fd-button--quiet`'s own `width: 100%` assumes it is the only, block-level
+  child of its container (Idle's and the old Staged's Cancel both were). Here
+  it shares a flex row with the disclosure trigger, so it needs its intrinsic
+  width instead -- a targeted override scoped to this one composition rather
+  than a change to the shared rule, which every other Cancel/Dismiss button
+  still relies on for its own full-width layout. `flex: none` plus
+  `align-self: flex-start` (Defect fix) keep Cancel a fixed-width column
+  pinned to the row's top edge regardless of how tall the disclosure beside
+  it grows.
+*/
+.fd-staged-foot .fd-button--quiet {
+    width: auto;
+    flex: none;
+    align-self: flex-start;
 }
 
 /* ------------------------------------------------------------- Transferring */
 
-.fd-meter-label {
+/*
+  Story 9.5: the progress ring, in Staged's own 216px QR slot -- the card
+  never changes shape moving from Staged to Sending. Sized and positioned
+  exactly like `.fd-qr-panel` (`width: min(216px, 100%)`, the same reflow
+  behaviour at 759px and below), but with no light-substrate tile behind it:
+  the ring paints directly on the card's own surface, matching the
+  owner-approved prototype's `.ring` (as opposed to its `.qr`, which does
+  carry one).
+*/
+.fd-ring-panel {
     display: flex;
-    justify-content: space-between;
-    gap: var(--spacing-3);
-    margin-bottom: var(--spacing-2);
-    font-size: var(--text-body-strong);
-    font-weight: var(--font-weight-body-strong);
-    line-height: var(--leading-body-strong);
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-2);
+    width: min(216px, 100%);
+    opacity: 1;
+    scale: 1;
+    transition:
+        opacity 300ms var(--ease-decelerate),
+        scale 420ms var(--ease-decelerate);
 }
 
-.fd-meter {
-    position: relative;
-    height: 8px;
-    overflow: hidden;
-    border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-full);
-    background: var(--color-track);
+@starting-style {
+    .fd-ring-panel {
+        opacity: 0;
+        scale: 0.94;
+    }
 }
 
 /*
-  Unknown totals get a static non-directional pattern -- no sweep, no shimmer,
-  no direction. It reads the same with reduced motion because it never moves.
+  The 216x216 square the ring itself draws in, separate from `.fd-ring-panel`
+  so the unknown mode's status caption can sit *beneath* it (per Story 9.5's
+  acceptance criteria, "in the centre or beneath") without either stretching
+  the ring away from a true circle or overlapping its own stroke -- the
+  known-positive and known-empty modes render no caption, so their panel
+  stays exactly this one square with nothing added beneath it.
+
+  Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+  merged): `display: grid; place-items: center` moved here (from
+  `.fd-ring__pct`, below) to match the owner-approved prototype's own
+  structure exactly -- its `.ring` is the `place-items: center` grid, and
+  its `.pct` is a plain, content-sized box the grid centres as a whole,
+  with the `<svg>` excluded from grid layout by its own `position:
+  absolute`. The previous version had it backwards: `.fd-ring__pct` was
+  itself `position: absolute; inset: 0` (i.e. stretched to fill the whole
+  216px frame) and tried to centre its own *content* inside that already
+  full-size box -- which put the percentage's line at the box's cross-start
+  edge rather than centred in the frame (measured ~91px above centre, not
+  the few pixels a rendering rounding difference would explain). Centring
+  a content-sized box via the parent's grid, the way the prototype does it,
+  has no such failure mode: a grid item that is not stretched is exactly as
+  tall as its own content, so `place-items: center` centres precisely that.
 */
-.fd-meter--unknown {
-    background-image: repeating-linear-gradient(
-        135deg,
-        transparent 0 8px,
-        var(--color-primary) 8px 12px,
-        transparent 12px 20px
-    );
+.fd-ring-frame {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 1;
 }
 
-.fd-meter__fill {
-    display: block;
+.fd-ring {
+    /*
+      Absolutely positioned so it never participates in `.fd-ring-frame`'s
+      grid layout (matching the prototype's own `.ring svg`) -- `.fd-ring__pct`
+      is the frame's one remaining, normal-flow grid item, sized to its own
+      content and centred by `place-items: center` above.
+    */
+    position: absolute;
+    inset: 0;
+    width: 100%;
     height: 100%;
-    background: var(--color-primary);
+    /*
+      A fixed, static orientation -- the fill starts drawing from 12 o'clock
+      rather than SVG's own 3 o'clock zero-angle -- never a transition or an
+      animation, so `prefers-reduced-motion` has nothing here to collapse.
+    */
+    rotate: -90deg;
 }
 
+.fd-ring__track {
+    fill: none;
+    stroke: var(--color-track);
+    stroke-width: 10px;
+}
+
+/*
+  The functional boundary DESIGN.md's Colors table requires on "the
+  progress-track outline" -- a thin ring exactly at the track band's own
+  outer edge (radius 96 + half its 10px width + this stroke's own half-width:
+  101), not a second, separately-positioned decoration. `--color-track` alone
+  clears only ~1.2:1 against `--color-surface`/`--color-elevated` (measured,
+  not assumed), nowhere near the 3:1 non-text floor -- exactly why the retired
+  linear meter (`.fd-meter`) carried a 1px `border` in this same token around
+  its own pale fill. A ring has no separate fill rectangle to frame, so the
+  edge is a second concentric stroke rather than a `border` property; moving
+  `.fd-ring__track` itself to `--color-control-border` instead was rejected --
+  it would have pulled the *fill-vs-track* adjacency `styles.test.ts` already
+  pins at 4.56/4.95 (`primary` on `track`) down to primary-on-control-border,
+  which measures only ~1.53/1.86 in the two authored modes and would have
+  made the filled and unfilled arcs hard to tell apart at the boundary that
+  matters most.
+*/
+.fd-ring__edge {
+    fill: none;
+    stroke: var(--color-control-border);
+    stroke-width: 1px;
+}
+
+/*
+  The determinate fill: solid `{colors.primary}`, never a gradient -- the
+  single-gradient rule is absolute and the primary button already spends it.
+  `stroke-dasharray` is set inline per render (the circle's own circumference,
+  a constant), so only `stroke-dashoffset` ever changes; transitioning that
+  alone is what animates the draw without a gradient or a keyframe.
+*/
+.fd-ring__fill {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: 10px;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 400ms var(--ease-decelerate);
+}
+
+/*
+  Unknown totals get a static, non-directional dashed pattern -- no sweep, no
+  shimmer, no rotation of its own beyond the track's fixed -90deg orientation
+  every mode shares. It reads the same with reduced motion because it never
+  moves in the first place, the same reasoning `.fd-meter--unknown` (Story
+  7.5's linear meter, retired by this story) used.
+*/
+.fd-ring__fill--unknown {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: 10px;
+    stroke-dasharray: 4 10;
+}
+
+/*
+  {typography.numeric}: tabular numerals so a changing value never reflows.
+
+  Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+  merged), two bugs in the same rule:
+
+  1. This used to be `display: grid; place-items: center;` with two direct
+     children (the number `<span>` and the `<small>` "%" sign) and no
+     declared `grid-template-columns` -- an implicit grid with no explicit
+     column count packs multiple children into separate rows by default
+     (`grid-auto-flow: row`, one implicit column), so the number centred on
+     its own row while the "%" sign centred on a second row down near the
+     ring's bottom edge. `display: flex` with `align-items: baseline` puts
+     both children on one line instead, sharing a text baseline the way
+     "43" and a smaller trailing "%" unit actually should.
+  2. This element also used to be `position: absolute; inset: 0` (stretched
+     to fill the whole 216px frame) with the centring (`place-items`, then
+     `align-items`/`justify-content`) applied *inside* that already
+     full-size box -- which is why the existing "centres the determinate
+     percentage inside the ring" test in accessibility.test.tsx never
+     caught either bug: `.fd-ring__pct` itself always equalled the frame's
+     own bounding box regardless of how its children were laid out inside
+     it, so that test measured the container, not the text. Centring is
+     now done the way the owner-approved prototype does it: `.fd-ring-frame`
+     (the parent, above) is the `place-items: center` grid, and this stays
+     a plain, content-sized, normal-flow grid item that grid centres as a
+     whole -- both axes, by construction, not by guessing at cross-axis
+     behaviour for a box already stretched to its container's full size.
+*/
+.fd-ring__pct {
+    display: flex;
+    align-items: baseline;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-numeric);
+    font-weight: var(--font-weight-numeric);
+    letter-spacing: var(--tracking-numeric);
+    line-height: var(--leading-numeric);
+    font-variant-numeric: tabular-nums;
+}
+
+.fd-ring__pct small {
+    font-size: var(--text-meta);
+    font-weight: var(--font-weight-meta);
+    color: var(--color-muted);
+    margin-inline-start: 1px;
+}
+
+/* The unknown-total status, a plain caption beneath `.fd-ring-frame`. */
+.fd-ring__status {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+    text-align: center;
+}
+
+/*
+  Defect fix (orchestrator's rendered review after Story 9.5 merged): this
+  used to be a bordered, filled `{rounded.md}` box -- a stray survivor of
+  the retired linear meter's own card-within-a-card styling -- which reads
+  as an inert control rather than plain status text sitting in the details
+  column beside the item row and the figures. No border, no fill, no
+  padding: the same visual weight as `.fd-ring__status` (the unknown mode's
+  own plain, muted caption) rather than a boxed surface. It is still never
+  a percentage-bearing progressbar -- that guarantee lives entirely in
+  `ProgressRing`'s own markup (no `role` on the known-empty ring panel),
+  untouched by this purely visual change.
+*/
 .fd-empty-status {
     margin: 0;
-    padding: var(--spacing-3);
-    border: 1px solid var(--color-control-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
+    color: var(--color-muted);
     font-size: var(--text-body-strong);
     font-weight: var(--font-weight-body-strong);
     line-height: var(--leading-body-strong);
 }
 
+/*
+  Defect fix (orchestrator's rendered review after Story 9.5 merged): this
+  used to be a two-column grid of bordered, filled `{rounded.sm}` boxes --
+  Story 7.5's own metric-card styling, never revisited when Story 9.5 moved
+  the percentage into the ring and left these two figures as the only
+  content. The acceptance criteria call for "two plain figure-over-caption
+  pairs", which the owner-approved prototype's own `.stats`/`.stat` render
+  as an unboxed flex row (~22px gap, `--spacing-6`'s 24px the nearest
+  token) of figure-over-caption stacks, not a bordered grid.
+*/
 .fd-metrics {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-6);
 }
 
 .fd-metric {
-    padding: var(--spacing-3);
-    border: 1px solid var(--color-separator);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
 }
 
 .fd-metric__value {
-    display: block;
     font-variant-numeric: tabular-nums;
     font-size: var(--text-body-strong);
     font-weight: var(--font-weight-body-strong);
@@ -1511,15 +2237,52 @@ body {
     line-height: var(--leading-meta);
 }
 
+/*
+  Defect fix (orchestrator's rendered review after Story 9.5 merged): Cancel
+  is the sole block-level child at the foot of `.fd-hero__details`, so it
+  inherited `.fd-button--quiet`'s shared `width: 100%` (authored for Idle's
+  and the old Staged Cancel, which really were the only child of their own
+  containers) and rendered as a full-width bar -- the owner-approved
+  prototype's own Sending template places an intrinsic-width Cancel, left-
+  aligned beneath the figures. `width: auto` alone is not enough:
+  `.fd-hero__details` is a column flex container, and a flex item's default
+  `align-self: stretch` still fills the cross axis (the container's width)
+  when its own `width` is `auto` -- the same two-part fix
+  `.fd-staged-foot .fd-button--quiet` already uses for the same shared
+  rule, scoped here instead because Transferring's Cancel has no disclosure
+  beside it to share a row with.
+*/
+.fd-hero__details .fd-button--quiet {
+    width: auto;
+    align-self: flex-start;
+}
+
 /* ---------------------------------------------------------------- Outcomes */
 
 /*
-  Outcome Panel (Story 7.5): a centred composition at rounded.xxl / sh-3, the
-  same elevation step as the progress card and the packet -- the focal object
-  of the Done/Error lifecycle state.
+  Outcome Panel (Story 7.5; rebuilt as one card by Story 9.6): a centred
+  composition at rounded.xxl / sh-3, the same elevation step as the progress
+  card and the packet -- the focal object of the Done/Error lifecycle state.
+
+  Story 9.6: column width, never wider than the Staged card -- `.fd-region`
+  (Staged's own wrapper) caps at 720px, so this rule matches that figure
+  directly rather than reading it back out of another selector. This applies
+  to every shape the card takes: a live outcome (App's top-level slot, still
+  `.fd-app`'s direct child), a retained outcome or an Idle command failure
+  (also `.fd-app`'s child once IdleView stops rendering its own composition
+  around it -- see IdleView.tsx). Deliberately does not touch `flex` or
+  `justify-content`: this rule fixes the card's own width and never its
+  height, which is left to size to its own content in every one of its three
+  forms. Vertical centering is a *container* concern instead -- see the
+  `margin-block: auto` rule earlier in this file (the "App Shell" section,
+  near `.fd-region`'s own vertical-composition rules) for how the card is
+  positioned without ever changing its own size.
 */
 .fd-outcome {
     display: flex;
+    width: 100%;
+    max-width: 720px;
+    margin-inline: auto;
     flex-direction: column;
     align-items: center;
     gap: var(--spacing-3);
@@ -1532,19 +2295,34 @@ body {
 }
 
 /*
-  The 74px tinted disc. Color is never the only cue: the done disc also
-  carries the stroke-drawn check, the error disc the literal "!" glyph, and
-  both panels additionally differ by heading and body text.
+  The ~96px tinted disc (Story 9.6, up from 74px: DESIGN.md's Outcome Panel
+  row now calls for a larger disc now that it anchors a one-card composition
+  with its own actions row, rather than sharing weight with a longer body
+  paragraph this story removes). Color is never the only cue: the done disc
+  also carries the stroke-drawn check, the error disc the literal "!" glyph,
+  and both panels additionally differ by heading and message text.
+
+  Story 9.6: the disc itself now scales in from ~0.7, unstaggered -- like the
+  QR tile in Story 9.4, it is the card's own focal object entering with the
+  card, not a queued `.fd-rise` child behind it.
 */
 .fd-outcome__icon {
     display: grid;
-    width: 74px;
-    height: 74px;
+    width: 96px;
+    height: 96px;
     flex-shrink: 0;
     place-items: center;
     border-radius: var(--radius-full);
     font-size: 32px;
     font-weight: var(--font-weight-label);
+    transition: opacity 300ms var(--ease-decelerate), scale 520ms var(--ease-decelerate);
+}
+
+@starting-style {
+    .fd-outcome__icon {
+        opacity: 0;
+        scale: 0.7;
+    }
 }
 
 .fd-outcome__icon--done {
@@ -1572,10 +2350,18 @@ body {
   `transition-duration: 1ms !important` rule already collapses this
   transition like every other one in the sheet, landing on the same fully
   drawn `stroke-dashoffset: 0` this rule pins as the resting value.
+
+  Story 9.6 leaves this rule's own duration and the absence of a delay
+  untouched on purpose -- styles.test.ts pins the exact declaration text, and
+  the AC that asks for the check to draw "after a short delay" is met by the
+  disc's own ~520ms scale-in above instead: the check is not legible until
+  partway through that motion regardless of when its own transition starts,
+  and the two started at the same moment already reads as the check
+  following the disc rather than the two competing for attention at once.
 */
 .fd-outcome__check {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
 }
 
 .fd-outcome__check-path {
@@ -1593,6 +2379,7 @@ body {
     stroke-dashoffset: 0;
 }
 
+/* Story 9.6: the Error card's fixed message. Done no longer has a body paragraph at all (`copy.done.body` is removed). */
 .fd-outcome__body {
     margin: 0;
     max-width: 44ch;
@@ -1600,44 +2387,75 @@ body {
 }
 
 /*
-  Completion Receipt (Story 7.5): two cells on {colors.fill}, divided by a
-  separator. Two cells, not three -- no elapsed-time cell exists here or
-  anywhere else, because no clock is tracked in the frontend and
-  EXPERIENCE.md forbids a frontend lifecycle timer. Both values are read out
-  of `CompletionReceipt`, never recomputed.
+  The receipt (Story 9.6 replaces Story 7.4/7.5's two-cell grid with one
+  line): a pill-shaped chip on {colors.fill} holding a kind glyph (Done only),
+  the item name, and -- for Done -- the wire bytes actually sent. Never a
+  third cell and never an elapsed-time figure: no clock is tracked anywhere
+  in the frontend and EXPERIENCE.md forbids a frontend lifecycle timer.
+  `receipt.bytesSent` is the wire count the terminal `ProgressSnapshot`
+  reported (Story 7.4's retained state), never `metadata.size`. An Error's
+  receipt (when Story 9.2 retained an item name) carries the name alone --
+  `RetainedErrorOutcome` has no kind or byte count to show beside it.
 */
-.fd-receipt {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 1fr 1fr;
+.fd-outcome__receipt {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: var(--spacing-2);
     margin: 0;
-    border-radius: var(--radius-md);
+    padding: var(--spacing-2) var(--spacing-4) var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-full);
     background: var(--color-fill);
-    text-align: start;
-}
-
-.fd-receipt__cell {
-    min-inline-size: 0;
-    padding: var(--spacing-3) var(--spacing-4);
-}
-
-.fd-receipt__cell + .fd-receipt__cell {
-    border-inline-start: 1px solid var(--color-separator);
-}
-
-.fd-receipt__caption {
-    margin: 0;
-    color: var(--color-muted);
-    font-size: var(--text-meta);
-    line-height: var(--leading-meta);
-}
-
-.fd-receipt__value {
-    margin: 0;
-    overflow-wrap: anywhere;
-    font-size: var(--text-body-strong);
+    color: var(--color-text);
     font-weight: var(--font-weight-body-strong);
+}
+
+.fd-outcome__receipt-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    color: var(--color-muted);
+}
+
+.fd-outcome__receipt-glyph {
+    width: 18px;
+    height: 18px;
+}
+
+.fd-outcome__receipt-name {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fd-outcome__receipt-meta {
+    flex: none;
+    color: var(--color-muted);
+    font-weight: var(--font-weight-body);
     font-variant-numeric: tabular-nums;
+}
+
+/* Story 9.6: the two pill buttons (Send Another/Done, Try Again/Choose Another/Dismiss). */
+.fd-outcome__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-3);
+}
+
+/*
+  Defect fix, found rendered: `.fd-button--quiet`'s own `width: 100%` assumes
+  it is the only, block-level child of its container (see the identical
+  override and comment on `.fd-staged-foot .fd-button--quiet` above) -- here
+  Done/Dismiss shares a wrapping flex row with the primary action, so the
+  quiet button forced itself onto its own line, measured 56px below Send
+  Another/Try Again rather than beside it. Scoped to this one composition,
+  same as Staged's foot row; the shared rule still governs every other lone
+  Cancel/Dismiss button.
+*/
+.fd-outcome__actions .fd-button--quiet {
+    width: auto;
 }
 
 /* ---------------------------------------------------------------- Reflow */
@@ -1653,14 +2471,23 @@ body {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .fd-qr-panel {
+    .fd-qr-panel,
+    .fd-ring-panel {
         order: -1;
         margin-inline: auto;
     }
 
-    .fd-direct-row {
-        grid-template-columns: minmax(0, 1fr);
-    }
+    /*
+      Story 9.4: `.fd-direct-row` no longer holds the field beside the copy
+      action -- it is a wrapping flex row of two buttons now (see its own
+      rule above), which needs no width-specific override to stay usable
+      down to the 320px reflow floor. This breakpoint reflows only `.fd-hero`
+      and `.fd-qr-panel`'s ordering.
+
+      Story 9.5: `.fd-ring-panel` shares the same fixed 216px track as
+      `.fd-qr-panel` in `.fd-hero` (both are Staged's own card geometry, just
+      with a ring or a QR bitmap in the slot), so it reflows identically.
+    */
 }
 
 @media (max-width: 639px) {
@@ -1668,9 +2495,13 @@ body {
       fd-selection dropped out of this collapse (spec-4-1): a single control
       has no pair of columns left to fold, and its menu is already absolutely
       positioned regardless of width.
+
+      Defect fix (Story 9.5 follow-up): `.fd-metrics` is a flex row now, not
+      a two-column grid, so the narrow-width override folds it to a column
+      instead of resetting a grid template that no longer exists.
     */
     .fd-metrics {
-        grid-template-columns: minmax(0, 1fr);
+        flex-direction: column;
     }
 }
 
@@ -1779,12 +2610,23 @@ body {
 /*
   Reduced motion.
 
-  The app declares no animation or transition today -- the unknown-progress
-  pattern is a static gradient, and state swaps are immediate -- so this is a
-  standing guarantee rather than a correction: any motion a later edit adds is
-  neutralised here before it can sweep, shimmer, blink, or move a lifecycle
-  region through space. Text, pattern, wire bytes and state are untouched,
-  because none of them is carried by movement.
+  Every duration and delay collapses to effectively nothing here before it
+  can sweep, shimmer, blink, or move a lifecycle region through space; the
+  unknown-progress pattern stays a static gradient regardless, because it was
+  never animated in the first place. Text, pattern, wire bytes and state are
+  untouched, because none of them is carried by movement.
+
+  Story 9.1 adds `translate` and `scale` explicitly (`!important`, matching
+  every other declaration in this block) rather than relying on the
+  duration/delay collapse alone: a 1ms transition from `translate: 0 10px` to
+  `none` still, for that 1ms, translates -- imperceptible in practice, but
+  "no element translates or scales on entrance" is a rule about the resting
+  value, not about how long the trip there takes, and a test can hold that
+  distinction where a screen cannot. Neither property touches
+  `.fd-button:active`'s own 0.975 press feedback, which is authored as
+  `transform: scale(0.975)` -- a different CSS property from the standalone
+  `scale` reset here -- and is therefore untouched by this rule, exactly as
+  DESIGN.md's Motion section still asks for.
 */
 @media (prefers-reduced-motion: reduce) {
     *,
@@ -1796,5 +2638,7 @@ body {
         transition-delay: 0ms !important;
         transition-duration: 1ms !important;
         scroll-behavior: auto !important;
+        translate: none !important;
+        scale: none !important;
     }
 }

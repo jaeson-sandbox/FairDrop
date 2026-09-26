@@ -333,6 +333,144 @@ describe('reduced motion', () => {
             expect(reducedMotion, forbidden).not.toContain(forbidden)
         }
     })
+
+    it('removes translate and scale from every entrance outright, not only by collapsing their duration (Story 9.1)', () => {
+        // Mutation named in Story 9.1's acceptance criteria: delete these two
+        // lines, leaving only the duration/delay collapse above -> must fail.
+        // A 1ms transition from `translate: 0 10px` to `none` still, for that
+        // 1ms, translates; "no element translates or scales on entrance" is a
+        // rule about the resting value reached, which only an explicit
+        // override -- not a faster trip there -- can guarantee.
+        expect(reducedMotion).toContain('translate: none !important;')
+        expect(reducedMotion).toContain('scale: none !important;')
+    })
+
+    it("does not touch the button press accent, which is a different CSS property (Story 9.1)", () => {
+        // `.fd-button:active` presses via `transform: scale(0.975)`, not the
+        // standalone `scale` property reset above -- the two compose
+        // independently in the Transforms spec, so neutralising `scale`
+        // cannot also silently flatten the press feedback DESIGN.md's Motion
+        // section still asks for.
+        expect(reducedMotion).not.toMatch(/transform:\s*none/)
+        const press = block('.fd-button:active {')
+        expect(press).toContain('transform: scale(0.975);')
+    })
+})
+
+describe('Story 9.1: the motion foundation', () => {
+    it('enters every phase view with a fade and a 10px rise via @starting-style, with no keyframe and no JavaScript', () => {
+        // Mutation 1 (acceptance criteria): delete the @starting-style block
+        // -> must fail naming it -- proved by asserting its exact content
+        // below, not merely that the string "@starting-style" occurs
+        // somewhere in the file.
+        // Mutation 2: implement it with a keyframe instead -> must fail --
+        // proved by the sheet-wide ban already enforced in "progress
+        // presentation" above and re-asserted here for locality.
+        const rule = block('[data-phase-view] {')
+        expect(rule).toContain('opacity: 1;')
+        expect(rule).toContain('translate: none;')
+        expect(rule).toMatch(/transition:\s*\n?\s*opacity 340ms var\(--ease-decelerate\),\s*\n?\s*translate 420ms var\(--ease-decelerate\);/)
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\[data-phase-view\] \{\s*opacity: 0;\s*translate: 0 10px;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for [data-phase-view]').toBeTruthy()
+
+        expect(stylesheet).not.toContain('@keyframes')
+        expect(stylesheet).not.toContain('animation:')
+    })
+
+    it('names all five views by data-phase-view, so the entrance rule reaches every one of them', () => {
+        // Not a CSS assertion -- a cross-check that the selector above
+        // actually has five readers, so a view that quietly stopped setting
+        // the attribute would not just silently lose its entrance unnoticed.
+        const readers = [
+            ['IdleView.tsx', "data-phase-view=\"idle\""],
+            ['StagePendingCard.tsx', "data-phase-view=\"pending\""],
+            ['StagedView.tsx', "data-phase-view=\"staged\""],
+            ['TransferringView.tsx', "data-phase-view=\"transferring\""],
+            ['OutcomePanel.tsx', "phaseView ? 'outcome' : undefined"],
+        ] as const
+        for (const [file, needle] of readers) {
+            const source = readFileSync(resolve(projectRoot, 'src/ui', file), 'utf8')
+            expect(source, `${file} carries data-phase-view`).toContain(needle)
+        }
+    })
+
+    it('never gives an exit transition to anything -- views animate in and never out', () => {
+        // The spine rule: there is no exit-selector counterpart to
+        // [data-phase-view] or .fd-rise anywhere in the sheet -- no
+        // .fd-leaving, .fd-exit or [data-phase-view-leaving] class or
+        // attribute for a later edit to have quietly wired up. An outgoing
+        // view is replaced, not animated off -- keeping one mounted long
+        // enough to animate out would give one moment two DOM nodes both
+        // claiming to be the current view, breaking the retained-node
+        // identity rule App.focus.test.tsx pins.
+        for (const exitSelector of ['.fd-leaving', '.fd-exit', '-leaving]', '-exit]']) {
+            expect(stylesheet, exitSelector).not.toContain(exitSelector)
+        }
+    })
+
+    it('provides a capped, reduced-motion-neutral per-child stagger helper, declared exactly once', () => {
+        // Two occurrences by design, not one: the live rule and its
+        // @starting-style companion -- the same shape every other entrance
+        // in this sheet takes ([data-phase-view], .fd-browse-menu). "Exists
+        // once in the sheet" (the acceptance criterion) means one *helper*,
+        // not a duplicated live rule -- a third occurrence would be that.
+        const occurrences = [...stylesheet.matchAll(/\.fd-rise\s*\{/g)]
+        expect(occurrences).toHaveLength(2)
+
+        const rise = block('.fd-rise {')
+        expect(rise).toMatch(/transition-delay:\s*calc\(min\(var\(--fd-stagger,\s*0\),\s*5\)\s*\*\s*55ms\);/)
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\.fd-rise \{\s*opacity: 0;\s*translate: 0 8px;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for .fd-rise').toBeTruthy()
+
+        // Neutralised the same way every other delay in this sheet is: the
+        // universal transition-delay: 0ms !important rule under reduced
+        // motion overrides this calc() outright. Proved directly rather than
+        // by re-deriving the cascade: reduced motion's own describe block
+        // above already pins that override exists and applies to every
+        // element via the universal *, *::before, *::after selector.
+        expect(reducedMotion).toContain('transition-delay: 0ms !important;')
+    })
+
+    it('scales and fades the browse menu in from ~0.96 at its own corner, via @starting-style, in <=200ms', () => {
+        const menu = block('.fd-browse-menu {')
+        expect(menu).toContain('scale: 1;')
+        expect(menu).toContain('transform-origin: top left;')
+        expect(menu).toMatch(/transition:\s*\n?\s*opacity 160ms var\(--ease-decelerate\),\s*\n?\s*scale 200ms var\(--ease-decelerate\);/)
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\.fd-browse-menu \{\s*opacity: 0;\s*scale: 0\.96;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for .fd-browse-menu').toBeTruthy()
+    })
+
+    /*
+      Story 9.4: DESIGN.md's Motion section names "cards and discs in the
+      stories that follow" the browse menu's own fade-plus-scale pattern --
+      this is the first of them. Unlike `.fd-rise`'s children, the QR tile is
+      not staggered behind the view: it enters at the same time as the view
+      itself, which is why this is its own rule rather than another `.fd-rise`
+      caller (mutation: giving `.fd-qr-panel` the `fd-rise` class instead
+      would still fade it in, but with an 8px translate rather than a scale,
+      and staggered a step behind the item row -- exactly the regression this
+      test's literal `scale`/`opacity` pair, not merely "it animates in",
+      would catch).
+    */
+    it('scales and fades the Staged QR tile in from ~0.94, via @starting-style, unstaggered (Story 9.4)', () => {
+        const panel = block('.fd-qr-panel {')
+        expect(panel).toContain('scale: 1;')
+        expect(panel).toMatch(/transition:\s*\n?\s*opacity 300ms var\(--ease-decelerate\),\s*\n?\s*scale 420ms var\(--ease-decelerate\);/)
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\.fd-qr-panel \{\s*opacity: 0;\s*scale: 0\.94;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for .fd-qr-panel').toBeTruthy()
+    })
 })
 
 describe('the focus indicator', () => {
@@ -568,23 +706,46 @@ describe('activation targets', () => {
 
 describe('reflow to 320 CSS pixels', () => {
     it('keeps details beside the QR only above the 760px content width', () => {
-        expect(stylesheet).toMatch(/\.fd-hero \{[^}]*grid-template-columns: minmax\(0, 1fr\) 224px;/)
+        // Story 9.4: 216px, not 224 -- the QR tile's own acceptance criterion
+        // ("~216px", matching the owner-approved prototype's 216x216 `.qr`).
+        //
+        // Defect fix (orchestrator's rendered 1024x768 review after Story
+        // 9.4 merged): the fixed track has to come *first*, matching
+        // `StagedView.tsx`'s DOM order (`.fd-qr-panel` renders before
+        // `.fd-hero__details`) -- grid assigns tracks to children in DOM
+        // order, so a template with the fixed track second handed it to
+        // whichever element is second in the DOM, not to "the QR" by name.
+        // `browser/accessibility.test.tsx`'s rendered geometry test is what
+        // actually proves which element ends up in which track; this only
+        // pins the literal template text.
+        expect(stylesheet).toMatch(/\.fd-hero \{[^}]*grid-template-columns: 216px minmax\(0, 1fr\);/)
         expect(stylesheet).toContain('@media (max-width: 759px)')
     })
 
-    it('stacks the QR above the URL row and its action below 760px', () => {
+    it('stacks the QR above the item details below 760px', () => {
         const narrow = block('@media (max-width: 759px) {')
         expect(narrow).toContain('.fd-hero')
         expect(narrow).toContain('grid-template-columns: minmax(0, 1fr);')
         expect(narrow).toContain('.fd-qr-panel')
         expect(narrow).toContain('order: -1;')
-        expect(narrow).toContain('.fd-direct-row')
+        // Story 9.4: `.fd-direct-row` no longer holds the field beside the
+        // copy action -- it is a wrapping flex row of two buttons now (Copy
+        // Link, Show/Hide Link), which needs no width-specific override of
+        // its own, so this breakpoint no longer touches it. The dropped
+        // `.fd-direct-row` expectation this replaces is exactly that: a
+        // premise the new layout no longer has, not a coverage loss -- the
+        // field's own reflow is proven separately in
+        // `browser/staged-url-field.test.tsx`'s continuous sweep.
     })
 
     it('collapses the remaining pair into one column below 640px', () => {
         const narrowest = block('@media (max-width: 639px) {')
         expect(narrowest).toContain('.fd-metrics')
-        expect(narrowest).toContain('grid-template-columns: minmax(0, 1fr);')
+        // Defect fix, Story 9.5 follow-up: `.fd-metrics` moved from a
+        // two-column grid to a flex row (see "the Sending figures and
+        // Cancel read as plain text" below), so the narrow-width collapse
+        // is now a flex-direction switch rather than a grid-template reset.
+        expect(narrowest).toContain('flex-direction: column;')
     })
 
     it('drops the single browse control out of the pair-collapse media query', () => {
@@ -670,14 +831,106 @@ describe('Story 7.3: rebuilding Idle', () => {
         expect(disclosure).toContain('border-radius: var(--radius-xl);')
         expect(disclosure).toContain('box-shadow: var(--shadow-sh-1);')
 
+        // Story 9.1: the summary is a <button> now, not a <summary> --
+        // `list-style: none` and the `::-webkit-details-marker` suppression
+        // it used to sit beside were <summary>-only UA resets with no reader
+        // on a button, and both are gone rather than shipped as dead CSS.
+        // `cursor: pointer` is what survives from that assertion.
+        //
+        // Story 9.4 gives `list-style: none` a new, unrelated reader --
+        // `.fd-caveats`, a genuine `<ul>` -- so the blanket whole-stylesheet
+        // check this used to be would now fail for a reason that has nothing
+        // to do with `<summary>`. Scoped to the summary rule itself instead,
+        // which is what the mutation this guards against actually touches.
         const summary = block('.fd-disclosure__summary {')
-        expect(summary).toContain('list-style: none;')
+        expect(summary).toContain('cursor: pointer;')
+        expect(summary).not.toContain('list-style: none;')
+        expect(stylesheet).not.toContain('::-webkit-details-marker')
 
         expect(stylesheet).toContain('.fd-disclosure__summary:hover {')
 
+        // Story 9.1: keyed to `[data-open]` on the controlled wrapper, not
+        // native `<details>`'s `[open]` attribute -- see Disclosure.tsx and
+        // the DOM-structure comment above `.fd-disclosure__region` in
+        // style.css for why the heading now sits between `.fd-disclosure`
+        // and `.fd-disclosure__summary` in the selector chain.
         expect(stylesheet).toMatch(
-            /\.fd-disclosure\[open\] > \.fd-disclosure__summary \.fd-disclosure__chevron \{\s*transform: rotate\(45deg\);\s*\}/,
+            /\.fd-disclosure\[data-open\] > \.fd-disclosure__heading \.fd-disclosure__summary \.fd-disclosure__chevron \{\s*transform: rotate\(45deg\);\s*\}/,
         )
+    })
+
+    it("expands and collapses the disclosure region with grid-template-rows, not a fixed height (Story 9.1)", () => {
+        // The mutation named in Story 9.1's acceptance criteria: the region
+        // has to animate between a collapsed and an expanded state in both
+        // Chromium and WebKit with no fixed height to measure and no
+        // JavaScript reading one. grid-template-rows interpolating between
+        // 0fr and 1fr is what does that; a fixed max-height or a JS-measured
+        // scrollHeight would both be a regression to a mechanism this story
+        // deliberately avoided.
+        const region = block('.fd-disclosure__region {')
+        expect(region).toContain('display: grid;')
+        expect(region).toContain('grid-template-rows: 0fr;')
+        expect(region).toMatch(/transition:\s*\n?\s*grid-template-rows 320ms var\(--ease-decelerate\)/)
+        expect(region).not.toMatch(/max-height|max-block-size/)
+
+        const open = block('.fd-disclosure__region[data-open] {')
+        expect(open).toContain('grid-template-rows: 1fr;')
+
+        const inner = block('.fd-disclosure__region-inner {')
+        expect(inner).toContain('overflow: hidden;')
+    })
+
+    it('keeps collapsed disclosure content out of the tab order and the accessibility tree via a transitioned visibility, not inert (Story 9.1)', () => {
+        // `inert` is unsupported on the older macOS WebKit this product's
+        // compatibility range includes (AGENTS.md), which is why the
+        // acceptance criteria name a transitioned `visibility: hidden`
+        // specifically. Closed: visible until the collapse transition
+        // finishes (a 320ms-delayed hide), so nothing vanishes mid-shrink.
+        // Open: visible immediately (a 0-delay show), so content is never
+        // hidden while it grows in.
+        const closed = block('.fd-disclosure__region {')
+        expect(closed).toContain('visibility: hidden;')
+        expect(closed).toMatch(/visibility 0s linear 320ms/)
+
+        const open = block('.fd-disclosure__region[data-open] {')
+        expect(open).toContain('visibility: visible;')
+        expect(open).toMatch(/visibility 0s linear 0s/)
+    })
+
+    /*
+      Story 9.4: Staged's direct-link field is hidden until Show Link is
+      activated, using the identical grid-template-rows/transitioned-
+      visibility mechanism proven above for `.fd-disclosure__region` -- see
+      `.fd-url-reveal` in style.css and `StagedView.tsx`'s own comment on it.
+      It is a separate rule rather than a reuse of the Disclosure component,
+      because the trigger is a plain button beside Copy Link, not a
+      heading-wrapped disclosure summary -- but the mechanism, and the
+      mutation it guards against (a fixed max-height, or an unmount that
+      would make Story 7.9's CSS-grid mirror sizing meaningless), is exactly
+      the same.
+    */
+    it('expands and collapses the Staged link-reveal region the same way, with no fixed height (Story 9.4)', () => {
+        const region = block('.fd-url-reveal {')
+        expect(region).toContain('display: grid;')
+        expect(region).toContain('grid-template-rows: 0fr;')
+        expect(region).toMatch(/transition:\s*\n?\s*grid-template-rows 320ms var\(--ease-decelerate\)/)
+        expect(region).not.toMatch(/max-height|max-block-size/)
+
+        const open = block('.fd-url-reveal[data-open] {')
+        expect(open).toContain('grid-template-rows: 1fr;')
+
+        const inner = block('.fd-url-reveal__inner {')
+        expect(inner).toContain('overflow: hidden;')
+    })
+
+    it('keeps the collapsed link field out of the tab order and the accessibility tree via a transitioned visibility (Story 9.4)', () => {
+        const closed = block('.fd-url-reveal {')
+        expect(closed).toContain('visibility: hidden;')
+        expect(closed).toMatch(/visibility 0s linear 320ms/)
+
+        const open = block('.fd-url-reveal[data-open] {')
+        expect(open).toContain('visibility: visible;')
+        expect(open).toMatch(/visibility 0s linear 0s/)
     })
 
     it("gives the open disclosure's body enough top padding to clear the focus ring, expressed as a token, not a magic number", () => {
@@ -743,12 +996,86 @@ describe('Story 7.3: rebuilding Idle', () => {
         expect(chevron).not.toContain('transform: rotate(-45deg);')
     })
 
-    it('keeps the always-open recovery block styled separately from the Idle disclosure form', () => {
-        // Both share the fd-help class name -- StagedView's plain <div> and
-        // IdleView's <details> -- so the box styling has to be scoped away
-        // from the disclosure form, or Idle would paint both a card and a
-        // disclosure surface on the same element.
-        expect(stylesheet).toContain('.fd-help:not(.fd-disclosure) {')
+    /*
+      Story 9.4 removed Staged's always-open `RecoveryHelp` form -- its
+      "Trouble connecting?" content now lives behind the same controlled
+      `Disclosure` Idle's "Troubleshooting" row uses, so both consumers of
+      the `fd-help` class are `.fd-disclosure` now and the box-styling
+      scope this test used to require (`:not(.fd-disclosure)`, to keep an
+      always-open card from painting a second surface on the same element)
+      no longer has a second form to be scoped away from. This replaces the
+      old test with its mirror: the escape hatch is gone, not merely renamed.
+    */
+    it('no longer needs an escape hatch for an always-open recovery form (Story 9.4 removed it)', () => {
+        expect(stylesheet).not.toContain('.fd-help:not(.fd-disclosure)')
+    })
+})
+
+describe('Story 9.3: declutter Idle and drop the button ellipses', () => {
+    it('gives the browse control a pill shape -- {rounded.full}, not the standard control radius', () => {
+        const pill = block('.fd-button--pill {')
+        expect(pill).toContain('border-radius: var(--radius-full);')
+    })
+
+    it('no longer stretches the browse control to the full width of its row (Story 9.3 reversal)', () => {
+        // Story 7.3 made this full-width, with a comment naming that as a
+        // reversal of Paper Relay's "quieter than the drop zone" rule. Story
+        // 9.3 reverses it a second time: the control now sits inside the
+        // drop zone as a centred, intrinsic-width pill, so `.fd-selection`
+        // no longer stretches its child to 100%. *Mutation:* restore
+        // `.fd-selection > .fd-button { width: 100%; }` -> this must fail.
+        const selection = block('.fd-selection {')
+        expect(selection).not.toContain('width: 100%')
+        expect(stylesheet).not.toContain('.fd-selection > .fd-button')
+    })
+
+    it('groups both Idle disclosures into one {rounded.xl} surface with a separator between rows', () => {
+        const group = block('.fd-idle-disclosures {')
+        expect(group).toContain('border-radius: var(--radius-xl);')
+        expect(group).toContain('box-shadow: var(--shadow-sh-1);')
+
+        // Each nested disclosure gives up its own card and shadow to the
+        // group wrapper -- otherwise Idle would paint a card inside a card.
+        const nested = block('.fd-idle-disclosures > .fd-disclosure {')
+        expect(nested).toContain('border-radius: 0;')
+        expect(nested).toContain('box-shadow: none;')
+
+        // The decorative separator, not the functional control-border token:
+        // this rule divides two rows of the same surface, it does not
+        // identify anything operable.
+        const separator = block('.fd-idle-disclosures > .fd-disclosure + .fd-disclosure {')
+        expect(separator).toContain('border-top: 1px solid var(--color-separator);')
+    })
+
+    /*
+      Defect fix, found by the orchestrator driving the built macOS binary of
+      the epic branch: Story 9.1 replaced native <summary> (whose containing
+      <h2> carried `flex: 1`, pushing the chevron to the row's trailing edge)
+      with a <button> that never got an equivalent rule, so the chevron drifted
+      to sit immediately after the label text instead of at the edge, as the
+      owner-approved prototype's `.row` shows.
+
+      *Mutation:* remove `justify-content: space-between;` from
+      `.fd-disclosure__summary` -> this must fail. The rendered-Chromium proof
+      that the chevron's right edge actually lands at the row's trailing edge
+      (not merely that this declaration exists in the stylesheet text) lives
+      in accessibility.test.tsx, "the disclosure chevron sits at the row's
+      trailing edge".
+    */
+    it("pushes the disclosure chevron to the row's trailing edge with justify-content: space-between", () => {
+        const summary = block('.fd-disclosure__summary {')
+        expect(summary).toContain('display: flex;')
+        expect(summary).toContain('justify-content: space-between;')
+    })
+
+    it('gives each browse menu item room for a leading glyph', () => {
+        const item = block('.fd-browse-menu .fd-button {')
+        expect(item).toContain('justify-content: flex-start;')
+        expect(item).toMatch(/gap:\s*var\(--spacing-\d\);/)
+
+        const icon = block('.fd-browse-menu-item__icon {')
+        expect(icon).toContain('width: 16px;')
+        expect(icon).toContain('height: 16px;')
     })
 })
 
@@ -760,38 +1087,51 @@ describe('Story 7.7: compose the lifecycle region vertically', () => {
         expect(region).toMatch(/flex:\s*1 1 auto;/)
     })
 
-    it('centres Pending, Transferring and the terminal outcome-as-phase-view, never Idle or Staged', () => {
+    it('centres Pending, Transferring and Staged, never Idle (Story 9.6 review follow-up reverses the earlier Staged exception)', () => {
         // Mutation: top-align any of the three named states -> must fail.
         const centered = block(".fd-region[data-phase-view='pending'],")
         expect(centered).toContain("data-phase-view='transferring'")
-        expect(centered).toContain(".fd-app > .fd-outcome[data-phase-view='outcome']")
+        expect(centered).toContain("data-phase-view='staged'")
         expect(centered).toContain('justify-content: center;')
 
-        // Idle and Staged are not named by the centering selector at all --
-        // top alignment is the flex default, so their absence here is what
-        // keeps them top-aligned. DESIGN.md states the Staged exception
-        // explicitly rather than leaving it as CSS silence.
+        // Idle alone is not named by the centering selector -- top alignment
+        // is the flex default, so its absence here is what keeps it
+        // top-aligned; its drop zone grows to fill the slack instead (the
+        // next test). The outcome card is no longer named here at all: it
+        // used to share this rule's growth so its centering half could
+        // apply, but growing the card itself (rather than its container) is
+        // what made it jump size and position between its live and retained
+        // forms -- see the next-but-one test for its own centering rule.
         expect(centered).not.toContain("data-phase-view='idle'")
-        expect(centered).not.toContain("data-phase-view='staged'")
+        expect(centered).not.toContain('.fd-outcome')
 
         const designSpine = readFileSync(designSpinePath(), 'utf8')
-        expect(designSpine).toMatch(/Staged is the one exception, and stays top-aligned/)
+        expect(designSpine).toMatch(/Staged is now centred too/)
     })
 
-    it('excludes a retained outcome from growth or centering, so it keeps its natural height', () => {
-        // OutcomePanel.tsx only sets data-phase-view when `phaseView` is true;
-        // a retained outcome above Idle renders without it, and a
-        // command-failure panel (also OutcomePanel, also phaseView=false)
-        // renders *inside* .fd-idle, not as .fd-app's direct child at all --
-        // so the growth/centering rule has to key off the base .fd-outcome
-        // class doing nothing on its own. Growth belongs only on the two
-        // qualified selectors this describe block already pins:
-        // .fd-app > .fd-outcome[data-phase-view='outcome'] for the terminal
-        // phase view, and nothing for a retained or command-failure panel.
+    /*
+      Story 9.6 review follow-up: the outcome card is centred by its own
+      `margin-block: auto`, never by growing itself with `flex: 1 1 auto` and
+      centring its own children -- the previous approach made the live
+      phase-view form (the only one that carried `flex: 1 1 auto`) grow to
+      fill the whole region and then centre its content inside that grown
+      box, so the same node visibly collapsed and jumped to the top the
+      moment reset made it retained, since only the live form's selector
+      matched. An auto-margin item keeps its own natural height regardless of
+      which of the card's three forms is currently showing.
+      *Mutation:* restore the old `.fd-app > .fd-outcome[data-phase-view=...]`
+      grow-and-centre rule (or drop the margin-block: auto rule below) ->
+      the rendered "does not jump size or position at reset" test must fail.
+    */
+    it('centres the outcome card by margin-block: auto on the card itself, never by growing it', () => {
         const base = block('.fd-outcome {')
         expect(base).not.toMatch(/flex:\s*1/)
         expect(base).not.toContain('justify-content: center;')
         expect(stylesheet).not.toMatch(/\.fd-app > \.fd-outcome\s*\{[^}]*flex:\s*1/)
+
+        const margin = block('.fd-app > .fd-outcome,')
+        expect(margin).toContain('.fd-region > .fd-outcome:only-child')
+        expect(margin).toContain('margin-block: auto;')
     })
 
     it('grows the drop zone into Idle\'s slack with a bounded flexible height, never a fixed one', () => {
@@ -870,12 +1210,20 @@ describe('guarantees a stylesheet edit could silently undo', () => {
         expect(attributes).toMatch(/^\*\.css text eol=lf$/m)
     })
 
-    it('marks only the not-encrypted disclosure, never the neutral one', () => {
-        // DESIGN.md gives the trusted-LAN note a single warning marker. Applied
-        // to every paragraph it also decorated "FairDrop does not upload or
-        // store an extra copy", which is a plain statement of fact.
-        expect(stylesheet).toContain('.fd-trust p:first-child::before');
-        expect(stylesheet).not.toMatch(/\.fd-trust p::before/)
+    it('replaces the single not-encrypted marker with per-line caveat glyphs (Story 9.4)', () => {
+        // The old `.fd-trust p:first-child::before` "!" marked one line via a
+        // CSS generated marker, applied to every paragraph until a fix scoped
+        // it to the first child only. Story 9.4 replaced that whole mechanism
+        // with inline SVG glyphs in StagedView.tsx (an info glyph on the
+        // first-opener caveat, a lock glyph on the network one) -- distinct
+        // icons a CSS `::before` selector could not express -- so what the
+        // stylesheet owns now is sizing and alignment (`.fd-caveats__glyph`),
+        // not the glyph choice itself. The old class must be fully gone, not
+        // merely superseded, or a future edit could resurrect a mismatched
+        // CSS marker alongside the new SVG icons.
+        expect(stylesheet).toContain('.fd-caveats {')
+        expect(stylesheet).toContain('.fd-caveats__glyph {')
+        expect(stylesheet).not.toContain('.fd-trust')
     })
 
     it('keeps the copy action a fixed width so its label swap cannot reflow the row', () => {
@@ -1199,47 +1547,155 @@ describe('the copy control takes the success tint (Story 7.2)', () => {
     })
 })
 
-describe('the progress card and meter (Story 7.5)', () => {
-    it('is a rounded.xxl surface at sh-3, the same step as the packet and the browse menu', () => {
-        const card = block('.fd-transfer-view {')
-        expect(card).toContain('border-radius: var(--radius-xxl);')
-        expect(card).toContain('box-shadow: var(--shadow-sh-3);')
-    })
-
-    it('keeps the pending card at its own radius, unaffected by the progress card split', () => {
-        // The two selectors shared one rule before this story; splitting them
-        // is what lets the progress card take sh-3/xxl without moving the
-        // stage-pending card, which Story 7.5 does not own.
+describe('the progress ring (Story 9.5, retiring the Story 7.5 progress card and meter)', () => {
+    it('keeps the pending card at its own radius, unaffected by the ring rebuild', () => {
+        // Unaffected carry-forward from Story 7.5: the stage-pending card
+        // was already split from the (now-removed) `.fd-transfer-view` onto
+        // its own rule, and this story does not own it either.
         const pending = block('.fd-pending-card {')
         expect(pending).toContain('border-radius: var(--radius-lg);')
         expect(pending).not.toContain('box-shadow')
     })
 
-    it('is an 8px rounded.full track with a functional boundary', () => {
-        const meter = block('.fd-meter {')
-        expect(meter).toContain('height: 8px;')
-        expect(meter).toContain('border-radius: var(--radius-full);')
-        expect(meter).toContain('var(--color-control-border)')
+    it('sizes the ring panel to Staged’s own ~216px slot and reflows it the same way below 759px', () => {
+        const panel = block('.fd-ring-panel {')
+        expect(panel).toContain('width: min(216px, 100%);')
+
+        const narrow = block('@media (max-width: 759px) {')
+        expect(narrow).toContain('.fd-qr-panel,')
+        expect(narrow).toContain('.fd-ring-panel {')
     })
 
-    it('fills the track solid -- the single-gradient rule is absolute and the button already spends it', () => {
-        const fill = block('.fd-meter__fill {')
-        expect(fill).toContain('background: var(--color-primary);')
+    it('enters with the same fade-and-scale-from-0.94 as the QR panel it replaces, unstaggered', () => {
+        const panel = block('.fd-ring-panel {')
+        expect(panel).toContain('opacity 300ms var(--ease-decelerate)')
+        expect(panel).toContain('scale 420ms var(--ease-decelerate)')
+
+        const starting = stylesheet.match(
+            /@starting-style \{\s*\.fd-ring-panel \{\s*opacity: 0;\s*scale: 0\.94;\s*\}\s*\}/,
+        )
+        expect(starting, 'the @starting-style block for .fd-ring-panel').toBeTruthy()
+    })
+
+    it('draws its own functional-boundary edge, distinct from the decorative track fill', () => {
+        const track = block('.fd-ring__track {')
+        expect(track).toContain('stroke: var(--color-track);')
+
+        const edge = block('.fd-ring__edge {')
+        expect(edge).toContain('stroke: var(--color-control-border);')
+        expect(edge).not.toContain('var(--color-separator)')
+    })
+
+    it('fills the ring solid -- the single-gradient rule is absolute and the button already spends it', () => {
+        const fill = block('.fd-ring__fill {')
+        expect(fill).toContain('stroke: var(--color-primary);')
         expect(fill).not.toContain('gradient')
     })
 
-    it('renders the percentage in {typography.numeric} with tabular numerals', () => {
-        const percent = block('.fd-progress-percent {')
+    it('transitions the determinate fill’s stroke-dashoffset over 400ms, never a keyframe', () => {
+        const fill = block('.fd-ring__fill {')
+        expect(fill).toContain('transition: stroke-dashoffset 400ms var(--ease-decelerate);')
+        expect(fill).not.toContain('@keyframes')
+    })
+
+    /*
+      Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+      merged): the percentage used to be centred by making `.fd-ring__pct`
+      itself `position: absolute; inset: 0` (stretched to the whole 216px
+      frame) and centring its content inside that already full-size box --
+      which put the text at the box's cross-start edge rather than centred
+      in the frame (measured ~91px off centre). Centring now happens the
+      way the owner-approved prototype does it: `.fd-ring-frame` (the
+      parent) is the `place-items: center` grid, and `.fd-ring__pct` is a
+      plain, content-sized, normal-flow item the grid centres as a whole --
+      both axes, by construction.
+    */
+    it('renders the percentage in {typography.numeric} with tabular numerals, centred by the frame’s own grid', () => {
+        const frame = block('.fd-ring-frame {')
+        expect(frame).toContain('display: grid;')
+        expect(frame).toContain('place-items: center;')
+
+        const svg = block('.fd-ring {')
+        expect(svg).toContain('position: absolute;')
+        expect(svg).toContain('inset: 0;')
+
+        const percent = block('.fd-ring__pct {')
+        expect(percent).not.toContain('position: absolute')
         expect(percent).toContain('font-size: var(--text-numeric);')
         expect(percent).toContain('font-variant-numeric: tabular-nums;')
+    })
+
+    /*
+      Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+      merged): the number and its "%" sign rendered on two separate lines --
+      `place-items: center` on an implicit grid with no declared
+      `grid-template-columns` puts each of the two direct children in its
+      own row by default. `display: flex` with `align-items: baseline`
+      keeps both children on one line instead, sharing a text baseline. See
+      the rendered mutation in accessibility.test.tsx for the "% detaches
+      onto its own line" case this pins against reintroducing.
+    */
+    it('lays the percentage and its "%" sign out on one baseline, not one grid row each', () => {
+        const percent = block('.fd-ring__pct {')
+        expect(percent).toContain('display: flex;')
+        expect(percent).toContain('align-items: baseline;')
+        expect(percent).not.toContain('display: grid;')
+        expect(percent).not.toContain('place-items:')
+    })
+
+    it('gives the ring a fixed, static drawing orientation rather than an animated rotation', () => {
+        const ring = block('.fd-ring {')
+        expect(ring).toContain('rotate: -90deg;')
+        expect(ring).not.toContain('transition:')
+        expect(ring).not.toContain('animation:')
     })
 })
 
 describe('progress presentation', () => {
-    it('keeps the unknown pattern static: no sweep, shimmer, or blink', () => {
-        expect(stylesheet).toMatch(/\.fd-meter--unknown \{[^}]*repeating-linear-gradient\(/)
+    it('keeps the unknown ring static: a dashed stroke, no sweep, shimmer, blink, or rotation of its own', () => {
+        expect(stylesheet).toMatch(/\.fd-ring__fill--unknown \{[^}]*stroke-dasharray:/)
         expect(stylesheet).not.toContain('@keyframes')
         expect(stylesheet).not.toContain('animation:')
+    })
+})
+
+/*
+  Defect fix (orchestrator's rendered 1024x768 review after Story 9.5
+  merged, branch fix-9-5-sending-details): three further visual defects the
+  suites passed. See the matching rendered proof in accessibility.test.tsx
+  and the mutation table in evidence-9-5-rebuild-sending-around-a-ring.md's
+  "Review follow-up" section.
+*/
+describe('the Sending figures and Cancel read as plain text, not boxed controls (Story 9.5 defect fix)', () => {
+    it('gives the metrics row a plain flex layout with no border or fill on either figure', () => {
+        const metrics = block('.fd-metrics {')
+        expect(metrics).toContain('display: flex;')
+        expect(metrics).not.toContain('grid-template-columns')
+
+        const metric = block('.fd-metric {')
+        expect(metric).not.toContain('border')
+        expect(metric).not.toContain('background')
+        expect(metric).not.toContain('padding')
+    })
+
+    it('folds the metrics row to a column instead of resetting a grid template that no longer exists', () => {
+        const narrow = block('@media (max-width: 639px) {')
+        expect(narrow).toMatch(/\.fd-metrics \{\s*flex-direction: column;/)
+        expect(narrow).not.toContain('grid-template-columns')
+    })
+
+    it('gives the known-empty status plain text, no border or fill, the same weight as the unknown caption', () => {
+        const status = block('.fd-empty-status {')
+        expect(status).not.toContain('border')
+        expect(status).not.toContain('background')
+        expect(status).not.toContain('padding')
+        expect(status).toContain('color: var(--color-muted);')
+    })
+
+    it('gives Cancel an intrinsic width, left-aligned under the figures, not the shared full-width bar', () => {
+        const cancel = block('.fd-hero__details .fd-button--quiet {')
+        expect(cancel).toContain('width: auto;')
+        expect(cancel).toContain('align-self: flex-start;')
     })
 })
 
@@ -1251,10 +1707,10 @@ describe('the outcome panel (Story 7.5)', () => {
         expect(outcome).toMatch(/align-items:\s*center;/)
     })
 
-    it('gives the done and error discs their own tint, at the 74px DESIGN.md size', () => {
+    it('gives the done and error discs their own tint, at the ~96px Story 9.6 size', () => {
         const icon = block('.fd-outcome__icon {')
-        expect(icon).toContain('width: 74px;')
-        expect(icon).toContain('height: 74px;')
+        expect(icon).toContain('width: 96px;')
+        expect(icon).toContain('height: 96px;')
         expect(icon).toContain('border-radius: var(--radius-full);')
 
         const done = block('.fd-outcome__icon--done {')
@@ -1264,6 +1720,40 @@ describe('the outcome panel (Story 7.5)', () => {
         const error = block('.fd-outcome__icon--error {')
         expect(error).toContain('background: var(--color-error-tint);')
         expect(error).toContain('color: var(--color-error);')
+    })
+
+    // Story 9.6: the disc scales in from ~0.7, via @starting-style -- the
+    // same progressive-enhancement mechanism every phase view and the QR
+    // tile already use. *Mutation:* drop the @starting-style block or the
+    // scale figure -> must fail.
+    it('scales the disc in from ~0.7, via @starting-style', () => {
+        const icon = block('.fd-outcome__icon {')
+        expect(icon).toMatch(/transition:\s*opacity 300ms var\(--ease-decelerate\), scale 520ms var\(--ease-decelerate\);/)
+
+        // The @starting-style block immediately following .fd-outcome__icon's
+        // own rule -- not the first @starting-style in the file, which
+        // belongs to [data-phase-view] further up.
+        const iconStart = stylesheet.indexOf('.fd-outcome__icon {')
+        const startingStyleOpen = stylesheet.indexOf('@starting-style {\n    .fd-outcome__icon {', iconStart)
+        expect(startingStyleOpen, 'a @starting-style block for .fd-outcome__icon').toBeGreaterThan(-1)
+        const startingStyleClose = stylesheet.indexOf('\n}\n', startingStyleOpen)
+        const startingStyleBlock = stylesheet.slice(startingStyleOpen, startingStyleClose)
+        expect(startingStyleBlock).toContain('opacity: 0;')
+        expect(startingStyleBlock).toContain('scale: 0.7;')
+    })
+
+    it('never wraps the card wider than the Staged card\'s own column (720px)', () => {
+        // Story 9.6: one centred card, column width, for every shape it takes
+        // -- a live outcome, a retained outcome, or an Idle command failure --
+        // so the rule lives on the unqualified selector rather than only the
+        // live-phase-view-scoped one. *Mutation:* drop max-width -> must fail.
+        const outcome = block('.fd-outcome {')
+        expect(outcome).toContain('max-width: 720px;')
+        expect(outcome).toContain('margin-inline: auto;')
+
+        // And not duplicated onto the phase-view-scoped selector any more --
+        // the base rule alone covers every shape now.
+        expect(stylesheet).not.toMatch(/\.fd-app > \.fd-outcome\[data-phase-view='outcome'\]\s*\{[^}]*max-width/)
     })
 
     it('mutes the body copy', () => {
@@ -1297,27 +1787,39 @@ describe('the outcome panel (Story 7.5)', () => {
     })
 })
 
-describe('the completion receipt (Story 7.5)', () => {
-    it('is two cells on {colors.fill}, divided by a separator', () => {
-        const receipt = block('.fd-receipt {')
+describe('the outcome receipt (Story 9.6 replaces Story 7.4/7.5\'s two-cell grid)', () => {
+    it('is one pill-shaped line on {colors.fill}, not a two-cell grid', () => {
+        const receipt = block('.fd-outcome__receipt {')
         expect(receipt).toContain('background: var(--color-fill);')
-        expect(receipt).toContain('grid-template-columns: 1fr 1fr;')
-
-        const divider = block('.fd-receipt__cell + .fd-receipt__cell {')
-        expect(divider).toContain('var(--color-separator)')
+        expect(receipt).toContain('border-radius: var(--radius-full);')
+        expect(receipt).toContain('display: inline-flex;')
+        // *Mutation:* reintroduce the two-cell grid on the receipt itself ->
+        // must fail, naming it. (`.fd-metrics`, Transfer Metrics, is a
+        // different component that legitimately keeps its own 2-column grid
+        // -- this checks the receipt's own rule, not the whole sheet.)
+        expect(receipt).not.toContain('grid-template-columns')
+        expect(stylesheet).not.toMatch(/\.fd-receipt\b/)
     })
 
     it('carries no duration cell and no third column', () => {
         // The mutation this guards against is the worst possible outcome of
         // this story: inventing a displayed duration. Nothing in the sheet
-        // may name a third receipt cell or a duration/elapsed rule.
-        expect(stylesheet).not.toMatch(/\.fd-receipt__cell--(duration|elapsed|time)/)
+        // may name a duration/elapsed rule anywhere near the receipt.
+        expect(stylesheet).not.toMatch(/\.fd-outcome__receipt.*--(duration|elapsed|time)/)
         expect(stylesheet).not.toContain('grid-template-columns: 1fr 1fr 1fr')
     })
 
-    it('renders the receipt figures with tabular numerals, like the percentage', () => {
-        const value = block('.fd-receipt__value {')
-        expect(value).toContain('font-variant-numeric: tabular-nums;')
+    it('truncates a long name with an ellipsis rather than wrapping or overflowing the pill', () => {
+        // *Mutation:* drop text-overflow/white-space -> must fail.
+        const name = block('.fd-outcome__receipt-name {')
+        expect(name).toContain('overflow: hidden;')
+        expect(name).toContain('text-overflow: ellipsis;')
+        expect(name).toContain('white-space: nowrap;')
+    })
+
+    it('renders the wire-bytes figure with tabular numerals, like the percentage', () => {
+        const meta = block('.fd-outcome__receipt-meta {')
+        expect(meta).toContain('font-variant-numeric: tabular-nums;')
     })
 })
 
@@ -1369,8 +1871,10 @@ describe('the unrounded contrast proof', () => {
 
       "Placed together" means the views really put this foreground on this
       background. `.fd-button--quiet` is what puts muted and error on elevated,
-      because it drops the surface fill every other control keeps; `.fd-trust`'s
-      marker is what puts warning there.
+      because it drops the surface fill every other control keeps. (Story 9.4
+      removed the one bare `warning`-on-`elevated` placement, the old
+      `.fd-trust` marker, along with its row in the table below -- see the
+      comment beside that removal.)
     */
 
     function channel(value: number): number {
@@ -1454,7 +1958,14 @@ describe('the unrounded contrast proof', () => {
         ['primary', 'track', 3, true],
         ['primary', 'surface', 3, true],
         ['primary', 'elevated', 3, true],
-        ['warning', 'elevated', 3, true],
+        // Story 9.4 removed the last bare `warning`-on-`elevated` placement
+        // (the old `.fd-trust p:first-child::before` marker, which had no
+        // background of its own and sat directly on `.fd-packet`'s
+        // elevated fill): both remaining warning surfaces --
+        // `.fd-warning-banner` and `.fd-cancel-summary` -- paint their own
+        // `--color-surface` fill first, which is the `warning`-on-`surface`
+        // row above. Removed rather than left in place unplaced ("Placed
+        // together" is this table's own stated rule, further up this file).
         // Story 7.11: the focus ring is `--color-primary` itself now (no
         // separate `--color-focus` token), so its visibility against every
         // surface it can sit on is exactly the `primary` rows around it --
@@ -1682,7 +2193,10 @@ describe('the decorative edge stays decorative', () => {
         '.fd-button',
         '.fd-qr-panel',
         '.fd-url',
-        '.fd-meter',
+        // Story 9.5 retired `.fd-meter` (the linear progress track) for
+        // `.fd-ring__edge` -- the ring's own functional-boundary stroke, the
+        // same role this list already checked on the old element.
+        '.fd-ring__edge',
         '.fd-browse-menu',
         '.fd-drop-zone__inner',
     ]
@@ -1740,11 +2254,19 @@ describe('rules the components can only reference by name', () => {
       them left all 462 green while the guarantee was gone.
     */
 
-    it('clamps the item name to two lines and hides the overflow', () => {
-        const clamp = block('.fd-clamp {')
-        expect(clamp).toContain('-webkit-line-clamp: 2;')
-        expect(clamp).toContain('line-clamp: 2;')
-        expect(clamp).toContain('overflow: hidden;')
+    /*
+      Story 9.4 removed the two-line clamp this test used to pin
+      (`.fd-clamp`, `-webkit-line-clamp: 2`) along with the "Show full name"
+      toggle it required: the item name always wraps now, so there is no
+      clamp rule left for a component to reference by name. Replaced with an
+      equivalent case from the same story: `.fd-caveats__glyph` sizes the
+      info/lock glyphs `StagedView.tsx` references only by class, which jsdom
+      cannot verify any other way.
+    */
+    it("sizes the caveat glyph via its own class, since jsdom applies no stylesheet (Story 9.4)", () => {
+        const glyph = block('.fd-caveats__glyph {')
+        expect(glyph).toContain('width: 14px;')
+        expect(glyph).toContain('height: 14px;')
     })
 
     it('keeps the full item name off screen rather than merely invisible', () => {
@@ -1826,7 +2348,17 @@ describe('rules the components can only reference by name', () => {
     it('dims nothing with opacity, because a composited pair publishes no figure', () => {
         const opacities = [...stylesheet.matchAll(/^\s*opacity:\s*([^;]+);/gm)].map((match) => match[1].trim())
 
-        expect(opacities.filter((value) => value !== '1'), 'fractional opacity declarations').toEqual([])
+        // Story 9.1: `0` joins the allowed set alongside `1`, and only those
+        // two -- an entrance's `opacity: 0` in @starting-style (and its
+        // resting `opacity: 1` counterpart) is binary presence/absence, not
+        // the fractional composite this test exists to forbid. Nothing ever
+        // *renders* at `opacity: 0`; it is the pre-paint state a view
+        // transitions away from before a user reads anything, never a
+        // dimmed pair sitting on screen the way `aria-disabled`'s old
+        // `opacity: 0.7` did. Any value strictly between 0 and 1 remains
+        // exactly as forbidden as before.
+        const fractional = opacities.filter((value) => value !== '1' && value !== '0')
+        expect(fractional, 'fractional opacity declarations').toEqual([])
     })
 })
 

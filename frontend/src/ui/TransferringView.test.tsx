@@ -8,6 +8,11 @@ afterEach(cleanup)
 
 const sessionId = '0123456789abcdef0123456789abcdef'
 
+// Matches TransferringView.tsx's own `ringRadius`/`ringCircumference` -- kept
+// as a second, independent computation rather than an import, so a broken
+// formula in the view cannot also make its own test agree with it.
+const ringCircumference = 2 * Math.PI * 96
+
 function metadata(overrides: Partial<FileMetadata> = {}): FileMetadata {
     return {
         sessionId,
@@ -36,6 +41,7 @@ function transferring(
     }
 }
 
+/** The ring panel: the mode-bearing element, same role `.fd-meter` used to carry. */
 function meter(): HTMLElement | null {
     return document.querySelector('[data-progress-mode]')
 }
@@ -45,16 +51,16 @@ describe('known positive totals', () => {
         bytesSent: 5_800_000,
         totalBytes: 8_400_000,
         totalKnown: true,
-        // Deliberately not 5.8/8.4. The meter reads the authoritative byte
+        // Deliberately not 5.8/8.4. The ring reads the authoritative byte
         // pair, so this figure reaches no surface: what shows is 69%, and a
         // sender that rounds its own percentage for display cannot make the
-        // bar disagree with the counts printed beside it (Epic 1 retrospective
+        // ring disagree with the counts printed beside it (Epic 1 retrospective
         // item 7).
         percent: 68,
         speedBytesPerSec: 4_700_000,
     }
 
-    it('renders a determinate progressbar carrying the derived percentage', () => {
+    it('renders a determinate progress ring carrying the derived percentage', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
         const bar = screen.getByRole('progressbar')
@@ -64,26 +70,35 @@ describe('known positive totals', () => {
         expect(meter()?.getAttribute('data-progress-mode')).toBe('known-positive')
     })
 
-    it('labels the meter with sent-of-total and the same percentage', () => {
+    it('shows the derived percentage, in tabular numerals, centred in the ring', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
-        expect(screen.getByText('5.8 MB of 8.4 MB')).toBeTruthy()
-        expect(screen.getByText('69%')).toBeTruthy()
+        const pct = document.querySelector('.fd-ring__pct')
+        expect(pct?.textContent).toBe('69%')
         expect(screen.queryByText('68%')).toBeNull()
     })
 
-    it('reports wire bytes first and throughput second', () => {
+    it('reports sent-of-total first and throughput second, captioned Sent and Speed', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
         const metrics = [...document.querySelectorAll('.fd-metric')].map((node) => node.textContent)
-        expect(metrics).toEqual(['5.8 MB sentWire bytes', '4.7 MB/sThroughput'])
+        // Defect fix: the figure used to read "5.8 MB sent" over its own
+        // "Sent" caption -- the value repeating the caption's word rather
+        // than adding a fact. A known total now reads sent-of-total instead.
+        expect(metrics).toEqual(['5.8 MB of 8.4 MBSent', '4.7 MB/sSpeed'])
     })
 
-    it('fills the track from the byte pair, not from the wire percentage', () => {
+    it('draws the ring from the byte pair, not from the wire-reported percent', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
-        const fill = document.querySelector('.fd-meter__fill') as HTMLElement
-        expect(fill.style.width).toBe(`${100 * 5_800_000 / 8_400_000}%`)
+        const fill = document.querySelector('.fd-ring__fill') as unknown as SVGElement & {style: CSSStyleDeclaration}
+        const derivedValue = 100 * 5_800_000 / 8_400_000
+        const derivedOffset = ringCircumference * (1 - derivedValue / 100)
+        const wireOffset = ringCircumference * (1 - 68 / 100)
+
+        // The two would visibly disagree, so this assertion has teeth.
+        expect(Math.abs(derivedOffset - wireOffset)).toBeGreaterThan(1)
+        expect(Number(fill.style.strokeDashoffset)).toBeCloseTo(derivedOffset, 6)
     })
 })
 
@@ -96,7 +111,7 @@ describe('unknown totals', () => {
         speedBytesPerSec: 12_400_000,
     }
 
-    it('states the unknown total and exposes no value on the progressbar', () => {
+    it('states the unknown total and exposes no value on the progress ring', () => {
         const state = transferring(snapshot, {metadata: metadata({name: "Dad's PDFs", isDir: true, size: 36_800_000})})
         render(<TransferringView state={state} onCancel={vi.fn()}/>)
 
@@ -106,31 +121,37 @@ describe('unknown totals', () => {
         expect(meter()?.getAttribute('data-progress-mode')).toBe('unknown')
     })
 
-    it('uses a static non-directional pattern and never a percentage', () => {
+    it('uses a static non-directional dashed ring and never a percentage', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
-        const bar = screen.getByRole('progressbar')
-        expect(bar.className).toContain('fd-meter--unknown')
-        expect(document.querySelector('.fd-meter__fill')).toBeNull()
+        expect(document.querySelector('.fd-ring__fill--unknown')).toBeTruthy()
+        expect(document.querySelector('.fd-ring__pct')).toBeNull()
         expect(document.body.textContent).not.toMatch(/\d+%/)
     })
 
-    it('still reports the actual wire bytes and throughput', () => {
+    it('still reports the actual wire bytes and throughput, with no meaningful "of X" to add', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
-        expect(screen.getByText('48.2 MB sent')).toBeTruthy()
+        // Defect fix: an unknown total has no meaningful total to read
+        // "of", so the figure is the bare wire count -- not "48.2 MB sent"
+        // (repeating its own "Sent" caption) and not "48.2 MB of ..." (there
+        // is no total).
+        expect(screen.getByText('48.2 MB')).toBeTruthy()
+        expect(screen.queryByText('48.2 MB sent')).toBeNull()
         expect(screen.getByText('12.4 MB/s')).toBeTruthy()
     })
 
-    it('keeps the folder identity and its ZIP note visible', () => {
+    it('keeps the folder identity, its logical size distinct from the wire total, and its ZIP note visible', () => {
         const state = transferring(snapshot, {metadata: metadata({name: "Dad's PDFs", isDir: true, size: 36_800_000})})
         render(<TransferringView state={state} onCancel={vi.fn()}/>)
 
         expect(document.querySelector('bdi')?.textContent).toBe("Dad's PDFs")
         expect(screen.getByText('This folder downloads as a ZIP.')).toBeTruthy()
-        expect(document.querySelector('.fd-packet-tab')?.textContent).toBe('Folder')
-        // The logical size never becomes a wire total for a ZIP stream.
-        expect(document.body.textContent).not.toContain('36.8 MB')
+        // The packet tab is gone (Story 9.5): the item row's own meta line
+        // carries the kind and the logical size, explicitly labelled so it
+        // is never mistaken for the wire total the ZIP stream reports.
+        expect(document.querySelector('.fd-meta')?.textContent).toBe('Folder · 36.8 MB logical size')
+        expect(screen.getByText('48.2 MB')).toBeTruthy()
     })
 })
 
@@ -143,7 +164,7 @@ describe('known empty files', () => {
         speedBytesPerSec: 0,
     }
 
-    it('states the literal empty status with no percentage-bearing progressbar', () => {
+    it('states the literal empty status with no percentage-bearing progress ring', () => {
         const state = transferring(snapshot, {metadata: metadata({name: 'Empty Notes.txt', size: 0})})
         render(<TransferringView state={state} onCancel={vi.fn()}/>)
 
@@ -152,20 +173,20 @@ describe('known empty files', () => {
         expect(meter()?.getAttribute('data-progress-mode')).toBe('known-empty')
     })
 
-    it('keeps a decorative track that claims nothing', () => {
+    it('keeps a decorative ring that claims nothing', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
-        const track = document.querySelector('.fd-meter')
-        expect(track?.getAttribute('aria-hidden')).toBe('true')
-        expect(track?.hasAttribute('role')).toBe(false)
+        const panel = document.querySelector('.fd-ring-panel')
+        expect(panel?.getAttribute('aria-hidden')).toBe('true')
+        expect(panel?.hasAttribute('role')).toBe(false)
     })
 
     it('shows zero wire bytes and omits the meaningless speed', () => {
         render(<TransferringView state={transferring(snapshot)} onCancel={vi.fn()}/>)
 
         const metrics = [...document.querySelectorAll('.fd-metric')].map((node) => node.textContent)
-        expect(metrics).toEqual(['0 bytes sentWire bytes'])
-        expect(screen.queryByText('Throughput')).toBeNull()
+        expect(metrics).toEqual(['0 bytesSent'])
+        expect(screen.queryByText('Speed')).toBeNull()
     })
 })
 
@@ -178,6 +199,14 @@ describe('before the first accepted snapshot', () => {
         expect(meter()).toBeNull()
         expect(screen.queryByRole('progressbar')).toBeNull()
         expect(document.querySelectorAll('.fd-metric')).toHaveLength(0)
+    })
+
+    it('still occupies the ring slot with a plain track, so the card never changes shape', () => {
+        render(<TransferringView state={transferring(null)} onCancel={vi.fn()}/>)
+
+        expect(document.querySelector('.fd-ring-panel')).toBeTruthy()
+        expect(document.querySelector('.fd-ring__fill')).toBeNull()
+        expect(document.querySelector('.fd-ring__fill--unknown')).toBeNull()
     })
 })
 
@@ -227,7 +256,7 @@ describe('the transfer surface', () => {
         expect(onCancel).toHaveBeenCalledTimes(1)
 
         rerender(<TransferringView state={transferring(null, {cancelPending: true})} onCancel={onCancel}/>)
-        expect(screen.getByRole('button', {name: 'Canceling…'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Canceling'})).toBeTruthy()
     })
 
     it('is exactly one phase view', () => {
@@ -251,7 +280,7 @@ describe('the pending cancellation contract', () => {
 
         rerender(<TransferringView state={transferring(null, {cancelPending: true})} onCancel={onCancel}/>)
 
-        const outstanding = screen.getByRole('button', {name: 'Canceling…'})
+        const outstanding = screen.getByRole('button', {name: 'Canceling'})
         expect(outstanding).toBe(cancel)
         expect(document.activeElement).toBe(outstanding)
         expect(outstanding.getAttribute('aria-disabled')).toBe('true')
@@ -309,7 +338,7 @@ describe('the progress ARIA the three modes already carry', () => {
         expect(bar.hasAttribute('aria-valuemax')).toBe(false)
     })
 
-    it('exposes a known-empty transfer as literal text with no progressbar at all', () => {
+    it('exposes a known-empty transfer as literal text with no progress ring role at all', () => {
         const snapshot: ProgressSnapshot = {
             bytesSent: 0, totalBytes: 0, totalKnown: true, percent: 0, speedBytesPerSec: 0,
         }

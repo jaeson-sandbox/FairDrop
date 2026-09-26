@@ -377,16 +377,39 @@ state it is:
 - **Pending, Transferring, and a terminal Done or Error rendered as the phase
   view** are short, single-purpose states with no reason to anchor to the top
   edge, so the region is centred vertically instead.
-- **Staged is the one exception, and stays top-aligned.** It is content-rich --
+- **Staged is now centred too (Story 9.6 review follow-up reverses the
+  original exception below).** The owner-approved prototype centres every
+  state (`.app { display: grid; place-items: center }`), Staged included, and
+  the rendered-Chromium reflow proof (below) confirms the same monotonic-loss
+  property the top-aligned exception existed to protect still holds: at the
+  640×480 floor, content that exceeds the window scrolls from the top rather
+  than clipping it, so centring costs nothing the exception was written to
+  avoid.
+  ~~Staged is the one exception, and stays top-aligned. It is content-rich --
   packet, hero, QR, direct-link row, disclosures -- and centring a tall column
   moves content upward as the window shortens; the QR is the first thing that
   leaves the viewport when it does, because it sits nearest the vertical
   centre of a hero-heavy layout. Top alignment keeps the loss monotonic: content
   is lost from the bottom, through the permitted vertical scroll, rather than
-  from wherever centring happens to put the QR.
-- A retained outcome rendered above Idle keeps its natural height regardless of
-  the rule above; only the phase's own region grows or centres. The drop zone's
-  minimum height is a floor the retained panel cannot push it under.
+  from wherever centring happens to put the QR.~~ (superseded; kept struck
+  through rather than deleted, since `styles.test.ts`'s history references it.)
+- **The outcome card -- live, retained, or an Idle Stage-time command failure
+  -- is centred by its own `margin-block: auto`, not by growing itself with
+  `flex: 1 1 auto` and centring its own children.** This is a Story 9.6 review
+  fix: the live phase-view form used to grow to fill the whole region (a
+  ~560px-tall card with its content floating inside it) and centre its
+  children within that grown box, so the same node visibly collapsed and
+  jumped to the top the moment `transfer-reset` made it retained (the flex
+  rule stopped applying, since only the live form carried
+  `data-phase-view='outcome'`). An auto-margin item, by contrast, keeps its
+  own natural height in every form and is centred by consuming the
+  container's free space instead of its own -- the same node, same height,
+  same position, whichever of the three forms it currently is. The container
+  it centres within is `.fd-app` for the live/retained top-level card and the
+  phase's own region (already grown by the rule above) for an Idle command
+  failure, both already tall enough for the auto margin to have something to
+  consume. The drop zone's minimum height is still a floor nothing here can
+  push it under.
 
 At the 640×480 native minimum, a 320 CSS pixel content width, 200% text zoom,
 and the WCAG text-spacing overrides, the drop zone's growth is the first thing
@@ -469,8 +492,19 @@ Rules, all enforceable:
 items, `{rounded.md}` for buttons and fields, `{rounded.lg}` for the QR card and
 the browse menu, `{rounded.xl}` for notices and inner panels, `{rounded.xxl}` for
 the drop zone, the packet, the progress card and the outcome panel.
-`{rounded.full}` is reserved for the progress track and the item-kind pill — never
-a button or a container.
+`{rounded.full}` is reserved for the progress track, the item-kind pill, and a
+**pill-shaped primary button** — the Browse Control (Story 9.3) and, later, the
+single-action buttons Epic 9's terminal cards offer. It is still never used for
+an ordinary container. This amends the previous "never a button" wording, which
+predates Story 9.3's approved prototype
+(`_bmad-output/planning-artifacts/ux-designs/ux-FairDrop-quartz-2026-09-20/mockups/epic-9-proposal.html`)
+putting a pill button inside the drop zone; the row was written before that
+prototype existed and is corrected here rather than left contradicted.
+
+Story 9.6 adds one more use, informational rather than a button: the outcome
+card's own receipt line is a small pill-shaped chip (`{colors.fill}`), the same
+shape family as the item-kind pill it replaces on that card, not a fourth kind
+of container.
 
 Nested radii are concentric: an inner element's radius equals the parent's radius
 minus the padding between them. A 24px card with 7px inset padding takes a 17–18px
@@ -486,24 +520,24 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 |---|---|
 | **App Shell** | Canvas background, standard OS chrome, one centred lifecycle region plus an optional retained outcome in Idle. No shadow. |
 | **Drop Zone** | `{rounded.xxl}` surface at `{elevation.sh-2}` with a 2px dashed inner rule at `{colors.control-border}` inset 7px (concentric, so `{rounded.xl}`). The **functional** token, not the decorative one: the zone carries no click handler and no tab stop, but that rule is the only thing identifying the drop target -- the card is `{colors.surface}` on `{colors.canvas}` at 1.09:1 in light mode, and shadow may not carry a boundary. This row previously said `{colors.separator}` and contradicted the Colors table above it, which already required the functional token on the rest-state drop target; the row was the error. Drag-active: the rule goes solid `{colors.primary}`, the fill goes `{colors.primary-tint}`, and the glyph lifts 3px. Fill is never the only state cue. The rest-state boundary uses `{colors.control-border}` in forced colors. |
-| **Browse Control** | Full-width primary button with a trailing chevron and `aria-haspopup="menu"`. Opens the menu; the label never changes. |
-| **Browse Menu** | `{rounded.lg}` raised surface at `{elevation.sh-3}` with a functional boundary, 5px padding, `{rounded.sm}` items. **One active item at a time, owned by focus** (Story 7.11): the menu has a single notion of "the item about to be chosen," and it is whichever item currently holds focus -- never a separate hover state and never two items marked at once. Hovering an item moves focus to it, so hover and keyboard navigation paint the identical treatment -- primary fill plus a tint halo and its own ring, not only the focus ring -- through the one `:focus` rule; there is no weaker `:hover`-only appearance. A menu opened by **pointer** pre-selects nothing: the trigger keeps focus and no item is marked until the sender points at or arrows onto one. A menu opened by **keyboard** (ArrowDown, ArrowUp, Enter or Space on the trigger) focuses the first item immediately, matching the platform convention that a keyboard-opened menu always lands focus inside it. |
-| **Disclosure** | `{rounded.xl}` surface at `{elevation.sh-1}` with a 12px chevron that rotates 90° when open, and a hover fill. **No leading icon**: Story 7.7 removed it after finding that a tinted circle small enough to sit beside a one-line summary resolves to a featureless coloured dot, which reads as a bullet rather than as an icon. A dot is not an acceptable outcome per that story's acceptance criteria, and a shape legible at this size does not fit the row without crowding the summary text, so the row ships with no glyph at all -- consistent with the platform's own disclosure rows, which frequently carry none either. **Replaces the always-open firewall and recovery blocks** — see the FR23 note below. |
-| **Packet** | `{rounded.xxl}` surface at `{elevation.sh-3}`. Holds the warning banner, hero, disclosures and cancel. Replaces the folder-tab silhouette and the paper offset. |
-| **Item Kind Pill** | `{rounded.full}`, `{colors.primary-tint}` on `{colors.primary}`, `{typography.label}`, with a leading glyph. Says File or Folder. Never an authoritative-state badge. |
-| **Item Summary** | `{typography.headline}` name in a bidi isolate with the full-name control beside it; kind, logical size and the ZIP note in `{typography.meta}`. |
-| **QR Panel** | Fixed white substrate, 12px padding, `{rounded.lg}`, `{elevation.sh-2}` plus a functional boundary. Square, crisp, generous quiet zone, no rotation or overlay. |
-| **Direct URL Row** | Readonly monospace `<textarea>` on `{colors.fill}` with a functional boundary, beside the action named by `EXPERIENCE.md` key `copy.direct_link.action`. Never a sender-side activation link. |
-| **Copy Feedback** | Label swaps to `copy.copy.confirmation` and the control takes the success tint and boundary. Fixed width so the swap cannot reflow the row; reverts on blur (D-114). No toast. |
+| **Browse Control** | **Story 9.3 reverses Story 7.3's full-width rule** (which itself reversed Paper Relay's "quieter than the drop zone" rule): now that the drop zone carries no click handler and no tab stop of its own, and the control sits *inside* it as the zone's one action, a full-width row is no longer the shape that reads as "the acting control" -- a centred, intrinsic-width pill does, matching the owner-approved prototype. Centred, intrinsic-width, pill-shaped (`{rounded.full}`) primary button with a trailing chevron and `aria-haspopup="menu"`, placed after the glyph, heading and one line of promise copy inside the drop zone. Opens the menu; the label never changes. The same component (`BrowseControl`, extracted to its own module in Story 9.3) is reused wherever else the product needs a file-or-folder chooser, with only its label varying by caller. |
+| **Browse Menu** | `{rounded.lg}` raised surface at `{elevation.sh-3}` with a functional boundary, 5px padding, `{rounded.sm}` items, each with a leading glyph naming its kind (File/Folder; Story 9.3). **One active item at a time, owned by focus** (Story 7.11): the menu has a single notion of "the item about to be chosen," and it is whichever item currently holds focus -- never a separate hover state and never two items marked at once. Hovering an item moves focus to it, so hover and keyboard navigation paint the identical treatment -- primary fill plus a tint halo and its own ring, not only the focus ring -- through the one `:focus` rule; there is no weaker `:hover`-only appearance. A menu opened by **pointer** pre-selects nothing: the trigger keeps focus and no item is marked until the sender points at or arrows onto one. A menu opened by **keyboard** (ArrowDown, ArrowUp, Enter or Space on the trigger) focuses the first item immediately, matching the platform convention that a keyboard-opened menu always lands focus inside it. |
+| **Disclosure** | `{rounded.xl}` surface at `{elevation.sh-1}` with a 12px chevron that rotates 90° when open, and a hover fill. The chevron sits at the row's **trailing edge**, not immediately after the summary text -- `justify-content: space-between` on `.fd-disclosure__summary`, the same rule the owner-approved prototype's `.row` uses. (Defect fix, Story 9.3: the `<button>` that replaced `<summary>` in Story 9.1 lost the old heading's `flex: 1`, which had been what pushed the chevron to the edge, so it drifted to sit right after the label instead -- found on the built macOS binary.) **No leading icon**: Story 7.7 removed it after finding that a tinted circle small enough to sit beside a one-line summary resolves to a featureless coloured dot, which reads as a bullet rather than as an icon. A dot is not an acceptable outcome per that story's acceptance criteria, and a shape legible at this size does not fit the row without crowding the summary text, so the row ships with no glyph at all -- consistent with the platform's own disclosure rows, which frequently carry none either. **Replaces the always-open firewall and recovery blocks** — see the FR23 note below. **Idle groups both of its disclosures into one `{rounded.xl}` surface** (Story 9.3), the two rows divided by a `{colors.separator}` rule rather than each carrying its own card and shadow. **Story 9.4 retires Staged's always-open `RecoveryHelp` form**: Staged's "Trouble connecting?" is now a `Disclosure` too (its own card, not grouped with Idle's), so the sentence above that used to except Staged from this component no longer has an exception to state. **Story 9.1 implementation choice, recorded here as the acceptance criteria require:** this used to be native `<details>`/`<summary>`, which supplied keyboard operability and open/closed state for free but cannot smoothly expand or collapse in both engines this product ships to -- `build/darwin/Info.plist` declares `LSMinimumSystemVersion` 10.13, and neither the `<details>` display swap nor the newer `::details-content` pseudo-element needed to transition it is available across that whole range. It is now a controlled `<button aria-expanded aria-controls>` (wrapped in an `<h2>`, since a button's content model does not permit a heading child -- the WAI-ARIA APG accordion pattern) plus a region that expands and collapses with `grid-template-rows: 0fr ↔ 1fr`, the same technique the owner-approved prototype uses for every expand/collapse in the product and one with materially broader cross-engine support than an animated `<details>` open. Collapsed content stays in the DOM either way -- a transitioned `visibility: hidden`, not `inert` (unsupported on the older WebKit this range includes) and not an unmount, is what keeps it out of the tab order and the accessibility tree while still letting the region's height animate. Every existing keyboard, focus and content guarantee (Tab reachability, Enter/Space activation, Escape blurring the trigger, every recovery and firewall string still present regardless of open state) holds under the new markup; see `Disclosure.tsx` and `styles.test.ts` for the mutation-verified detail. |
+| **Packet** | `{rounded.xxl}` surface at `{elevation.sh-3}`. Holds the warning banner and the hero (QR plus item details). Replaces the folder-tab silhouette and the paper offset. **Story 9.4:** Cancel and "Trouble connecting?" moved out of the card into a foot row below it (`.fd-staged-foot`) -- the card itself is exactly the QR-and-item handoff now, not the whole Staged surface. |
+| **Item Kind Pill** | **Superseded by Story 9.4.** This described the `fd-packet-tab` label above the card (File/Folder, `{rounded.full}`, `{colors.primary-tint}` on `{colors.primary}`), which Story 9.4 removed along with the card it sat above. The item's kind is now a plain glyph beside its name in the item row (`.fd-item__icon`, `{colors.fill}` on `{colors.muted}`) -- decorative, not a badge, exactly as this row already required. |
+| **Item Summary** | `{typography.headline}` name in a bidi isolate beside a kind glyph; kind, logical size and the ZIP note in `{typography.meta}`. **Story 9.4:** the name always wraps (`overflow-wrap: anywhere`); the persistent full-name control this row used to mention is removed along with the two-line clamp it existed to expand. |
+| **QR Panel** | Fixed white substrate, 12px padding, `{rounded.lg}`, `{elevation.sh-2}` plus a functional boundary, ~216px square (Story 9.4; was 224px at `{rounded.xs}` before the QR became the card's whole point rather than sharing weight with an always-visible link row). Crisp, generous quiet zone, no rotation or overlay. |
+| **Direct URL Row** | **Story 9.4:** not rendered until Show Link (`copy.direct_link.show`/`copy.direct_link.hide`, secondary) is activated, using the same `grid-template-rows`/transitioned-`visibility` mechanism as `Disclosure` (its own rule, `.fd-url-reveal`, since the trigger is a plain button rather than a heading-wrapped summary). Revealed: readonly monospace `<textarea>` on `{colors.fill}` with a functional boundary, unchanged from Story 7.9's CSS-grid mirror sizing. Copy Link (primary) copies without revealing it, named by `EXPERIENCE.md` key `copy.direct_link.action`. Never a sender-side activation link. |
+| **Copy Feedback** | Label swaps to `copy.copy.confirmation` with a check glyph, as a non-reflowing crossfade (Story 9.4: both faces occupy the same grid cell, the inactive one `aria-hidden`) rather than a jump cut; the control takes the success tint and boundary. Fixed width so the swap cannot reflow the row; reverts on blur (D-114). No toast. |
 | **Warning Banner** | `{rounded.md}`, warning tint, inset warning boundary, leading glyph, heading plus message. Inline, non-modal, never a full fill. |
-| **Trusted-LAN Note** | Muted copy behind a 3px `{rounded.xs}` warning-coloured bar. Literal plain-HTTP and local-network disclosure; never green or lock-shaped. |
-| **Progress Card** | `{rounded.xxl}` surface at `{elevation.sh-3}`: kind pill and name, then the percentage in `{typography.numeric}` with wire bytes and throughput right-aligned beside it, then the track, then Cancel. |
-| **Progress Meter** | 8px `{rounded.full}` track at `{colors.track}` with a functional boundary; fill is **solid** `{colors.primary}`, not a gradient -- the single-gradient rule is absolute and the button already spends it. Determinate value, static unknown pattern, or decorative known-empty track. No fake ZIP or empty-file percentage, and no sweep, shimmer or blink. |
-| **Transfer Metrics** | Wire bytes first, throughput second, tabular numerals. |
+| **Trusted-LAN Note** | Muted copy, each line with its own inline SVG glyph rather than a single shared warning-coloured bar (Story 9.4: an info glyph on the first-opener line, a lock glyph on the network line -- both `{colors.muted}`, matching the owner-approved prototype's `.caveats`, not warning-tinted). **This amends the previous "never green or lock-shaped" wording**, written before this story's approved prototype used exactly a lock glyph for the network disclosure; the story's own acceptance criteria name the lock glyph explicitly, and the story's text wins over an earlier row it contradicts. Literal plain-HTTP and local-network disclosure; still never green, and still never a claim of encryption. |
+| **Progress Card** | **Superseded by Story 9.5.** This described a standalone `{rounded.xxl}`/`{elevation.sh-3}` surface (kind pill and name, then the percentage with wire bytes and throughput beside it, then the track, then Cancel) that Story 9.5 removed along with the card it sat above. Sending now reuses Staged's own **Packet** card and **Hero** geometry verbatim (the same `{rounded.sm}/{rounded.lg}` surface at `{elevation.sh-3}`, the fixed ~216px slot beside a `minmax(0, 1fr)` details column): the QR bitmap in that slot becomes the Progress Ring below, and the item row, figures and Cancel sit beside it exactly where Staged's link actions, revealed field and caveats do. |
+| **Progress Ring** | **Replaces the Progress Meter (Story 9.5).** A ~216px ring in Staged's own QR slot, so the card never changes shape moving from Staged to Sending. Two concentric strokes on the resting track: a 10px band at `{colors.track}` (kept at that token specifically so the determinate fill's contrast against it stays the already-proven `primary`-on-`track` pairing) plus a 1px edge at `{colors.control-border}` just outside it -- the "functional boundary" this row has always required, expressed as a second stroke rather than a `border` property because a ring, unlike the retired linear track, has no separate fill rectangle to frame. The determinate fill is **solid** `{colors.primary}`, never a gradient -- the single-gradient rule is absolute and the button already spends it -- drawn with `stroke-dashoffset`, transitioned 400ms, never a `@keyframes` rule. Its own tabular-numeral percentage sits centred inside the ring. The unknown mode is a static, non-directional dashed stroke (no sweep, shimmer, or rotation of its own beyond the ring's fixed -90deg orientation) with its status caption beneath it; the known-empty mode shows the track only, `aria-hidden`, with no percentage-bearing role anywhere on the card. No fake ZIP or empty-file percentage ever appears. |
+| **Transfer Metrics** | Two plain figure-over-caption pairs beside the ring, tabular numerals: wire bytes first (captioned `copy.label.sentCaption`, "Sent"), throughput second (captioned `copy.label.speedCaption`, "Speed") -- Story 9.5's own pair, distinct from the Completion Receipt's `copy.label.wireBytes`/`copy.label.throughput` ("Wire bytes"/"Throughput", unchanged), since that receipt is a different card. The figures themselves are unchanged: actual wire bytes and visual-only throughput. |
 | **Cancel Action** | Quiet text action at full target size; error-coloured on hover and focus. |
-| **Outcome Panel — Done** | Centred composition at `{elevation.sh-3}`: a 74px success-tint disc with a stroke-drawn check, `{typography.display}` heading, muted body, the **completion receipt**, then the primary next action and a quiet Dismiss. This is the state that previously rendered a heading and one line into a mostly empty window. |
-| **Completion Receipt** | Two cells on `{colors.fill}`, divided by a separator: the item name and the wire bytes actually sent. **Two cells, not three** — no elapsed-time cell exists, because no clock is tracked and `EXPERIENCE.md` forbids frontend lifecycle timers. Both values must come from retained state, never from a placeholder. |
-| **Outcome Panel — Error** | Same composition in the error pair, with a `!` glyph, the safe heading and message from the fixed registry, and recovery guidance. No raw diagnostics. Retained form adds Dismiss. |
+| **Outcome Panel — Done** | **Story 9.6 rebuild.** One centred card, column width -- never wider than the Staged card's own 720px column, live or retained -- at `{elevation.sh-3}`: a ~96px success-tint disc (up from 74px) with a stroke-drawn check that scales in from ~0.7, `{typography.display}` heading (`copy.done.heading`, "Sent"), the one-line **outcome receipt**, then two pill buttons: **Send Another** (primary, the extracted `BrowseControl`) and **Done** (quiet Dismiss). `copy.done.body` is retired -- the receipt now carries what completion means, and the sentence that used to spell it out was redundant beside it. |
+| **Outcome Receipt** | **Story 9.6 replaces the two-cell grid.** One pill-shaped line on `{colors.fill}`: a kind glyph, the item name, and `· <wire bytes actually sent>` for Done; the item name alone for an Error whose outcome retained one (Story 9.2). No elapsed-time figure anywhere -- no clock is tracked and `EXPERIENCE.md` forbids frontend lifecycle timers. Every value comes from retained state, never a placeholder; the name truncates with an ellipsis rather than wrapping or overflowing the pill. |
+| **Outcome Panel — Error** | **Story 9.6 rebuild**, the same one-card shape as Done: the error disc, the fixed heading and fixed `PublicError.message` from the registry (unchanged), the outcome receipt when an item name was retained, and the primary action `selectEffectiveErrorAction` (Story 9.2) chooses -- **Try Again** (a refresh glyph, calls `retry()`) for `retry`, **Choose Another** (the `BrowseControl` menu) for `choose`, or no primary for `dismiss`. Every error card also carries **Dismiss** (quiet unless it is the card's only control, matching the Done panel's weight rule). No raw diagnostics. |
 | **Status Announcer** | Visually hidden, pre-mounted, atomic, layout-free. Never duplicates focused content. |
 
 ### FR23 and the disclosures
@@ -535,23 +569,83 @@ the rest of the treatment is unaffected; if acceptance decides FR23 means the
 preflight must again *precede* the selection control, the fix is to restore the
 document order above it and nothing else in this spine depends on that ordering.
 
+**Story 9.3 moves the control again, without touching FR23's substance.** The
+browse control now renders *inside* the drop zone (glyph, heading, promise line,
+control, in that order) rather than below it, so Idle's document order reads:
+drop zone (containing the browse control), command-failure panel (if any), the
+grouped disclosure list (firewall access, then troubleshooting). The preflight
+still follows the control and is still present-but-collapsed on first paint --
+this story changes where the control sits relative to the drop zone's own
+content, not its relative order against the two disclosures, so the FR23
+trade-off recorded above is unchanged.
+
 ## Motion
 
 Motion is new to this spine; Paper Relay had none beyond a reduced-motion guard.
+Story 9.1 gives it a foundation every later Epic 9 story builds on.
 
-- One easing curve: `cubic-bezier(.32,.72,0,1)`, the decelerate curve platform
-  animations use. One accent curve is what makes a set of transitions read as one
-  system.
+- One easing curve, unchanged: `--ease-decelerate`, `cubic-bezier(.32,.72,0,1)`,
+  the decelerate curve platform animations use. One accent curve is what makes a
+  set of transitions read as one system.
 - Durations: 120ms for a press, 150–200ms for hover and fill changes, 200ms for the
   disclosure chevron, 400ms for the progress fill, 500ms for the completion check.
-- The completion check draws its stroke once via `stroke-dashoffset`. It is the
-  only entrance animation in the product, and it marks the only moment worth
-  marking.
-- Buttons scale to 0.975 on `:active`. Nothing else scales.
-- **`prefers-reduced-motion: reduce` removes every animation and transition and
-  leaves the check mark fully drawn.** The existing assertion that reduced motion
-  removes nothing which carries meaning stays binding: the check is a state cue, so
-  it must be present, not animated.
+- **Entrance.** Every one of the five views -- Idle, Pending, Staged, Transferring,
+  and the outcome panel when it is the phase view -- carries `data-phase-view` and
+  enters with a fade (opacity 0→1, ~340ms) plus a 10px rise (translate, ~420ms),
+  both on the one easing curve, via `@starting-style`. An optional per-child
+  stagger (`--fd-stagger`, read into `transition-delay` at ~55ms a step) lets a
+  view's own children rise in sequence behind it; it is capped at five steps so a
+  long list can never queue a straggler more than ~275ms behind. **Views animate
+  in and never out**: there is no exit transition anywhere in the product. An
+  outgoing view is replaced, not animated off -- keeping an unmounted view's DOM
+  alive long enough to animate it away would give one moment two nodes both
+  claiming to be the current view, which breaks the one-retained-node identity
+  reset and the outcome panel depend on.
+- **Motion is progressive enhancement.** `build/darwin/Info.plist` declares
+  `LSMinimumSystemVersion` 10.13, so the WKWebView this product runs in ranges from
+  engines with no `@starting-style` support at all to current Safari. Every
+  entrance is written so that an unsupporting engine simply shows the finished,
+  resting state on first paint -- opaque, untranslated, unscaled -- with nothing
+  to detect and no fallback branch to maintain. This is also why entrance motion is
+  built from CSS transitions plus `@starting-style` rather than a keyframe rule:
+  neither construct depends on the other, and `@starting-style`'s own graceful
+  no-op is what a keyframe-based entrance would not get for free. **No `@keyframes`
+  rule and no `animation` property appear anywhere in this sheet, and `styles.test.ts`
+  enforces the ban directly.**
+- **Disclosure.** Opens and closes by animating `grid-template-rows` between `0fr`
+  and `1fr` on a controlled `<button aria-expanded>` plus region, not native
+  `<details>` -- see the Disclosure row below for the choice and why. The chevron
+  rotates in step, over 200ms, unchanged from before this story.
+- **Browse Menu.** Enters with a fade and a scale from ~0.96, anchored at the
+  corner it hangs from, over ≤200ms, via `@starting-style` -- the product's first
+  floating surface gets the same progressive-enhancement treatment as a phase view.
+- The completion check draws its stroke once via `stroke-dashoffset`. It is no
+  longer the only entrance animation in the product, now that views, disclosures
+  and the browse menu all animate in too -- but it remains the only moment marked
+  by *drawing* rather than by fading or rising, which is still worth marking on its
+  own terms.
+- **Story 9.6: the outcome card's own disc** scales in from ~0.7 (its own
+  fade-plus-scale rule, unstaggered -- the same "cards and discs" pattern the
+  QR tile uses), while the heading, receipt and actions row stagger in behind
+  it via `.fd-rise`. The check's own transition keeps its pre-existing 500ms
+  duration and no added delay -- `styles.test.ts` pins that declaration
+  literally -- so "the check draws after a short delay" is read from the
+  disc's own ~520ms scale-in rather than from a delay on the check itself:
+  the check is not legible until partway through that motion regardless of
+  when its own transition starts.
+- Buttons scale to 0.975 on `:active` via `transform: scale(0.975)` -- the one
+  *interaction* accent that scales, and unaffected by the entrance motion above,
+  which scales through the standalone `scale` property instead (the browse menu now,
+  cards and discs in the stories that follow). The two compose independently and
+  are neutralised independently, so pressing a button never loses its feedback to a
+  rule written for an unrelated entrance.
+- **`prefers-reduced-motion: reduce` collapses every duration and delay to
+  effectively nothing and removes `translate`/`scale` outright, leaving the check
+  mark fully drawn and every other state cue in its finished form.** The existing
+  assertion that reduced motion removes nothing which carries meaning stays
+  binding: the check is a state cue, so it must be present, not animated, and the
+  same now holds for a disclosure's open state and the browse menu's presence --
+  reduced motion changes how fast they arrive, never whether they do.
 
 ## Do's and Don'ts
 

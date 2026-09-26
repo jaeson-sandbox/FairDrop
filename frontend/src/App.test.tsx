@@ -24,6 +24,14 @@ const mocks = vi.hoisted(() => ({
     cancel: vi.fn(),
     reportCopyFailure: vi.fn(),
     dismissRetained: vi.fn(),
+    retry: vi.fn(),
+    stageFromOutcome: vi.fn(),
+    // Story 9.6 review follow-up: the outcome card's own chooser action
+    // routes through this controller command now, not through the Go-bound
+    // choosers directly -- see useTransfer.test.tsx for the real hook's own
+    // lease-release/chooser_failed/cancelled-chooser proof of what this
+    // command actually does; here it is only wiring.
+    selectFromOutcome: vi.fn(),
 }))
 
 vi.mock('../wailsjs/runtime/runtime', () => ({
@@ -40,7 +48,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
 }))
 
 function zone(): HTMLElement | null {
-    return screen.getByRole('heading', {name: 'Drop one file or folder.'}).closest<HTMLElement>('.fd-drop-zone')
+    return screen.getByRole('heading', {name: 'Drop one file or folder'}).closest<HTMLElement>('.fd-drop-zone')
 }
 
 function isDropTarget(element: Element | null): boolean {
@@ -69,6 +77,9 @@ beforeEach(() => {
     mocks.selectFile.mockResolvedValue(undefined)
     mocks.selectDirectory.mockResolvedValue(undefined)
     mocks.copyToClipboard.mockResolvedValue(undefined)
+    mocks.stageFromOutcome.mockResolvedValue(undefined)
+    mocks.retry.mockResolvedValue(undefined)
+    mocks.selectFromOutcome.mockResolvedValue(undefined)
     mocks.useTransfer.mockReturnValue({
         state: {phase: 'idle', retainedOutcome: null, commandError: null},
         stage: mocks.stage,
@@ -77,6 +88,11 @@ beforeEach(() => {
         cancel: mocks.cancel,
         rejectSelection: mocks.rejectSelection,
         dismissRetained: mocks.dismissRetained,
+        retry: mocks.retry,
+        stageFromOutcome: mocks.stageFromOutcome,
+        selectFromOutcome: mocks.selectFromOutcome,
+        canRetry: false,
+        reportCopyFailure: mocks.reportCopyFailure,
     })
 })
 afterEach(cleanup)
@@ -91,14 +107,22 @@ describe('production transfer controller integration', () => {
         expect(screen.queryByRole('img')).toBeNull()
     })
 
-    it('routes exactly one native path through Stage as unknown kind', () => {
+    // Story 9.6: the native drop handler now routes through `stageFromOutcome`
+    // rather than `stage` directly, so a drop on a retained outcome or a live
+    // terminal card releases its lease first (D-059) exactly as "Send
+    // Another"/"Choose Another" do -- see the "a native drop on the outcome
+    // card" describe block below for the retained/live cases themselves.
+    // `stageFromOutcome` stages immediately when nothing live is showing
+    // (plain Idle), which is what this test exercises.
+    it('routes exactly one native path through stageFromOutcome as unknown kind', () => {
         render(<App/>)
         const originalPath = String.raw` C:\private\report.pdf `
 
         drop([originalPath])
 
-        expect(mocks.stage).toHaveBeenCalledTimes(1)
-        expect(mocks.stage).toHaveBeenCalledWith(String.raw` C:\private\report.pdf `, 'unknown')
+        expect(mocks.stageFromOutcome).toHaveBeenCalledTimes(1)
+        expect(mocks.stageFromOutcome).toHaveBeenCalledWith(String.raw` C:\private\report.pdf `, 'unknown')
+        expect(mocks.stage).not.toHaveBeenCalled()
         expect(mocks.rejectSelection).not.toHaveBeenCalled()
     })
 
@@ -118,6 +142,7 @@ describe('production transfer controller integration', () => {
 
         expect(mocks.rejectSelection).toHaveBeenCalledTimes(1)
         expect(mocks.stage).not.toHaveBeenCalled()
+        expect(mocks.stageFromOutcome).not.toHaveBeenCalled()
     })
 })
 
@@ -139,6 +164,7 @@ describe('native drop gate lifecycle', () => {
         dropOn(outside, [String.raw`C:\ignored.txt`])
 
         expect(mocks.stage).not.toHaveBeenCalled()
+        expect(mocks.stageFromOutcome).not.toHaveBeenCalled()
         expect(mocks.rejectSelection).not.toHaveBeenCalled()
     })
 
@@ -160,7 +186,7 @@ describe('native drop gate lifecycle', () => {
         expect(mocks.onFileDrop).toHaveBeenCalledTimes(2)
 
         drop([String.raw`C:\report.pdf`])
-        expect(mocks.stage).toHaveBeenCalledTimes(1)
+        expect(mocks.stageFromOutcome).toHaveBeenCalledTimes(1)
     })
 })
 
@@ -199,6 +225,10 @@ const commands: ControllerCommands = {
     rejectSelection: mocks.rejectSelection,
     reportCopyFailure: mocks.reportCopyFailure,
     dismissRetained: mocks.dismissRetained,
+    retry: mocks.retry,
+    stageFromOutcome: mocks.stageFromOutcome,
+    selectFromOutcome: mocks.selectFromOutcome,
+    canRetry: false,
 }
 
 function mountWith(state: TransferState) {
@@ -270,7 +300,7 @@ describe('one view per phase', () => {
     it('gives the terminal outcome the document heading', () => {
         mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', receipt: doneReceipt}})
 
-        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Transfer finished')
+        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Sent')
     })
 
     // EXPERIENCE.md gives `cancelled` one rule -- "Return to Idle; never render
@@ -286,7 +316,7 @@ describe('one view per phase', () => {
 
         expect(phaseViews()).toEqual(['idle'])
         expect(screen.queryByText('Transfer canceled.')).toBeNull()
-        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Drop one file or folder.')
+        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Drop one file or folder')
         expect(document.querySelector('[data-outcome]')).toBeNull()
         // The one legitimate disagreement between the two phase-naming
         // attributes: the shell still mirrors the reducer's `error` phase
@@ -329,21 +359,22 @@ describe('controller wiring', () => {
     it('routes both kinds in the browse menu to their own command', () => {
         mountWith({phase: 'idle', retainedOutcome: null, commandError: null})
 
-        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Choose File or Folder'}))
         fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
         expect(mocks.selectFile).toHaveBeenCalledTimes(1)
         expect(mocks.selectDirectory).not.toHaveBeenCalled()
 
-        fireEvent.click(screen.getByRole('button', {name: 'Choose a file or folder'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Choose File or Folder'}))
         fireEvent.click(screen.getByRole('menuitem', {name: 'Folder'}))
         expect(mocks.selectDirectory).toHaveBeenCalledTimes(1)
         expect(mocks.stage).not.toHaveBeenCalled()
     })
 
-    it('routes Dismiss to the retained-outcome command', () => {
+    it('routes Done to the retained-outcome command', () => {
         mountWith({phase: 'idle', retainedOutcome: {kind: 'done', receipt: doneReceipt}, commandError: null})
 
-        fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
+        // A Done card's own Dismiss is labelled "Done" (Story 9.6), not "Dismiss".
+        fireEvent.click(screen.getByRole('button', {name: 'Done'}))
         expect(mocks.dismissRetained).toHaveBeenCalledTimes(1)
     })
 
@@ -493,13 +524,13 @@ describe('announcer-owned transitions', () => {
             'Cancel requested during preparation',
             pendingState,
             {...pendingState, cancelPending: true} as TransferState,
-            'Canceling preparation…',
+            'Canceling preparation',
         ],
         [
             'Cancel requested from Staged',
             stagedState,
             {...stagedState, cancelPending: true} as TransferState,
-            'Canceling…',
+            'Canceling',
         ],
         ['beacon_warning', stagedState, warned(), discoveryWarning],
     ]
@@ -521,15 +552,15 @@ describe('announcer-owned transitions', () => {
 
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
 
-        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling…'}))
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling'}))
+        expect(announcer().textContent).toBe('Canceling')
     })
 
     it('replaces the announcer rather than appending to it', () => {
         const view = mountWith(stagedState)
 
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(announcer().textContent).toBe('Canceling')
 
         transitionTo(view, {...warned(), cancelPending: true} as TransferState)
 
@@ -548,7 +579,7 @@ describe('announcer-owned transitions', () => {
         let resolveCopy!: () => void
         mocks.copyToClipboard.mockReturnValue(new Promise<void>((resolve) => { resolveCopy = resolve }))
 
-        fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Copy Link'}))
         // The transfer starts while the clipboard command is still in flight.
         // That transition is focus-owned; announcing the copy as well would
         // give one moment two owners, which is the rule this story enforces.
@@ -591,7 +622,7 @@ describe('announcer-owned transitions', () => {
         let resolveCopy!: () => void
         mocks.copyToClipboard.mockReturnValue(new Promise<void>((resolve) => { resolveCopy = resolve }))
 
-        fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Copy Link'}))
         // Staged again, but a different session: the in-flight command belongs
         // to the one that started it, and the phase alone cannot tell them apart.
         transitionTo(view, {
@@ -605,7 +636,7 @@ describe('announcer-owned transitions', () => {
 
     it('re-announces a repeated message instead of going silent', async () => {
         mountWith(stagedState)
-        const copy = screen.getByRole('button', {name: 'Copy download link'})
+        const copy = screen.getByRole('button', {name: 'Copy Link'})
 
         await act(async () => { fireEvent.click(copy) })
         const first = announcer().firstElementChild
@@ -621,7 +652,7 @@ describe('announcer-owned transitions', () => {
 
     it('reports a copy success without moving focus or changing the lifecycle', async () => {
         mountWith(stagedState)
-        const copy = screen.getByRole('button', {name: 'Copy download link'})
+        const copy = screen.getByRole('button', {name: 'Copy Link'})
         copy.focus()
 
         await act(async () => {
@@ -636,7 +667,7 @@ describe('announcer-owned transitions', () => {
     /*
       Two owners for one moment, arriving in the wrong order.
 
-      `cancel-requested` is a spoken row: the announcer says "Canceling…" and
+      `cancel-requested` is a spoken row: the announcer says "Canceling" and
       that is the only acknowledgement the user gets that the request was
       heard. A clipboard command already in flight resolved a moment later and
       replaced it with "Copied" -- an answer to a question they had stopped
@@ -645,14 +676,14 @@ describe('announcer-owned transitions', () => {
     */
     it('keeps the cancellation acknowledgement when a copy resolves behind it', async () => {
         const view = mountWith(stagedState)
-        const copy = screen.getByRole('button', {name: 'Copy download link'})
+        const copy = screen.getByRole('button', {name: 'Copy Link'})
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(announcer().textContent).toBe('Canceling')
 
         await act(async () => { fireEvent.click(copy) })
 
         expect(mocks.copyToClipboard).toHaveBeenCalledWith(metadata.url)
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(announcer().textContent).toBe('Canceling')
     })
 
     it('hands the staged view the reporter a failed clipboard write needs', async () => {
@@ -660,7 +691,7 @@ describe('announcer-owned transitions', () => {
         mountWith(stagedState)
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', {name: 'Copy download link'}))
+            fireEvent.click(screen.getByRole('button', {name: 'Copy Link'}))
         })
 
         expect(mocks.reportCopyFailure).toHaveBeenCalledWith(sessionId)
@@ -670,7 +701,7 @@ describe('announcer-owned transitions', () => {
     it('empties the announcer again on the next focus-owned transition', () => {
         const view = mountWith(stagedState)
         transitionTo(view, {...stagedState, cancelPending: true} as TransferState)
-        expect(announcer().textContent).toBe('Canceling…')
+        expect(announcer().textContent).toBe('Canceling')
 
         transitionTo(view, {...transferringState, cancelPending: true} as TransferState)
 
@@ -694,9 +725,12 @@ describe('reset after a terminal outcome', () => {
         expect(document.querySelector('[data-outcome="done"]')).toBe(panel)
         expect(document.activeElement).toBe(panel)
         expect(announcer().textContent).toBe('')
-        // Idle is now the phase view underneath the retained node.
-        expect(phaseViews()).toEqual(['idle'])
-        expect(screen.getByRole('button', {name: 'Dismiss'})).toBeTruthy()
+        // Story 9.6: the retained card replaces Idle's own composition, so
+        // nothing carries data-phase-view once it is showing -- neither
+        // IdleView (not rendered at all) nor the card itself (phaseView is
+        // false for a retained outcome, unchanged from before this story).
+        expect(phaseViews()).toEqual([])
+        expect(screen.getByRole('button', {name: 'Done'})).toBeTruthy()
     })
 
     it('keeps the retained failure on the fixed table with a Dismiss control', () => {
@@ -713,7 +747,19 @@ describe('reset after a terminal outcome', () => {
         expect(mocks.dismissRetained).toHaveBeenCalledTimes(1)
     })
 
-    it('shows the retained node above a newer command failure, and both at once', () => {
+    /*
+      Story 9.6 changes this from "both at once" to "one card, the retained
+      one wins": since a retained outcome now replaces Idle's own composition
+      (including IdleView's own command-error slot), IdleView is not rendered
+      at all while a retained outcome shows, so its inline command-error card
+      never appears alongside it -- there being only one Dismiss/Done control
+      on screen either way. The rare dual state itself (`invalid-selection`
+      spreading a fresh commandError onto a state that still carries a
+      retained outcome) is unchanged in the reducer; only its rendering and
+      its own Dismiss now clear both at once (state.test.ts's "clears both
+      halves of the rare retained-outcome-plus-command-error state at once").
+    */
+    it('shows only the retained node when a command failure also happens to be set, never both', () => {
         mountWith({
             phase: 'idle',
             retainedOutcome: {kind: 'done', receipt: doneReceipt},
@@ -721,9 +767,163 @@ describe('reset after a terminal outcome', () => {
         })
 
         const panels = [...document.querySelectorAll('.fd-outcome')]
-        expect(panels).toHaveLength(2)
+        expect(panels).toHaveLength(1)
         expect(panels[0].getAttribute('data-retained')).toBe('true')
-        expect(panels[1].getAttribute('data-error-code')).toBe('invalid_selection')
+        expect(panels[0].getAttribute('data-outcome')).toBe('done')
+    })
+})
+
+/*
+  Story 9.6 AC2's own test: "a native drop while a retained outcome shows
+  stages the path and dismisses the outcome." The card itself carries the
+  inherited `--wails-drop-target: drop` in all three shapes -- a retained
+  outcome, a live terminal outcome, and an Idle command failure -- and a drop
+  on it routes through `stageFromOutcome` (mocked here; useTransfer.test.tsx
+  proves what that primitive itself does with a live lease).
+*/
+describe('a native drop on the outcome card (Story 9.6)', () => {
+    it('carries the drop target on a retained outcome, and stages a dropped path through stageFromOutcome', () => {
+        mountWith({phase: 'idle', retainedOutcome: {kind: 'done', receipt: doneReceipt}, commandError: null} as TransferState)
+
+        const card = document.querySelector('.fd-outcome')
+        expect(isDropTarget(card)).toBe(true)
+
+        dropOn(card, [String.raw`C:\new-file.txt`])
+
+        expect(mocks.stageFromOutcome).toHaveBeenCalledTimes(1)
+        expect(mocks.stageFromOutcome).toHaveBeenCalledWith(String.raw`C:\new-file.txt`, 'unknown')
+        expect(mocks.stage).not.toHaveBeenCalled()
+    })
+
+    it('carries the drop target on a live terminal outcome too', () => {
+        mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', receipt: doneReceipt}} as TransferState)
+
+        const card = document.querySelector('.fd-outcome')
+        expect(isDropTarget(card)).toBe(true)
+
+        dropOn(card, [String.raw`C:\new-file.txt`])
+        expect(mocks.stageFromOutcome).toHaveBeenCalledTimes(1)
+    })
+
+    it('carries the drop target on an Idle Stage-time command-failure card too', () => {
+        mountWith({
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+        } as TransferState)
+
+        const card = document.querySelector('.fd-outcome')
+        expect(isDropTarget(card)).toBe(true)
+
+        dropOn(card, [String.raw`C:\new-file.txt`])
+        expect(mocks.stageFromOutcome).toHaveBeenCalledTimes(1)
+    })
+})
+
+/*
+  Story 9.6 review follow-up: "Send Another"/"Choose Another" now route
+  through the controller's own `selectFromOutcome(kind)` (App.tsx's
+  `chooseForOutcome`) rather than importing the Go-bound choosers directly --
+  what that command actually does (release a live lease, then run the
+  ordinary `selectFile`/`selectDirectory` path -- so a cancelled chooser is a
+  quiet no-op, a rejected one surfaces `chooser_failed`, and nothing runs
+  ahead of the lease release) is proved end to end against the real hook in
+  useTransfer.test.tsx. These prove only the wiring: the right kind reaches
+  the right control from each menu item.
+*/
+describe('the outcome card\'s own "Send Another"/"Choose Another" (Story 9.6)', () => {
+    it('wires the File/Folder menu items to selectFromOutcome(\'file\'/\'directory\'), on a live Done card', async () => {
+        mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', receipt: doneReceipt}} as TransferState)
+
+        fireEvent.click(screen.getByRole('button', {name: 'Send Another'}))
+        await act(async () => {
+            fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
+        })
+        expect(mocks.selectFromOutcome).toHaveBeenCalledWith('file')
+
+        fireEvent.click(screen.getByRole('button', {name: 'Send Another'}))
+        await act(async () => {
+            fireEvent.click(screen.getByRole('menuitem', {name: 'Folder'}))
+        })
+        expect(mocks.selectFromOutcome).toHaveBeenCalledWith('directory')
+
+        // Never the raw Go bindings and never the idle-gated stage-path
+        // commands directly -- both are the controller's job now.
+        expect(mocks.stage).not.toHaveBeenCalled()
+        expect(mocks.selectFile).not.toHaveBeenCalled()
+        expect(mocks.selectDirectory).not.toHaveBeenCalled()
+    })
+
+    it('offers Choose Another, wired the same way, for an Error whose action is choose', async () => {
+        // canRetry: true, deliberately -- with the shared fixture's false a
+        // `retry` mutation on path_not_found would be masked by
+        // selectEffectiveErrorAction's own canRetry downgrade (retry ->
+        // choose whenever nothing is remembered), which found path_not_found
+        // "choose" for the wrong reason during this review's own mutation
+        // pass. True here means only path_not_found's own table row can
+        // produce this result.
+        harnessMountWith(mocks.useTransfer, {
+            phase: 'idle',
+            retainedOutcome: {kind: 'error', error: {code: 'path_not_found', message: 'ignored'}},
+            commandError: null,
+        } as TransferState, {...commands, canRetry: true})
+
+        // *Mutation named in Story 9.6 AC3:* "offer Try Again for
+        // path_not_found" -> this line is what would fail: path_not_found's
+        // row is `choose`, never `retry`.
+        expect(screen.queryByRole('button', {name: 'Try Again'})).toBeNull()
+
+        fireEvent.click(screen.getByRole('button', {name: 'Choose Another'}))
+        await act(async () => {
+            fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
+        })
+
+        expect(mocks.selectFromOutcome).toHaveBeenCalledWith('file')
+    })
+})
+
+/*
+  Story 9.6 AC3 names three mutations explicitly; the OutcomePanel.test.tsx
+  suite proves them at the component level (given exactly this wiring, exactly
+  that control appears/behaves). These prove the same three through the real
+  App, i.e. that `selectEffectiveErrorAction` -- Story 9.2's own fixed table --
+  is really what decides which control App wires up, not a hardcoded guess.
+*/
+describe('App wires the outcome card\'s primary action from selectEffectiveErrorAction (Story 9.6 AC3)', () => {
+    it('offers no primary at all for not_ready -- its row is dismiss', () => {
+        // *Mutation:* "offer a primary for not_ready" -> both queries below
+        // are what would fail.
+        mountWith({
+            phase: 'idle',
+            retainedOutcome: {kind: 'error', error: {code: 'not_ready', message: 'ignored'}},
+            commandError: null,
+        } as TransferState)
+
+        expect(screen.queryByRole('button', {name: 'Try Again'})).toBeNull()
+        expect(screen.queryByRole('button', {name: 'Choose Another'})).toBeNull()
+        expect(screen.getByRole('button', {name: 'Dismiss'})).toBeTruthy()
+    })
+
+    it('wires Try Again to retry(), never to the chooser', async () => {
+        // canRetry: true here (unlike the shared `commands` fixture's false)
+        // -- transfer_failed's row is `retry`, but selectEffectiveErrorAction
+        // downgrades that to `choose` without a remembered path, and this
+        // test is specifically about the retry wiring itself.
+        harnessMountWith(mocks.useTransfer, {
+            phase: 'idle',
+            retainedOutcome: {kind: 'error', error: {code: 'transfer_failed', message: 'ignored'}},
+            commandError: null,
+        } as TransferState, {...commands, canRetry: true})
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', {name: 'Try Again'}))
+        })
+
+        expect(mocks.retry).toHaveBeenCalledTimes(1)
+        // *Mutation named in the AC:* "Try Again opening the chooser" -> both
+        // assertions below are what would fail.
+        expect(mocks.selectFromOutcome).not.toHaveBeenCalled()
+        expect(screen.queryByRole('menu')).toBeNull()
     })
 })
 
@@ -870,8 +1070,8 @@ describe('the routing table still works after mounting under StrictMode', () => 
 
         strictTransitionTo(view, {...stagedState, cancelPending: true} as TransferState)
 
-        expect(announcer().textContent).toBe('Canceling…')
-        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling…'}))
+        expect(announcer().textContent).toBe('Canceling')
+        expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Canceling'}))
     })
 })
 
@@ -893,7 +1093,8 @@ describe('a live terminal outcome is never a dead end', () => {
     it('offers a control on a live Done that cancels the held session', () => {
         mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', receipt: doneReceipt}} as TransferState)
 
-        fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
+        // A Done card's own Dismiss is labelled "Done" (Story 9.6).
+        fireEvent.click(screen.getByRole('button', {name: 'Done'}))
 
         expect(mocks.cancel).toHaveBeenCalledTimes(1)
         expect(mocks.dismissRetained).not.toHaveBeenCalled()
@@ -902,7 +1103,7 @@ describe('a live terminal outcome is never a dead end', () => {
     it('still dismisses locally when the outcome is retained', () => {
         mountWith({phase: 'idle', retainedOutcome: {kind: 'done', receipt: doneReceipt}, commandError: null} as TransferState)
 
-        fireEvent.click(screen.getByRole('button', {name: 'Dismiss'}))
+        fireEvent.click(screen.getByRole('button', {name: 'Done'}))
 
         expect(mocks.dismissRetained).toHaveBeenCalledTimes(1)
         expect(mocks.cancel).not.toHaveBeenCalled()

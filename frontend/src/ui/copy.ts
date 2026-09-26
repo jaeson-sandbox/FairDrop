@@ -34,7 +34,15 @@ export const copy = {
         promise: 'Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.',
     },
     idle: {
-        instruction: 'Drop one file or folder.',
+        instruction: 'Drop one file or folder',
+        /**
+         * Story 9.3: the Idle-only short promise line, rendered inside the
+         * drop zone in place of `copy.external.promise`. That key keeps its
+         * longer wording for external use (README, store copy) -- see its
+         * own comment -- so this is a separate registered string rather than
+         * a second reading of the same one.
+         */
+        promise: 'Sends to one browser on the same local network. No account or receiver app.',
     },
     firewall: {
         preflight: 'Your first transfer may ask to allow FairDrop on this local network.',
@@ -49,27 +57,42 @@ export const copy = {
             folder: 'Preparing your folder…',
             item: 'Preparing your item…',
         },
-        heading: 'Ready to pass along',
+        heading: 'Ready to send',
     },
     qr: {
-        instruction: 'Scan this code on the receiving device to start the download.',
+        instruction: 'Scan the code with the receiving device’s camera.',
         alt: 'Download QR code for [item name]',
     },
     folder: {
         note: 'This folder downloads as a ZIP.',
     },
     directLink: {
-        action: 'Copy download link',
-        helper: 'Open this link directly in the receiving device’s browser.',
+        action: 'Copy Link',
+        /**
+         * Story 9.4: the link is no longer rendered until the sender asks for
+         * it. These two toggle `aria-expanded` and the field's own grid-rows
+         * reveal (`.fd-url-reveal` in style.css, the same mechanism
+         * `Disclosure` uses); `copy.direct_link.helper` is retired alongside
+         * the always-visible field it used to sit beside.
+         */
+        show: 'Show Link',
+        hide: 'Hide Link',
     },
     firstOpener: {
-        warning: 'One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.',
+        warning: 'Works once: the first device to open it gets the file.',
+        /**
+         * Story 9.4: moved out of the always-visible card into "Trouble
+         * connecting?" -- a link preview is the one first-opener case a
+         * sender can actually act on, so it belongs beside the rest of the
+         * troubleshooting guidance rather than in the one-line visible caveat.
+         */
+        previews: 'Link previews in chat apps can count as that first device, so paste the link straight into a browser.',
     },
     network: {
-        disclosure: 'Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.',
+        disclosure: 'Not encrypted. Use it only on a network you trust.',
     },
     localCopy: {
-        disclosure: 'Sent directly over your local network. FairDrop does not upload or store an extra copy. The receiving device keeps the downloaded file.',
+        disclosure: 'FairDrop keeps no copy. The receiving device keeps what it downloads.',
     },
     copy: {
         confirmation: 'Copied',
@@ -82,23 +105,38 @@ export const copy = {
         knownEmpty: 'Empty file — 0 bytes to transfer',
     },
     done: {
-        heading: 'Transfer finished',
-        body: 'FairDrop finished sending the item.',
+        /**
+         * Story 9.6: the Done card's own heading. `copy.done.body` is
+         * removed -- the one-line receipt (kind glyph, name, wire bytes) now
+         * carries what completion means, and the sentence that used to spell
+         * it out is redundant beside it.
+         */
+        heading: 'Sent',
+        /** Story 9.6: the Done card's primary action -- the extracted BrowseControl, reused verbatim. */
+        sendAnother: 'Send Another',
+        /** Story 9.6: the Done card's own Dismiss, distinct wording from an Error card's. */
+        dismiss: 'Done',
     },
     cancel: {
         preparation: 'Cancel preparation',
-        preparationPending: 'Canceling preparation…',
+        preparationPending: 'Canceling preparation',
         action: 'Cancel',
-        pending: 'Canceling…',
+        pending: 'Canceling',
         won: 'Transfer canceled. Ready for another file or folder.',
     },
     outcome: {
         dismiss: 'Dismiss',
-    },
-    name: {
-        showFull: 'Show full name',
+        /** Story 9.6: the Error card's primary action when `selectEffectiveErrorAction` returns `retry`. */
+        tryAgain: 'Try Again',
+        /** Story 9.6: the Error card's primary action when `selectEffectiveErrorAction` returns `choose`. */
+        chooseAnother: 'Choose Another',
     },
     help: {
+        /**
+         * Story 9.4: the "Trouble connecting?" disclosure's own summary --
+         * the second thing Staged's foot row offers, beside Cancel.
+         */
+        heading: 'Trouble connecting?',
         differentLan: 'Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.',
         receiverHttp: 'Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.',
     },
@@ -112,7 +150,7 @@ export const copy = {
          * (Story 4.1): the label names both kinds itself, and the menu it
          * opens is where the Windows/macOS dialog asymmetry is absorbed.
          */
-        chooseFileOrFolder: 'Choose a file or folder',
+        chooseFileOrFolder: 'Choose File or Folder',
         /** "Firewall Preflight and Recovery" bullet labels, in document order. */
         firewallHeading: 'Local network access',
         windows: 'Windows',
@@ -127,7 +165,7 @@ export const copy = {
          * first one, so this is a structural label rather than approved body
          * copy.
          */
-        recoveryHeading: 'Recovery help',
+        recoveryHeading: 'Troubleshooting',
         /** The approved item vocabulary: file, folder. */
         file: 'File',
         folder: 'Folder',
@@ -137,9 +175,25 @@ export const copy = {
         directLinkHeading: 'Direct download link',
         /** Transferring state heading, from the transferring production reference. */
         sending: 'Sending',
-        /** Transfer Metrics: wire bytes first, throughput second. */
+        /**
+         * Completion Receipt (Story 7.5, `OutcomePanel.tsx`): wire bytes
+         * first, throughput second. Left exactly as it was -- Story 9.5 needs
+         * its own, differently-worded captions on the Sending card
+         * (`sentCaption`/`speedCaption` below) rather than renaming these,
+         * because the Done receipt reads this same pair and 9.5's scope is
+         * Sending only.
+         */
         wireBytes: 'Wire bytes',
         throughput: 'Throughput',
+        /**
+         * Transfer Metrics (Story 9.5, `TransferringView.tsx` only): the
+         * Sending card's own two figure captions, plainer than the receipt's
+         * "Wire bytes"/"Throughput" above -- the owner-approved prototype's
+         * own wording. The figures underneath are unchanged (actual wire
+         * bytes; visual-only throughput).
+         */
+        sentCaption: 'Sent',
+        speedCaption: 'Speed',
         sent: 'sent',
         of: 'of',
         metaSeparator: ' · ',

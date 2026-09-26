@@ -17,7 +17,10 @@ describe('approved product copy', () => {
             'Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.',
         )
         expect(copy.idle.instruction, 'copy.idle.instruction').toBe(
-            'Drop one file or folder.',
+            'Drop one file or folder',
+        )
+        expect(copy.idle.promise, 'copy.idle.promise').toBe(
+            'Sends to one browser on the same local network. No account or receiver app.',
         )
         expect(copy.firewall.preflight, 'copy.firewall.preflight').toBe(
             'Your first transfer may ask to allow FairDrop on this local network.',
@@ -44,10 +47,10 @@ describe('approved product copy', () => {
             'Preparing your item…',
         )
         expect(copy.stage.heading, 'copy.stage.heading').toBe(
-            'Ready to pass along',
+            'Ready to send',
         )
         expect(copy.qr.instruction, 'copy.qr.instruction').toBe(
-            'Scan this code on the receiving device to start the download.',
+            'Scan the code with the receiving device’s camera.',
         )
         expect(copy.qr.alt, 'copy.qr.alt').toBe(
             'Download QR code for [item name]',
@@ -56,19 +59,25 @@ describe('approved product copy', () => {
             'This folder downloads as a ZIP.',
         )
         expect(copy.directLink.action, 'copy.direct_link.action').toBe(
-            'Copy download link',
+            'Copy Link',
         )
-        expect(copy.directLink.helper, 'copy.direct_link.helper').toBe(
-            'Open this link directly in the receiving device’s browser.',
+        expect(copy.directLink.show, 'copy.direct_link.show').toBe(
+            'Show Link',
+        )
+        expect(copy.directLink.hide, 'copy.direct_link.hide').toBe(
+            'Hide Link',
         )
         expect(copy.firstOpener.warning, 'copy.first_opener.warning').toBe(
-            'One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.',
+            'Works once: the first device to open it gets the file.',
+        )
+        expect(copy.firstOpener.previews, 'copy.first_opener.previews').toBe(
+            'Link previews in chat apps can count as that first device, so paste the link straight into a browser.',
         )
         expect(copy.network.disclosure, 'copy.network.disclosure').toBe(
-            'Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.',
+            'Not encrypted. Use it only on a network you trust.',
         )
         expect(copy.localCopy.disclosure, 'copy.local_copy.disclosure').toBe(
-            'Sent directly over your local network. FairDrop does not upload or store an extra copy. The receiving device keeps the downloaded file.',
+            'FairDrop keeps no copy. The receiving device keeps what it downloads.',
         )
         expect(copy.copy.confirmation, 'copy.copy.confirmation').toBe(
             'Copied',
@@ -83,22 +92,25 @@ describe('approved product copy', () => {
             'Empty file — 0 bytes to transfer',
         )
         expect(copy.done.heading, 'copy.done.heading').toBe(
-            'Transfer finished',
+            'Sent',
         )
-        expect(copy.done.body, 'copy.done.body').toBe(
-            'FairDrop finished sending the item.',
+        expect(copy.done.sendAnother, 'copy.done.send_another').toBe(
+            'Send Another',
+        )
+        expect(copy.done.dismiss, 'copy.done.dismiss').toBe(
+            'Done',
         )
         expect(copy.cancel.preparation, 'copy.cancel.preparation').toBe(
             'Cancel preparation',
         )
         expect(copy.cancel.preparationPending, 'copy.cancel.preparation_pending').toBe(
-            'Canceling preparation…',
+            'Canceling preparation',
         )
         expect(copy.cancel.action, 'copy.cancel.action').toBe(
             'Cancel',
         )
         expect(copy.cancel.pending, 'copy.cancel.pending').toBe(
-            'Canceling…',
+            'Canceling',
         )
         expect(copy.cancel.won, 'copy.cancel.won').toBe(
             'Transfer canceled. Ready for another file or folder.',
@@ -106,8 +118,14 @@ describe('approved product copy', () => {
         expect(copy.outcome.dismiss, 'copy.outcome.dismiss').toBe(
             'Dismiss',
         )
-        expect(copy.name.showFull, 'copy.name.show_full').toBe(
-            'Show full name',
+        expect(copy.outcome.tryAgain, 'copy.outcome.try_again').toBe(
+            'Try Again',
+        )
+        expect(copy.outcome.chooseAnother, 'copy.outcome.choose_another').toBe(
+            'Choose Another',
+        )
+        expect(copy.help.heading, 'copy.help.heading').toBe(
+            'Trouble connecting?',
         )
         expect(copy.help.differentLan, 'copy.help.different_lan').toBe(
             'Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.',
@@ -142,21 +160,26 @@ describe('approved product copy', () => {
             'cancel.won',
             'copy.confirmation',
             'directLink.action',
-            'directLink.helper',
+            'directLink.hide',
+            'directLink.show',
             'discovery.warning',
-            'done.body',
+            'done.dismiss',
             'done.heading',
+            'done.sendAnother',
             'external.promise',
             'firewall.macos',
             'firewall.macosRecovery',
             'firewall.preflight',
             'firewall.windows',
             'firewall.windowsRecovery',
+            'firstOpener.previews',
             'firstOpener.warning',
             'folder.note',
             'help.differentLan',
+            'help.heading',
             'help.receiverHttp',
             'idle.instruction',
+            'idle.promise',
             'label.chooseFileOrFolder',
             'label.directLinkHeading',
             'label.file',
@@ -170,14 +193,17 @@ describe('approved product copy', () => {
             'label.recoveryHeading',
             'label.sending',
             'label.sent',
+            'label.sentCaption',
+            'label.speedCaption',
             'label.throughput',
             'label.windows',
             'label.windowsRecovery',
             'label.wireBytes',
             'localCopy.disclosure',
-            'name.showFull',
             'network.disclosure',
+            'outcome.chooseAnother',
             'outcome.dismiss',
+            'outcome.tryAgain',
             'progress.knownEmpty',
             'progress.unknown',
             'qr.alt',
@@ -199,8 +225,9 @@ describe('approved product copy', () => {
 
 describe('functional labels the spine names in prose', () => {
     it('holds the control, firewall, item and metric words used by the views', () => {
-        expect(copy.label.chooseFileOrFolder).toBe('Choose a file or folder')
+        expect(copy.label.chooseFileOrFolder).toBe('Choose File or Folder')
         expect(copy.label.firewallHeading).toBe('Local network access')
+        expect(copy.label.recoveryHeading).toBe('Troubleshooting')
         expect(copy.label.windows).toBe('Windows')
         expect(copy.label.macos).toBe('macOS')
         expect(copy.label.file).toBe('File')
@@ -210,6 +237,8 @@ describe('functional labels the spine names in prose', () => {
         expect(copy.label.sending).toBe('Sending')
         expect(copy.label.wireBytes).toBe('Wire bytes')
         expect(copy.label.throughput).toBe('Throughput')
+        expect(copy.label.sentCaption).toBe('Sent')
+        expect(copy.label.speedCaption).toBe('Speed')
         expect(copy.label.sent).toBe('sent')
         expect(copy.label.of).toBe('of')
         expect(copy.label.metaSeparator).toBe(' \u00b7 ')
@@ -360,7 +389,7 @@ describe('registry immutability', () => {
         expect(() => {
             mutable.instruction = 'Drop anything you like.'
         }).toThrow()
-        expect(copy.idle.instruction).toBe('Drop one file or folder.')
+        expect(copy.idle.instruction).toBe('Drop one file or folder')
     })
 
     it('refuses a write to a heading', () => {
@@ -450,7 +479,7 @@ describe('the spine table and the registry that quotes it', () => {
     */
     it('parses the table it is about to check', () => {
         expect(rows.length, 'rows parsed from the Voice and Tone table').toBeGreaterThan(30)
-        expect(rows).toContainEqual({id: 'copy.idle.instruction', value: 'Drop one file or folder.'})
+        expect(rows).toContainEqual({id: 'copy.idle.instruction', value: 'Drop one file or folder'})
     })
 
     it('quotes, in every row, the exact string the registry holds', () => {

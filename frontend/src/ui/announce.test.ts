@@ -138,19 +138,19 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
         'Cancel requested during preparation',
         pending(),
         pending(true),
-        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling preparation…'},
+        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling preparation'},
     ],
     [
         'Cancel requested from Staged',
         staged(),
         staged({cancelPending: true}),
-        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling…'},
+        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling'},
     ],
     [
         'Cancel requested from Transferring',
         transferring(),
         transferring({cancelPending: true}),
-        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling…'},
+        {row: 'cancel-requested', owner: 'announcer', text: 'Canceling'},
     ],
     [
         'Cancel-winning reset',
@@ -175,6 +175,17 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
     [
         'Dismiss retained outcome',
         idle({retainedOutcome: {kind: 'done', receipt: doneReceipt}}),
+        createInitialTransferState(),
+        {row: 'dismiss-retained', owner: 'focus', target: 'idle-instruction'},
+    ],
+    [
+        // Story 9.6: the same row and target as dismissing a retained
+        // outcome -- 'dismiss-retained' now clears a Stage-time command
+        // failure too (state.ts), and every outcome card Dismiss focuses the
+        // Idle heading the same way regardless of which of the three shapes
+        // it was showing.
+        'Dismiss Idle command failure',
+        idle({commandError: publicError('invalid_selection')}),
         createInitialTransferState(),
         {row: 'dismiss-retained', owner: 'focus', target: 'idle-instruction'},
     ],

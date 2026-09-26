@@ -13,10 +13,11 @@ import {copy} from './copy'
  *    cover every shape between them: a wrong or expired link, a competing
  *    opener, a changed source, and guest or client isolation on the network.
  *
- * Split into content and a plain wrapper so `IdleView` can sink the same
- * content into a `Disclosure` (Story 7.3) without producing two elements that
- * both carry the `fd-help` class -- the wrapper here keeps that class for
- * `StagedView`, which still renders this always-open, exactly as before.
+ * Both `IdleView`'s "Troubleshooting" disclosure and `StagedView`'s "Trouble
+ * connecting?" disclosure (Story 9.4) sink this same content into a
+ * `Disclosure`, so it stays a plain fragment rather than an element of its
+ * own -- two callers rendering it side by side would otherwise both carry
+ * whatever class this component chose.
  */
 export function RecoveryHelpContent() {
     return (
@@ -38,18 +39,21 @@ export function RecoveryHelpContent() {
 }
 
 /**
- * The always-open form `StagedView` renders unchanged.
- *
- * It carries no heading itself. Every heading in the app is a registered
- * string, and the spine registers none for this block; two self-describing
- * paragraphs and a platform list read correctly without one, and inventing a
- * heading here would be inventing product copy. `IdleView`'s disclosure form
- * names its own summary instead -- see `copy.label.recoveryHeading`.
+ * Staged's own "Trouble connecting?" content (Story 9.4): the local-copy
+ * disclosure and the link-preview caveat -- both moved out of the
+ * always-visible card into this disclosure -- prepended to the same
+ * firewall/receiver guidance `IdleView`'s "Troubleshooting" disclosure shows.
+ * A separate component rather than added paragraphs on `RecoveryHelpContent`
+ * itself, so Idle's own disclosure keeps exactly the content it already had
+ * (`IdleView.test.tsx`'s existing assertions are unchanged) and this story's
+ * two new lines land only where the acceptance criteria put them.
  */
-export function RecoveryHelp() {
+export function StagedHelpContent() {
     return (
-        <div className="fd-help" data-recovery-help="true">
+        <>
+            <p className="fd-body">{copy.localCopy.disclosure}</p>
+            <p className="fd-body">{copy.firstOpener.previews}</p>
             <RecoveryHelpContent/>
-        </div>
+        </>
     )
 }

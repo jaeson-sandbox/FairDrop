@@ -8,6 +8,7 @@ vi.mock('../../wailsjs/go/main/App', () => ({
 }))
 import type {StagedTransferState} from '../transfer/state'
 import type {FileMetadata, PublicError} from '../transfer/types'
+import {copy} from './copy'
 import {StagedView} from './StagedView'
 
 afterEach(cleanup)
@@ -54,8 +55,8 @@ describe('the staged handoff', () => {
     it('leads with the staged heading and the QR instruction', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
-        expect(screen.getByRole('heading', {level: 1, name: 'Ready to pass along'})).toBeTruthy()
-        expect(screen.getByText('Scan this code on the receiving device to start the download.')).toBeTruthy()
+        expect(screen.getByRole('heading', {level: 1, name: 'Ready to send'})).toBeTruthy()
+        expect(screen.getByText('Scan the code with the receiving device’s camera.')).toBeTruthy()
     })
 
     it('renders the QR from the bare base64, prefixing the data URL only at render', () => {
@@ -64,6 +65,18 @@ describe('the staged handoff', () => {
         const image = screen.getByRole('img') as HTMLImageElement
         expect(image.getAttribute('src')).toBe(`data:image/png;base64,${qrPNG}`)
         expect(image.getAttribute('alt')).toBe('Download QR code for Travel Notes.pdf')
+    })
+
+    /*
+      Story 9.4: the QR tile gets its own fade-plus-scale entrance
+      (`.fd-qr-panel` in style.css), not the generic staggered `.fd-rise` the
+      item row/actions/caveats use -- it is the view's focal object, entering
+      with the view itself rather than queued a step behind it.
+    */
+    it('does not stagger the QR tile behind the view -- it carries no fd-rise class', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        expect(document.querySelector('.fd-qr-panel')?.className).not.toContain('fd-rise')
     })
 
     it('isolates the full sanitized name and states its logical size', () => {
@@ -83,11 +96,13 @@ describe('the staged handoff', () => {
         expect(screen.getByRole('img').getAttribute('alt')).toBe(`Download QR code for ${name}`)
     })
 
-    it('says a folder downloads as a ZIP and labels its size as logical', () => {
+    it('says a folder downloads as a ZIP, as the third caveat line, and labels its size as logical', () => {
         const state = staged({metadata: metadata({name: "Dad's PDFs", isDir: true, size: 36_800_000})})
         render(<StagedView state={state} onCancel={vi.fn()}/>)
 
-        expect(screen.getByText('This folder downloads as a ZIP.')).toBeTruthy()
+        const note = screen.getByText('This folder downloads as a ZIP.')
+        expect(note).toBeTruthy()
+        expect(note.closest('.fd-caveats')).toBeTruthy()
         expect(screen.getByText('Folder · 36.8 MB logical size')).toBeTruthy()
     })
 
@@ -96,15 +111,85 @@ describe('the staged handoff', () => {
 
         expect(screen.queryByText('This folder downloads as a ZIP.')).toBeNull()
     })
+
+    it('gives the item row a kind glyph, decorative and unlabelled', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        const icon = document.querySelector('.fd-item__icon')
+        expect(icon?.getAttribute('aria-hidden')).toBe('true')
+        expect(icon?.querySelector('svg')).toBeTruthy()
+    })
+})
+
+/*
+  Story 9.4 removed the two-line name clamp and its persistent "Show full
+  name" toggle: the name always wraps instead
+  (`.fd-headline`'s `overflow-wrap: anywhere`, unaffected by this story).
+  These replace the old "full-value access to a long or bidi name" describe
+  block, whose clamp/toggle tests no longer have a feature to exercise.
+*/
+describe('long or bidi names always wrap, never clip behind a clamp', () => {
+    const unbroken = 'Q1-report-' + 'x'.repeat(180) + '.pdf'
+
+    it('never clamps a long name, and offers no toggle to reveal one', () => {
+        render(<StagedView state={staged({metadata: metadata({name: unbroken})})} onCancel={vi.fn()}/>)
+
+        const isolate = document.querySelector('bdi') as HTMLElement
+        // Mutation: reintroducing a clamp on the headline without a toggle
+        // beside it must fail here, naming the stray class.
+        expect(isolate.closest('.fd-headline')?.className).not.toContain('fd-clamp')
+        expect(isolate.textContent).toBe(unbroken)
+        expect(screen.queryByRole('button', {name: 'Show full name'})).toBeNull()
+    })
+
+    it('isolates a mixed-direction name exactly once -- no second, assistive-only copy', () => {
+        const mixed = 'تقرير ٢٠٢٦ ‮report‬.pdf'
+        render(<StagedView state={staged({metadata: metadata({name: mixed})})} onCancel={vi.fn()}/>)
+
+        // The old clamp shipped a second, visually hidden <bdi> carrying the
+        // full value for the toggle's aria-describedby. With no clamp there
+        // is nothing left to describe, so exactly one isolate remains.
+        const isolates = [...document.querySelectorAll('bdi')]
+        expect(isolates).toHaveLength(1)
+        expect(isolates[0].getAttribute('dir')).toBe('auto')
+        expect(isolates[0].textContent).toBe(mixed)
+        expect(screen.getByRole('img').getAttribute('alt')).toBe(`Download QR code for ${mixed}`)
+    })
 })
 
 describe('the direct URL row', () => {
-    it('is a readonly form control rather than a sender-side activation link', () => {
+    it('does not render the link until Show Link is activated', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        const trigger = screen.getByRole('button', {name: 'Show Link'})
+        expect(trigger.getAttribute('aria-expanded')).toBe('false')
+        const region = document.querySelector('.fd-url-reveal')
+        expect(region?.hasAttribute('data-open')).toBe(false)
+        expect(screen.queryByRole('button', {name: 'Hide Link'})).toBeNull()
+    })
+
+    it('reveals the field on Show Link, and toggles the trigger to Hide Link', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
+
+        const trigger = screen.getByRole('button', {name: 'Hide Link'})
+        expect(trigger.getAttribute('aria-expanded')).toBe('true')
+        expect(document.querySelector('.fd-url-reveal')?.getAttribute('data-open')).toBe('true')
+        expect(trigger.getAttribute('aria-controls')).toBe(document.querySelector('.fd-url-reveal')?.id)
+
+        fireEvent.click(screen.getByRole('button', {name: 'Hide Link'}))
+        expect(screen.getByRole('button', {name: 'Show Link'}).getAttribute('aria-expanded')).toBe('false')
+        expect(document.querySelector('.fd-url-reveal')?.hasAttribute('data-open')).toBe(false)
+    })
+
+    it('is a readonly form control rather than a sender-side activation link, once revealed', () => {
         const {container} = render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+        fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
 
         // A real <input readonly>, not a div wearing role="textbox": assistive
         // technology reads the value of one reliably and disagrees about the
-        // other. It is named by the row's own heading and it is still not a link.
+        // other. It is still not a link.
         const field = screen.getByRole('textbox') as HTMLTextAreaElement
         // A textarea rather than an input: the value has to wrap, because at
         // 320px under 200% text a single-line field shows a fraction of the
@@ -115,12 +200,13 @@ describe('the direct URL row', () => {
         expect(field.value).toBe(capabilityURL)
         expect(field.readOnly).toBe(true)
         expect(field.className).toContain('fd-target')
-        expect(field.getAttribute('aria-labelledby')).toBe('fd-direct-link-heading')
+        expect(field.getAttribute('aria-label')).toBe(copy.label.directLinkHeading)
         expect(container.querySelectorAll('a')).toHaveLength(0)
     })
 
     it('exposes the capability token as readable content exactly once, and never as prose or a link target', () => {
         const {container} = render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+        fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
 
         expect((screen.getByRole('textbox') as HTMLInputElement).value).toContain(token)
         // The QR carries the same URL as an image, not as readable text.
@@ -175,8 +261,9 @@ describe('the direct URL row', () => {
         expect(reported.filter((entry) => String(entry).includes('same key'))).toEqual([])
     })
 
-    it('selects the whole capability URL on focus, as the manual fallback', () => {
+    it('selects the whole capability URL on focus, as the manual fallback, once revealed', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+        fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
         const field = screen.getByRole('textbox') as HTMLInputElement
         const select = vi.spyOn(field, 'select')
 
@@ -188,8 +275,9 @@ describe('the direct URL row', () => {
         expect(select).toHaveBeenCalledTimes(1)
     })
 
-    it('keeps the click that focuses the URL from collapsing its selection', () => {
+    it('keeps the click that focuses the URL from collapsing its selection, once revealed', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+        fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
         const field = screen.getByRole('textbox') as HTMLTextAreaElement
 
         const prevented = !fireEvent.mouseDown(field)
@@ -201,14 +289,41 @@ describe('the direct URL row', () => {
         expect(document.activeElement).toBe(field)
     })
 
-    it('carries the direct-link helper beside the action', () => {
+    it('blurs the revealed field on Escape rather than leaving it ringed', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+        fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
+        const field = screen.getByRole('textbox') as HTMLTextAreaElement
+        field.focus()
+        expect(document.activeElement).toBe(field)
+
+        fireEvent.keyDown(field, {key: 'Escape'})
+
+        expect(document.activeElement).not.toBe(field)
+    })
+})
+
+describe('Copy Link copies without revealing the link', () => {
+    it('leaves the link collapsed and the trigger labelled Show Link after a successful copy', async () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
-        expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
-        // The copy action was one of two controls with no floor assertion:
-        // stripping fd-target from it passed the whole suite.
-        expect(screen.getByRole('button', {name: 'Copy download link'}).className).toContain('fd-target')
-        expect(screen.getByText('Open this link directly in the receiving device’s browser.')).toBeTruthy()
+        await act(async () => {
+            pressCopy()
+        })
+
+        expect(writeText).toHaveBeenCalledWith(capabilityURL)
+        expect(screen.getByRole('button', {name: 'Show Link'})).toBeTruthy()
+        expect(document.querySelector('.fd-url-reveal')?.hasAttribute('data-open')).toBe(false)
+    })
+
+    it('reveals independently of Copy Link -- toggling one never toggles the other', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
+        expect(screen.getByRole('button', {name: 'Hide Link'})).toBeTruthy()
+
+        fireEvent.click(screen.getByRole('button', {name: 'Copy Link'}))
+        // Still revealed: Copy Link does not close it either.
+        expect(screen.getByRole('button', {name: 'Hide Link'})).toBeTruthy()
     })
 })
 
@@ -222,7 +337,32 @@ describe('copy feedback', () => {
 
         expect(writeText).toHaveBeenCalledWith(capabilityURL)
         expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
-        expect(screen.queryByRole('button', {name: 'Copy download link'})).toBeNull()
+        expect(screen.queryByRole('button', {name: 'Copy Link'})).toBeNull()
+    })
+
+    /*
+      Story 9.4: the swap is a crossfade, not a jump cut -- both faces are
+      always mounted in the same grid cell (`.fd-button__swap`), and exactly
+      one carries `aria-hidden="true"` at a time. This is what a screen
+      reader's accessible-name computation relies on: without it, both
+      "Copy Link" and "Copied" would read as one concatenated name.
+    */
+    it('keeps both label faces mounted for the crossfade, with exactly one aria-hidden at a time', async () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+        const swap = () => document.querySelector('.fd-button__swap') as HTMLElement
+
+        const facesBefore = swap().querySelectorAll('.fd-button__swap-face')
+        expect(facesBefore).toHaveLength(2)
+        expect([...facesBefore].filter((face) => face.getAttribute('aria-hidden') === 'true')).toHaveLength(1)
+
+        await act(async () => {
+            pressCopy()
+        })
+
+        const facesAfter = swap().querySelectorAll('.fd-button__swap-face')
+        expect(facesAfter).toHaveLength(2)
+        expect([...facesAfter].filter((face) => face.getAttribute('aria-hidden') === 'true')).toHaveLength(1)
+        expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
     })
 
     it('leaves the action label alone when the clipboard write rejects', async () => {
@@ -233,7 +373,7 @@ describe('copy feedback', () => {
             pressCopy()
         })
 
-        expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Copy Link'})).toBeTruthy()
         expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
     })
 
@@ -266,8 +406,7 @@ describe('copy feedback', () => {
         })
 
         expect(writeText).toHaveBeenCalledTimes(1)
-        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Ready to pass along')
-        expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe(capabilityURL)
+        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Ready to send')
         expect(document.querySelector('[role="alert"]')).toBeNull()
     })
 
@@ -326,7 +465,7 @@ describe('copy feedback', () => {
             fireEvent.click(screen.getByRole('button', {name: 'Copied'}))
         })
 
-        expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Copy Link'})).toBeTruthy()
         expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
         expect(onCopyFailed).toHaveBeenCalledWith(sessionId)
     })
@@ -350,28 +489,28 @@ describe('copy feedback', () => {
 
         fireEvent.blur(button)
 
-        expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Copy Link'})).toBeTruthy()
         expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
     })
 
     it('still names the action when the sender returns to the control later', async () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
-        const button = () => screen.getByRole('button', {name: /^(Copy download link|Copied)$/})
+        const button = () => screen.getByRole('button', {name: /^(Copy Link|Copied)$/})
         await act(async () => {
             // Focus first: a real press focuses before it clicks, and the
             // confirmation is only claimed while the control holds focus.
             button().focus()
             fireEvent.click(button())
         })
-        expect(button().textContent).toBe('Copied')
+        expect(button().textContent).toContain('Copied')
 
         // The sender moves on -- Tab reaches Cancel, say -- and later returns.
         fireEvent.blur(button(), {relatedTarget: screen.getByRole('button', {name: 'Cancel'})})
         fireEvent.focus(button())
 
-        expect(button().textContent).toBe('Copy download link')
-        expect(screen.getByRole('button', {name: 'Copy download link'})).toBe(button())
+        expect(button().textContent).toContain('Copy Link')
+        expect(screen.getByRole('button', {name: 'Copy Link'})).toBe(button())
     })
 
     it('does not revert while the same activation is still retrying (a click on "Copied")', async () => {
@@ -393,15 +532,52 @@ describe('copy feedback', () => {
 })
 
 describe('trust disclosures', () => {
-    it('states the first-opener limit, the unencrypted network, and the no-extra-copy fact', () => {
+    it('states the first-opener limit and the unencrypted network, always visible, each with its own glyph', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
-        expect(screen.getByText('One device only—the first device or software to open this link starts the ' +
-            'download. Link previews may use this V1 link before the intended browser.')).toBeTruthy()
-        expect(screen.getByText('Use FairDrop only on a network you trust. The transfer is not encrypted, so ' +
-            'someone monitoring this network may be able to observe it.')).toBeTruthy()
-        expect(screen.getByText('Sent directly over your local network. FairDrop does not upload or store an ' +
-            'extra copy. The receiving device keeps the downloaded file.')).toBeTruthy()
+        const caveats = document.querySelector('.fd-caveats') as HTMLElement
+        expect(caveats.textContent).toContain('Works once: the first device to open it gets the file.')
+        expect(caveats.textContent).toContain('Not encrypted. Use it only on a network you trust.')
+
+        const glyphs = caveats.querySelectorAll('.fd-caveats__glyph')
+        expect(glyphs).toHaveLength(2)
+        for (const glyph of glyphs) expect(glyph.getAttribute('aria-hidden')).toBe('true')
+    })
+
+    it('states the no-extra-copy fact and the link-preview caveat inside "Trouble connecting?", not on the always-visible card', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        // The disclosure's own content stays mounted in the DOM regardless of
+        // open state (Story 9.1's collapsed-content guarantee), so this is a
+        // structural containment check -- inside the disclosure, not inside
+        // the always-visible caveat list -- rather than a visibility one;
+        // jsdom applies no CSS, so a presence check alone would pass whether
+        // the string were on the card or behind the disclosure.
+        const caveats = document.querySelector('.fd-caveats') as HTMLElement
+        const help = document.querySelector('.fd-help .fd-disclosure__region') as HTMLElement
+        expect(caveats.textContent).not.toContain('FairDrop keeps no copy.')
+        expect(caveats.textContent).not.toContain('Link previews in chat apps')
+        expect(help.textContent).toContain('FairDrop keeps no copy. The receiving device keeps what it downloads.')
+        expect(help.textContent).toContain(
+            'Link previews in chat apps can count as that first device, so paste the link straight into a browser.',
+        )
+    })
+
+    /*
+      Mutation the acceptance criteria name explicitly: moving the
+      not-encrypted line inside "Trouble connecting?" must fail this test. It
+      is the one security disclosure and stays visible on the card regardless
+      of whether the disclosure is open.
+    */
+    it('never renders the not-encrypted disclosure inside "Trouble connecting?"', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        fireEvent.click(screen.getByRole('button', {name: 'Trouble connecting?'}))
+
+        const region = document.querySelector('.fd-help .fd-disclosure__region') as HTMLElement
+        expect(region.textContent).not.toContain('Not encrypted. Use it only on a network you trust.')
+        expect(document.querySelector('.fd-caveats')?.textContent)
+            .toContain('Not encrypted. Use it only on a network you trust.')
     })
 })
 
@@ -421,9 +597,28 @@ describe('the non-terminal discovery warning', () => {
         expect(banner?.textContent).toBe('Discovery unavailable' +
             'Device discovery isn’t available. The QR code and download link still work.')
         expect(screen.getByRole('img')).toBeTruthy()
-        expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe(capabilityURL)
         // A warning is not an Error, so no outcome panel appears.
         expect(document.querySelector('.fd-outcome')).toBeNull()
+    })
+
+    it('renders the warning banner inside the card, above the item row', () => {
+        const warned = staged({
+            metadata: metadata({
+                warnings: [{code: 'beacon_warning', message: 'x'}],
+            }),
+        })
+        const {container} = render(<StagedView state={warned} onCancel={vi.fn()}/>)
+
+        const packet = container.querySelector('.fd-packet') as HTMLElement
+        const banner = packet.querySelector('.fd-warning-banner')
+        const item = packet.querySelector('.fd-item')
+        expect(banner).toBeTruthy()
+        expect(item).toBeTruthy()
+
+        // DOCUMENT_POSITION_FOLLOWING means banner precedes item.
+        const bannerPrecedesItem =
+            (banner!.compareDocumentPosition(item!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+        expect(bannerPrecedesItem).toBe(true)
     })
 
     it('shows no banner when metadata carries no warning', () => {
@@ -482,8 +677,11 @@ describe('cancellation and command failure', () => {
     it('changes the label while a cancellation is outstanding and keeps the item readable', () => {
         render(<StagedView state={staged({cancelPending: true})} onCancel={vi.fn()}/>)
 
-        expect(screen.getByRole('button', {name: 'Canceling…'})).toBeTruthy()
-        expect(screen.getByRole('heading', {level: 2}).textContent).toBe('Travel Notes.pdf')
+        expect(screen.getByRole('button', {name: 'Canceling'})).toBeTruthy()
+        // level: 2 alone now also matches the "Trouble connecting?" disclosure
+        // heading (Disclosure wraps its summary in an <h2>), so this names
+        // the item name specifically.
+        expect(screen.getByRole('heading', {level: 2, name: 'Travel Notes.pdf'}).textContent).toBe('Travel Notes.pdf')
     })
 
     it('shows a command failure on the fixed table without leaving Staged', () => {
@@ -499,60 +697,19 @@ describe('cancellation and command failure', () => {
     })
 })
 
-describe('full-value access to a long or bidi name', () => {
-    const unbroken = 'Q1-report-' + 'x'.repeat(180) + '.pdf'
-
-    it('clamps the name visually while keeping the complete value in the DOM', () => {
-        render(<StagedView state={staged({metadata: metadata({name: unbroken})})} onCancel={vi.fn()}/>)
-
-        const isolate = document.querySelector('bdi') as HTMLElement
-        expect(isolate.className).toContain('fd-clamp')
-        // Clamped by its box, never by JavaScript: no code unit is dropped.
-        expect(isolate.textContent).toBe(unbroken)
-    })
-
-    it('offers a persistent keyboard control that expands the clamp', () => {
-        render(<StagedView state={staged({metadata: metadata({name: unbroken})})} onCancel={vi.fn()}/>)
-
-        const control = screen.getByRole('button', {name: 'Show full name'})
-        expect(control.className).toContain('fd-target')
-        expect(control.getAttribute('aria-expanded')).toBe('false')
-
-        fireEvent.click(control)
-
-        expect(screen.getByRole('button', {name: 'Show full name'}).getAttribute('aria-expanded')).toBe('true')
-        expect((document.querySelector('bdi') as HTMLElement).className).not.toContain('fd-clamp')
-    })
-
-    it('describes the control with the complete value, so a tooltip is not the only route', () => {
-        render(<StagedView state={staged({metadata: metadata({name: unbroken})})} onCancel={vi.fn()}/>)
-
-        const describedBy = screen.getByRole('button', {name: 'Show full name'}).getAttribute('aria-describedby')
-        const description = document.getElementById(describedBy ?? '')
-        expect(description?.textContent).toBe(unbroken)
-        expect(description?.className).toContain('fd-visually-hidden')
-    })
-
-    it('isolates both copies of a mixed-direction name', () => {
-        const mixed = 'تقرير ٢٠٢٦ ‮report‬.pdf'
-        render(<StagedView state={staged({metadata: metadata({name: mixed})})} onCancel={vi.fn()}/>)
-
-        const isolates = [...document.querySelectorAll('bdi')]
-        expect(isolates).toHaveLength(2)
-        for (const isolate of isolates) {
-            expect(isolate.getAttribute('dir')).toBe('auto')
-            expect(isolate.textContent).toBe(mixed)
-        }
-        // The accessible name of the QR matches the visible name exactly.
-        expect(screen.getByRole('img').getAttribute('alt')).toBe(`Download QR code for ${mixed}`)
-    })
-})
-
-describe('recovery help beside the handoff', () => {
-    it('covers platform firewall recovery and every generic receiver failure', () => {
+describe('recovery help behind "Trouble connecting?"', () => {
+    it('is collapsed by default, distinct from Idle\'s own disclosure', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
-        expect(document.querySelector('.fd-packet .fd-help')).toBeTruthy()
+        const trigger = screen.getByRole('button', {name: 'Trouble connecting?'})
+        expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    })
+
+    it('covers platform firewall recovery and every generic receiver failure once opened', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        fireEvent.click(screen.getByRole('button', {name: 'Trouble connecting?'}))
+
         expect(screen.getByText('Open Windows Firewall settings and allow FairDrop on Private networks only, ' +
             'then prepare the item again.')).toBeTruthy()
         expect(screen.getByText('Open System Settings → Network → Firewall → Options, allow incoming ' +
@@ -563,6 +720,22 @@ describe('recovery help beside the handoff', () => {
         expect(screen.getByText('Browser says Not Found: the link may be wrong or expired. Locked: another ' +
             'opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a ' +
             'fresh link.')).toBeTruthy()
+    })
+
+    it('keeps every one of these strings in the DOM regardless of open state (mutation: drop one -> fails, naming it)', () => {
+        render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+        const region = document.querySelector('.fd-help .fd-disclosure__region') as HTMLElement
+        for (const text of [
+            'Open Windows Firewall settings',
+            'Open System Settings → Network → Firewall → Options',
+            'Not downloading?',
+            'Browser says Not Found',
+            'FairDrop keeps no copy.',
+            'Link previews in chat apps',
+        ]) {
+            expect(region.textContent, text).toContain(text)
+        }
     })
 })
 
@@ -578,7 +751,7 @@ describe('a pending cancellation', () => {
 
         rerender(<StagedView state={staged({cancelPending: true})} onCancel={onCancel}/>)
 
-        const pending = screen.getByRole('button', {name: 'Canceling…'})
+        const pending = screen.getByRole('button', {name: 'Canceling'})
         // The same element, so focus never left it -- which `disabled` would
         // have done, and `aria-disabled` does not.
         expect(pending).toBe(cancel)
@@ -627,9 +800,49 @@ describe('the announcer rows this view owns', () => {
 
         const heading = document.querySelector('[data-focus-target="staged-heading"]') as HTMLElement
         expect(heading.tagName).toBe('H1')
-        expect(heading.textContent).toBe('Ready to pass along')
+        expect(heading.textContent).toBe('Ready to send')
         expect(heading.getAttribute('tabindex')).toBe('-1')
     })
+})
+
+/*
+  Defect fix, predates Epic 9 (same code in v1.2.1): the orchestrator observed
+  on the built macOS binary that clicking Copy Link with the mouse copies the
+  URL (verified with `pbpaste`) and the announcer speaks, but the button's
+  label never changes to "Copied" and never gets the success tint.
+
+  Cause: `handleCopy` only claims the confirmation while `focusedRef.current`
+  is true, and that ref is set only by the button's `onFocus`. On WebKit, a
+  pointer click never focuses a `<button>` at all (AGENTS.md's macOS WebKit
+  focus fact 3) -- so `onFocus` never fires for a mouse activation there, and
+  the control never has a chance to claim "Copied", nor to revert on blur,
+  since no blur is coming either.
+
+  Every existing test above passes anyway because jsdom (and Chromium) *do*
+  focus a clicked button -- `pressCopy()` even calls `button.focus()` itself
+  first, to state that precondition explicitly rather than rely on jsdom's
+  click doing it. That precondition is exactly the thing false on WebKit, so
+  this test states the opposite one: `fireEvent.click` with no prior focus,
+  `document.activeElement` left at `document.body`, the way a raw WebKit
+  pointer click actually behaves.
+
+  Mutation: remove the explicit `event.currentTarget.focus()` this fix adds
+  to `handleCopy` -> this fails, naming the label that never became "Copied".
+*/
+it('claims Copied after a pointer click that never focused the button first (WebKit)', async () => {
+    render(<StagedView state={staged()} onCancel={vi.fn()}/>)
+
+    const button = screen.getByRole('button', {name: 'Copy Link'})
+    expect(document.activeElement).not.toBe(button)
+    expect(document.activeElement ?? document.body).toBe(document.body)
+
+    await act(async () => {
+        fireEvent.click(button)
+    })
+
+    expect(writeText).toHaveBeenCalledWith(capabilityURL)
+    expect(screen.getByRole('button', {name: 'Copied'})).toBeTruthy()
+    expect(screen.queryByRole('button', {name: 'Copy Link'})).toBeNull()
 })
 
 /*
@@ -642,7 +855,7 @@ describe('the announcer rows this view owns', () => {
  * precondition the behaviour depends on instead of quietly not having it.
  */
 function pressCopy(): HTMLElement {
-    const button = screen.getByRole('button', {name: 'Copy download link'})
+    const button = screen.getByRole('button', {name: 'Copy Link'})
     button.focus()
     fireEvent.click(button)
     return button
@@ -676,7 +889,7 @@ it('does not strand the confirmation when the copy resolves after focus has left
     writeText.mockReturnValue(pending.promise)
     render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
-    const button = screen.getByRole('button', {name: 'Copy download link'})
+    const button = screen.getByRole('button', {name: 'Copy Link'})
     button.focus()
     expect(document.activeElement).toBe(button)
 
@@ -688,6 +901,6 @@ it('does not strand the confirmation when the copy resolves after focus has left
         await pending.promise
     })
 
-    expect(screen.getByRole('button', {name: 'Copy download link'})).toBeTruthy()
+    expect(screen.getByRole('button', {name: 'Copy Link'})).toBeTruthy()
     expect(screen.queryByRole('button', {name: 'Copied'})).toBeNull()
 })

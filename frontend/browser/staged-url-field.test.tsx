@@ -1,4 +1,4 @@
-import {cleanup, render} from '@testing-library/react'
+import {cleanup, fireEvent, render, screen} from '@testing-library/react'
 import {page} from 'vitest/browser'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {StagedTransferState} from '../src/transfer/state'
@@ -52,8 +52,24 @@ function staged(url: string): StagedTransferState {
     }
 }
 
+/*
+  Story 9.4: the field is no longer rendered open by default -- it stays
+  mounted but collapsed (`.fd-url-reveal`, the same grid-rows/visibility
+  mechanism `Disclosure` uses) until Show Link is activated. Every case below
+  still means to measure the revealed field's own sizing, so each render is
+  followed by one click on Show Link before any assertion -- "kept passing
+  against the revealed state" is Story 9.4's acceptance criterion's own
+  wording for exactly this edit. Nothing about Story 7.9's guarantee changed;
+  it is only reached one activation later now.
+*/
+function revealLink(): void {
+    fireEvent.click(screen.getByRole('button', {name: 'Show Link'}))
+}
+
 function renderStagedWithURL(url: string): HTMLElement {
-    return render(<StagedView state={staged(url)} onCancel={() => undefined}/>).container
+    const container = render(<StagedView state={staged(url)} onCancel={() => undefined}/>).container
+    revealLink()
+    return container
 }
 
 afterEach(() => {
@@ -194,6 +210,7 @@ describe('Staged direct URL field re-sizes on a live window resize, not just at 
                 <StagedView state={staged(url)} onCancel={() => undefined}/>,
                 {container: wrapper},
             )
+            revealLink() // Story 9.4: the field is collapsed until requested.
             assertURLFieldFitsItsContent(container) // sanity: fits at the initial width
 
             const field = container.querySelector<HTMLTextAreaElement>('.fd-url')
@@ -268,11 +285,20 @@ function rectsOverlap(a: DOMRect, b: DOMRect): boolean {
 }
 
 /**
- * The two reflow pairs `.fd-hero` and `.fd-direct-row` fold at 759px
- * (style.css, "Reflow"): side-by-side above it, stacked at or below it. Their
- * track *count* -- not the fluid pixel sizes of a `minmax(0, 1fr)` track,
- * which legitimately differ at every width -- is what identifies which of
- * the two arrangements the sweep is currently in.
+ * `.fd-hero` folds at 759px (style.css, "Reflow"): side-by-side above it,
+ * stacked at or below it. Its track *count* -- not the fluid pixel sizes of a
+ * `minmax(0, 1fr)` track, which legitimately differ at every width -- is what
+ * identifies which of the two arrangements the sweep is currently in.
+ *
+ * Story 9.4: `.fd-direct-row` is still queried and still contributes to the
+ * fingerprint below, but it is a wrapping flex row now (Copy Link and
+ * Show/Hide Link, not the field), so it no longer reflows at 759px on its
+ * own -- `getComputedStyle(row).gridTemplateColumns` reads `none` (one
+ * token) at every width. It stays in the fingerprint anyway: a constant
+ * contribution changes nothing about the transition-counting logic below,
+ * and querying it here is also what still fails this test by name
+ * ("`.fd-hero` or `.fd-direct-row` did not render") if that row ever goes
+ * missing.
  */
 function currentArrangement(container: HTMLElement): string {
     const hero = container.querySelector('.fd-hero')

@@ -1,13 +1,15 @@
 import {useEffect, useRef, useState} from 'react'
 import type {CSSProperties, ReactElement} from 'react'
 import {OnFileDrop, OnFileDropOff} from '../wailsjs/runtime/runtime'
-import {selectOutcome, selectProgressSnapshot} from './transfer/selectors'
+import {selectCommandError, selectEffectiveErrorAction, selectOutcome, selectProgressSnapshot} from './transfer/selectors'
 import {createInitialTransferState, type IdleTransferState, type TransferState} from './transfer/state'
+import type {PublicError} from './transfer/types'
 import {useTransfer, type TransferController} from './transfer/useTransfer'
 import {focusSelector, routeTransition, type FocusTarget} from './ui/announce'
 import {nextProgressSpeech, type ProgressSpeechMemory} from './ui/progressSpeech'
+import {copy} from './ui/copy'
 import {IdleView} from './ui/IdleView'
-import {OutcomePanel} from './ui/OutcomePanel'
+import {OutcomePanel, type OutcomeBrowseAction, type OutcomeCardProps} from './ui/OutcomePanel'
 import {StagePendingCard} from './ui/StagePendingCard'
 import {StagedView} from './ui/StagedView'
 import {TransferringView} from './ui/TransferringView'
@@ -15,6 +17,13 @@ import {TransferringView} from './ui/TransferringView'
 // Wails gates native file drops on a CSS custom property rather than a class.
 // The property inherits, so every descendant of the zone is a valid drop point.
 const dropTargetStyle = {'--wails-drop-target': 'drop'} as CSSProperties
+
+// Story 9.6: a command-failure card's action props when there is no command
+// failure to show -- IdleView only ever spreads this into a rendered
+// OutcomePanel when `selectCommandError` is non-null, so this placeholder is
+// never actually read; it exists only so `commandErrorPanelProps` can be a
+// plain, always-valid prop rather than an optional one IdleView has to guard.
+const EMPTY_OUTCOME_CARD_PROPS: OutcomeCardProps = {}
 
 function App() {
     const transfer = useTransfer()
@@ -35,6 +44,102 @@ function App() {
     // this transition's own view (the cancellation summary, for one) is part of.
     const [focusRequest, setFocusRequest] = useState<{readonly target: FocusTarget} | null>(null)
 
+    /*
+      Story 9.6: true from the moment an outcome card's own action --
+      "Send Another", "Try Again", "Choose Another", or a native drop on the
+      card -- is invoked until `stageFromOutcome`/`retry()` settles. Every
+      action the currently-shown card owns (its primary and Dismiss/Done)
+      renders `aria-disabled` while this is true, and each guards its own
+      click against it, so a Dismiss pressed during the wait cannot be
+      followed by a stage firing later: Dismiss becomes a no-op for exactly
+      the same window the primary action is disabled for, rather than
+      completing immediately and leaving the queued stage to land afterwards.
+    */
+    const [outcomeActionPending, setOutcomeActionPending] = useState(false)
+
+    /**
+     * "Send Another"/"Choose Another"'s own action: `transfer.selectFromOutcome`
+     * (Story 9.6 review follow-up) releases a live outcome's lease first if
+     * one is showing, then runs the ordinary `selectFile`/`selectDirectory`
+     * path unchanged -- so a cancelled chooser is the same quiet no-op it
+     * always is, a rejected chooser surfaces `chooser_failed` through the
+     * normal Idle command-error card exactly as Idle's own browse control
+     * does, and a chosen path stages through the normal `stage()` path.
+     * This used to call the Go-bound choosers directly, which bypassed
+     * `browse()`'s generation guard and its `chooser_failed` reporting
+     * entirely -- fixed by routing through the controller instead.
+     */
+    async function chooseForOutcome(kind: 'file' | 'directory'): Promise<void> {
+        setOutcomeActionPending(true)
+        try {
+            await transfer.selectFromOutcome(kind)
+        } finally {
+            setOutcomeActionPending(false)
+        }
+    }
+
+    /** "Try Again": `retry()` plus the busy-state bookkeeping every outcome-card action shares. */
+    async function retryOutcome(): Promise<void> {
+        setOutcomeActionPending(true)
+        try {
+            await transfer.retry()
+        } finally {
+            setOutcomeActionPending(false)
+        }
+    }
+
+    /**
+     * A native drop's own path, already in hand -- no chooser involved.
+     * `stageFromOutcome` releases a live outcome's lease first if one is
+     * showing (D-059) and stages immediately otherwise, so this is correct
+     * whether the drop lands on the plain Idle zone, a retained outcome, a
+     * live outcome, or an Idle command-failure card: all four carry the
+     * inherited `--wails-drop-target: drop` style and route here alike.
+     */
+    async function stageDroppedPath(path: string): Promise<void> {
+        setOutcomeActionPending(true)
+        try {
+            await transfer.stageFromOutcome(path, 'unknown')
+        } finally {
+            setOutcomeActionPending(false)
+        }
+    }
+
+    function outcomeBrowseAction(label: string): OutcomeBrowseAction {
+        return {
+            label,
+            onSelectFile: () => void chooseForOutcome('file'),
+            onSelectDirectory: () => void chooseForOutcome('directory'),
+        }
+    }
+
+    /** Done's card is always offered "Send Another" -- live or retained (Story 9.6 AC1). */
+    function doneCardProps(dismiss: () => void): OutcomeCardProps {
+        return {
+            dropTargetStyle,
+            onDismiss: dismiss,
+            browse: outcomeBrowseAction(copy.done.sendAnother),
+            busy: outcomeActionPending,
+        }
+    }
+
+    /**
+     * An Error card's primary action, chosen by `selectEffectiveErrorAction`
+     * -- shared between App's own top-level outcome slot (a live or retained
+     * Error) and IdleView's Stage-time command-failure card, since both are
+     * the same "one card" shape.
+     */
+    function errorCardProps(error: PublicError, dismiss: () => void): OutcomeCardProps {
+        const action = selectEffectiveErrorAction(error.code, transfer.canRetry)
+        return {
+            dropTargetStyle,
+            onDismiss: dismiss,
+            onRetry: action === 'retry' ? retryOutcome : undefined,
+            browse: action === 'choose' ? outcomeBrowseAction(copy.outcome.chooseAnother) : undefined,
+            busy: outcomeActionPending,
+        }
+    }
+
     useEffect(() => {
         // useDropTarget=true: only fire when the drop lands inside the zone.
         OnFileDrop((_x, _y, dropped) => {
@@ -43,10 +148,10 @@ function App() {
                 transfer.rejectSelection()
                 return
             }
-            void transfer.stage(dropped[0], 'unknown')
+            void stageDroppedPath(dropped[0])
         }, true)
         return () => OnFileDropOff()
-    }, [transfer.rejectSelection, transfer.stage])
+    }, [transfer.rejectSelection, transfer.stageFromOutcome])
 
     /*
       One transition in, one owner out.
@@ -141,7 +246,7 @@ function App() {
         // an in-flight command belongs to the session that started it.
         if (current.phase !== 'staged' || current.session.sessionId !== sessionId) return
         // A retiring session has already been announced. `cancel-requested` is a
-        // spoken row -- "Canceling…" -- and a copy that resolves a moment later
+        // spoken row -- "Canceling" -- and a copy that resolves a moment later
         // would replace the one confirmation the user is waiting on with an
         // answer to a question they stopped asking.
         if (current.cancelPending) return
@@ -174,6 +279,10 @@ function App() {
     // data-transfer-phase="error" while data-phase-view="idle". Pinned in
     // App.test.tsx's "returns to Idle rather than showing a cancellation as
     // an Error".
+    // A retained outcome dismisses locally; a live terminal one cancels,
+    // which is what clears the coordinator's three-second terminal lease and
+    // returns it to Idle. Neither leaves the window with no way out if the
+    // reset event is lost (D-059).
     return (
         <main className="fd-app" data-transfer-phase={transfer.state.phase} ref={rootRef}>
             {outcome === null ? null : (
@@ -182,15 +291,15 @@ function App() {
                     level={1}
                     phaseView={terminal}
                     focusTarget="outcome"
-                    // A retained outcome dismisses locally; a live terminal
-                    // one cancels, which is what clears the coordinator's
-                    // three-second terminal lease and returns it to Idle. The
-                    // point is that neither leaves the window with no way out
-                    // if the reset event is lost (D-059).
-                    onDismiss={outcome.retained ? transfer.dismissRetained : () => void transfer.cancel()}
+                    {...(outcome.kind === 'done'
+                        ? doneCardProps(outcome.retained ? transfer.dismissRetained : () => void transfer.cancel())
+                        : errorCardProps(
+                            outcome.error,
+                            outcome.retained ? transfer.dismissRetained : () => void transfer.cancel(),
+                        ))}
                 />
             )}
-            {phaseBody(transfer, cancelWon, announceFromStaged)}
+            {phaseBody(transfer, cancelWon, announceFromStaged, errorCardProps)}
             <div className="fd-status-announcer" role="status" aria-live="polite" aria-atomic="true">
                 <span key={announcement.nonce}>{announcement.text}</span>
             </div>
@@ -212,12 +321,17 @@ function phaseBody(
     transfer: TransferController,
     cancelWon: boolean,
     announce: (sessionId: string, text: string) => void,
+    errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps,
 ): ReactElement | null {
     const {state} = transfer
 
     switch (state.phase) {
         case 'idle':
-            return idleView(transfer, state, cancelWon)
+            // Story 9.6: a retained outcome replaces this whole composition
+            // rather than stacking above it -- App's top-level OutcomePanel
+            // slot already renders it; IdleView (the drop zone, the pill, the
+            // grouped disclosures) is not rendered at all while it shows.
+            return state.retainedOutcome === null ? idleView(transfer, state, cancelWon, errorCardProps) : null
 
         case 'pending':
             return <StagePendingCard state={state} onCancel={() => void transfer.cancel()}/>
@@ -245,7 +359,7 @@ function phaseBody(
             // sends that transition to the Idle cancellation summary, so Idle is
             // rendered here with the summary showing.
             return selectOutcome(state) === null
-                ? idleView(transfer, createInitialTransferState(), cancelWon)
+                ? idleView(transfer, createInitialTransferState(), cancelWon, errorCardProps)
                 : null
     }
 }
@@ -254,7 +368,9 @@ function idleView(
     transfer: TransferController,
     state: IdleTransferState,
     cancelWon: boolean,
+    errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps,
 ): ReactElement {
+    const commandError = selectCommandError(state)
     return (
         <IdleView
             state={state}
@@ -262,6 +378,11 @@ function idleView(
             cancelWon={cancelWon}
             onSelectFile={() => void transfer.selectFile()}
             onSelectDirectory={() => void transfer.selectDirectory()}
+            commandErrorPanelProps={
+                commandError === null
+                    ? EMPTY_OUTCOME_CARD_PROPS
+                    : errorCardProps(commandError, transfer.dismissRetained)
+            }
         />
     )
 }

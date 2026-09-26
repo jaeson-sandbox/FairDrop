@@ -50,7 +50,7 @@ describe('preparation cancellation', () => {
     it('changes the visible label while the cancellation is outstanding', () => {
         render(<StagePendingCard state={pending('file', true)} onCancel={vi.fn()}/>)
 
-        expect(screen.getByRole('button', {name: 'Canceling preparation…'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Canceling preparation'})).toBeTruthy()
         expect(screen.queryByRole('button', {name: 'Cancel preparation'})).toBeNull()
     })
 
@@ -58,7 +58,7 @@ describe('preparation cancellation', () => {
         render(<StagePendingCard state={pending('file')} onCancel={vi.fn()}/>)
 
         expect(screen.queryByRole('button', {name: 'Cancel'})).toBeNull()
-        expect(screen.queryByRole('button', {name: 'Canceling…'})).toBeNull()
+        expect(screen.queryByRole('button', {name: 'Canceling'})).toBeNull()
     })
 })
 
@@ -95,7 +95,7 @@ describe('the pending cancellation contract', () => {
 
         rerender(<StagePendingCard state={pending('file', true)} onCancel={onCancel}/>)
 
-        const outstanding = screen.getByRole('button', {name: 'Canceling preparation…'})
+        const outstanding = screen.getByRole('button', {name: 'Canceling preparation'})
         expect(outstanding).toBe(cancel)
         expect(document.activeElement).toBe(outstanding)
         expect(outstanding.getAttribute('aria-disabled')).toBe('true')

@@ -63,7 +63,18 @@ export interface DoneTransferState {
 export interface ErrorTransferState {
     readonly phase: 'error'
     readonly session: SessionCursor
-    readonly outcome: {readonly kind: 'error'; readonly error: PublicError}
+    readonly outcome: {
+        readonly kind: 'error'
+        readonly error: PublicError
+        /**
+         * The failed item's display name -- never the full `FileMetadata`,
+         * which also carries the one-shot capability URL and its QR code (see
+         * `RetainedErrorOutcome`, Story 9.2). Always populated at the two
+         * transitions below, since both originate from a live session that
+         * already has `metadata` in scope.
+         */
+        readonly itemName?: string
+    }
 }
 
 export type TransferState =
@@ -188,8 +199,25 @@ export function transferReducer(state: TransferState, action: TransferAction): T
             }
             return {...state, commandError: publicError('clipboard_failed')}
 
+        /*
+          Story 9.6: this action now clears whichever Idle-level outcome is
+          currently showing -- a retained Done/Error, a Stage-time command
+          failure, or (the rare dual case `invalid-selection` can produce,
+          see "keeps retained terminal outcome when invalid selection
+          supplies the visible command error" above) both at once -- rather
+          than only a retained outcome. The one-card rebuild replaces the
+          whole Idle composition with whichever of the two is showing, and
+          every such card carries a working Dismiss (the AC's own words:
+          "every error card also has Dismiss"), so this is the one action
+          both "Done" (a retained/live Done outcome) and "Dismiss" (an Error
+          outcome or a command failure) call. The action name is kept
+          rather than renamed: it is still "dismiss whatever is retained at
+          the Idle level," just no longer scoped to `retainedOutcome` alone.
+        */
         case 'dismiss-retained':
-            if (state.phase !== 'idle' || state.retainedOutcome === null) return state
+            if (state.phase !== 'idle' || (state.retainedOutcome === null && state.commandError === null)) {
+                return state
+            }
             return createInitialTransferState()
     }
 }
@@ -236,7 +264,7 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                     return {
                         phase: 'error',
                         session,
-                        outcome: {kind: 'error', error: publicError('transfer_failed')},
+                        outcome: {kind: 'error', error: publicError('transfer_failed'), itemName: state.metadata.name},
                     }
                 }
                 return {
@@ -259,7 +287,7 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                 return {
                     phase: 'error',
                     session,
-                    outcome: {kind: 'error', error: fixedCopy(event.error)},
+                    outcome: {kind: 'error', error: fixedCopy(event.error), itemName: state.metadata.name},
                 }
             }
             if (event.kind === 'transfer-reset') return createInitialTransferState()
@@ -280,7 +308,11 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
             if (event.kind !== 'transfer-reset') return state
             return {
                 phase: 'idle',
-                retainedOutcome: {kind: 'error', error: fixedCopy(state.outcome.error)},
+                retainedOutcome: {
+                    kind: 'error',
+                    error: fixedCopy(state.outcome.error),
+                    itemName: state.outcome.itemName,
+                },
                 commandError: null,
             }
     }

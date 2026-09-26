@@ -889,3 +889,445 @@ describe('the completion receipt reaches a live consumer (Story 7.4)', () => {
         expect(serialized, 'the QR code must not outlive the session').not.toContain(qrPNG)
     })
 })
+
+/*
+  Story 9.2: the controller remembers the absolute path it last passed to
+  StageTransfer -- in JS memory only -- so a failed transfer can retry the
+  same item without reopening the chooser.
+*/
+describe('remembering the staged item for retry (Story 9.2)', () => {
+    const rememberedPath = String.raw`C:\Users\jaeson\Shared Folder\secret-report.pdf`
+
+    async function driveToLiveError(
+        hook: {result: {current: ReturnType<typeof useTransfer>}},
+        path = rememberedPath,
+    ) {
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        await act(async () => { await hook.result.current.stage(path) })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-error', {sessionId, seq: 2, error: {code: 'transfer_failed', message: 'x'}})
+        })
+    }
+
+    it('reports canRetry once a Stage succeeds, before any terminal outcome exists', async () => {
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        const hook = renderHook(() => useTransfer())
+
+        expect(hook.result.current.canRetry, 'nothing has been staged yet').toBe(false)
+        await act(async () => { await hook.result.current.stage(rememberedPath) })
+        expect(hook.result.current.canRetry).toBe(true)
+    })
+
+    it('does nothing when retry() is called with nothing remembered', async () => {
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.retry() })
+
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+    })
+
+    /*
+      *Mutation:* persist the remembered path anywhere outside JS memory
+      (localStorage, a log line) or render it -> the assertions below must
+      fail. `localStorage` is spied directly; "never rendered" is proven the
+      only way it can be from this layer -- the path never appears anywhere
+      in the serialized `TransferState`, even while retry() can still use it.
+    */
+    it('never persists or renders the remembered path outside JS memory', async () => {
+        const setItem = vi.spyOn(Storage.prototype, 'setItem')
+        const hook = renderHook(() => useTransfer())
+        await driveToLiveError(hook)
+
+        const serialized = JSON.stringify(hook.result.current.state)
+        // JSON.stringify escapes backslashes (`\` -> `\\`), so a Windows path
+        // like `rememberedPath` never appears in serialized text verbatim --
+        // comparing against its own JSON-escaped form is what makes this
+        // assertion actually exercise the claim instead of trivially passing.
+        const escapedPath = JSON.stringify(rememberedPath).slice(1, -1)
+        expect(serialized, 'the remembered path must never appear in TransferState').not.toContain(escapedPath)
+        expect(setItem, 'the remembered path must never reach localStorage').not.toHaveBeenCalled()
+
+        // Still usable by retry() despite never being visible above -- proving
+        // it really was remembered, just never exposed.
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        let retryPromise!: Promise<void>
+        act(() => { retryPromise = hook.result.current.retry() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await retryPromise })
+
+        expect(mocks.stageTransfer).toHaveBeenLastCalledWith(rememberedPath)
+        setItem.mockRestore()
+    })
+
+    it('replaces the remembered path with the next Stage', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToLiveError(hook, String.raw`C:\first.pdf`)
+        expect(hook.result.current.canRetry).toBe(true)
+
+        // A fresh Stage from Idle (as "Choose Another" would issue) replaces
+        // the remembered target, even though the previous one is still
+        // showing as a retained/live outcome's error at this point.
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        let stagePromise!: Promise<void>
+        act(() => { stagePromise = hook.result.current.stageFromOutcome(String.raw`C:\second.pdf`) })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await stagePromise })
+        expect(hook.result.current.state.phase).toBe('staged')
+
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-error', {sessionId, seq: 2, error: {code: 'transfer_failed', message: 'x'}})
+        })
+        mocks.stageTransfer.mockClear()
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        mocks.cancelTransfer.mockClear()
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        let retryPromise!: Promise<void>
+        act(() => { retryPromise = hook.result.current.retry() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await retryPromise })
+
+        expect(mocks.stageTransfer).toHaveBeenCalledWith(String.raw`C:\second.pdf`)
+        expect(mocks.stageTransfer).not.toHaveBeenCalledWith(String.raw`C:\first.pdf`)
+    })
+
+    it('clears the remembered path on Dismiss', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToLiveError(hook)
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        let cancelPromise!: Promise<void>
+        act(() => { cancelPromise = hook.result.current.cancel() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await cancelPromise })
+        expect(hook.result.current.state.phase).toBe('idle')
+        expect(hook.result.current.canRetry, 'still remembered while retained').toBe(true)
+
+        act(() => { hook.result.current.dismissRetained() })
+
+        expect(hook.result.current.canRetry).toBe(false)
+        mocks.stageTransfer.mockClear()
+        await act(async () => { await hook.result.current.retry() })
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+    })
+
+    it('clears the remembered path on a completed Done', async () => {
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.stage(rememberedPath) })
+        expect(hook.result.current.canRetry).toBe(true)
+
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        })
+
+        expect(hook.result.current.state.phase).toBe('done')
+        expect(hook.result.current.canRetry, 'a completed Done needs no retry target').toBe(false)
+    })
+
+    it('clears the remembered path when a Stage fails with a non-retry code, keeps it for a retry code', async () => {
+        const hook = renderHook(() => useTransfer())
+
+        mocks.stageTransfer.mockRejectedValueOnce(new Error(JSON.stringify({
+            code: 'path_not_found', message: 'gone',
+        })))
+        await act(async () => { await hook.result.current.stage(String.raw`C:\choose-again.pdf`) })
+        expect(hook.result.current.canRetry, 'path_not_found is a choose-action code').toBe(false)
+
+        mocks.stageTransfer.mockRejectedValueOnce(new Error(JSON.stringify({
+            code: 'network_unavailable', message: 'no network',
+        })))
+        await act(async () => { await hook.result.current.stage(String.raw`C:\retry-me.pdf`) })
+        expect(hook.result.current.canRetry, 'network_unavailable is a retry-action code').toBe(true)
+    })
+
+    /*
+      Story 9.2 AC3: retry() consults the current error's action -- a
+      remembered path is not enough on its own. `transfer-error`'s own code
+      travels with the event, not through `dispatchStageFailed`'s clearing
+      rule (that rule is specific to a *Stage command* failing), so this
+      constructs the one case where a path is still remembered but the live
+      error's code maps to `choose`, to prove retry() checks the action and
+      not just "is something remembered".
+    */
+    it('does nothing when the current error\'s action is not retry, even with a path remembered', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToLiveError(hook)
+        expect(hook.result.current.canRetry, 'transfer_failed is a retry-action code').toBe(true)
+
+        // Re-drive the same live session to a different terminal error whose
+        // code maps to `choose` -- transfer-error's own code is not run
+        // through the Stage-failure clearing rule, so the remembered path is
+        // untouched by this transition.
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        let firstRetry!: Promise<void>
+        act(() => { firstRetry = hook.result.current.retry() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await firstRetry })
+        expect(hook.result.current.state.phase).toBe('staged')
+        act(() => emit('transfer-started', {sessionId, seq: 1}))
+        act(() => emit('transfer-error', {sessionId, seq: 2, error: {code: 'path_not_found', message: 'gone'}}))
+
+        expect(hook.result.current.state.phase).toBe('error')
+        expect(hook.result.current.canRetry, 'the remembered path itself is untouched by this transition').toBe(true)
+
+        mocks.stageTransfer.mockClear()
+        mocks.cancelTransfer.mockClear()
+        await act(async () => { await hook.result.current.retry() })
+
+        expect(mocks.stageTransfer, 'path_not_found maps to choose, not retry').not.toHaveBeenCalled()
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+    })
+
+    /*
+      Story 9.2 AC4, driven through the real hook: retry() from a *live*
+      terminal Error must release the backend's ~3s lease first (D-059) --
+      exactly the `cancel()` Dismiss already uses -- and wait for the actual
+      transfer-reset transition to Idle before staging, so the attempt never
+      surfaces `busy` for a session the sender already considers finished.
+    */
+    it('releases the live lease before retrying, and stages exactly once with the remembered path', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToLiveError(hook)
+        expect(hook.result.current.state.phase).toBe('error')
+
+        const cancelDeferred = deferred<void>()
+        mocks.cancelTransfer.mockReturnValueOnce(cancelDeferred.promise)
+        mocks.stageTransfer.mockClear()
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+
+        let retryPromise!: Promise<void>
+        act(() => { retryPromise = hook.result.current.retry() })
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+
+        // Cancel has been issued but not yet settled, and no reset has
+        // arrived: staging now would risk `busy`, so nothing must have been
+        // staged yet.
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+        expect(hook.result.current.state.phase).toBe('error')
+
+        await act(async () => { cancelDeferred.resolve() })
+        // The Cancel command settling is not enough on its own -- the reset
+        // event is a separate, later message, and retry() must still be
+        // waiting for it.
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await retryPromise })
+
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfer).toHaveBeenCalledWith(rememberedPath)
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    it('retries directly from a retained (already Idle) Error with no Cancel call at all', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToLiveError(hook)
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        let cancelPromise!: Promise<void>
+        act(() => { cancelPromise = hook.result.current.cancel() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await cancelPromise })
+        expect(hook.result.current.state.phase).toBe('idle')
+        mocks.cancelTransfer.mockClear()
+        mocks.stageTransfer.mockClear()
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+
+        await act(async () => { await hook.result.current.retry() })
+
+        expect(mocks.cancelTransfer, 'nothing live to release from Idle').not.toHaveBeenCalled()
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfer).toHaveBeenCalledWith(rememberedPath)
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    it('retries a Stage-time command failure with a retry-action code directly from Idle', async () => {
+        const hook = renderHook(() => useTransfer())
+        mocks.stageTransfer.mockRejectedValueOnce(new Error(JSON.stringify({
+            code: 'busy', message: 'still finishing',
+        })))
+        await act(async () => { await hook.result.current.stage(rememberedPath) })
+        expect(hook.result.current.state).toMatchObject({phase: 'idle', commandError: {code: 'busy'}})
+        expect(hook.result.current.canRetry).toBe(true)
+
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        await act(async () => { await hook.result.current.retry() })
+
+        expect(mocks.cancelTransfer, 'Idle never holds a lease to release').not.toHaveBeenCalled()
+        expect(mocks.stageTransfer).toHaveBeenCalledWith(rememberedPath)
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+})
+
+/*
+  Story 9.2: `stageFromOutcome` is the primitive Story 9.6 will call for
+  "Send Another"/"Choose Another" and for a drop on a live outcome card --
+  the same lease-release-then-stage behaviour retry() uses, for an
+  arbitrary new path rather than the remembered one.
+*/
+describe('stageFromOutcome releases a live lease before staging a new item (Story 9.2)', () => {
+    it('stages immediately when no terminal outcome is live', async () => {
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.stageFromOutcome('C:\\fresh.pdf') })
+
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+        expect(mocks.stageTransfer).toHaveBeenCalledWith('C:\\fresh.pdf')
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    it('releases a live Done outcome\'s lease before staging a new item, waiting for the reset', async () => {
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.stage('C:\\first.pdf') })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        })
+        expect(hook.result.current.state.phase).toBe('done')
+
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        let stagePromise!: Promise<void>
+        act(() => { stagePromise = hook.result.current.stageFromOutcome('C:\\second.pdf') })
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1) // only the first stage so far
+
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await stagePromise })
+
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(2)
+        expect(mocks.stageTransfer).toHaveBeenLastCalledWith('C:\\second.pdf')
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+})
+
+/*
+  Story 9.6 review follow-up: "Send Another"/"Choose Another" used to call
+  the Go-bound SelectFile/SelectDirectory directly from App.tsx, bypassing
+  browse()'s own generation guard and its chooser_failed reporting entirely
+  -- which is why a rejected chooser from an outcome card used to be silently
+  swallowed. selectFromOutcome fixes that by releasing a live lease (the same
+  primitive stageFromOutcome uses) and then running the *ordinary*
+  selectFile/selectDirectory path unchanged, so every one of browse()'s
+  existing guarantees applies here too.
+*/
+describe('selectFromOutcome runs the ordinary chooser path, releasing a live lease first (Story 9.6 review follow-up)', () => {
+    async function driveToDone(hook: {result: {current: ReturnType<typeof useTransfer>}}) {
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        await act(async () => { await hook.result.current.stage('C:\\first.pdf') })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        })
+    }
+
+    async function resetToRetained(hook: {result: {current: ReturnType<typeof useTransfer>}}) {
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        let cancelPromise!: Promise<void>
+        act(() => { cancelPromise = hook.result.current.cancel() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await cancelPromise })
+    }
+
+    it('runs the chooser immediately, through the ordinary path, when nothing live is showing', async () => {
+        mocks.selectFile.mockResolvedValueOnce('C:\\picked.pdf')
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.selectFromOutcome('file') })
+
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+        expect(mocks.selectFile).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfer).toHaveBeenCalledWith('C:\\picked.pdf')
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    /*
+      *Test named in the review*: from a live terminal outcome, no SelectFile
+      call happens before the lease release -- the chooser must not even open
+      until the backend's own transfer-reset actually arrives, not merely
+      once the Cancel command settles (the same two-step D-059 distinction
+      stageFromOutcome/retry() already prove elsewhere in this file).
+    */
+    it('releases a live Done outcome\'s lease before the chooser opens at all, waiting for the actual reset', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+        expect(hook.result.current.state.phase).toBe('done')
+
+        const cancelDeferred = deferred<void>()
+        mocks.cancelTransfer.mockReturnValueOnce(cancelDeferred.promise)
+        mocks.selectFile.mockClear()
+
+        let selectPromise!: Promise<void>
+        act(() => { selectPromise = hook.result.current.selectFromOutcome('file') })
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+
+        expect(mocks.selectFile, 'no chooser call before the lease is released').not.toHaveBeenCalled()
+        expect(hook.result.current.state.phase).toBe('done')
+
+        await act(async () => { cancelDeferred.resolve() })
+        expect(mocks.selectFile, 'the Cancel command settling is not the reset event').not.toHaveBeenCalled()
+
+        mocks.selectFile.mockResolvedValueOnce('C:\\picked.pdf')
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await selectPromise })
+
+        expect(mocks.selectFile).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfer).toHaveBeenCalledWith('C:\\picked.pdf')
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    /*
+      *Test named in the review*: a cancelled chooser leaves the outcome card
+      in place -- the ordinary quiet no-op `browse()` already gives an empty
+      selection, proven here to hold for a retained outcome too rather than
+      being silently discarded the way the direct-binding bypass was.
+    */
+    it('leaves a retained outcome in place, unchanged, when the chooser is cancelled', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+        await resetToRetained(hook)
+        expect(hook.result.current.state).toMatchObject({phase: 'idle', retainedOutcome: {kind: 'done'}})
+        const before = hook.result.current.state
+        mocks.stageTransfer.mockClear()
+
+        mocks.selectFile.mockResolvedValueOnce('')
+        await act(async () => { await hook.result.current.selectFromOutcome('file') })
+
+        expect(mocks.stageTransfer, 'no new Stage from a cancelled chooser').not.toHaveBeenCalled()
+        expect(hook.result.current.state).toBe(before)
+    })
+
+    /*
+      *Test named in the review*: a rejected chooser from Send Another/Choose
+      Another produces the chooser_failed card, not silence -- the exact
+      failure the direct-binding bypass this replaces could not surface at
+      all, since it had no `commandError` slot to report into.
+    */
+    it('surfaces chooser_failed through the normal Idle command-error card when the chooser rejects', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+        await resetToRetained(hook)
+        expect(hook.result.current.state.phase).toBe('idle')
+
+        mocks.selectDirectory.mockRejectedValueOnce(new Error(JSON.stringify({
+            code: 'chooser_failed',
+            message: 'FairDrop couldn’t open the chooser. Try again, or drop the item on the zone above.',
+        })))
+        await act(async () => { await hook.result.current.selectFromOutcome('directory') })
+
+        expect(hook.result.current.state).toMatchObject({
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: {code: 'chooser_failed'},
+        })
+    })
+})
