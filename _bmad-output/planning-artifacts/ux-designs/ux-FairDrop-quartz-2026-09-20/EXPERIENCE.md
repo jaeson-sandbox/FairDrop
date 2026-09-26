@@ -85,18 +85,20 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.stage.pending.file` | File Stage pending | “Preparing your file…” |
 | `copy.stage.pending.folder` | Folder Stage pending | “Preparing your folder…” |
 | `copy.stage.pending.item` | Native-drop Stage pending before kind is known | “Preparing your item…” |
-| `copy.stage.heading` | Staged heading | “Ready to pass along” |
-| `copy.qr.instruction` | QR instruction | “Scan this code on the receiving device to start the download.” |
+| `copy.stage.heading` | Staged heading | “Ready to send” |
+| `copy.qr.instruction` | QR instruction | “Scan the code with the receiving device’s camera.” |
 | `copy.qr.alt` | QR accessible-name template | “Download QR code for [item name]” |
 | `copy.folder.note` | Folder note | “This folder downloads as a ZIP.” |
-| `copy.direct_link.action` | Direct-link action | “Copy download link” |
+| `copy.direct_link.action` | Direct-link action (copies without revealing) | “Copy Link” |
+| `copy.direct_link.show` | Direct-link reveal action | “Show Link” |
+| `copy.direct_link.hide` | Direct-link reveal action, open state | “Hide Link” |
 | `copy.label.choose_file_or_folder` | Browse control | “Choose File or Folder” |
 | `copy.label.file` | Item kind, file | “File” |
 | `copy.label.folder` | Item kind, folder | “Folder” |
-| `copy.direct_link.helper` | Direct-link helper | “Open this link directly in the receiving device’s browser.” |
-| `copy.first_opener.warning` | First-opener warning | “One device only—the first device or software to open this link starts the download. Link previews may use this V1 link before the intended browser.” |
-| `copy.network.disclosure` | Network disclosure | “Use FairDrop only on a network you trust. The transfer is not encrypted, so someone monitoring this network may be able to observe it.” |
-| `copy.local_copy.disclosure` | Local/no-extra-copy disclosure | “Sent directly over your local network. FairDrop does not upload or store an extra copy. The receiving device keeps the downloaded file.” |
+| `copy.first_opener.warning` | First-opener warning, always visible | “Works once: the first device to open it gets the file.” |
+| `copy.first_opener.previews` | First-opener link-preview caveat, inside “Trouble connecting?” | “Link previews in chat apps can count as that first device, so paste the link straight into a browser.” |
+| `copy.network.disclosure` | Network disclosure, always visible | “Not encrypted. Use it only on a network you trust.” |
+| `copy.local_copy.disclosure` | Local/no-extra-copy disclosure, inside “Trouble connecting?” | “FairDrop keeps no copy. The receiving device keeps what it downloads.” |
 | `copy.copy.confirmation` | Copy confirmation | “Copied” |
 | `copy.discovery.warning` | Discovery warning | “Device discovery isn’t available. The QR code and download link still work.” |
 | `copy.progress.unknown` | Unknown-total transfer | “Sending — total size unknown” |
@@ -109,7 +111,7 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.cancel.pending` | Pending cancellation | “Canceling” |
 | `copy.cancel.won` | Cancel-winning reset | “Transfer canceled. Ready for another file or folder.” |
 | `copy.outcome.dismiss` | Retained-outcome action | “Dismiss” |
-| `copy.name.show_full` | Full-name disclosure action | “Show full name” |
+| `copy.help.heading` | Staged troubleshooting disclosure summary | “Trouble connecting?” |
 | `copy.help.different_lan` | Different-LAN help | “Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.” |
 | `copy.help.receiver_http` | Generic receiver-error help | “Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.” |
 
@@ -153,12 +155,12 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 | **DropZone** | Idle | Uses `OnFileDrop(callback, true)` and inherited `--wails-drop-target: drop`; no DOM drop handler. Rejects zero/multiple paths and stages exactly one. |
 | **Selection Controls** | Idle | One control labelled `copy.label.chooseFileOrFolder`, opening a `role="menu"` offering both kinds (spec-4-1) because Windows' `IFileOpenDialog` cannot; the item chosen runs the matching semantic `SelectFile()` / `SelectDirectory()`. Keyboard-operable, Escape closes the menu, and focus returns to the control on Escape or on a kind chosen; focus leaving the menu on its own (e.g. Tab) closes it without recapturing focus, since no focus trap is permitted outside an OS dialog. Non-empty result stages immediately; empty result stays quiet. Starting Stage dismisses a retained outcome. |
 | **Stage Pending Card** | Local command pending | Identifies item kind and preparation; includes semantic `copy.cancel.preparation`. No QR/session controls or authoritative-state badge. Obsolete promises cannot commit state. |
-| **StagedView** | Staged | Built only from successful metadata. QR is primary; URL is fallback. Exposes exact link/trust guidance, warning, recovery help, and Cancel without implying receiver identity or claim. |
-| **Item Summary** | Staged, Transferring | Shows sanitized bidi-isolated full name and logical size; folders distinguish logical size from unknown ZIP wire total. Persistent full-name access follows `DESIGN.md`. |
+| **StagedView** | Staged | **Story 9.4 rebuild:** a centred heading and instruction above one card -- the QR tile is the whole point of the screen, and the URL is one activation away rather than always present. Built only from successful metadata. Exposes exact link/trust guidance, warning, and Cancel without implying receiver identity or claim; recovery help lives behind "Trouble connecting?" (a `Disclosure`, not an always-open block). |
+| **Item Summary** | Staged, Transferring | Shows a kind glyph beside the sanitized bidi-isolated full name and logical size; folders distinguish logical size from unknown ZIP wire total. **Story 9.4:** the name always wraps (`overflow-wrap: anywhere`) rather than clamping behind a persistent "Show full name" toggle, which is removed along with `copy.name.show_full`. |
 | **QR Panel** | Staged | Prepends `data:image/png;base64,` only at render. The noninteractive image uses `copy.qr.alt`; it never exposes or spells the token. |
-| **Direct URL Row** | Staged | Readonly selectable text, not a sender-side activation link. The button uses `copy.direct_link.action`; the helper uses `copy.direct_link.helper` and `copy.first_opener.warning`. |
-| **Copy Feedback** | Staged | Label becomes `copy.copy.confirmation`; one polite update, no toast, focus move, lifecycle change, or clipboard clearing. Reverts to `copy.direct_link.action` the moment focus leaves the control (D-114) -- an event the sender's own action triggers, not a timer, so the one control that reaches the capability URL still names what it does whenever the sender returns to it. |
-| **Trusted-LAN Note** | Staged | Displays the approved not-encrypted and no-extra-copy/receiver-retains-download disclosures beside handoff controls. |
+| **Direct URL Row** | Staged | **Story 9.4:** not rendered, focusable, or exposed to assistive technology until requested -- SPEC.md's "expose the QR code and URL" is met by the URL being one activation away, not always present. `copy.direct_link.action` (Copy Link, primary) copies without revealing it, through the same bound `CopyToClipboard` as before; `copy.direct_link.show`/`copy.direct_link.hide` (secondary, `aria-expanded`/`aria-controls`) reveals or hides the readonly selectable field with a smooth expansion, never a sender-side activation link. `copy.direct_link.helper` is retired along with the always-visible field it used to sit beside. Every Story 7.9 guarantee (readonly `textarea`, CSS-grid mirror sizing, select-on-focus, Escape blurs) applies to the revealed field unchanged. |
+| **Copy Feedback** | Staged | Label becomes `copy.copy.confirmation` with a check glyph and success tint, as a non-reflowing crossfade (Story 9.4) rather than a jump cut; one polite update, no toast, focus move, lifecycle change, or clipboard clearing. Reverts to `copy.direct_link.action` the moment focus leaves the control (D-114) -- an event the sender's own action triggers, not a timer, so the one control that reaches the capability URL still names what it does whenever the sender returns to it. |
+| **Trusted-LAN Note** | Staged | **Story 9.4:** the first-opener (`copy.first_opener.warning`) and network (`copy.network.disclosure`) disclosures stay visible on the card, each with its own inline SVG glyph -- an info glyph and a lock glyph respectively -- rather than a single shared warning marker. The local-copy disclosure (`copy.local_copy.disclosure`) and the link-preview caveat (`copy.first_opener.previews`) move into "Trouble connecting?" alongside firewall/receiver recovery. |
 | **Warning Banner** | Staged or Idle recovery | Renders safe `Warning` or firewall/recovery copy. `beacon_warning` remains non-terminal. |
 | **TransferView** | Transferring | Appears only after accepted `transfer-started`; never from scan animation, browser navigation, or frontend inference. |
 | **Progress Meter** | Transferring | Three modes: known positive determinate; directory/unknown static-pattern unknown; known-empty text-only status with no percentage-bearing progressbar. |
@@ -190,7 +192,7 @@ State composition references: [Idle and local preparation](mockups/key-idle-prep
 | Staging pending | Stage Pending Card plus Cancel preparation. Local command results govern pre-ack completion/cancellation. |
 | Staging/cancel pending | Use `copy.cancel.preparation_pending`; retain focus, suppress duplicates, and make no lifecycle-state claim. |
 | Stage command failure | Idle with focused safe Error Panel; no QR, URL, terminal lease, or lifecycle event. |
-| Staged/ready | Focused Staged heading; QR, link guidance, item, disclosures, recovery help, and Cancel visible. |
+| Staged/ready | Focused Staged heading; QR, item, the two link actions, the two always-visible caveats, "Trouble connecting?" (collapsed), and Cancel visible. The link itself is not rendered until Show Link is activated (Story 9.4). |
 | Staged/`beacon_warning` | Warning added and announced once; QR/link remain usable. |
 | Staged/copy success | Copy Feedback only; focus/state remain. |
 | Transferring/known positive file | Determinate progressbar plus wire bytes and visual throughput. |
