@@ -1207,3 +1207,127 @@ describe('stageFromOutcome releases a live lease before staging a new item (Stor
         expect(hook.result.current.state.phase).toBe('staged')
     })
 })
+
+/*
+  Story 9.6 review follow-up: "Send Another"/"Choose Another" used to call
+  the Go-bound SelectFile/SelectDirectory directly from App.tsx, bypassing
+  browse()'s own generation guard and its chooser_failed reporting entirely
+  -- which is why a rejected chooser from an outcome card used to be silently
+  swallowed. selectFromOutcome fixes that by releasing a live lease (the same
+  primitive stageFromOutcome uses) and then running the *ordinary*
+  selectFile/selectDirectory path unchanged, so every one of browse()'s
+  existing guarantees applies here too.
+*/
+describe('selectFromOutcome runs the ordinary chooser path, releasing a live lease first (Story 9.6 review follow-up)', () => {
+    async function driveToDone(hook: {result: {current: ReturnType<typeof useTransfer>}}) {
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        await act(async () => { await hook.result.current.stage('C:\\first.pdf') })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        })
+    }
+
+    async function resetToRetained(hook: {result: {current: ReturnType<typeof useTransfer>}}) {
+        mocks.cancelTransfer.mockResolvedValue(undefined)
+        let cancelPromise!: Promise<void>
+        act(() => { cancelPromise = hook.result.current.cancel() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await cancelPromise })
+    }
+
+    it('runs the chooser immediately, through the ordinary path, when nothing live is showing', async () => {
+        mocks.selectFile.mockResolvedValueOnce('C:\\picked.pdf')
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        const hook = renderHook(() => useTransfer())
+
+        await act(async () => { await hook.result.current.selectFromOutcome('file') })
+
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+        expect(mocks.selectFile).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfer).toHaveBeenCalledWith('C:\\picked.pdf')
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    /*
+      *Test named in the review*: from a live terminal outcome, no SelectFile
+      call happens before the lease release -- the chooser must not even open
+      until the backend's own transfer-reset actually arrives, not merely
+      once the Cancel command settles (the same two-step D-059 distinction
+      stageFromOutcome/retry() already prove elsewhere in this file).
+    */
+    it('releases a live Done outcome\'s lease before the chooser opens at all, waiting for the actual reset', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+        expect(hook.result.current.state.phase).toBe('done')
+
+        const cancelDeferred = deferred<void>()
+        mocks.cancelTransfer.mockReturnValueOnce(cancelDeferred.promise)
+        mocks.selectFile.mockClear()
+
+        let selectPromise!: Promise<void>
+        act(() => { selectPromise = hook.result.current.selectFromOutcome('file') })
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+
+        expect(mocks.selectFile, 'no chooser call before the lease is released').not.toHaveBeenCalled()
+        expect(hook.result.current.state.phase).toBe('done')
+
+        await act(async () => { cancelDeferred.resolve() })
+        expect(mocks.selectFile, 'the Cancel command settling is not the reset event').not.toHaveBeenCalled()
+
+        mocks.selectFile.mockResolvedValueOnce('C:\\picked.pdf')
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await selectPromise })
+
+        expect(mocks.selectFile).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfer).toHaveBeenCalledWith('C:\\picked.pdf')
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    /*
+      *Test named in the review*: a cancelled chooser leaves the outcome card
+      in place -- the ordinary quiet no-op `browse()` already gives an empty
+      selection, proven here to hold for a retained outcome too rather than
+      being silently discarded the way the direct-binding bypass was.
+    */
+    it('leaves a retained outcome in place, unchanged, when the chooser is cancelled', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+        await resetToRetained(hook)
+        expect(hook.result.current.state).toMatchObject({phase: 'idle', retainedOutcome: {kind: 'done'}})
+        const before = hook.result.current.state
+        mocks.stageTransfer.mockClear()
+
+        mocks.selectFile.mockResolvedValueOnce('')
+        await act(async () => { await hook.result.current.selectFromOutcome('file') })
+
+        expect(mocks.stageTransfer, 'no new Stage from a cancelled chooser').not.toHaveBeenCalled()
+        expect(hook.result.current.state).toBe(before)
+    })
+
+    /*
+      *Test named in the review*: a rejected chooser from Send Another/Choose
+      Another produces the chooser_failed card, not silence -- the exact
+      failure the direct-binding bypass this replaces could not surface at
+      all, since it had no `commandError` slot to report into.
+    */
+    it('surfaces chooser_failed through the normal Idle command-error card when the chooser rejects', async () => {
+        const hook = renderHook(() => useTransfer())
+        await driveToDone(hook)
+        await resetToRetained(hook)
+        expect(hook.result.current.state.phase).toBe('idle')
+
+        mocks.selectDirectory.mockRejectedValueOnce(new Error(JSON.stringify({
+            code: 'chooser_failed',
+            message: 'FairDrop couldn’t open the chooser. Try again, or drop the item on the zone above.',
+        })))
+        await act(async () => { await hook.result.current.selectFromOutcome('directory') })
+
+        expect(hook.result.current.state).toMatchObject({
+            phase: 'idle',
+            retainedOutcome: null,
+            commandError: {code: 'chooser_failed'},
+        })
+    })
+})

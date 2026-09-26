@@ -16,13 +16,6 @@ const mocks = vi.hoisted(() => ({
     onFileDrop: vi.fn(),
     onFileDropOff: vi.fn(),
     copyToClipboard: vi.fn(),
-    // Story 9.6: the Go-bound native choosers, called directly from App.tsx's
-    // outcome-card wiring (`pickForOutcome`) -- distinct from the *controller
-    // commands* below named the same in spirit (`selectFile`/`selectDirectory`
-    // on the mocked `useTransfer` return value), which are Idle's own browse
-    // control path and never touch these.
-    selectFileBinding: vi.fn(),
-    selectDirectoryBinding: vi.fn(),
     useTransfer: vi.fn(),
     stage: vi.fn(),
     selectFile: vi.fn(),
@@ -33,6 +26,12 @@ const mocks = vi.hoisted(() => ({
     dismissRetained: vi.fn(),
     retry: vi.fn(),
     stageFromOutcome: vi.fn(),
+    // Story 9.6 review follow-up: the outcome card's own chooser action
+    // routes through this controller command now, not through the Go-bound
+    // choosers directly -- see useTransfer.test.tsx for the real hook's own
+    // lease-release/chooser_failed/cancelled-chooser proof of what this
+    // command actually does; here it is only wiring.
+    selectFromOutcome: vi.fn(),
 }))
 
 vi.mock('../wailsjs/runtime/runtime', () => ({
@@ -46,8 +45,6 @@ vi.mock('./transfer/useTransfer', () => ({
 
 vi.mock('../wailsjs/go/main/App', () => ({
     CopyToClipboard: mocks.copyToClipboard,
-    SelectFile: mocks.selectFileBinding,
-    SelectDirectory: mocks.selectDirectoryBinding,
 }))
 
 function zone(): HTMLElement | null {
@@ -82,6 +79,7 @@ beforeEach(() => {
     mocks.copyToClipboard.mockResolvedValue(undefined)
     mocks.stageFromOutcome.mockResolvedValue(undefined)
     mocks.retry.mockResolvedValue(undefined)
+    mocks.selectFromOutcome.mockResolvedValue(undefined)
     mocks.useTransfer.mockReturnValue({
         state: {phase: 'idle', retainedOutcome: null, commandError: null},
         stage: mocks.stage,
@@ -92,6 +90,7 @@ beforeEach(() => {
         dismissRetained: mocks.dismissRetained,
         retry: mocks.retry,
         stageFromOutcome: mocks.stageFromOutcome,
+        selectFromOutcome: mocks.selectFromOutcome,
         canRetry: false,
         reportCopyFailure: mocks.reportCopyFailure,
     })
@@ -228,6 +227,7 @@ const commands: ControllerCommands = {
     dismissRetained: mocks.dismissRetained,
     retry: mocks.retry,
     stageFromOutcome: mocks.stageFromOutcome,
+    selectFromOutcome: mocks.selectFromOutcome,
     canRetry: false,
 }
 
@@ -820,47 +820,53 @@ describe('a native drop on the outcome card (Story 9.6)', () => {
     })
 })
 
+/*
+  Story 9.6 review follow-up: "Send Another"/"Choose Another" now route
+  through the controller's own `selectFromOutcome(kind)` (App.tsx's
+  `chooseForOutcome`) rather than importing the Go-bound choosers directly --
+  what that command actually does (release a live lease, then run the
+  ordinary `selectFile`/`selectDirectory` path -- so a cancelled chooser is a
+  quiet no-op, a rejected one surfaces `chooser_failed`, and nothing runs
+  ahead of the lease release) is proved end to end against the real hook in
+  useTransfer.test.tsx. These prove only the wiring: the right kind reaches
+  the right control from each menu item.
+*/
 describe('the outcome card\'s own "Send Another"/"Choose Another" (Story 9.6)', () => {
-    beforeEach(() => {
-        mocks.selectFileBinding.mockResolvedValue(String.raw`C:\picked-file.txt`)
-        mocks.selectDirectoryBinding.mockResolvedValue(String.raw`C:\picked-folder`)
-    })
-
-    it('opens the native chooser directly and stages the picked path via stageFromOutcome, on a live Done card', async () => {
+    it('wires the File/Folder menu items to selectFromOutcome(\'file\'/\'directory\'), on a live Done card', async () => {
         mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', receipt: doneReceipt}} as TransferState)
 
         fireEvent.click(screen.getByRole('button', {name: 'Send Another'}))
         await act(async () => {
             fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
         })
-
-        expect(mocks.selectFileBinding).toHaveBeenCalledTimes(1)
-        expect(mocks.stageFromOutcome).toHaveBeenCalledWith(String.raw`C:\picked-file.txt`, 'file')
-        // Not the idle-gated browse() path -- that would call the controller's
-        // own selectFile/selectDirectory, which this bypasses on purpose (see
-        // App.tsx's pickForOutcome doc comment).
-        expect(mocks.selectFile).not.toHaveBeenCalled()
-    })
-
-    it('does nothing when the chooser returns an empty selection', async () => {
-        mocks.selectDirectoryBinding.mockResolvedValue('')
-        mountWith({phase: 'idle', retainedOutcome: {kind: 'done', receipt: doneReceipt}, commandError: null} as TransferState)
+        expect(mocks.selectFromOutcome).toHaveBeenCalledWith('file')
 
         fireEvent.click(screen.getByRole('button', {name: 'Send Another'}))
         await act(async () => {
             fireEvent.click(screen.getByRole('menuitem', {name: 'Folder'}))
         })
+        expect(mocks.selectFromOutcome).toHaveBeenCalledWith('directory')
 
-        expect(mocks.selectDirectoryBinding).toHaveBeenCalledTimes(1)
-        expect(mocks.stageFromOutcome).not.toHaveBeenCalled()
+        // Never the raw Go bindings and never the idle-gated stage-path
+        // commands directly -- both are the controller's job now.
+        expect(mocks.stage).not.toHaveBeenCalled()
+        expect(mocks.selectFile).not.toHaveBeenCalled()
+        expect(mocks.selectDirectory).not.toHaveBeenCalled()
     })
 
     it('offers Choose Another, wired the same way, for an Error whose action is choose', async () => {
-        mountWith({
+        // canRetry: true, deliberately -- with the shared fixture's false a
+        // `retry` mutation on path_not_found would be masked by
+        // selectEffectiveErrorAction's own canRetry downgrade (retry ->
+        // choose whenever nothing is remembered), which found path_not_found
+        // "choose" for the wrong reason during this review's own mutation
+        // pass. True here means only path_not_found's own table row can
+        // produce this result.
+        harnessMountWith(mocks.useTransfer, {
             phase: 'idle',
             retainedOutcome: {kind: 'error', error: {code: 'path_not_found', message: 'ignored'}},
             commandError: null,
-        } as TransferState)
+        } as TransferState, {...commands, canRetry: true})
 
         // *Mutation named in Story 9.6 AC3:* "offer Try Again for
         // path_not_found" -> this line is what would fail: path_not_found's
@@ -872,8 +878,7 @@ describe('the outcome card\'s own "Send Another"/"Choose Another" (Story 9.6)', 
             fireEvent.click(screen.getByRole('menuitem', {name: 'File'}))
         })
 
-        expect(mocks.selectFileBinding).toHaveBeenCalledTimes(1)
-        expect(mocks.stageFromOutcome).toHaveBeenCalledWith(String.raw`C:\picked-file.txt`, 'file')
+        expect(mocks.selectFromOutcome).toHaveBeenCalledWith('file')
     })
 })
 
@@ -917,8 +922,7 @@ describe('App wires the outcome card\'s primary action from selectEffectiveError
         expect(mocks.retry).toHaveBeenCalledTimes(1)
         // *Mutation named in the AC:* "Try Again opening the chooser" -> both
         // assertions below are what would fail.
-        expect(mocks.selectFileBinding).not.toHaveBeenCalled()
-        expect(mocks.selectDirectoryBinding).not.toHaveBeenCalled()
+        expect(mocks.selectFromOutcome).not.toHaveBeenCalled()
         expect(screen.queryByRole('menu')).toBeNull()
     })
 })

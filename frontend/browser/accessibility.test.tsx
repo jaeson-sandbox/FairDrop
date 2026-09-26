@@ -154,6 +154,27 @@ async function renderStaged(): Promise<HTMLElement> {
 }
 
 /**
+ * Staged wrapped in a stand-in for `.fd-app` (App.tsx's real shell), the
+ * same reason `renderIdleInAppShell` above exists: `.fd-region`'s vertical
+ * centering (Story 9.6 review follow-up: `justify-content: center` on
+ * `.fd-region[data-phase-view='staged']`) resolves against `.fd-app`'s own
+ * height, which needs a real, definite ancestor height to grow into and
+ * centre within -- `renderStaged` mounts `StagedView` as the render root
+ * with no such ancestor, so there is no free space for the centering rule
+ * to distribute at all, and a measurement taken against it reads as
+ * top-pinned regardless of whether the rule is present.
+ */
+async function renderStagedInAppShell(): Promise<HTMLElement> {
+    const {container} = render(
+        <div className="fd-app" style={{height: '100vh'}}>
+            <StagedView state={staged()} onCancel={() => undefined}/>
+        </div>,
+    )
+    await waitForEntranceToSettle(container)
+    return container
+}
+
+/**
  * Story 9.4 defect fix: the orchestrator's rendered 1024x768 review used
  * "dev-environment-guide.html" (the owner-approved prototype's own item
  * name) to observe the item name wrapping mid-word once the details column
@@ -1630,4 +1651,161 @@ describe('the outcome card is one centred, column-width card (Story 9.6)', () =>
             assertNoHorizontalOverflow(container)
         },
     )
+})
+
+/*
+  Story 9.6 review follow-up: the orchestrator's rendered check at 1024x768
+  found the live terminal card growing to fill the whole window (a ~560px
+  tall card with its content floating inside it, via the old
+  `.fd-app > .fd-outcome[data-phase-view='outcome'] { flex: 1 1 auto;
+  justify-content: center }` rule) and then, once `transfer-reset` made it
+  retained, snapping to its natural ~250px height pinned to the top of the
+  window -- the same node visibly collapsing and jumping the instant reset
+  landed. The fix (style.css's `.fd-app > .fd-outcome, .fd-region >
+  .fd-outcome:only-child { margin-block: auto }`) keeps the card at its own
+  natural height in every form and centres it by consuming the *container's*
+  free space instead of its own -- proved here by measuring across a real
+  reset (test (c) below), not only by rendering each form in isolation.
+*/
+describe('the outcome card does not jump size or position at reset (Story 9.6 review follow-up)', () => {
+    it.each([[1024, 768], [640, 480]])(
+        'keeps the card at its own natural height rather than stretching to the window, at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+
+            for (const renderCard of [renderRetainedDoneOutcome, renderLiveErrorOutcome, renderIdleCommandFailure]) {
+                await renderCard()
+                const shortHeight = document.querySelector('.fd-outcome')!.getBoundingClientRect().height
+                cleanup()
+
+                // The same content, rendered again with a much taller window
+                // available: a card that grows to fill its container would
+                // measure hundreds of pixels taller here; a naturally-sized
+                // one measures the same either way. This is the direct,
+                // mutation-sensitive form of "the card's height matches its
+                // content, not the window" -- the old flex: 1 1 auto rule
+                // this replaces made the live form's height track the
+                // window almost 1:1, which this comparison catches directly
+                // rather than needing a second, separate "content height"
+                // measurement to compare against.
+                await page.viewport(width, 1400)
+                await renderCard()
+                const tallHeight = document.querySelector('.fd-outcome')!.getBoundingClientRect().height
+                cleanup()
+                await page.viewport(width, height)
+
+                expect(
+                    Math.abs(tallHeight - shortHeight),
+                    `${renderCard.name}'s card measured ${shortHeight.toFixed(1)}px tall in a ${height}px ` +
+                        `window and ${tallHeight.toFixed(1)}px tall in a 1400px window -- it is stretching ` +
+                        'to fill the window rather than sizing to its own content',
+                ).toBeLessThanOrEqual(40)
+            }
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'centres the card vertically -- top and bottom gaps to the window differ by <=2px, at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+
+            for (const renderCard of [renderRetainedDoneOutcome, renderLiveErrorOutcome, renderIdleCommandFailure]) {
+                const container = await renderCard()
+                const card = container.querySelector('.fd-outcome')
+                if (card === null) throw new Error(`.fd-outcome did not render for ${renderCard.name}`)
+                const rect = card.getBoundingClientRect()
+                const topGap = rect.top
+                const bottomGap = document.documentElement.clientHeight - rect.bottom
+                expect(
+                    Math.abs(topGap - bottomGap),
+                    `${renderCard.name}'s card sits ${topGap.toFixed(1)}px from the top and ` +
+                        `${bottomGap.toFixed(1)}px from the bottom at ${width}x${height} -- not centred`,
+                ).toBeLessThanOrEqual(2)
+                cleanup()
+            }
+        },
+    )
+
+    it('keeps the same node at the same rect (top, height) when a live outcome becomes retained', async () => {
+        await page.viewport(1024, 768)
+        const error = {code: 'transfer_failed', message: 'x'} as const
+
+        const {container, rerender} = render(
+            <div className="fd-app" style={{height: '100vh'}}>
+                <OutcomePanel
+                    outcome={{kind: 'error', retained: false, error, itemName: 'report.pdf'}}
+                    level={1}
+                    phaseView
+                    dropTargetStyle={dropTargetStyle}
+                    onDismiss={() => undefined}
+                    onRetry={() => undefined}
+                />
+            </div>,
+        )
+        await waitForEntranceToSettle(container)
+        const liveCard = container.querySelector('.fd-outcome')
+        if (liveCard === null) throw new Error('.fd-outcome did not render (live)')
+        const liveRect = liveCard.getBoundingClientRect()
+
+        rerender(
+            <div className="fd-app" style={{height: '100vh'}}>
+                <OutcomePanel
+                    outcome={{kind: 'error', retained: true, error, itemName: 'report.pdf'}}
+                    dropTargetStyle={dropTargetStyle}
+                    onDismiss={() => undefined}
+                    onRetry={() => undefined}
+                />
+            </div>,
+        )
+        await waitForEntranceToSettle(container)
+        const retainedCard = container.querySelector('.fd-outcome')
+
+        // The identical DOM node -- App.focus.test.tsx's own retained-node
+        // guarantee, re-proven here at the geometry level: reset must not
+        // only preserve identity, it must preserve what the sender sees.
+        expect(retainedCard, 'the same node, not a rebuilt one').toBe(liveCard)
+        const retainedRect = retainedCard!.getBoundingClientRect()
+
+        // *Mutation:* restore the old `.fd-app > .fd-outcome
+        // [data-phase-view='outcome'] { flex: 1 1 auto; justify-content:
+        // center }` rule -> this must fail, since the live form would again
+        // grow to a materially different height/position than the retained
+        // form measures at rest.
+        expect(
+            Math.abs(retainedRect.top - liveRect.top),
+            `top moved from ${liveRect.top.toFixed(1)}px (live) to ${retainedRect.top.toFixed(1)}px (retained)`,
+        ).toBeLessThanOrEqual(1)
+        expect(
+            Math.abs(retainedRect.height - liveRect.height),
+            `height changed from ${liveRect.height.toFixed(1)}px (live) to ${retainedRect.height.toFixed(1)}px (retained)`,
+        ).toBeLessThanOrEqual(1)
+    })
+
+    it('centres Staged vertically when it fits in the window', async () => {
+        await page.viewport(1024, 900)
+        const container = await renderStagedInAppShell()
+
+        const region = container.querySelector('.fd-region')
+        if (region === null) throw new Error('.fd-region did not render')
+        const rect = region.getBoundingClientRect()
+        const topGap = rect.top
+        const bottomGap = document.documentElement.clientHeight - rect.bottom
+        expect(
+            Math.abs(topGap - bottomGap),
+            `Staged sits ${topGap.toFixed(1)}px from the top and ${bottomGap.toFixed(1)}px from the ` +
+                'bottom -- not centred',
+        ).toBeLessThanOrEqual(2)
+    })
+
+    it('scrolls Staged from the top rather than clipping it when its content exceeds a 640x480 window', async () => {
+        await page.viewport(640, 480)
+        const container = await renderStagedInAppShell()
+
+        const heading = screen.getByRole('heading', {name: 'Ready to send'})
+        expect(
+            heading.getBoundingClientRect().top,
+            'the heading is clipped above the top of the viewport',
+        ).toBeGreaterThanOrEqual(0)
+        assertNoHorizontalOverflow(container)
+    })
 })
