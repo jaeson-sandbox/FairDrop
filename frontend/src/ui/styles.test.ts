@@ -2282,6 +2282,18 @@ describe('rules the components can only reference by name', () => {
     })
 
     /*
+      Story 10.1: select-on-focus paints the whole URL, so the selection is
+      the field's dominant look while focused. It reuses the text on
+      primary-tint pair the contrast proof already derives and DESIGN.md
+      publishes, rather than leaving it to the engine's default blue.
+    */
+    it('paints the URL field selection with the published text on primary-tint pair', () => {
+        const selection = block('.fd-url::selection {')
+        expect(selection).toContain('background: var(--color-primary-tint);')
+        expect(selection).toContain('color: var(--color-text);')
+    })
+
+    /*
       Story 7.9: the URL field's height comes from a CSS grid + hidden-mirror
       technique (`.fd-url-wrap`/`.fd-url-mirror`), not a JS ResizeObserver.
       `.fd-url-mirror` replicates the URL as text so its wrapped height can
