@@ -24,6 +24,7 @@ colors:
   primary-hover: '#7F4428'
   primary-ink: '#FFFFFF'
   primary-tint: '#F5EEEB'
+  selection: '#D9A679'
   track: '#E9E9EB'
   focus: '#6B4E9E'
   success: '#177A48'
@@ -45,6 +46,7 @@ colors:
   primary-hover-dark: '#F0B694'
   primary-ink-dark: '#2B1206'
   primary-tint-dark: '#372E2B'
+  selection-dark: '#7A5240'
   track-dark: '#3A3A3E'
   focus-dark: '#B79BE0'
   success-dark: '#4ED08B'
@@ -155,6 +157,7 @@ the frontmatter in ordinary colour modes.
 | Functional boundary | `{colors.control-border}` / `{colors.control-border-dark}` | Required on controls, the rest-state drop target, the QR frame, the URL field, and the progress-track outline. These values were chosen as the lightest greys that still clear 3:1 against every surface they touch. |
 | Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, and `{colors.primary-hover}` / `{colors.primary-hover-dark}` as the hover fill | The single strongest action, the (solid) progress fill, and the item-kind pill. Never status decoration. **The hover fill is a separate token from the resting fill, and the two move in opposite directions: light darkens on hover, dark lightens.** A single shared lighter value once put light mode's hover label under the 4.5:1 text floor — see the hover-pair row below. The primary button's own sheen (Elevation & Depth, below) is a fixed translucent white independent of both, not a third fill token. |
 | Focus | `{colors.primary}` / `{colors.primary-dark}`, with a `{colors.surface}` / `{colors.surface-dark}` gap | A two-tone ring (Story 7.11): a surface-coloured gap, then a 2px ring in the accent colour itself, stacked as `box-shadow`, never `outline`. Story 7.8's dedicated violet is retired — the owner found it "poorly polished," a second hue with no relationship to the rest of the product — and the gap, not a different hue, is what keeps a same-hue ring legible against a same-hue fill. Scoped to keyboard-operable controls only — see the amendment carried forward below. |
+| Selection | `{colors.selection}` / `{colors.selection-dark}` | **Defect fix.** The Direct URL Row's select-all-on-focus highlight (`.fd-url::selection`, Story 10.1). Authored as its own token rather than reused from `{colors.primary-tint}`: Story 10.1 measured only the selection's *text* against the tint (`text`/`primary-tint`, above), never the tint itself against the field's own `{colors.fill}` it paints over — in dark mode the two are nearly identical (1.021:1), so the highlight was there and copied correctly but was not visible. `{colors.selection}` clears both floors instead: `text` on it stays ≥4.5:1 (see the Text pair table), and it clears ≥1.5:1 against `{colors.fill}` in both modes (a *visibility* floor, not a text-contrast one) — see the note below the tables. Forced colors maps this to the system `Highlight`/`HighlightText` pair directly on `.fd-url::selection`, not through `{colors.text}`, since that token stays `CanvasText` for every other rule in that mode. |
 | Outcomes | Success, warning, error, each with a tint | Always pair colour with outline, glyph, or literal text. |
 | QR | `{colors.qr-surface}` / `{colors.qr-ink}` in both modes | Fixed high-contrast substrate; never recolour, invert, texture, rotate, round modules, or overlay a logo. Unchanged from Paper Relay and non-negotiable — it is a scan-reliability constraint, not a style choice. |
 
@@ -187,6 +190,7 @@ at **17.377657264**.
 | `text` on `primary-tint` | 15.153268673 | 11.826910776 |
 | `muted` on `primary-tint` | 5.048617711 | 4.851652072 |
 | `primary-ink` on primary button sheen (rest) | 4.677257536 | 8.269767363 |
+| `text` on `selection` | 8.011038123 | 6.042413035 |
 
 **The hover row above is a review finding, added after ship.** An interactive
 state's own fill is a text background like any other, and belongs in this
@@ -208,11 +212,41 @@ from a leftover blue wash (`#E6EFFB` / `#23303F`) to mocha at 10% light / 12%
 dark on `{colors.surface}` / `{colors.surface-dark}`. The dark fraction is
 deliberately 12%, not 16%: 16% was checked first and put `muted` on it at
 4.49:1, under the 4.5:1 floor: `text`/`primary-tint` and `muted`/`primary-tint`
-must both be re-checked before this token moves again. **Story 10.1 places
-`text`/`primary-tint` a second time**, as the Direct URL Row's own
-select-all-on-focus highlight (`.fd-url::selection`) -- the same reasoning
-applies: it is a text background, the pair was already load-bearing and
-already proven above, and no new figure was needed to reuse it here.
+must both be re-checked before this token moves again. **Story 10.1 originally
+placed `text`/`primary-tint` a second time**, as the Direct URL Row's own
+select-all-on-focus highlight (`.fd-url::selection`) -- the reasoning at the
+time was that it is a text background, the pair was already load-bearing and
+already proven above, and no new figure was needed to reuse it here. That
+reasoning covered only the text; see the defect fix immediately below for
+what it missed.
+
+**Defect fix, orchestrator-observed on the built macOS binary (dark
+appearance): reusing `{colors.primary-tint}` for the selection was wrong,
+because the load-bearing figure it reused (`text`/`primary-tint`, above)
+proves only that the selection's *text* is readable -- it says nothing about
+whether the selection itself is visible against the field it paints over.**
+`{colors.primary-tint-dark}` and `{colors.fill-dark}` are close enough
+(1.021:1) that in dark mode the highlight was there -- Cmd+C still copied the
+right value -- but a sender could not see that anything was selected at all.
+Before Story 10.1 the engine's own default selection colour (blue) was at
+least visible against both fills, so this was a regression the ship-time
+review missed by checking only the pair it already had a figure for.
+
+The fix is a dedicated `{colors.selection}` token (Colors table, Selection
+row), authored against both floors this selection actually needs rather than
+against one of them:
+
+| Visibility pair | Light ratio | Dark ratio |
+|---|---:|---:|
+| `selection` on `fill` (the URL field's own background) | 1.921761995 | 1.917235399 |
+
+This is a **visibility** floor (≥1.5:1, "can the selection be told apart from
+the row it sits on"), not the ≥4.5:1 **text** floor the table above checks --
+the two are different questions about the same token, and `{colors.selection}`
+had to clear both: `text`/`selection` stays ≥4.5:1 in both modes exactly as
+`text`/`primary-tint` did, while `selection`/`fill` recovers from 1.016:1
+light / 1.021:1 dark (the failing figures `{colors.primary-tint}` measured
+here before the fix) to the figures published above.
 
 **The sheen row above is a third finding of the same shape, from the
 black-flash defect fix.** This is the third time in this epic a colour
@@ -563,7 +597,7 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 | **Item Kind Pill** | **Superseded by Story 9.4.** This described the `fd-packet-tab` label above the card (File/Folder, `{rounded.full}`, `{colors.primary-tint}` on `{colors.primary}`), which Story 9.4 removed along with the card it sat above. The item's kind is now a plain glyph beside its name in the item row (`.fd-item__icon`, `{colors.fill}` on `{colors.muted}`) -- decorative, not a badge, exactly as this row already required. |
 | **Item Summary** | `{typography.headline}` name in a bidi isolate beside a kind glyph; kind, logical size and the ZIP note in `{typography.meta}`. **Story 9.4:** the name always wraps (`overflow-wrap: anywhere`); the persistent full-name control this row used to mention is removed along with the two-line clamp it existed to expand. |
 | **QR Panel** | Fixed white substrate, 12px padding, `{rounded.lg}`, `{elevation.sh-2}` plus a functional boundary, ~216px square (Story 9.4; was 224px at `{rounded.xs}` before the QR became the card's whole point rather than sharing weight with an always-visible link row). Crisp, generous quiet zone, no rotation or overlay. |
-| **Direct URL Row** | **Story 9.4:** not rendered until Show Link (`copy.direct_link.show`/`copy.direct_link.hide`, secondary) is activated, using the same `grid-template-rows`/transitioned-`visibility` mechanism as `Disclosure` (its own rule, `.fd-url-reveal`, since the trigger is a plain button rather than a heading-wrapped summary). Revealed: readonly monospace `<textarea>` on `{colors.fill}` with a functional boundary, unchanged from Story 7.9's CSS-grid mirror sizing. Copy Link (primary) copies without revealing it, named by `EXPERIENCE.md` key `copy.direct_link.action`. Never a sender-side activation link. **Story 10.1 defect fix:** the focused field now draws the same complete, unclipped two-tone ring every other control uses -- `.fd-url-reveal__body` (not the clipping `.fd-url-reveal__inner`, which the open/close animation still squeezes to zero when collapsed) carries padding equal to the ring's own reach on every side, so `__inner` simply auto-sizes around the larger box when open and clips it away whole, ring room included, when collapsed. The select-all-on-focus highlight is `{colors.text}` on `{colors.primary-tint}` (`.fd-url::selection`) instead of the engine default, reusing the pair already proven and published below rather than a new one. |
+| **Direct URL Row** | **Story 9.4:** not rendered until Show Link (`copy.direct_link.show`/`copy.direct_link.hide`, secondary) is activated, using the same `grid-template-rows`/transitioned-`visibility` mechanism as `Disclosure` (its own rule, `.fd-url-reveal`, since the trigger is a plain button rather than a heading-wrapped summary). Revealed: readonly monospace `<textarea>` on `{colors.fill}` with a functional boundary, unchanged from Story 7.9's CSS-grid mirror sizing. Copy Link (primary) copies without revealing it, named by `EXPERIENCE.md` key `copy.direct_link.action`. Never a sender-side activation link. **Story 10.1 defect fix:** the focused field now draws the same complete, unclipped two-tone ring every other control uses -- `.fd-url-reveal__body` (not the clipping `.fd-url-reveal__inner`, which the open/close animation still squeezes to zero when collapsed) carries padding equal to the ring's own reach on every side, so `__inner` simply auto-sizes around the larger box when open and clips it away whole, ring room included, when collapsed. The select-all-on-focus highlight is `{colors.text}` on `{colors.selection}` (`.fd-url::selection`) instead of the engine default. **Defect fix:** originally reused `{colors.primary-tint}` on the reasoning that the text pair was already proven, but nothing had measured the tint itself against this field's own `{colors.fill}` -- see the Colors table's Selection row and the defect-fix note under the contrast tables for the figures a dedicated token was needed to clear. |
 | **Copy Feedback** | Label swaps to `copy.copy.confirmation` with a check glyph, as a non-reflowing crossfade (Story 9.4: both faces occupy the same grid cell, the inactive one `aria-hidden`) rather than a jump cut; the control takes the success tint and boundary. Fixed width so the swap cannot reflow the row; reverts on blur (D-114). No toast. |
 | **Warning Banner** | `{rounded.md}`, warning tint, inset warning boundary, leading glyph, heading plus message. Inline, non-modal, never a full fill. |
 | **Trusted-LAN Note** | Muted copy, each line with its own inline SVG glyph rather than a single shared warning-coloured bar (Story 9.4: an info glyph on the first-opener line, a lock glyph on the network line -- both `{colors.muted}`, matching the owner-approved prototype's `.caveats`, not warning-tinted). **This amends the previous "never green or lock-shaped" wording**, written before this story's approved prototype used exactly a lock glyph for the network disclosure; the story's own acceptance criteria name the lock glyph explicitly, and the story's text wins over an earlier row it contradicts. Literal plain-HTTP and local-network disclosure; still never green, and still never a claim of encryption. |
