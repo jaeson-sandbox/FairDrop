@@ -112,8 +112,13 @@ describe('approved product copy', () => {
         expect(copy.cancel.pending, 'copy.cancel.pending').toBe(
             'Canceling',
         )
-        expect(copy.cancel.won, 'copy.cancel.won').toBe(
-            'Transfer canceled. Ready for another file or folder.',
+        // Story 10.2: copy.cancel.won split into a title and a body for the
+        // sliding notification -- see EXPERIENCE.md's Voice and Tone table.
+        expect(copy.cancel.wonTitle, 'copy.cancel.wonTitle').toBe(
+            'Transfer canceled',
+        )
+        expect(copy.cancel.wonBody, 'copy.cancel.wonBody').toBe(
+            'Ready for another file or folder.',
         )
         expect(copy.outcome.dismiss, 'copy.outcome.dismiss').toBe(
             'Dismiss',
@@ -157,7 +162,8 @@ describe('approved product copy', () => {
             'cancel.pending',
             'cancel.preparation',
             'cancel.preparationPending',
-            'cancel.won',
+            'cancel.wonBody',
+            'cancel.wonTitle',
             'copy.confirmation',
             'directLink.action',
             'directLink.hide',

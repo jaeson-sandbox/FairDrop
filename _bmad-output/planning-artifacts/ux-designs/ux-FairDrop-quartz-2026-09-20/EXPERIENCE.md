@@ -110,7 +110,8 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.cancel.preparation_pending` | Pending preparation cancellation | “Canceling preparation” |
 | `copy.cancel.action` | Transfer cancellation action | “Cancel” |
 | `copy.cancel.pending` | Pending cancellation | “Canceling” |
-| `copy.cancel.won` | Cancel-winning reset | “Transfer canceled. Ready for another file or folder.” |
+| `copy.cancel.wonTitle` | Cancel-winning notification title (Story 10.2) | “Transfer canceled” |
+| `copy.cancel.wonBody` | Cancel-winning notification body (Story 10.2) | “Ready for another file or folder.” |
 | `copy.outcome.dismiss` | Error card's own Dismiss (every outcome card carries one) | “Dismiss” |
 | `copy.outcome.try_again` | Error card's primary action when `selectEffectiveErrorAction` returns `retry` | “Try Again” |
 | `copy.outcome.choose_another` | Error card's primary action when `selectEffectiveErrorAction` returns `choose` | “Choose Another” |
@@ -130,7 +131,7 @@ The codes come from the binding contract. `PublicErrorOf` and the malformed/unkn
 |---|---|---|---|---|
 | `invalid_selection` | Choose one item | “Choose exactly one file or folder.” | Focused inline Error Panel | Use the drop target or one browse action and choose one item. |
 | `busy` | FairDrop is still busy | “FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.” | Focused current-state heading with the message as description | Wait for it to finish, or restart FairDrop. The clause “or cancel it” was removed on 2026-09-13: cancelling cannot stop an uninterruptible filesystem call, and the outstanding work is not always a transfer (D-111). |
-| `cancelled` | Transfer canceled | “Transfer canceled.” | Polite status during pending; focused Idle cancellation summary when reset wins | Return to Idle; never render as Error. |
+| `cancelled` | Transfer canceled | “Transfer canceled.” | Polite status during pending; focused Idle heading, described by the cancellation notification, when reset wins (Story 10.2) | Return to Idle; never render as Error. |
 | `path_not_found` | Item not found | “That file or folder is no longer available. Choose it again.” | Focused Error Panel | Choose the item again. |
 | `path_unsupported` | Can’t use that item | “FairDrop can use regular files and folders only. Choose another item.” | Focused Error Panel | Choose a non-link regular file or folder. |
 | `source_changed` | Item changed | “The item changed after it was prepared. Cancel and create a fresh link.” | Focused terminal Error Panel | Return to Idle and prepare it again. |
@@ -162,7 +163,7 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 | **Item Summary** | Staged, Transferring | Shows a kind glyph beside the sanitized bidi-isolated full name and logical size; folders distinguish logical size from unknown ZIP wire total. **Story 9.4:** the name always wraps (`overflow-wrap: anywhere`) rather than clamping behind a persistent "Show full name" toggle, which is removed along with `copy.name.show_full`. |
 | **QR Panel** | Staged | Prepends `data:image/png;base64,` only at render. The noninteractive image uses `copy.qr.alt`; it never exposes or spells the token. |
 | **Direct URL Row** | Staged | **Story 9.4:** not rendered, focusable, or exposed to assistive technology until requested -- SPEC.md's "expose the QR code and URL" is met by the URL being one activation away, not always present. `copy.direct_link.action` (Copy Link, primary) copies without revealing it, through the same bound `CopyToClipboard` as before; `copy.direct_link.show`/`copy.direct_link.hide` (secondary, `aria-expanded`/`aria-controls`) reveals or hides the readonly selectable field with a smooth expansion, never a sender-side activation link. `copy.direct_link.helper` is retired along with the always-visible field it used to sit beside. Every Story 7.9 guarantee (readonly `textarea`, CSS-grid mirror sizing, select-on-focus, Escape blurs) applies to the revealed field unchanged. |
-| **Copy Feedback** | Staged | Label becomes `copy.copy.confirmation` with a check glyph and success tint, as a non-reflowing crossfade (Story 9.4) rather than a jump cut; one polite update, no toast, focus move, lifecycle change, or clipboard clearing. Reverts to `copy.direct_link.action` the moment focus leaves the control (D-114) -- an event the sender's own action triggers, not a timer, so the one control that reaches the capability URL still names what it does whenever the sender returns to it. |
+| **Copy Feedback** | Staged | Label becomes `copy.copy.confirmation` with a check glyph and success tint, as a non-reflowing crossfade (Story 9.4) rather than a jump cut; one polite update, no toast, focus move, lifecycle change, or clipboard clearing. Reverts to `copy.direct_link.action` the moment focus leaves the control (D-114) -- an event the sender's own action triggers, not a timer, so the one control that reaches the capability URL still names what it does whenever the sender returns to it. This row's "no toast" still holds -- copy feedback keeps its in-button label, never a toast of its own. Story 10.2's cancellation notification is the one sanctioned transient notification in the product; it is not this row's concern, and this row is not an exception to it. |
 | **Trusted-LAN Note** | Staged | **Story 9.4:** the first-opener (`copy.first_opener.warning`) and network (`copy.network.disclosure`) disclosures stay visible on the card, each with its own inline SVG glyph -- an info glyph and a lock glyph respectively -- rather than a single shared warning marker. The local-copy disclosure (`copy.local_copy.disclosure`) and the link-preview caveat (`copy.first_opener.previews`) move into "Trouble connecting?" alongside firewall/receiver recovery. |
 | **Warning Banner** | Staged or Idle recovery | Renders safe `Warning` or firewall/recovery copy. `beacon_warning` remains non-terminal. |
 | **TransferView** | Transferring | Appears only after accepted `transfer-started`; never from scan animation, browser navigation, or frontend inference. **Story 9.5 rebuild:** reuses Staged's own card geometry (`.fd-packet`/`.fd-hero`) verbatim rather than a standalone progress card, so the card never changes shape moving from Staged to Sending; the `fd-packet-tab` kind label is gone, replaced by the same plain item-row glyph Staged uses. |
@@ -172,6 +173,7 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 | **Done Panel** | Done and retained Idle status | **Story 9.6 rebuild:** one centred card (disc, heading, a one-line receipt, "Send Another", "Done"), live or retained -- "Send Another" is unconditional, so the way forward never depends on whether the backend's reset already landed. After reset the same visible node becomes non-session status and remains until dismissal or the next Stage. |
 | **Error Panel** | Error, retained Idle status, command/validation failures | **Story 9.6 rebuild:** the same one-card shape as Done -- the fixed heading/message table, the retained item name when Story 9.2 kept one, and the primary action `selectEffectiveErrorAction` names (Try Again/Choose Another/none), plus Dismiss on every card. Terminal Error persists after reset as dismissible non-session status. Focused errors are not simultaneously alerts. |
 | **Status Announcer** | Non-focus status only | One pre-mounted `role="status" aria-live="polite" aria-atomic="true"`; never repeats content announced by focus and never becomes an event log. |
+| **Notification** | Idle, after a cancel-winning reset (Story 10.2) | The one sanctioned transient notification (see the Interaction Primitives amendment above and the Copy Feedback row, which is not this). Not interactive: no controls, takes no focus, not `role="alert"`, not a live region -- the Idle heading's focus move is this transition's one owner, and the notification's text reaches assistive technology only through that heading's `aria-describedby`. Appears via `copy.cancel.wonTitle`/`copy.cancel.wonBody`, holds for a few seconds (paused while the pointer is over it, restarted if a second cancellation lands while one is still showing), then removes itself -- via its own presentation-only dismissal timer, never a lifecycle or reset timer -- without any further announcement or focus move. Starting a Stage, or the app leaving Idle by any other path, removes it immediately. |
 
 ### Stage-preparation cancellation
 
@@ -179,7 +181,7 @@ On `copy.cancel.preparation`, keep focus on the control, set its label to `copy.
 
 ### Cancel race
 
-While Staged/Transferring Cancel is pending, keep metrics readable and focus on the control labeled `copy.cancel.pending`. If `transfer-complete` or `transfer-error` linearizes first, remove cancel-pending feedback and announce only that authoritative terminal outcome. If `transfer-reset` arrives without a terminal event, focus the visible Idle summary `copy.cancel.won` and do not render Error. Command resolution is never announced separately from the winning outcome.
+While Staged/Transferring Cancel is pending, keep metrics readable and focus on the control labeled `copy.cancel.pending`. If `transfer-complete` or `transfer-error` linearizes first, remove cancel-pending feedback and announce only that authoritative terminal outcome. If `transfer-reset` arrives without a terminal event, focus the Idle heading and do not render Error; a sliding notification (`copy.cancel.wonTitle`/`copy.cancel.wonBody`, Story 10.2) appears alongside that focus move, described by the heading's `aria-describedby` while it is mounted, and disappears on its own after a few seconds without moving focus again. Command resolution is never announced separately from the winning outcome.
 
 ## State Patterns
 
@@ -225,6 +227,18 @@ Generic 404/423/410 receiver pages are an accepted V1 limitation. No friendly re
 - Unknown progress remains understandable without motion through a static non-directional pattern, `copy.progress.unknown`, and live wire bytes.
 - Visual progress may refresh on every accepted snapshot. Assistive progress speech is separate: start once; then no more often than every five seconds **and** only after meaningful change (at least 10 percentage points **or** 10 MiB of new wire bytes, whichever comes first, in either mode — corrected 2026-09-14 to match the shipped throttle, which has always read it this way: a known total that is large and slow gains bytes without gaining percentage points, and the five-second floor already caps how often the extra threshold can speak); terminal/error cancels queued progress speech. Throughput is never spoken in progress updates.
 - Banned: DOM file drop, drag-only input, hover-only actions, modal warnings, frontend lifecycle/reset timers, automatic clipboard clearing, celebratory animation, tray/always-on-top behavior, and navigation chrome.
+  **Amended, Story 10.2 (owner direction, 2026-09-26):** the "frontend
+  lifecycle/reset timers" half of this ban now permits exactly one kind of
+  timer -- a **presentation-only dismissal timer** for a transient
+  notification (the cancellation notification below is the first and, for
+  now, only one). That timer may remove the notification from the DOM and
+  may do nothing else: it never dispatches a reducer action, never calls a
+  bound Go command, never moves focus, and never changes what lifecycle
+  state the app is in. Every other frontend timer this section has ever
+  banned -- anything that would drive lifecycle, reset, or dismissal of
+  session state itself -- stays banned; the backend's three-second terminal
+  lease (Story 1.6) is still the only authority over the transfer lifecycle,
+  and this amendment does not touch it.
 
 ### Announcement ownership
 
@@ -241,7 +255,7 @@ Every transition has exactly one owner. Focused content is excluded from live/al
 | `transfer-started` | Focused Transferring heading | Move once; no live duplicate. |
 | Throttled progress | Atomic polite Status Announcer | No focus move. |
 | Cancel requested | Atomic polite Status Announcer | Keep focus on the `copy.cancel.pending` control. |
-| Cancel-winning reset | Focused Idle cancellation summary | One combined message; no live reset message. |
+| Cancel-winning reset | Focused Idle heading (Story 10.2, owner-approved: was a dedicated cancellation summary, now `idle-instruction`) | One combined message: the heading's `aria-describedby` points at the sliding notification's text while it is mounted, so the one focus move announces `copy.idle.instruction` plus `copy.cancel.wonTitle`/`copy.cancel.wonBody` together; no live reset message. The reference is removed the moment the notification unmounts. |
 | Complete or terminal Error | Focused outcome heading/panel | Move once; no polite/alert duplicate. |
 | Reset after terminal | None | No second focus move; retained node remains mounted. |
 | Dismiss retained outcome | Focused Idle instruction | Focus is the only owner. Story 9.6: the same row now also covers dismissing an Idle Stage-time command failure. |
@@ -383,7 +397,7 @@ Failure: quiet dialog cancel remains quiet. Invalid selection uses fixed focused
 
 1. During Stage Pending, Jaeson activates `copy.cancel.preparation`; the focused control changes to `copy.cancel.preparation_pending` until the local Stage/Cancel pair settles with no lifecycle event and returns Idle.
 2. In a later Staged or Transferring session, he activates Cancel while current status remains readable.
-3. **Climax:** if reset wins without terminal, focused Idle presents `copy.cancel.won`.
+3. **Climax:** if reset wins without terminal, focus moves to the Idle heading and a sliding notification (Story 10.2) presents `copy.cancel.wonTitle`/`copy.cancel.wonBody`, then disappears on its own a few seconds later.
 4. If complete or error wins, only that authoritative outcome appears; reset preserves it without a second focus move, after which Jaeson may Dismiss or stage another item.
 
 Failure: command errors use the exact code table. Cancellation is never Error, and the frontend never arbitrates the backend linearization race.

@@ -229,6 +229,38 @@ rest/hover x light/dark combinations and the figure the sheen's alpha
 `frontend/src/ui/styles.test.ts`, not hand-computed: raising the alpha
 towards 0.12 fails this floor, which is why it is not raised.
 
+**The notification material is a fourth finding of the same shape, Story
+10.2.** Same pattern as the hover fill, `primary-tint` and the button sheen
+above: a text background that is not a named `--color-*` token at all,
+because it is translucent -- `rgb(255 255 255 / 0.75)` light,
+`rgb(39 39 43 / 0.75)` dark, composited over whichever of the two worst-case
+backdrops (`{colors.canvas}`, `{colors.surface}`) sits behind the window at
+the moment a cancellation lands. Both are checked, in both authored modes,
+because the material's own contrast proof is computed from the composite,
+not from the token in isolation. Every figure below is copied verbatim from
+`frontend/src/ui/styles.test.ts`'s own output ("the notification's title and
+body clear 4.5:1 against the material it actually resolves to"), never
+hand-computed:
+
+| Notification pair | Composited over | Ratio |
+|---|---|---:|
+| `text` on the light notification | `canvas` | 16.938172843 |
+| `text` on the light notification | `surface` | 17.377657264 |
+| `muted` on the light notification | `canvas` | 5.643294609 |
+| `muted` on the light notification | `surface` | 5.789717726 |
+| `text` on the dark notification | `canvas` | 14.018293623 |
+| `text` on the dark notification | `surface` | 13.657025243 |
+| `muted` on the dark notification | `canvas` | 5.750604244 |
+| `muted` on the dark notification | `surface` | 5.602404218 |
+
+The opaque fallback, painted unconditionally and replaced only where
+`@supports` confirms `backdrop-filter` (or `-webkit-backdrop-filter`) is
+available, is `{colors.elevated}` itself -- not a new value derived for this
+one component. Its own text/muted rows are already proven above (the
+`text`/`elevated` and `muted`/`elevated` rows in the first contrast table),
+so "an opaque value that meets the same contrast" needs no new derivation:
+it is a token already held to that floor.
+
 Status text placed on its own panel (`.fd-button--quiet`'s muted/error on
 elevated is the row above; `warning`/`success`/`error` on `surface` is what the
 Warning Banner, a completed transfer's success copy, and the Error Panel place)
@@ -539,6 +571,7 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 | **Outcome Receipt** | **Story 9.6 replaces the two-cell grid.** One pill-shaped line on `{colors.fill}`: a kind glyph, the item name, and `· <wire bytes actually sent>` for Done; the item name alone for an Error whose outcome retained one (Story 9.2). No elapsed-time figure anywhere -- no clock is tracked and `EXPERIENCE.md` forbids frontend lifecycle timers. Every value comes from retained state, never a placeholder; the name truncates with an ellipsis rather than wrapping or overflowing the pill. |
 | **Outcome Panel — Error** | **Story 9.6 rebuild**, the same one-card shape as Done: the error disc, the fixed heading and fixed `PublicError.message` from the registry (unchanged), the outcome receipt when an item name was retained, and the primary action `selectEffectiveErrorAction` (Story 9.2) chooses -- **Try Again** (a refresh glyph, calls `retry()`) for `retry`, **Choose Another** (the `BrowseControl` menu) for `choose`, or no primary for `dismiss`. Every error card also carries **Dismiss** (quiet unless it is the card's only control, matching the Done panel's weight rule). No raw diagnostics. |
 | **Status Announcer** | Visually hidden, pre-mounted, atomic, layout-free. Never duplicates focused content. |
+| **Notification** | **Story 10.2.** A top-centre overlay, `position: fixed` so it never displaces the Idle layout beneath it -- width to its content up to ~420px, never wider than the window gutter allows, ~14px below the top edge. A small glyph in a warning-tinted disc (never the error tint: the spine's rule for `cancelled` is "return to Idle; never render as Error") beside a bold title and a muted body line. Material: `{rounded.xl}`, `{elevation.sh-3}`, a `{colors.separator}` hairline boundary (decorative, matching `.fd-packet`'s own precedent), and a translucent surface -- `backdrop-filter: blur(24px) saturate(1.6)` plus `-webkit-backdrop-filter` for WKWebView, gated behind `@supports` so an engine without either falls back to the already-proven opaque `{colors.elevated}` fill unconditionally (true progressive enhancement: nothing to detect, no branch to maintain). Not interactive: no controls, no focus, not `role="alert"`, not a live region -- the one focus move a cancellation makes lands on the Idle heading instead (see EXPERIENCE.md's routing table), whose `aria-describedby` points at this component's text while it is mounted. Built generically (`Notification.tsx`) so a later transient message can reuse it; only the cancellation notification wires it today. |
 
 ### FR23 and the disclosures
 
@@ -624,6 +657,22 @@ Story 9.1 gives it a foundation every later Epic 9 story builds on.
   and the browse menu all animate in too -- but it remains the only moment marked
   by *drawing* rather than by fading or rising, which is still worth marking on its
   own terms.
+- **Story 10.2: the one component that does animate out.** The cancellation
+  notification slides down into place (`translate: 0 -16px` -> `none` plus a
+  fade, ~420ms) via `@starting-style`, exactly like a phase view's entrance,
+  but unlike every phase view it is genuinely transient -- it holds for ~4s
+  (paused while the pointer is over it) and then slides up and fades out
+  again (~260ms) before unmounting. This is a deliberate, narrow exception to
+  "views animate in and never out": the identity hazard that rule protects
+  against (two nodes both claiming to be the current view, at the moment an
+  outgoing one is kept alive to animate away) cannot arise here, because the
+  notification is not a view -- it owns no phase, no focus, and nothing else
+  in the product is waiting to inherit its slot. The exit is driven entirely
+  by the component's own dismissal timer, never by a `transitionend` event:
+  an engine that cannot transition would never fire one, and the
+  notification would never leave. `prefers-reduced-motion: reduce` fades it
+  in and out without moving, the same universal `translate: none !important`
+  rule every other entrance already relies on.
 - **Story 9.6: the outcome card's own disc** scales in from ~0.7 (its own
   fade-plus-scale rule, unstaggered -- the same "cards and discs" pattern the
   QR tile uses), while the heading, receipt and actions row stagger in behind
