@@ -6,12 +6,12 @@ Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged cop
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: v1.3.0.** A redesign of every screen on the Quartz spine that 1.2.0
-introduced: smooth entrance motion, a Ready screen built around the QR code with the link
-revealed only when asked for, a progress ring, and one clear card when a transfer finishes
-or fails — where **Try Again** re-prepares the same item instead of sending you back to
-the chooser. Transfer behavior remains the same complete FR1-FR24 scope proven for v1.0.0:
-one file or folder, one receiver, plain HTTP on a trusted LAN, nothing persisted.
+**Current release: v1.3.1.** A polish release over 1.3.0, which redesigned every screen on
+the Quartz spine. 1.3.1 replaces the static "Transfer canceled" banner with a notification
+that slides in at the top of the window and leaves on its own, and fixes the direct-link
+field's focus ring and selection highlight. Transfer behavior remains the same complete
+FR1-FR24 scope proven for v1.0.0: one file or folder, one receiver, plain HTTP on a trusted
+LAN, nothing persisted.
 
 ## Using it
 
