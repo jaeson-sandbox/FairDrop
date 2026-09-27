@@ -112,6 +112,12 @@ describe('the Quartz token layer', () => {
             // zone's heading and meta line, drag-active) -- see the
             // 'primary-tint carries text' describe block below.
             'primary-tint': '#F5EEEB',
+            // Defect fix: a dedicated selection token, authored rather than
+            // derived from primary-tint -- see the "URL field selection is
+            // visible against its own field" describe block below for why
+            // primary-tint (nearly invisible against the field's own fill in
+            // dark mode) could not simply be reused here.
+            selection: '#D9A679',
             track: '#E9E9EB',
             // Story 7.8 introduced a dedicated violet `focus` role here;
             // Story 7.11 retired it in favour of the ring reading `primary`
@@ -156,6 +162,9 @@ describe('the Quartz token layer', () => {
             // on this fill. See the CSS comment beside the real
             // declaration.
             'primary-tint': '#372E2B',
+            // Defect fix: dark half of the dedicated selection token -- see
+            // the light block above.
+            selection: '#7A5240',
             track: '#3A3A3E',
             success: '#4ED08B',
             'success-tint': '#20342A',
@@ -297,6 +306,14 @@ describe('forced colors', () => {
             'primary-hover': 'Highlight',
             'primary-ink': 'HighlightText',
             'primary-tint': 'Canvas',
+            // Defect fix: maps to the system selection colour, like
+            // `primary`/`primary-hover` above. The URL field's own
+            // `.fd-url::selection` restates the paired foreground as
+            // `HighlightText` explicitly -- see "restates the URL field
+            // selection with the system Highlight/HighlightText pair" below
+            // -- since `--color-text` (this token's usual foreground
+            // partner) resolves to `CanvasText` everywhere else it is used.
+            selection: 'Highlight',
             track: 'Canvas',
             success: 'CanvasText',
             'success-tint': 'Canvas',
@@ -326,6 +343,16 @@ describe('forced colors', () => {
 
     it('drops the primary button gradient and its highlight, which have no system color', () => {
         expect(forcedColors).toMatch(/\.fd-button--primary \{\s*background: Highlight;\s*box-shadow: none;\s*\}/)
+    })
+
+    it('restates the URL field selection with the system Highlight/HighlightText pair (defect fix)', () => {
+        // `--color-selection: Highlight;` alone is not enough: `.fd-url::selection`'s
+        // foreground reads `--color-text`, which resolves to `CanvasText`
+        // everywhere else in forced colors, not `HighlightText`. Restated
+        // directly on the rule, the same way `.fd-button--primary` restates
+        // its own background above, rather than left to combine into
+        // `Highlight` on `CanvasText`.
+        expect(forcedColors).toMatch(/\.fd-url::selection \{\s*background: Highlight;\s*color: HighlightText;\s*\}/)
     })
 
     it('restates every box-shadow focus ring as an outline, because Windows High Contrast Mode strips decorative box-shadow (Story 7.11)', () => {
@@ -2004,6 +2031,12 @@ describe('the unrounded contrast proof', () => {
         ['warning', 'canvas', 3, false],
         ['success', 'canvas', 3, false],
         ['error', 'canvas', 3, false],
+        // Defect fix: the URL field's select-on-focus highlight (Story
+        // 10.1) is a text background too, exactly like primary-tint above
+        // it -- see "the URL field selection is visible against its own
+        // field" below for the visibility half of this fix (contrast
+        // against the field's own fill, not text on the selection).
+        ['text', 'selection', 4.5, true],
     ]
 
     it.each(placed)('%s on %s clears its AA ratio in both authored modes', (foreground, background, minimum) => {
@@ -2012,6 +2045,61 @@ describe('the unrounded contrast proof', () => {
 
         expect(contrast(lightTokens[foreground], lightTokens[background])).toBeGreaterThan(minimum)
         expect(contrast(darkTokens[foreground], darkTokens[background])).toBeGreaterThan(minimum)
+    })
+
+    /*
+      Defect fix, orchestrator-observed on the built macOS binary (dark
+      appearance): Story 10.1's `.fd-url::selection` reused
+      `{colors.primary-tint}` on the reasoning that the pair was already
+      load-bearing and already published -- but that story only measured the
+      selection's TEXT against the tint (`text`/`primary-tint`, published
+      above as `text`/`selection` now). Nothing measured the tint itself
+      against the field's own background, `{colors.fill}`, that the
+      selection paints over. In dark mode `primary-tint-dark` (`#372E2B`) is
+      almost the same colour as `fill-dark` (`#313135`) -- the selection is
+      there, and Cmd+C copies the right thing, but a sender cannot see that
+      anything is selected. Before Story 10.1 the engine's own default
+      (blue) was at least visible against both fills; this defect made the
+      fix invisible in the one mode it was meant to be seen in.
+
+      Resolves the selection background and the field's own background
+      dynamically, by reading whichever `var(--color-*)` each rule currently
+      declares, rather than hard-coding a role name -- so this keeps proving
+      the right thing even if the token the selection reads is renamed
+      again. Before the defect fix, `.fd-url::selection` read
+      `var(--color-primary-tint)` and this failed in both modes: light
+      measured 1.016:1, dark measured 1.021:1, both far under the 1.5:1
+      floor a "visibly distinct fill" needs here -- the field's own
+      background is the floor, because a selection that cannot be told
+      apart from the row it sits on is not visible at all, never mind AA
+      text contrast on top of it.
+    */
+    it.each([
+        ['light', 'lightTokens'],
+        ['dark', 'darkTokens'],
+    ])('the URL field selection is visible against its own field: clears 1.5:1 in %s mode', (scheme) => {
+        const tokens = scheme === 'light' ? lightTokens : darkTokens
+
+        const selectionRule = block('.fd-url::selection {')
+        const selectionVar = selectionRule.match(/background:\s*var\((--color-[a-z-]+)\);/)?.[1]
+        expect(selectionVar, 'the var() the selection background reads').toBeTruthy()
+        const selectionRole = selectionVar!.replace('--color-', '')
+
+        const field = block('.fd-url {')
+        const fieldVar = field.match(/\n {4}background:\s*var\((--color-[a-z-]+)\);/)?.[1]
+        expect(fieldVar, "the var() the URL field's own background reads").toBeTruthy()
+        const fieldRole = fieldVar!.replace('--color-', '')
+
+        expect(tokens[selectionRole], selectionRole).toBeTruthy()
+        expect(tokens[fieldRole], fieldRole).toBeTruthy()
+
+        const ratio = contrast(tokens[selectionRole], tokens[fieldRole])
+        expect(ratio, `${selectionRole} vs ${fieldRole} (${scheme})`).toBeGreaterThan(1.5)
+
+        // Published, unrounded, alongside the text/selection pair -- see
+        // DESIGN.md's Colors table, Selection row.
+        expect(designSpine, `${selectionRole} vs ${fieldRole} (${scheme}) = ${ratio.toFixed(9)}`)
+            .toContain(ratio.toFixed(9))
     })
 
     it('gives the hover fill its own direction-correct token, distinct from the gradient top stop', () => {
@@ -2305,13 +2393,14 @@ describe('rules the components can only reference by name', () => {
 
     /*
       Story 10.1: select-on-focus paints the whole URL, so the selection is
-      the field's dominant look while focused. It reuses the text on
-      primary-tint pair the contrast proof already derives and DESIGN.md
-      publishes, rather than leaving it to the engine's default blue.
+      the field's dominant look while focused. Defect fix follow-up: it now
+      reuses a dedicated `{colors.selection}` token rather than
+      `{colors.primary-tint}` -- see "the URL field selection is visible
+      against its own field" below for why.
     */
-    it('paints the URL field selection with the published text on primary-tint pair', () => {
+    it('paints the URL field selection with the published text on selection pair', () => {
         const selection = block('.fd-url::selection {')
-        expect(selection).toContain('background: var(--color-primary-tint);')
+        expect(selection).toContain('background: var(--color-selection);')
         expect(selection).toContain('color: var(--color-text);')
     })
 

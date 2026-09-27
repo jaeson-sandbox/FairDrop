@@ -62,6 +62,26 @@
       wash.
     */
     --color-primary-tint: #F5EEEB;
+    /*
+      Defect fix (found rendered on the built macOS binary, dark appearance):
+      `.fd-url::selection` used to read `--color-primary-tint` directly on
+      the reasoning that the text/tint pair was already load-bearing and
+      already published (Story 10.1's own comment, now removed). That
+      comment only ever measured the selection's TEXT against the tint --
+      nothing measured the tint itself against the URL field's own
+      background, `--color-fill`, that the selection paints over. In dark
+      mode `--color-primary-tint`'s `#372E2B` and `--color-fill`'s `#313135`
+      are close enough (1.021:1) that a sender cannot tell the field is
+      selected at all, even though Cmd+C still copies the right value.
+      `--color-selection` is authored -- not derived from `primary-tint` by
+      a formula -- so it can be tuned against `--color-fill` independently of
+      whatever `primary-tint` needs for its own, unrelated job (the drag-
+      active drop zone fill and the browse-menu item fill). See
+      styles.test.ts's "the URL field selection is visible against its own
+      field" for the 1.5:1 visibility floor this clears, and "text on
+      selection clears its AA ratio" for the 4.5:1 text floor.
+    */
+    --color-selection: #D9A679;
     --color-track: #E9E9EB;
     /*
       Story 7.8 introduced a dedicated violet `--color-focus` here, distinct
@@ -246,6 +266,16 @@
           without re-checking muted/primary-tint in the contrast proof.
         */
         --color-primary-tint: #372E2B;
+        /*
+          Defect fix: the dark half of the dedicated selection token -- see
+          the light declaration's comment above for why this is authored
+          rather than derived from `--color-primary-tint`. #7A5240 clears
+          both floors styles.test.ts pins: text/selection at 6.042413035:1
+          (>= 4.5:1) and selection/fill at 1.917235399:1 (>= 1.5:1) -- unlike
+          `--color-primary-tint`'s dark value, which measured only 1.021:1
+          against `--color-fill` and was the whole defect.
+        */
+        --color-selection: #7A5240;
         --color-track: #3A3A3E;
         --color-success: #4ED08B;
         --color-success-tint: #20342A;
@@ -1947,15 +1977,27 @@ body {
 /*
   Defect fix (Story 10.1): the select-all-on-focus highlight (see the
   `onFocus` handler in `StagedView.tsx`) painted the engine's default
-  selection colour instead of the product's accent family. `{colors.text}` on
-  `{colors.primary-tint}` is not a new pair invented for this rule -- it is
-  already load-bearing and already published in `styles.test.ts`/DESIGN.md
-  ("the unrounded contrast proof") as the drop zone's drag-active text
-  background, so reusing it here needs no new figure: 15.153268673 light,
-  11.826910776 dark, both clearing 4.5:1 with room to spare.
+  selection colour instead of the product's accent family.
+
+  Follow-up defect fix, found rendered on the built macOS binary (dark
+  appearance): Story 10.1 originally read `--color-primary-tint` here on the
+  reasoning that `{colors.text}` on `{colors.primary-tint}` was already
+  load-bearing and already published -- but that pair only proves the
+  selection's TEXT is readable, not that the selection itself is visible
+  against the field it sits on. `--color-primary-tint`'s dark value is
+  nearly identical to the URL field's own `--color-fill` in dark mode
+  (1.021:1, see that token's own comment above) -- the selection was there
+  and Cmd+C still copied the right value, but a sender in dark mode could
+  not see that anything was selected at all. `--color-selection` is a
+  dedicated token for exactly this job (declared in `@theme` above, authored
+  rather than derived from `primary-tint`): text on it clears 4.5:1
+  (8.011038123 light, 6.042413035 dark) and it clears 1.5:1 against the
+  field's own `--color-fill` (1.921761995 light, 1.917235399 dark) -- see
+  styles.test.ts's "the unrounded contrast proof" describe block for both
+  floors.
 */
 .fd-url::selection {
-    background: var(--color-primary-tint);
+    background: var(--color-selection);
     color: var(--color-text);
 }
 
@@ -2698,6 +2740,20 @@ body {
         --color-primary-hover: Highlight;
         --color-primary-ink: HighlightText;
         --color-primary-tint: Canvas;
+        /*
+          Defect fix: `--color-selection` maps to `Highlight` here, the
+          system's own text-selection colour, consistent with `primary`/
+          `primary-hover` above. `.fd-url::selection` below restates the
+          *foreground* half explicitly as `HighlightText` too, because this
+          rule's ordinary `color` reads `--color-text` (`CanvasText` in this
+          block) for every other purpose it serves -- remapping `--color-text`
+          itself to `HighlightText` here would wrongly recolor all of the
+          body copy, headings and labels that token also feeds. Restating
+          the one rule that needs the paired system colour is what keeps
+          both halves -- `Highlight` background, `HighlightText` text -- a
+          real selection pair rather than `Highlight` on `CanvasText`.
+        */
+        --color-selection: Highlight;
         --color-track: Canvas;
         /*
           Story 7.11: no `--color-focus` override needed here any more. The
@@ -2722,6 +2778,18 @@ body {
     .fd-button--primary {
         background: Highlight;
         box-shadow: none;
+    }
+
+    /*
+      Defect fix: restates the URL field's selection as the real system
+      selection pair -- `Highlight` background, `HighlightText` foreground --
+      rather than `Highlight` on `--color-text` (`CanvasText`). See the
+      `--color-selection` comment above for why the foreground can't simply
+      read a token here the way the background does.
+    */
+    .fd-url::selection {
+        background: Highlight;
+        color: HighlightText;
     }
 
     /*
