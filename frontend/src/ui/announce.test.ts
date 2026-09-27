@@ -153,10 +153,16 @@ const rows: Array<[string, TransferState, TransferState, Announcement | null]> =
         {row: 'cancel-requested', owner: 'announcer', text: 'Canceling'},
     ],
     [
+        // Story 10.2, owner-approved: the static `.fd-cancel-summary` node
+        // and its `cancel-summary` focus target are gone, replaced by a
+        // sliding notification that disappears on its own timer and so
+        // cannot hold focus itself. The target is now the Idle heading,
+        // described by the notification's text via `aria-describedby`
+        // while it is mounted (App.tsx/IdleView.tsx).
         'Cancel-winning reset',
         transferring({cancelPending: true}),
         createInitialTransferState(),
-        {row: 'cancel-won', owner: 'focus', target: 'cancel-summary'},
+        {row: 'cancel-won', owner: 'focus', target: 'idle-instruction'},
     ],
     ['Complete', transferring(), done, {row: 'terminal-outcome', owner: 'focus', target: 'outcome'}],
     ['Terminal Error', transferring(), terminalError, {row: 'terminal-outcome', owner: 'focus', target: 'outcome'}],
@@ -227,8 +233,9 @@ describe('a cancellation that lands beside a command failure', () => {
         }
         const idle: TransferState = {phase: 'idle', retainedOutcome: null, commandError: null}
 
+        // Story 10.2: target is 'idle-instruction' now (see above).
         expect(routeTransition(staged, idle)).toEqual({
-            row: 'cancel-won', owner: 'focus', target: 'cancel-summary',
+            row: 'cancel-won', owner: 'focus', target: 'idle-instruction',
         })
     })
 
@@ -352,8 +359,9 @@ describe('rows the table names but a reducer transition cannot produce', () => {
             outcome: {kind: 'error', error: publicError('cancelled')},
         }
 
+        // Story 10.2: same target as the plain cancel-won row above.
         expect(routeTransition(transferring(), cancelled))
-            .toEqual({row: 'cancel-won', owner: 'focus', target: 'cancel-summary'})
+            .toEqual({row: 'cancel-won', owner: 'focus', target: 'idle-instruction'})
     })
 
     it('stays silent after a terminal outcome even when no node was retained', () => {
@@ -391,8 +399,10 @@ describe('the focus selector', () => {
 
     it('covers every target the table can name', () => {
         expect([...focusTargets]).toEqual([
+            // Story 10.2: 'cancel-summary' is gone -- the cancel-won row now
+            // targets 'idle-instruction' too (see the routing-table cases
+            // above), so it is not its own separate entry any more.
             'idle-instruction',
-            'cancel-summary',
             'command-error',
             'pending-heading',
             'staged-heading',

@@ -43,11 +43,17 @@ function block(opening: string): string {
 
 const theme = block('@theme {')
 const dark = block('@media (prefers-color-scheme: dark) {')
+// Story 10.2: the notification's translucent material, gated behind
+// feature support so an engine without it keeps the opaque fallback.
+const notificationBackdropSupport = block(
+    '@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {',
+)
 const forcedColors = block('@media (forced-colors: active) {')
 const reducedMotion = block('@media (prefers-reduced-motion: reduce) {')
 const componentRules = stylesheet
     .replace(theme, '')
     .replace(dark, '')
+    .replace(notificationBackdropSupport, '')
     .replace(forcedColors, '')
     // Reduced motion belongs out too: its universal-selector rules are not
     // component rules, and leaving them in let them satisfy assertions about
@@ -69,6 +75,8 @@ describe('the stylesheet parser sees the whole file', () => {
         expect(atRules).toEqual([
             '@theme {',
             '@media (prefers-color-scheme: dark) {',
+            // Story 10.2: the notification's translucent material.
+            '@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {',
             '@media (max-width: 759px) {',
             '@media (max-width: 639px) {',
             '@media (forced-colors: active) {',
@@ -218,10 +226,24 @@ describe('the Quartz token layer', () => {
         // (byte-identical, rest and :hover -- see "the primary button hover
         // has no black flash" describe block), so both occurrences are
         // stripped.
+        //
+        // Story 10.2: the notification's translucent-material *token itself*
+        // (`--color-notification-surface-translucent`, declared once in
+        // `:root` and once more in the dark override) is the one place this
+        // spine declares a literal colour outside `@theme` -- the same class
+        // of exception as the sheen above, a fixed overlay at a fixed
+        // opacity unrelated to any Quartz colour role, not a value a
+        // `--color-*` @theme token could carry (a translucent value has no
+        // single resolved colour independent of what sits behind it, which
+        // is the whole reason `.fd-notification` also needs the opaque
+        // `--color-elevated` fallback). Every *consumer* of the token still
+        // reads it through `var()`, which is what this test actually polices.
         const withoutHighlight = componentRules
             .replaceAll('rgb(255 255 255 / 0.4)', '')
             .replaceAll('rgb(255 255 255 / 0.08)', '')
             .replaceAll('rgb(255 255 255 / 0)', '')
+            .replaceAll('rgb(255 255 255 / 0.75)', '')
+            .replaceAll('rgb(39 39 43 / 0.75)', '')
 
         expect(withoutHighlight.match(colorLiteral) ?? []).toEqual([])
     })
@@ -2362,23 +2384,185 @@ describe('rules the components can only reference by name', () => {
     })
 })
 
-describe('a cancellation is a status, and never an error', () => {
+describe('a cancellation is a status, and never an error (Story 10.2: the sliding notification)', () => {
     /*
       EXPERIENCE.md's rule for `cancelled` is "return to Idle; never render as
       Error", and --color-error is what the Error Panel means in this palette --
-      it is used by nothing else. The summary needs to be noticed, so it carries
-      the warning token; painting it with the error token would tell the user a
-      deliberate action failed.
+      it is used by nothing else. The notification needs to be noticed, so its
+      icon disc carries the warning token; painting it with the error token
+      would tell the user a deliberate action failed.
     */
-    it('paints the cancellation summary with the warning token, not the error one', () => {
-        const summary = block('.fd-cancel-summary {')
+    it('paints the notification icon with the warning token, not the error one', () => {
+        const icon = block('.fd-notification__icon {')
 
-        expect(summary).toContain('var(--color-warning)')
-        expect(summary).not.toContain('var(--color-error)')
+        expect(icon).toContain('var(--color-warning)')
+        expect(icon).toContain('var(--color-warning-tint)')
+        expect(icon).not.toContain('var(--color-error)')
     })
 
-    it('pairs that colour with a glyph, so colour is never the only cue', () => {
-        expect(componentRules).toMatch(/\.fd-cancel-summary__icon \{[^}]*border: 1px solid currentColor;/)
+    it('never uses role="alert" or an aria-live region on the notification itself', () => {
+        const notification = block('.fd-notification {')
+        expect(notification).not.toContain('role')
+        expect(notification).not.toContain('aria-live')
+    })
+})
+
+describe('the cancellation notification overlays rather than displaces (Story 10.2)', () => {
+    it('is fixed to the viewport, not part of document flow', () => {
+        const notification = block('.fd-notification {')
+
+        expect(notification).toContain('position: fixed;')
+    })
+
+    it('never exceeds ~420px and stays inside the window gutter', () => {
+        const notification = block('.fd-notification {')
+
+        expect(notification).toMatch(/max-width:\s*min\(420px,\s*calc\(100vw - 2 \* var\(--spacing-window-gutter\)\)\);/)
+    })
+
+    it('enters via @starting-style with no @keyframes and no animation property, and never on this rule alone', () => {
+        expect(componentRules).toMatch(/@starting-style \{\s*\.fd-notification \{/)
+        const notification = block('.fd-notification {')
+        expect(notification).not.toContain('@keyframes')
+        expect(notification).not.toContain('animation:')
+    })
+
+    it('carries its own leaving state distinct from every phase view, which only ever enters', () => {
+        const leaving = block('.fd-notification[data-phase="leaving"] {')
+
+        expect(leaving).toContain('opacity: 0;')
+        expect(leaving).toContain('translate: 0 -16px;')
+    })
+
+    // The unmount step itself has no CSS spelling at all -- a stylesheet
+    // cannot express "and then call a callback", timer-driven or otherwise.
+    // Whether the unmount is wired to the exit transition's own duration or
+    // to a `transitionend` event is proved behaviourally, in
+    // `Notification.test.tsx`'s named mutation, not here.
+})
+
+describe('the notification material: translucent where supported, opaque and equally contrasted where not (Story 10.2)', () => {
+    it('falls back to the already-proven --color-elevated token outside the @supports block', () => {
+        const notification = block('.fd-notification {')
+        expect(notification).toContain('background-color: var(--color-elevated);')
+        // Not inside the feature-gated block: the fallback applies
+        // unconditionally, and the @supports block only ever adds to it.
+        expect(notificationBackdropSupport).not.toContain('--color-elevated')
+    })
+
+    it('only paints the translucent surface where backdrop-filter (or its -webkit- form) is supported', () => {
+        expect(notificationBackdropSupport).toContain('background-color: var(--color-notification-surface-translucent);')
+        expect(notificationBackdropSupport).toContain('backdrop-filter: blur(24px) saturate(1.6);')
+        expect(notificationBackdropSupport).toContain('-webkit-backdrop-filter: blur(24px) saturate(1.6);')
+    })
+
+    it('declares the translucent token in both authored modes', () => {
+        expect(stylesheet).toMatch(/--color-notification-surface-translucent:\s*rgb\(255 255 255 \/ [\d.]+\);/)
+        expect(dark).toMatch(/--color-notification-surface-translucent:\s*rgb\(39 39 43 \/ [\d.]+\);/)
+    })
+
+    it('restates the material as an opaque system surface with an outline under forced colors', () => {
+        const rule = block('.fd-notification {\n        background-color: Canvas;')
+        expect(rule).toContain('outline: 1px solid CanvasText;')
+        expect(rule).toContain('box-shadow: none;')
+        expect(rule).toContain('backdrop-filter: none;')
+    })
+})
+
+/*
+  The unrounded contrast proof for the notification's own text, derived the
+  same way "the unrounded contrast proof" describe block derives every other
+  figure in this file: composited from the tokens the stylesheet actually
+  declares, never hand-computed. DESIGN.md publishes the four figures below
+  verbatim from this test's own output, over both worst-case backdrops
+  (canvas and the drop-zone/Staged-card surface) in both authored modes, per
+  the story's own acceptance criteria.
+*/
+describe("the notification's title and body clear 4.5:1 against the material it actually resolves to (Story 10.2)", () => {
+    function channel(value: number): number {
+        const c = value / 255
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    }
+
+    function luminance(hex: string): number {
+        const digits = hex.replace('#', '')
+        return 0.2126 * channel(Number.parseInt(digits.slice(0, 2), 16)) +
+            0.7152 * channel(Number.parseInt(digits.slice(2, 4), 16)) +
+            0.0722 * channel(Number.parseInt(digits.slice(4, 6), 16))
+    }
+
+    function contrast(foreground: string, background: string): number {
+        const a = luminance(foreground)
+        const b = luminance(background)
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+    }
+
+    /** Composites a translucent `rgb(r g b / a)` layer over an opaque backdrop, rounding per channel. */
+    function composite(overlay: string, alpha: number, backgroundHex: string): string {
+        const bg = [0, 2, 4].map((i) => Number.parseInt(backgroundHex.slice(1).slice(i, i + 2), 16))
+        const fg = overlay.split(' ').map(Number)
+        const blended = bg.map((bgChannel, i) => Math.round(alpha * fg[i] + (1 - alpha) * bgChannel))
+        return `#${blended.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+    }
+
+    function declared(source: string): Record<string, string> {
+        const found: Record<string, string> = {}
+        for (const [, role, value] of source.matchAll(/--color-([a-z-]+):\s*(#[0-9A-Fa-f]{6});/g)) {
+            found[role] = value
+        }
+        return found
+    }
+
+    const lightTokens = declared(theme)
+    const darkTokens = {...lightTokens, ...declared(dark)}
+
+    /*
+      Re-derived from the stylesheet, not hand-copied: the overlay colour and
+      alpha come from the actual declarations, so a future edit to the
+      material is measured here rather than assumed. The token's light value
+      lives at `:root` (outside every extracted block, so it is read from the
+      raw `stylesheet`); its dark override lives inside the already-extracted
+      `dark` block.
+    */
+    const lightOverlayMatch = stylesheet.match(
+        /--color-notification-surface-translucent:\s*rgb\((\d+ \d+ \d+) \/ ([\d.]+)\);/,
+    )
+    const darkOverlayMatch = dark.match(
+        /--color-notification-surface-translucent:\s*rgb\((\d+ \d+ \d+) \/ ([\d.]+)\);/,
+    )
+
+    it('parses the translucent overlay colour and alpha for both modes', () => {
+        expect(lightOverlayMatch, 'light overlay').toBeTruthy()
+        expect(darkOverlayMatch, 'dark overlay').toBeTruthy()
+    })
+
+    const [, lightRgb, lightAlphaStr] = lightOverlayMatch!
+    const [, darkRgb, darkAlphaStr] = darkOverlayMatch!
+    const lightAlpha = Number(lightAlphaStr)
+    const darkAlpha = Number(darkAlphaStr)
+
+    /** [scheme, backdrop role, resolved composite]. */
+    const cases: Array<[string, string, string]> = [
+        ['light', 'canvas', composite(lightRgb, lightAlpha, lightTokens.canvas)],
+        ['light', 'surface', composite(lightRgb, lightAlpha, lightTokens.surface)],
+        ['dark', 'canvas', composite(darkRgb, darkAlpha, darkTokens.canvas)],
+        ['dark', 'surface', composite(darkRgb, darkAlpha, darkTokens.surface)],
+    ]
+
+    it.each(cases)('title (text) on the %s notification, composited over %s, clears 4.5:1', (scheme, _backdrop, resolved) => {
+        const tokens = scheme === 'light' ? lightTokens : darkTokens
+        expect(contrast(tokens.text, resolved)).toBeGreaterThan(4.5)
+    })
+
+    it.each(cases)('body (muted) on the %s notification, composited over %s, clears 4.5:1', (scheme, _backdrop, resolved) => {
+        const tokens = scheme === 'light' ? lightTokens : darkTokens
+        expect(contrast(tokens.muted, resolved)).toBeGreaterThan(4.5)
+    })
+
+    it('resolves each composite to a well-formed hex colour', () => {
+        for (const [, , resolved] of cases) {
+            expect(resolved).toMatch(/^#[0-9a-f]{6}$/)
+        }
     })
 })
 
