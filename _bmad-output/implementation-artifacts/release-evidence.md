@@ -469,3 +469,41 @@ Another, forced `source_changed` (Try Again → same item re-staged) and forced
 
 The draft was published on the owner's instruction "Merge and do the release", given
 2026-09-26.
+
+## v1.3.1 — PUBLISHED 2026-09-27
+
+A patch release for Epic 10, "Polish After 1.3.0". The static cancel-won banner is replaced by
+a translucent top-centre notification that slides in, pauses under the pointer, and leaves on
+its own after about four seconds; its unmount is timer-driven so it still leaves on an engine
+that cannot transition. The routing table's cancel-won row now focuses the Idle heading, whose
+accessible description carries the notification text while it is mounted. The revealed
+direct-link field draws its focus ring whole (the reveal region was clipping it) and paints its
+selection in a new `--color-selection` token. The owner chose 1.3.1 over 1.4.0. Transfer
+behavior is unchanged from 1.3.0.
+
+**Verification.** Tag `v1.3.1` points at `e52457f` (the release merge on `main`). That
+commit's verify run is **36292422791**, read with `gh run view --json conclusion,jobs`:
+`verify (windows-latest)` success, `verify (macos-latest)` success, `Linux adapter
+verification` success. Release run **36293183419** on the tag: all six jobs success.
+Published assets: `fairdrop.exe` (13,828,608 bytes) and `fairdrop-macos.zip` (6,242,716
+bytes), each with its `.sha256`; both checksums re-verified against downloaded copies of the
+draft before publication, and the downloaded `fairdrop.app` reports
+`CFBundleShortVersionString` 1.3.1.
+
+**A defect introduced and caught inside the epic.** Story 10.1's first selection colour reused
+`--color-primary-tint`, which is within 1.02:1 of the field's own background in both schemes,
+so the selected link was invisible — measured on the built binary by confirming ⌘C copied the
+URL while nothing looked selected. Fixed with a dedicated token and a new visibility assertion
+that failed first. See `evidence-url-selection-visibility-fix.md`.
+
+**Driven on a built macOS binary** (dark appearance): the focused link field shows a whole
+rounded ring and a visible mocha selection; Cancel from Staged shows the notification over
+Idle without displacing it, and it was gone ~4 s later.
+
+**Still unverified at publication:** the notification's slide motion itself (screenshots were
+too slow to capture a mid-transition frame; the final and resting states were observed), light
+appearance and Reduce Motion on a built binary, any Windows binary driven interactively, and a
+person launching a binary built from `e52457f`.
+
+The draft was published on the owner's instruction "lets do the merge and release but lets
+make it 1.3.1", given 2026-09-26.
