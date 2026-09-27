@@ -278,22 +278,26 @@ describe('one view per phase', () => {
         expect(screen.getByRole('main').getAttribute('data-transfer-phase')).toBe(phase)
     })
 
-    it('shows the cancel-winning summary when a terminal error carries cancelled', () => {
+    it('shows the cancel-winning notification when a terminal error carries cancelled', () => {
         const view = mountWith({...stagedState, cancelPending: true} as TransferState)
 
-        // Reached by transition, not by mounting: the summary exists only when
-        // the routing table has named this transition's owner, and the terminal
-        // branch has to forward that on. Rendering Idle without it leaves the
-        // one transition in the app with no owner at all.
+        // Reached by transition, not by mounting: the notification exists only
+        // when the routing table has named this transition's owner, and the
+        // terminal branch has to forward that on. Rendering Idle without it
+        // leaves the one transition in the app with no owner at all.
         transitionTo(view, {
             phase: 'error',
             session: {sessionId, lastSeq: 4},
             outcome: {kind: 'error', error: {code: 'cancelled', message: 'Transfer canceled.'}},
         } as TransferState)
 
-        const summary = document.querySelector('[data-focus-target="cancel-summary"]')
-        expect(summary).toBeTruthy()
-        expect(document.activeElement).toBe(summary)
+        // Story 10.2: the focus target is the Idle heading itself now, not a
+        // dedicated summary node -- the notification cannot hold focus
+        // because it disappears on its own timer.
+        const heading = document.querySelector('[data-focus-target="idle-instruction"]')
+        expect(heading).toBeTruthy()
+        expect(document.activeElement).toBe(heading)
+        expect(document.querySelector('.fd-notification')).toBeTruthy()
         expect(document.querySelector('[data-outcome]')).toBeNull()
     })
 
@@ -472,10 +476,13 @@ describe('focus-owned transitions', () => {
             'command-error',
         ],
         [
+            // Story 10.2, owner-approved: the target is the Idle heading now,
+            // not the retired 'cancel-summary' node -- see the describe block
+            // below for the notification itself.
             'Cancel-winning reset',
             {...stagedState, cancelPending: true} as TransferState,
             idleState,
-            'cancel-summary',
+            'idle-instruction',
         ],
         [
             'Dismiss retained outcome',
@@ -494,17 +501,65 @@ describe('focus-owned transitions', () => {
         expect(announcer().textContent).toBe('')
     })
 
-    it('shows the cancellation summary it focuses, and never as an Error', () => {
+    it('shows the cancellation notification it describes the focused heading with, and never as an Error', () => {
         const view = mountWith({...stagedState, cancelPending: true} as TransferState)
 
         transitionTo(view, idleState)
 
-        // The glyph beside it is aria-hidden and shares the focused
-        // container, so assert the text node it announces.
-        expect(document.activeElement?.querySelector('.fd-cancel-summary__text')?.textContent)
+        // Story 10.2: the focused heading (not a dedicated summary node) is
+        // described by the notification's own hidden text, which carries the
+        // exact combined sentence the old static summary used to render.
+        const heading = document.activeElement as HTMLElement
+        expect(heading.getAttribute('data-focus-target')).toBe('idle-instruction')
+        const describedById = heading.getAttribute('aria-describedby')
+        expect(describedById).toBeTruthy()
+        expect(document.getElementById(describedById!)?.textContent)
             .toBe('Transfer canceled. Ready for another file or folder.')
+        expect(document.querySelector('.fd-notification')).toBeTruthy()
         expect(document.querySelector('.fd-outcome')).toBeNull()
         expect(document.querySelector('[role="alert"]')).toBeNull()
+    })
+})
+
+describe('the cancellation notification (Story 10.2)', () => {
+    it('is not a live region and carries no control', () => {
+        const view = mountWith({...stagedState, cancelPending: true} as TransferState)
+        transitionTo(view, idleState)
+
+        const notification = document.querySelector('.fd-notification') as HTMLElement
+        expect(notification).toBeTruthy()
+        expect(notification.getAttribute('role')).not.toBe('alert')
+        expect(notification.closest('[aria-live]')).toBeNull()
+        expect(notification.querySelector('button')).toBeNull()
+    })
+
+    it('removes the notification the instant a Stage starts, before its own timer would', () => {
+        const view = mountWith({...stagedState, cancelPending: true} as TransferState)
+        transitionTo(view, idleState)
+        expect(document.querySelector('.fd-notification')).toBeTruthy()
+
+        transitionTo(view, pendingState)
+
+        expect(document.querySelector('.fd-notification')).toBeNull()
+    })
+
+    it('replaces (remounts) the notification when a second cancellation lands while one is showing', () => {
+        const view = mountWith({...stagedState, cancelPending: true} as TransferState)
+        transitionTo(view, idleState)
+        const first = document.querySelector('.fd-notification')
+        expect(first).toBeTruthy()
+
+        // Back through a live session and cancel again -- a second
+        // cancel-winning reset while the first notification is still up.
+        transitionTo(view, {...transferringState, cancelPending: true} as TransferState)
+        transitionTo(view, idleState)
+
+        const second = document.querySelector('.fd-notification')
+        expect(second).toBeTruthy()
+        // A fresh mount, not the same node kept in place with new props --
+        // this is what "restarts the timer" means for a component whose own
+        // effect starts the countdown on mount.
+        expect(second).not.toBe(first)
     })
 })
 

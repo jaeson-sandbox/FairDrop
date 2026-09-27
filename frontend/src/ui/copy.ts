@@ -122,7 +122,17 @@ export const copy = {
         preparationPending: 'Canceling preparation',
         action: 'Cancel',
         pending: 'Canceling',
-        won: 'Transfer canceled. Ready for another file or folder.',
+        /**
+         * Story 10.2: the cancel-winning notification's title and body,
+         * replacing the single combined `copy.cancel.won` the static Idle
+         * summary used to render. Split so the notification can bold the
+         * title and mute the body as two lines (DESIGN.md's Notification
+         * row); the combined sentence still exists, assembled from these two
+         * strings, as the accessible description the Idle heading points at
+         * while the notification is mounted (`Notification.tsx`).
+         */
+        wonTitle: 'Transfer canceled',
+        wonBody: 'Ready for another file or folder.',
     },
     outcome: {
         dismiss: 'Dismiss',

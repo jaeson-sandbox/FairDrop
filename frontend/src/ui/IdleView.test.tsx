@@ -37,31 +37,31 @@ function show(
     return {view, onSelectFile, onSelectDirectory}
 }
 
-describe('where the cancellation summary sits', () => {
-    // Reported from the running app: it read as nothing in particular, under
-    // the selection area. It now leads the region, which is also where a
-    // retained Done or Error already appears from the shell.
-    it('leads the Idle region rather than following the controls', () => {
+describe('the Idle heading describes the notification while a cancellation is showing (Story 10.2)', () => {
+    // Story 10.2 removed the static `.fd-cancel-summary` this component used
+    // to render; App now renders a sliding notification above the whole
+    // phase-view region instead, and this component's only remaining part
+    // is wiring the Idle heading's `aria-describedby` at the notification's
+    // well-known text id while `cancelWon` is true.
+    it('describes the heading with the notification text id when a cancellation won', () => {
         show(idle(), {}, true)
-        const region = document.querySelector('.fd-idle')!
+        const heading = screen.getByRole('heading', {name: 'Drop one file or folder'})
 
-        expect(region.firstElementChild?.classList.contains('fd-cancel-summary')).toBe(true)
+        expect(heading.getAttribute('aria-describedby')).toBe('fd-notification-text')
     })
 
-    it('carries a visible glyph beside the text, hidden from assistive technology', () => {
-        show(idle(), {}, true)
-        const icon = document.querySelector('.fd-cancel-summary__icon')!
-
-        // The colour is not the only cue, and the glyph is not read twice: the
-        // sentence already says the transfer was cancelled.
-        expect(icon.textContent?.trim()).not.toBe('')
-        expect(icon.getAttribute('aria-hidden')).toBe('true')
-    })
-
-    it('is absent entirely when no cancellation won', () => {
+    it('carries no aria-describedby when no cancellation won', () => {
         show()
+        const heading = screen.getByRole('heading', {name: 'Drop one file or folder'})
+
+        expect(heading.hasAttribute('aria-describedby')).toBe(false)
+    })
+
+    it('renders no static summary node of its own -- App owns the notification now', () => {
+        show(idle(), {}, true)
 
         expect(document.querySelector('.fd-cancel-summary')).toBeNull()
+        expect(document.querySelector('.fd-notification')).toBeNull()
     })
 })
 
@@ -506,26 +506,23 @@ describe('what Idle no longer owns', () => {
 })
 
 describe('Idle after a cancellation won its race', () => {
-    it('carries the cancellation summary as a focus target, not as an Error', () => {
+    it('carries the Idle heading as the focus target, not as an Error, described by the notification (Story 10.2)', () => {
         show(idle(), {}, true)
 
-        const summary = document.querySelector('[data-focus-target="cancel-summary"]') as HTMLElement
-        // The decorative glyph shares the focused container, so assert the
-        // text node rather than the container's raw textContent: the glyph
-        // is aria-hidden and is not part of what is announced.
-        expect(summary.querySelector('.fd-cancel-summary__text')?.textContent)
-            .toBe('Transfer canceled. Ready for another file or folder.')
-        expect(summary.getAttribute('tabindex')).toBe('-1')
+        const heading = document.querySelector('[data-focus-target="idle-instruction"]') as HTMLElement
+        expect(heading.getAttribute('tabindex')).toBe('-1')
+        expect(heading.getAttribute('aria-describedby')).toBe('fd-notification-text')
         // Never an Error, and never a live region: focus is this row's one owner.
         expect(document.querySelector('.fd-outcome')).toBeNull()
         expect(document.querySelector('[role="alert"]')).toBeNull()
-        expect(summary.closest('[aria-live]')).toBeNull()
+        expect(heading.closest('[aria-live]')).toBeNull()
     })
 
-    it('shows no summary on the Idle the app simply starts in', () => {
+    it('describes nothing on the Idle the app simply starts in', () => {
         show()
 
-        expect(document.querySelector('[data-focus-target="cancel-summary"]')).toBeNull()
+        const heading = document.querySelector('[data-focus-target="idle-instruction"]') as HTMLElement
+        expect(heading.hasAttribute('aria-describedby')).toBe(false)
     })
 
     it('marks the drop instruction as the target Dismiss focuses', () => {

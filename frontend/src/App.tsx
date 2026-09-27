@@ -9,6 +9,7 @@ import {focusSelector, routeTransition, type FocusTarget} from './ui/announce'
 import {nextProgressSpeech, type ProgressSpeechMemory} from './ui/progressSpeech'
 import {copy} from './ui/copy'
 import {IdleView} from './ui/IdleView'
+import {NOTIFICATION_TEXT_ID, Notification} from './ui/Notification'
 import {OutcomePanel, type OutcomeBrowseAction, type OutcomeCardProps} from './ui/OutcomePanel'
 import {StagePendingCard} from './ui/StagePendingCard'
 import {StagedView} from './ui/StagedView'
@@ -35,10 +36,21 @@ function App() {
     // region that accumulated text would be the event log the spine forbids.
     const [announcement, setAnnouncement] = useState({text: '', nonce: 0})
 
-    // A cancel-winning reset lands on plain Idle, which is also the state the
-    // app starts in, so the summary cannot be derived from the reducer. The
-    // transition is the evidence, and App is where transitions are observed.
-    const [cancelWon, setCancelWon] = useState(false)
+    /*
+      A cancel-winning reset lands on plain Idle, which is also the state the
+      app starts in, so the notification cannot be derived from the reducer.
+      The transition is the evidence, and App is where transitions are
+      observed.
+
+      `nonce` is what makes "a new cancellation while one is showing replaces
+      it and restarts the timer" (Story 10.2) simple: passing it as the
+      `Notification`'s React `key` forces a fresh mount -- a fresh dismissal
+      timer -- exactly when a second cancellation lands while the first
+      notification is still up, without this component tracking pause/resume
+      state of its own (`Notification.tsx` owns that entirely).
+    */
+    const [cancelNotification, setCancelNotification] = useState<{readonly nonce: number} | null>(null)
+    const cancelWon = cancelNotification !== null
 
     // Requested here, performed by the effect below -- after the render that
     // this transition's own view (the cancellation summary, for one) is part of.
@@ -173,7 +185,22 @@ function App() {
         if (next.phase !== 'transferring') speechRef.current = null
 
         const routed = routeTransition(previous, next)
-        setCancelWon(routed !== null && routed.row === 'cancel-won')
+
+        /*
+          Story 10.2: the notification's own lifetime, driven by the two
+          rules the acceptance criteria name -- "a new cancellation while one
+          is showing replaces it and restarts the timer" and "starting a
+          Stage or the app leaving Idle removes it immediately". Both are
+          expressed here, beside the routing decision that already observes
+          every transition, rather than inside `Notification.tsx`: the
+          component only knows its own visible/leaving state, never why it
+          was mounted or unmounted.
+        */
+        if (routed !== null && routed.row === 'cancel-won') {
+            setCancelNotification((current) => ({nonce: (current?.nonce ?? 0) + 1}))
+        } else if (previous.phase === 'idle' && next.phase !== 'idle') {
+            setCancelNotification(null)
+        }
 
         if (routed === null) {
             speakProgress(previous, next)
@@ -285,6 +312,20 @@ function App() {
     // reset event is lost (D-059).
     return (
         <main className="fd-app" data-transfer-phase={transfer.state.phase} ref={rootRef}>
+            {cancelNotification === null ? null : (
+                // key={nonce}: a replacement cancellation forces a fresh
+                // mount rather than updating props on the existing one, which
+                // is what "restarts the timer" means for a component whose
+                // whole dismissal clock lives in its own effect.
+                <Notification
+                    key={cancelNotification.nonce}
+                    icon={<span aria-hidden="true">&times;</span>}
+                    title={copy.cancel.wonTitle}
+                    body={copy.cancel.wonBody}
+                    textId={NOTIFICATION_TEXT_ID}
+                    onDismiss={() => setCancelNotification(null)}
+                />
+            )}
             {outcome === null ? null : (
                 <OutcomePanel
                     outcome={outcome}

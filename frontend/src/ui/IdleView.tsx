@@ -3,6 +3,7 @@ import {selectCommandError} from '../transfer/selectors'
 import type {IdleTransferState} from '../transfer/state'
 import {BrowseControl} from './BrowseControl'
 import {Disclosure} from './Disclosure'
+import {NOTIFICATION_TEXT_ID} from './Notification'
 import {OutcomePanel, type OutcomeCardProps} from './OutcomePanel'
 import {RecoveryHelpContent} from './RecoveryHelp'
 import {copy} from './copy'
@@ -38,6 +39,13 @@ interface IdleViewProps {
      * It cannot be read from the state: a cancel-winning reset lands on plain
      * Idle, which is also how the app starts. App owns the transition, so App
      * owns this flag, and the reducer keeps its two retained-outcome kinds.
+     *
+     * Story 10.2: this no longer renders a static summary here -- App renders
+     * the sliding notification itself, above this whole region. This flag now
+     * only decides whether the Idle heading carries `aria-describedby`
+     * pointing at that notification's text, so the one focus move still
+     * reads as a single combined announcement while the notification is
+     * mounted.
      */
     readonly cancelWon: boolean
     readonly onSelectFile: () => void
@@ -54,10 +62,16 @@ interface IdleViewProps {
 }
 
 /**
- * Idle: the cancellation summary, the drop target (glyph, heading, promise
- * line and the one browse control, in that order -- Story 9.3), a command
- * failure, and the grouped disclosure list (firewall preflight then
- * troubleshooting), in that document order.
+ * Idle: the drop target (glyph, heading, promise line and the one browse
+ * control, in that order -- Story 9.3), a command failure, and the grouped
+ * disclosure list (firewall preflight then troubleshooting), in that document
+ * order.
+ *
+ * Story 10.2 removes the static cancellation summary that used to lead this
+ * region: App now renders a sliding, self-dismissing notification above the
+ * whole phase-view region instead (see `App.tsx`), and this component's only
+ * remaining part in that transition is the heading's `aria-describedby` set
+ * below.
  *
  * The drop instruction leads because it is this region's `h1`. Story 7.8 put
  * the browse control -- the one control that does something -- ahead of both
@@ -108,32 +122,6 @@ export function IdleView({
         <div className="fd-region" data-phase-view="idle">
             <section className="fd-idle">
                 {/*
-                  The cancel-winning summary, first in the region.
-
-                  It leads because it is the answer to what just happened, and
-                  because a retained Done or Error already renders above this
-                  view from the shell -- an outcome that appeared under the
-                  browse control was the odd one out.
-
-                  Warning, not error. The spine's rule for `cancelled` is
-                  "return to Idle; never render as Error", and `--color-error`
-                  is the error language here: it appears on nothing but the
-                  Error Panel. Amber says "this stopped" without calling a
-                  deliberate action a failure. It is a focus target and nothing
-                  else -- no live region, because focus owns this transition.
-                */}
-                {cancelWon ? (
-                    <div
-                        className="fd-cancel-summary"
-                        tabIndex={-1}
-                        data-focus-target="cancel-summary"
-                    >
-                        <span className="fd-cancel-summary__icon" aria-hidden="true">&times;</span>
-                        <p className="fd-cancel-summary__text">{copy.cancel.won}</p>
-                    </div>
-                ) : null}
-
-                {/*
                   A drop target that also frames the one browse control. The
                   outer card itself still carries no click handler and no tab
                   stop of its own -- the browse control nested inside it (Story
@@ -178,6 +166,22 @@ export function IdleView({
                             style={rise(1)}
                             tabIndex={-1}
                             data-focus-target="idle-instruction"
+                            /*
+                              Story 10.2, owner-approved routing amendment:
+                              the cancel-won transition focuses this heading
+                              rather than a dedicated summary node, because
+                              the sliding notification that replaced the
+                              static summary disappears on its own timer and
+                              cannot hold focus itself. While the
+                              notification is mounted, this attribute is what
+                              lets "Drop one file or folder" plus "Transfer
+                              canceled. Ready for another file or folder."
+                              announce as the one combined message the single
+                              focus move owns -- removed the moment the
+                              notification unmounts, so the attribute never
+                              outlives the element it names.
+                            */
+                            aria-describedby={cancelWon ? NOTIFICATION_TEXT_ID : undefined}
                         >
                             {copy.idle.instruction}
                         </h1>

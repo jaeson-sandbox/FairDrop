@@ -200,6 +200,19 @@
       table the way colors, type, radii, spacing and elevation are.
     */
     --ease-decelerate: cubic-bezier(.32, .72, 0, 1);
+
+    /*
+      Story 10.2: the cancellation notification's translucent material.
+      Not a `--color-*` @theme token on purpose -- it is not a solid Quartz
+      colour, and the forced-colors "every authored token needs a system
+      answer" check (styles.test.ts, "forced colors") only walks the @theme
+      block, so a translucent value declared here instead needs no entry
+      there; `.fd-notification`'s own forced-colors rule (below) overrides
+      the material outright regardless. The opaque fallback for an engine
+      without backdrop-filter support is the already-proven `--color-elevated`
+      token, not a second value declared here -- see `.fd-notification`.
+    */
+    --color-notification-surface-translucent: rgb(255 255 255 / 0.75);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -245,6 +258,9 @@
         --shadow-sh-1: 0 0.5px 1px rgba(0,0,0,.4);
         --shadow-sh-2: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.34);
         --shadow-sh-3: 0 2px 8px rgba(0,0,0,.44), 0 16px 40px rgba(0,0,0,.5);
+
+        /* Story 10.2: the dark half of the notification's translucent material. */
+        --color-notification-surface-translucent: rgb(39 39 43 / 0.75);
     }
 }
 
@@ -1380,39 +1396,124 @@ body {
 }
 
 /*
-  The cancel-winning summary. Quiet status, not an outcome panel: a cancellation
-  is never rendered as an Error, and this node carries no icon, rule or color
-  that would read as one.
+  Story 10.2's sliding cancellation notification -- the one sanctioned
+  transient overlay EXPERIENCE.md's Interaction Primitives now names beside
+  the "no lifecycle/reset timers" ban, replacing the static `.fd-cancel-summary`
+  this section used to declare. Quiet status, not an outcome panel: a
+  cancellation is never rendered as an Error, and this carries no rule or
+  colour that would read as one -- the warning tint, not the error one, on
+  the icon disc below.
+
+  Fixed at the top centre so it overlays rather than displaces the Idle
+  layout beneath it (`position: fixed` takes it out of flow entirely).
+  `transform: translateX(-50%)` does the constant horizontal centring;
+  the standalone `translate` property (untouched by that `transform`,
+  since the two compose independently -- Motion, DESIGN.md) is what the
+  entrance/exit transition below actually animates.
 */
-/*
-  A status, styled like the other statuses: coloured rule, coloured text, glyph.
-  Warning rather than error, because the spine forbids rendering a cancellation
-  as an Error and `--color-error` is what the Error Panel means here.
-*/
-.fd-cancel-summary {
+.fd-notification {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    z-index: 10;
     display: flex;
+    align-items: flex-start;
     gap: var(--spacing-3);
-    align-items: center;
-    padding: var(--spacing-4);
-    border: 1px solid var(--color-warning);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-warning);
+    width: max-content;
+    max-width: min(420px, calc(100vw - 2 * var(--spacing-window-gutter)));
+    padding: var(--spacing-3) var(--spacing-4);
+    border: 1px solid var(--color-separator);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sh-3);
+    /*
+      The opaque fallback for an engine without backdrop-filter support:
+      the already-proven `--color-elevated` token (text/elevated and
+      muted/elevated both clear 4.5:1 in both authored modes -- "the
+      unrounded contrast proof", styles.test.ts), not a new value derived
+      for this one component. "An opaque value that meets the same
+      contrast" (the story's own wording) is satisfied by reusing a token
+      already held to that floor.
+    */
+    background-color: var(--color-elevated);
+    color: var(--color-text);
+    transform: translateX(-50%);
+    translate: none;
+    opacity: 1;
+    transition:
+        opacity 420ms var(--ease-decelerate),
+        translate 420ms var(--ease-decelerate);
 }
 
-.fd-cancel-summary__icon {
+@starting-style {
+    .fd-notification {
+        opacity: 0;
+        translate: 0 -16px;
+    }
+}
+
+/*
+  The exit. Every phase view in this sheet only ever enters (DESIGN.md's
+  Motion section is explicit that none of them animate out); this component
+  is genuinely transient, so it alone carries a leaving state. `data-phase`
+  is set by `Notification.tsx`'s own dismissal timer, never by this rule
+  reacting to a `transitionend` the browser fired -- see that component's
+  own comment for why the unmount step is timer-driven instead.
+*/
+.fd-notification[data-phase="leaving"] {
+    opacity: 0;
+    translate: 0 -16px;
+    transition:
+        opacity 260ms var(--ease-decelerate),
+        translate 260ms var(--ease-decelerate);
+}
+
+/*
+  The translucent material layered over the opaque fallback above. An engine
+  that supports backdrop-filter gets the blurred, saturated surface
+  DESIGN.md's Notification row asks for; one that does not keeps the flat
+  `--color-elevated` fill, unconditionally opaque and separately proven to
+  clear the same contrast floor -- true progressive enhancement, with
+  nothing here to detect and no fallback branch to maintain.
+*/
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .fd-notification {
+        background-color: var(--color-notification-surface-translucent);
+        backdrop-filter: blur(24px) saturate(1.6);
+        -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
+}
+
+.fd-notification__icon {
     display: grid;
     flex: none;
     width: 26px;
     height: 26px;
     place-items: center;
-    border: 1px solid currentColor;
     border-radius: var(--radius-full);
+    background: var(--color-warning-tint);
+    color: var(--color-warning);
     font-size: var(--text-body);
 }
 
-.fd-cancel-summary__text {
+.fd-notification__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+    min-inline-size: 0;
+}
+
+.fd-notification__title {
     margin: 0;
+    font-size: var(--text-body-strong);
+    font-weight: var(--font-weight-body-strong);
+    line-height: var(--leading-body-strong);
+}
+
+.fd-notification__body {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
 }
 
 /* ------------------------------------------------------------ Paper packets */
@@ -2658,6 +2759,21 @@ body {
     .fd-qr-panel,
     .fd-qr {
         forced-color-adjust: none;
+    }
+
+    /*
+      Story 10.2: the notification's translucent material has no system
+      colour, so it is restated as an opaque system surface with a real
+      `outline` -- the decorative `border`/`box-shadow` above are dropped
+      the same way every other shadow and gradient are in this mode.
+    */
+    .fd-notification {
+        background-color: Canvas;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border-color: CanvasText;
+        outline: 1px solid CanvasText;
+        box-shadow: none;
     }
 }
 
