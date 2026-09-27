@@ -62,6 +62,26 @@
       wash.
     */
     --color-primary-tint: #F5EEEB;
+    /*
+      Defect fix (found rendered on the built macOS binary, dark appearance):
+      `.fd-url::selection` used to read `--color-primary-tint` directly on
+      the reasoning that the text/tint pair was already load-bearing and
+      already published (Story 10.1's own comment, now removed). That
+      comment only ever measured the selection's TEXT against the tint --
+      nothing measured the tint itself against the URL field's own
+      background, `--color-fill`, that the selection paints over. In dark
+      mode `--color-primary-tint`'s `#372E2B` and `--color-fill`'s `#313135`
+      are close enough (1.021:1) that a sender cannot tell the field is
+      selected at all, even though Cmd+C still copies the right value.
+      `--color-selection` is authored -- not derived from `primary-tint` by
+      a formula -- so it can be tuned against `--color-fill` independently of
+      whatever `primary-tint` needs for its own, unrelated job (the drag-
+      active drop zone fill and the browse-menu item fill). See
+      styles.test.ts's "the URL field selection is visible against its own
+      field" for the 1.5:1 visibility floor this clears, and "text on
+      selection clears its AA ratio" for the 4.5:1 text floor.
+    */
+    --color-selection: #D9A679;
     --color-track: #E9E9EB;
     /*
       Story 7.8 introduced a dedicated violet `--color-focus` here, distinct
@@ -200,6 +220,19 @@
       table the way colors, type, radii, spacing and elevation are.
     */
     --ease-decelerate: cubic-bezier(.32, .72, 0, 1);
+
+    /*
+      Story 10.2: the cancellation notification's translucent material.
+      Not a `--color-*` @theme token on purpose -- it is not a solid Quartz
+      colour, and the forced-colors "every authored token needs a system
+      answer" check (styles.test.ts, "forced colors") only walks the @theme
+      block, so a translucent value declared here instead needs no entry
+      there; `.fd-notification`'s own forced-colors rule (below) overrides
+      the material outright regardless. The opaque fallback for an engine
+      without backdrop-filter support is the already-proven `--color-elevated`
+      token, not a second value declared here -- see `.fd-notification`.
+    */
+    --color-notification-surface-translucent: rgb(255 255 255 / 0.75);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -233,6 +266,16 @@
           without re-checking muted/primary-tint in the contrast proof.
         */
         --color-primary-tint: #372E2B;
+        /*
+          Defect fix: the dark half of the dedicated selection token -- see
+          the light declaration's comment above for why this is authored
+          rather than derived from `--color-primary-tint`. #7A5240 clears
+          both floors styles.test.ts pins: text/selection at 6.042413035:1
+          (>= 4.5:1) and selection/fill at 1.917235399:1 (>= 1.5:1) -- unlike
+          `--color-primary-tint`'s dark value, which measured only 1.021:1
+          against `--color-fill` and was the whole defect.
+        */
+        --color-selection: #7A5240;
         --color-track: #3A3A3E;
         --color-success: #4ED08B;
         --color-success-tint: #20342A;
@@ -245,6 +288,9 @@
         --shadow-sh-1: 0 0.5px 1px rgba(0,0,0,.4);
         --shadow-sh-2: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.34);
         --shadow-sh-3: 0 2px 8px rgba(0,0,0,.44), 0 16px 40px rgba(0,0,0,.5);
+
+        /* Story 10.2: the dark half of the notification's translucent material. */
+        --color-notification-surface-translucent: rgb(39 39 43 / 0.75);
     }
 }
 
@@ -1380,39 +1426,124 @@ body {
 }
 
 /*
-  The cancel-winning summary. Quiet status, not an outcome panel: a cancellation
-  is never rendered as an Error, and this node carries no icon, rule or color
-  that would read as one.
+  Story 10.2's sliding cancellation notification -- the one sanctioned
+  transient overlay EXPERIENCE.md's Interaction Primitives now names beside
+  the "no lifecycle/reset timers" ban, replacing the static `.fd-cancel-summary`
+  this section used to declare. Quiet status, not an outcome panel: a
+  cancellation is never rendered as an Error, and this carries no rule or
+  colour that would read as one -- the warning tint, not the error one, on
+  the icon disc below.
+
+  Fixed at the top centre so it overlays rather than displaces the Idle
+  layout beneath it (`position: fixed` takes it out of flow entirely).
+  `transform: translateX(-50%)` does the constant horizontal centring;
+  the standalone `translate` property (untouched by that `transform`,
+  since the two compose independently -- Motion, DESIGN.md) is what the
+  entrance/exit transition below actually animates.
 */
-/*
-  A status, styled like the other statuses: coloured rule, coloured text, glyph.
-  Warning rather than error, because the spine forbids rendering a cancellation
-  as an Error and `--color-error` is what the Error Panel means here.
-*/
-.fd-cancel-summary {
+.fd-notification {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    z-index: 10;
     display: flex;
+    align-items: flex-start;
     gap: var(--spacing-3);
-    align-items: center;
-    padding: var(--spacing-4);
-    border: 1px solid var(--color-warning);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-warning);
+    width: max-content;
+    max-width: min(420px, calc(100vw - 2 * var(--spacing-window-gutter)));
+    padding: var(--spacing-3) var(--spacing-4);
+    border: 1px solid var(--color-separator);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sh-3);
+    /*
+      The opaque fallback for an engine without backdrop-filter support:
+      the already-proven `--color-elevated` token (text/elevated and
+      muted/elevated both clear 4.5:1 in both authored modes -- "the
+      unrounded contrast proof", styles.test.ts), not a new value derived
+      for this one component. "An opaque value that meets the same
+      contrast" (the story's own wording) is satisfied by reusing a token
+      already held to that floor.
+    */
+    background-color: var(--color-elevated);
+    color: var(--color-text);
+    transform: translateX(-50%);
+    translate: none;
+    opacity: 1;
+    transition:
+        opacity 420ms var(--ease-decelerate),
+        translate 420ms var(--ease-decelerate);
 }
 
-.fd-cancel-summary__icon {
+@starting-style {
+    .fd-notification {
+        opacity: 0;
+        translate: 0 -16px;
+    }
+}
+
+/*
+  The exit. Every phase view in this sheet only ever enters (DESIGN.md's
+  Motion section is explicit that none of them animate out); this component
+  is genuinely transient, so it alone carries a leaving state. `data-phase`
+  is set by `Notification.tsx`'s own dismissal timer, never by this rule
+  reacting to a `transitionend` the browser fired -- see that component's
+  own comment for why the unmount step is timer-driven instead.
+*/
+.fd-notification[data-phase="leaving"] {
+    opacity: 0;
+    translate: 0 -16px;
+    transition:
+        opacity 260ms var(--ease-decelerate),
+        translate 260ms var(--ease-decelerate);
+}
+
+/*
+  The translucent material layered over the opaque fallback above. An engine
+  that supports backdrop-filter gets the blurred, saturated surface
+  DESIGN.md's Notification row asks for; one that does not keeps the flat
+  `--color-elevated` fill, unconditionally opaque and separately proven to
+  clear the same contrast floor -- true progressive enhancement, with
+  nothing here to detect and no fallback branch to maintain.
+*/
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .fd-notification {
+        background-color: var(--color-notification-surface-translucent);
+        backdrop-filter: blur(24px) saturate(1.6);
+        -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
+}
+
+.fd-notification__icon {
     display: grid;
     flex: none;
     width: 26px;
     height: 26px;
     place-items: center;
-    border: 1px solid currentColor;
     border-radius: var(--radius-full);
+    background: var(--color-warning-tint);
+    color: var(--color-warning);
     font-size: var(--text-body);
 }
 
-.fd-cancel-summary__text {
+.fd-notification__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+    min-inline-size: 0;
+}
+
+.fd-notification__title {
     margin: 0;
+    font-size: var(--text-body-strong);
+    font-weight: var(--font-weight-body-strong);
+    line-height: var(--leading-body-strong);
+}
+
+.fd-notification__body {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
 }
 
 /* ------------------------------------------------------------ Paper packets */
@@ -1667,8 +1798,47 @@ body {
     min-height: 0;
 }
 
+/*
+  Defect fix (Story 10.1, owner screenshot of the 1.3.0 binary): clicking the
+  revealed field painted a mocha band above and below it, cut off square at
+  both sides, instead of a ring. `.fd-url:focus-visible` below paints the
+  same two-tone `box-shadow` ring every other control uses -- drawn
+  `--focus-ring-offset + --focus-ring-width` outside the field's own border
+  box -- and `.fd-url-reveal__inner` above clips anything outside *its* own
+  box to make the grid-rows height animation read as a clean accordion. Before
+  this fix, `__inner`'s box hugged this body so tightly (no horizontal
+  padding, no bottom padding) that the ring had no room on any side: fully
+  clipped left and right, and only a flat sliver of the ring's straight edge
+  survived top and bottom because there was no room for its rounded corners
+  either -- exactly the "band, cut off square" the owner described.
+
+  The fix gives the ring room on `__body`, not on `__inner` itself, and that
+  choice is load-bearing, not a style preference: `__inner` is the element
+  the `0fr`/`1fr` grid-rows animation squeezes to zero height when collapsed,
+  and `box-sizing: border-box` has a hard floor at an element's own padding
+  sum -- a border-box element can be *told* to be shorter than its padding,
+  but it will never actually render shorter than that sum. Padding placed on
+  `__inner` would leave a permanent few-pixel gap the reveal could never
+  fully close, `min-height: 0` above notwithstanding (that override defeats
+  the *content-based* automatic minimum size grid items get by default; it
+  does not defeat the padding floor, which is a separate rule of the box
+  model). Padding here, on `__body`, has no such floor: `__body` is an
+  ordinary block whose own height is simply whatever its padding and content
+  add up to, and `__inner` -- unpadded, and sized only by its single child --
+  auto-sizes around that larger box when open and clips it away entirely,
+  ring room included, when collapsed. Nothing about the closed state changes:
+  `__inner` still has zero padding of its own, so it still genuinely reaches
+  zero height.
+
+  The existing top padding folds into the same ring-room figure rather than
+  stacking with it, so all four sides read as one consistent gap around the
+  field rather than a taller one on top by coincidence.
+*/
 .fd-url-reveal__body {
-    padding-top: var(--spacing-3);
+    padding:
+        calc(var(--spacing-3) + var(--focus-ring-offset) + var(--focus-ring-width))
+        calc(var(--focus-ring-offset) + var(--focus-ring-width))
+        calc(var(--focus-ring-offset) + var(--focus-ring-width));
 }
 
 /*
@@ -1802,6 +1972,33 @@ body {
     font-size: var(--text-code);
     font-weight: var(--font-weight-code);
     line-height: var(--leading-code);
+}
+
+/*
+  Defect fix (Story 10.1): the select-all-on-focus highlight (see the
+  `onFocus` handler in `StagedView.tsx`) painted the engine's default
+  selection colour instead of the product's accent family.
+
+  Follow-up defect fix, found rendered on the built macOS binary (dark
+  appearance): Story 10.1 originally read `--color-primary-tint` here on the
+  reasoning that `{colors.text}` on `{colors.primary-tint}` was already
+  load-bearing and already published -- but that pair only proves the
+  selection's TEXT is readable, not that the selection itself is visible
+  against the field it sits on. `--color-primary-tint`'s dark value is
+  nearly identical to the URL field's own `--color-fill` in dark mode
+  (1.021:1, see that token's own comment above) -- the selection was there
+  and Cmd+C still copied the right value, but a sender in dark mode could
+  not see that anything was selected at all. `--color-selection` is a
+  dedicated token for exactly this job (declared in `@theme` above, authored
+  rather than derived from `primary-tint`): text on it clears 4.5:1
+  (8.011038123 light, 6.042413035 dark) and it clears 1.5:1 against the
+  field's own `--color-fill` (1.921761995 light, 1.917235399 dark) -- see
+  styles.test.ts's "the unrounded contrast proof" describe block for both
+  floors.
+*/
+.fd-url::selection {
+    background: var(--color-selection);
+    color: var(--color-text);
 }
 
 .fd-copy-feedback {
@@ -2543,6 +2740,20 @@ body {
         --color-primary-hover: Highlight;
         --color-primary-ink: HighlightText;
         --color-primary-tint: Canvas;
+        /*
+          Defect fix: `--color-selection` maps to `Highlight` here, the
+          system's own text-selection colour, consistent with `primary`/
+          `primary-hover` above. `.fd-url::selection` below restates the
+          *foreground* half explicitly as `HighlightText` too, because this
+          rule's ordinary `color` reads `--color-text` (`CanvasText` in this
+          block) for every other purpose it serves -- remapping `--color-text`
+          itself to `HighlightText` here would wrongly recolor all of the
+          body copy, headings and labels that token also feeds. Restating
+          the one rule that needs the paired system colour is what keeps
+          both halves -- `Highlight` background, `HighlightText` text -- a
+          real selection pair rather than `Highlight` on `CanvasText`.
+        */
+        --color-selection: Highlight;
         --color-track: Canvas;
         /*
           Story 7.11: no `--color-focus` override needed here any more. The
@@ -2567,6 +2778,18 @@ body {
     .fd-button--primary {
         background: Highlight;
         box-shadow: none;
+    }
+
+    /*
+      Defect fix: restates the URL field's selection as the real system
+      selection pair -- `Highlight` background, `HighlightText` foreground --
+      rather than `Highlight` on `--color-text` (`CanvasText`). See the
+      `--color-selection` comment above for why the foreground can't simply
+      read a token here the way the background does.
+    */
+    .fd-url::selection {
+        background: Highlight;
+        color: HighlightText;
     }
 
     /*
@@ -2604,6 +2827,21 @@ body {
     .fd-qr-panel,
     .fd-qr {
         forced-color-adjust: none;
+    }
+
+    /*
+      Story 10.2: the notification's translucent material has no system
+      colour, so it is restated as an opaque system surface with a real
+      `outline` -- the decorative `border`/`box-shadow` above are dropped
+      the same way every other shadow and gradient are in this mode.
+    */
+    .fd-notification {
+        background-color: Canvas;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border-color: CanvasText;
+        outline: 1px solid CanvasText;
+        box-shadow: none;
     }
 }
 

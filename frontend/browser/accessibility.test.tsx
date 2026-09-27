@@ -6,6 +6,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {IdleTransferState, StagedTransferState, TransferringTransferState} from '../src/transfer/state'
 import type {FileMetadata, ProgressSnapshot} from '../src/transfer/types'
 import {IdleView} from '../src/ui/IdleView'
+import {NOTIFICATION_TEXT_ID, Notification} from '../src/ui/Notification'
 import {OutcomePanel} from '../src/ui/OutcomePanel'
 import {StagedView} from '../src/ui/StagedView'
 import {TransferringView} from '../src/ui/TransferringView'
@@ -253,6 +254,40 @@ async function renderIdleInAppShell(): Promise<HTMLElement> {
                 state={idle()}
                 dropTargetStyle={dropTargetStyle}
                 cancelWon={false}
+                onSelectFile={() => undefined}
+                onSelectDirectory={() => undefined}
+                commandErrorPanelProps={{}}
+            />
+        </div>,
+    )
+    await waitForEntranceToSettle(container)
+    return container
+}
+
+/**
+ * Idle with the cancellation notification mounted above it, in the same
+ * `.fd-app` stand-in `renderIdleInAppShell` uses -- the same document order
+ * `App.tsx` actually renders (the notification first, then the phase body),
+ * so the drop zone's own top position is measured with exactly the sibling
+ * the real app puts above it, not a synthetic approximation of it.
+ */
+async function renderIdleWithNotification(): Promise<HTMLElement> {
+    const {container} = render(
+        <div className="fd-app" style={{height: '100vh'}}>
+            <Notification
+                icon={<span aria-hidden="true">&times;</span>}
+                title="Transfer canceled"
+                body="Ready for another file or folder."
+                textId={NOTIFICATION_TEXT_ID}
+                onDismiss={() => undefined}
+                // Long enough that the fixed 640x480/1024x768 rendered
+                // checks below never race the real dismissal timer.
+                visibleMs={60_000}
+            />
+            <IdleView
+                state={idle()}
+                dropTargetStyle={dropTargetStyle}
+                cancelWon
                 onSelectFile={() => undefined}
                 onSelectDirectory={() => undefined}
                 commandErrorPanelProps={{}}
@@ -1851,6 +1886,86 @@ describe('the outcome card does not jump size or position at reset (Story 9.6 re
             heading.getBoundingClientRect().top,
             'the heading is clipped above the top of the viewport',
         ).toBeGreaterThanOrEqual(0)
+        assertNoHorizontalOverflow(container)
+    })
+})
+
+/*
+  Story 10.2's own rendered acceptance criterion: the notification overlays
+  the window at the top centre rather than displacing the Idle layout
+  beneath it, and it fits within the 640x480 native minimum. jsdom-based
+  tests elsewhere in the suite (App.test.tsx, IdleView.test.tsx,
+  Notification.test.tsx) already prove the DOM structure, routing and
+  timers; only real layout can prove `position: fixed` actually keeps the
+  drop zone's own top position unchanged, which is what these measure.
+*/
+describe('the cancellation notification overlays Idle rather than displacing it (Story 10.2)', () => {
+    it.each([[1024, 768], [640, 480]])(
+        'leaves the drop zone\'s own top position unchanged at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+
+            const plainIdle = await renderIdleInAppShell()
+            const plainZone = plainIdle.querySelector('.fd-drop-zone')
+            if (plainZone === null) throw new Error('.fd-drop-zone did not render for plain Idle')
+            const plainTop = plainZone.getBoundingClientRect().top
+            cleanup()
+
+            const withNotification = await renderIdleWithNotification()
+            const notification = withNotification.querySelector('.fd-notification')
+            if (notification === null) throw new Error('.fd-notification did not render')
+            const notifiedZone = withNotification.querySelector('.fd-drop-zone')
+            if (notifiedZone === null) throw new Error('.fd-drop-zone did not render alongside the notification')
+            const notifiedTop = notifiedZone.getBoundingClientRect().top
+
+            /*
+              Mutation: change `.fd-notification`'s `position` from `fixed`
+              to (say) `relative` in style.css -> this fails, because a
+              relatively (or statically) positioned notification pushes the
+              drop zone down by its own height instead of overlaying it, and
+              `plainTop`/`notifiedTop` stop agreeing.
+            */
+            expect(
+                notifiedTop,
+                `the drop zone moved from ${plainTop.toFixed(1)}px to ${notifiedTop.toFixed(1)}px ` +
+                    `at ${width}x${height} once the notification appeared -- it displaced the layout ` +
+                    'instead of overlaying it',
+            ).toBeCloseTo(plainTop, 0)
+        },
+    )
+
+    it.each([[1024, 768], [640, 480]])(
+        'is horizontally centred in the window at %ix%i',
+        async (width, height) => {
+            await page.viewport(width, height)
+            const container = await renderIdleWithNotification()
+
+            const notification = container.querySelector('.fd-notification')
+            if (notification === null) throw new Error('.fd-notification did not render')
+            const rect = notification.getBoundingClientRect()
+            const leftGap = rect.left
+            const rightGap = document.documentElement.clientWidth - rect.right
+            expect(
+                Math.abs(leftGap - rightGap),
+                `the notification sits ${leftGap.toFixed(1)}px from the left and ${rightGap.toFixed(1)}px ` +
+                    `from the right at ${width}x${height} -- not centred`,
+            ).toBeLessThanOrEqual(2)
+        },
+    )
+
+    it('fits within the window at the 640x480 native minimum, with no page-level horizontal scroll', async () => {
+        await page.viewport(640, 480)
+        const container = await renderIdleWithNotification()
+
+        const notification = container.querySelector('.fd-notification')
+        if (notification === null) throw new Error('.fd-notification did not render')
+        const rect = notification.getBoundingClientRect()
+
+        expect(rect.left, 'the notification extends past the left edge of a 640px window').toBeGreaterThanOrEqual(0)
+        expect(
+            rect.right,
+            `the notification's right edge (${rect.right.toFixed(1)}px) exceeds the 640px window`,
+        ).toBeLessThanOrEqual(640)
         assertNoHorizontalOverflow(container)
     })
 })

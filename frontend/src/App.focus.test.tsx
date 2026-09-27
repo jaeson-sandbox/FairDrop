@@ -17,6 +17,15 @@ import type {Announcement} from './ui/announce'
   table is stubbed here so a row can name a target that is not on the screen,
   which is the shape a future view edit would take: the row survives, the
   attribute quietly does not.
+
+  Story 10.2, owner-approved: the routing table's `cancel-won` row used to
+  target a dedicated `cancel-summary` focus node; that node (and the static
+  notification it belonged to) is gone, and the row now targets
+  `idle-instruction` instead, described by the sliding notification's own
+  text via `aria-describedby` while it is mounted. This file stubs
+  `routeTransition` directly and never asserts a specific target string, so
+  the row rename needs no edit here -- it is exercised (and pinned) by
+  `announce.test.ts` and `App.test.tsx` instead.
 */
 
 const mocks = vi.hoisted(() => ({

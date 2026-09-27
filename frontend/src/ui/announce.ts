@@ -33,7 +33,6 @@ import {copy} from './copy'
  */
 export const focusTargets = [
     'idle-instruction',
-    'cancel-summary',
     'command-error',
     'pending-heading',
     'staged-heading',
@@ -101,11 +100,16 @@ export function routeTransition(previous: TransferState, next: TransferState): A
 
         case 'error':
             // "Return to Idle; never render as Error" -- so a cancellation that
-            // somehow arrives as a terminal error is the cancel-winning summary,
-            // which is what App renders for it, and not an outcome panel that
-            // will not be on the screen to receive focus.
+            // somehow arrives as a terminal error is the cancel-winning
+            // notification, and not an outcome panel that will not be on the
+            // screen to receive focus. Story 10.2, owner-approved: the target
+            // is the Idle heading itself now, not a dedicated summary node --
+            // a notification that disappears on its own timer cannot hold
+            // focus, so focus lands on the one node that is always there, and
+            // the notification's text is reached through that heading's
+            // `aria-describedby` instead (App.tsx, IdleView.tsx).
             return next.outcome.error.code === 'cancelled'
-                ? focusRow('cancel-won', 'cancel-summary')
+                ? focusRow('cancel-won', 'idle-instruction')
                 : focusRow('terminal-outcome', 'outcome')
 
         case 'idle':
@@ -192,8 +196,13 @@ function toIdle(previous: TransferState, next: IdleTransferState): Announcement 
     }
 
     // Pending, Staged or Transferring reached plain Idle without a terminal
-    // event: the cancellation won the race, so the Idle summary owns it.
-    return next.retainedOutcome === null ? focusRow('cancel-won', 'cancel-summary') : null
+    // event: the cancellation won the race. Story 10.2, owner-approved: this
+    // row used to target a dedicated `cancel-summary` focus node; that node
+    // is gone, replaced by a notification that slides in and disappears on
+    // its own, so the target is the Idle heading itself, described (via
+    // `aria-describedby`, wired in App.tsx/IdleView.tsx) by the
+    // notification's text while it is mounted.
+    return next.retainedOutcome === null ? focusRow('cancel-won', 'idle-instruction') : null
 }
 
 /**

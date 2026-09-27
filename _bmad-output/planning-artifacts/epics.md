@@ -2098,3 +2098,52 @@ So that what the suites cannot see is still checked before it ships.
 - Given the built macOS binary, then a person or the orchestrating session drives every state -- Idle, the browse menu by pointer and keyboard, a real drop, Staged with Copy Link and Show/Hide Link, a real receiver download, Sent, Send Another, a forced error with Try Again, Choose Another and Dismiss -- in light and dark and with Reduce Motion on, and the evidence file records what was seen, including anything that looked wrong.
 - Given Windows, then the evidence states honestly whether it was driven interactively; `docs/release-policy.md` permits the automated gate alone and says so.
 - Given AGENTS.md, then any new WebKit or WebView2 behaviour discovered during this epic is added to its platform-facts section, and nothing there is recorded from a synthetic keystroke's negative result alone.
+
+## Epic 10: Polish After 1.3.0
+
+Two owner observations on the published 1.3.0 binary, 2026-09-26. Both build on Epic 9's rules unchanged: one look on both platforms; motion is progressive enhancement (an engine that cannot animate shows the finished state instantly); no `@keyframes`; the two-token border split; contrast figures derived by `styles.test.ts`; one owner per transition.
+
+**FRs covered:** none new.
+
+### Story 10.1: Draw the Link Field's Focus Ring Whole
+
+As a sender who clicks the revealed link,
+I want the field to show the same clean focus ring every other control does,
+So that selecting the link doesn't look broken.
+
+**Defect, observed by the owner:** clicking the revealed direct-link field on Staged shows a mocha band above and below the field, cut off square at both sides, instead of a ring. The field's focus indicator is the shared two-tone `box-shadow` ring (surface gap + primary ring) drawn *outside* the element, and the Story 9.4 reveal region clips its content (`.fd-url-reveal__inner { overflow: hidden }`, needed for the grid-rows height animation), so the ring's sides are cut away and only fragments show. The field's own select-all-on-focus highlight is the engine's default selection colour.
+
+**Scope:** `style.css` (the reveal region, the `.fd-url` focus rule, and its selection colour), `StagedView.tsx` only if markup must change, tests. This is a defect fix under the AGENTS.md carve-out: failing rendered test first.
+
+**Acceptance Criteria:**
+
+- Given the revealed link field has focus, then its focus ring is drawn **completely** — all four sides and rounded corners, concentric with the field's radius, the same two-tone ring every other Tab-reachable control uses — and nothing of it is clipped by the reveal region. The reveal still animates its height open and closed. *Test (rendered Chromium):* with the field focused, the ring's painted extent is not clipped — e.g. the clip container's bounds contain the field's rect expanded by `--focus-ring-offset + --focus-ring-width` on every side. *Mutation:* restore the clipping → must fail.
+- Given the field's text is selected on focus, then the selection is painted in the accent family (e.g. `--color-primary-tint` background with `--color-text`), not the engine default, and the pair clears 4.5:1 in both schemes, derived by `styles.test.ts`.
+- Given `forced-colors: active`, then the field still gets the `outline` fallback Story 7.11 added.
+- Given the full gate, when it runs, then it passes. The orchestrator re-drives it on the built macOS binary.
+
+### Story 10.2: Announce a Cancellation with a Sliding Notification
+
+As a sender who just cancelled,
+I want a brief notification that slides in, confirms it, and gets out of the way,
+So that cancelling feels like the rest of the product instead of leaving a static banner behind.
+
+**Owner direction (2026-09-26):** the static cancel-won banner at the top of Idle "looks very unpolished"; replace it with an Apple-style notification — "a translucent notification that slides down smoothly with a nice animation [and] leaves the screen after a short while."
+
+**This amends the spine deliberately, in three places, and the amendments land in the same commit as the code:**
+1. **EXPERIENCE.md bans "frontend lifecycle/reset timers".** Amend it to permit exactly one kind of frontend timer: a **presentation-only dismissal timer** for a transient notification, which may remove the notification from the DOM and may do nothing else — it never dispatches a reducer action, never calls a Go command, never moves focus and never changes what state the app is in. Lifecycle and reset timers stay banned.
+2. **The Copy Feedback row says "no toast".** It stays true for copy feedback (which keeps its in-button label). Note that the cancellation notification is the one sanctioned transient notification.
+3. **The routing table's Cancel-winning reset row is focus-owned, targeting the cancel summary.** A notification that disappears cannot hold focus. Change the row to: **focus the Idle heading (`idle-instruction`)**, with that heading's accessible description pointing at the notification's text while it is mounted — so the one focus move announces "Drop one file or folder" plus "Transfer canceled. Ready for another file or folder." as a single owner, exactly the pattern Staged already uses for warnings. Remove the description reference when the notification unmounts. No live-region write happens for this transition.
+
+**Scope:** a new `Notification` (or `Toast`) component, `IdleView.tsx` (remove the static summary), `App.tsx` / `announce.ts` for the routing change, `copy.ts` + EXPERIENCE.md, `style.css`, DESIGN.md (a new Notification component row and material), tests.
+
+**Acceptance Criteria:**
+
+- Given a cancel-winning reset, then a notification appears **overlaying** the window at the top centre (it does not push the Idle layout down), width to its content up to ~420px and never wider than the window gutter allows, ~12–16px below the top edge. It contains a small glyph in a tinted disc and two lines: a bold title **"Transfer canceled"** and a muted line **"Ready for another file or folder."** — `copy.cancel.won` becomes `copy.cancel.wonTitle` and `copy.cancel.wonBody` with exactly those strings; update the Voice and Tone table in the same commit.
+- Given its material, then it is **translucent**: a semi-transparent surface with `backdrop-filter: blur(...) saturate(...)` (plus `-webkit-backdrop-filter` for WKWebView), a hairline boundary, `{rounded.xl}`, and `{elevation.sh-3}`. Epic 7's rule for in-page translucency applies: DESIGN.md publishes the **opaque colour it resolves to** over the worst-case backdrop (canvas and the drop zone surface, both schemes) and `styles.test.ts` derives the title and body contrast against those resolved colours (≥ 4.5:1). Where `backdrop-filter` is unsupported the surface falls back to an opaque value that meets the same contrast. Under `forced-colors: active` it is an opaque system-coloured surface with an outline.
+- Given motion, then it **slides down** into place (~−16px → 0 plus fade, ~420ms, `--ease-decelerate`) via `@starting-style`, stays **~4 seconds**, then **slides up and fades out** (~260ms), then unmounts. Under `prefers-reduced-motion: reduce` it fades in and out without moving. No `@keyframes`, no animation library. **The unmount is driven by the dismissal timer, never by `transitionend`** — an engine that cannot transition never fires it, and the notification would stay forever.
+- Given the dismissal timer, then it pauses while the pointer is over the notification and resumes when it leaves; a new cancellation while one is showing replaces it and restarts the timer; starting a Stage or the app leaving Idle removes it immediately. It is implemented with injectable timing so tests use fake timers, not real waits. *Tests:* shows, stays for the duration, exits then unmounts; hover pauses; replacement restarts; leaving Idle removes it; the timer never dispatches a reducer action or calls a binding (assert on spies). *Mutation:* drive unmount from `transitionend` instead → a test with transitions disabled must fail because the notification never leaves.
+- Given the routing change above, then `announce.ts`'s cancel-won row targets `idle-instruction` with the description, the static `.fd-cancel-summary` and its focus target are removed, `App.focus.test.tsx` and `announce.test.ts` are updated **with a comment naming this owner-approved change**, and every other row is unchanged. *Test:* after a cancel-winning reset, the focused element is the Idle heading and its `aria-describedby` resolves to the notification's text; after the notification unmounts, the attribute no longer references a missing id.
+- Given the notification is not interactive, then it has no controls and takes no focus; it is not a `role="alert"` and not a live region (the focus move owns the announcement).
+- Given the rendered suite (`frontend/browser/accessibility.test.tsx`, real `.fd-app` shell at 1024×768 and 640×480, after its entrance settles): it is horizontally centred, overlays rather than displaces the drop zone (the drop zone's top is unchanged by its presence), and fits within the window at 640×480. Mutation-verify at least one.
+- Given the full gate on both platforms, when it runs, then it passes. The orchestrator drives it on the built macOS binary.

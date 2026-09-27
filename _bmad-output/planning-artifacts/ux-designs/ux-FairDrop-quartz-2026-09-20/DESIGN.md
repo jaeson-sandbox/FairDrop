@@ -24,6 +24,7 @@ colors:
   primary-hover: '#7F4428'
   primary-ink: '#FFFFFF'
   primary-tint: '#F5EEEB'
+  selection: '#D9A679'
   track: '#E9E9EB'
   focus: '#6B4E9E'
   success: '#177A48'
@@ -45,6 +46,7 @@ colors:
   primary-hover-dark: '#F0B694'
   primary-ink-dark: '#2B1206'
   primary-tint-dark: '#372E2B'
+  selection-dark: '#7A5240'
   track-dark: '#3A3A3E'
   focus-dark: '#B79BE0'
   success-dark: '#4ED08B'
@@ -155,6 +157,7 @@ the frontmatter in ordinary colour modes.
 | Functional boundary | `{colors.control-border}` / `{colors.control-border-dark}` | Required on controls, the rest-state drop target, the QR frame, the URL field, and the progress-track outline. These values were chosen as the lightest greys that still clear 3:1 against every surface they touch. |
 | Action | `{colors.primary}` / `{colors.primary-dark}` with the matching ink, and `{colors.primary-hover}` / `{colors.primary-hover-dark}` as the hover fill | The single strongest action, the (solid) progress fill, and the item-kind pill. Never status decoration. **The hover fill is a separate token from the resting fill, and the two move in opposite directions: light darkens on hover, dark lightens.** A single shared lighter value once put light mode's hover label under the 4.5:1 text floor — see the hover-pair row below. The primary button's own sheen (Elevation & Depth, below) is a fixed translucent white independent of both, not a third fill token. |
 | Focus | `{colors.primary}` / `{colors.primary-dark}`, with a `{colors.surface}` / `{colors.surface-dark}` gap | A two-tone ring (Story 7.11): a surface-coloured gap, then a 2px ring in the accent colour itself, stacked as `box-shadow`, never `outline`. Story 7.8's dedicated violet is retired — the owner found it "poorly polished," a second hue with no relationship to the rest of the product — and the gap, not a different hue, is what keeps a same-hue ring legible against a same-hue fill. Scoped to keyboard-operable controls only — see the amendment carried forward below. |
+| Selection | `{colors.selection}` / `{colors.selection-dark}` | **Defect fix.** The Direct URL Row's select-all-on-focus highlight (`.fd-url::selection`, Story 10.1). Authored as its own token rather than reused from `{colors.primary-tint}`: Story 10.1 measured only the selection's *text* against the tint (`text`/`primary-tint`, above), never the tint itself against the field's own `{colors.fill}` it paints over — in dark mode the two are nearly identical (1.021:1), so the highlight was there and copied correctly but was not visible. `{colors.selection}` clears both floors instead: `text` on it stays ≥4.5:1 (see the Text pair table), and it clears ≥1.5:1 against `{colors.fill}` in both modes (a *visibility* floor, not a text-contrast one) — see the note below the tables. Forced colors maps this to the system `Highlight`/`HighlightText` pair directly on `.fd-url::selection`, not through `{colors.text}`, since that token stays `CanvasText` for every other rule in that mode. |
 | Outcomes | Success, warning, error, each with a tint | Always pair colour with outline, glyph, or literal text. |
 | QR | `{colors.qr-surface}` / `{colors.qr-ink}` in both modes | Fixed high-contrast substrate; never recolour, invert, texture, rotate, round modules, or overlay a logo. Unchanged from Paper Relay and non-negotiable — it is a scan-reliability constraint, not a style choice. |
 
@@ -187,6 +190,7 @@ at **17.377657264**.
 | `text` on `primary-tint` | 15.153268673 | 11.826910776 |
 | `muted` on `primary-tint` | 5.048617711 | 4.851652072 |
 | `primary-ink` on primary button sheen (rest) | 4.677257536 | 8.269767363 |
+| `text` on `selection` | 8.011038123 | 6.042413035 |
 
 **The hover row above is a review finding, added after ship.** An interactive
 state's own fill is a text background like any other, and belongs in this
@@ -208,7 +212,41 @@ from a leftover blue wash (`#E6EFFB` / `#23303F`) to mocha at 10% light / 12%
 dark on `{colors.surface}` / `{colors.surface-dark}`. The dark fraction is
 deliberately 12%, not 16%: 16% was checked first and put `muted` on it at
 4.49:1, under the 4.5:1 floor: `text`/`primary-tint` and `muted`/`primary-tint`
-must both be re-checked before this token moves again.
+must both be re-checked before this token moves again. **Story 10.1 originally
+placed `text`/`primary-tint` a second time**, as the Direct URL Row's own
+select-all-on-focus highlight (`.fd-url::selection`) -- the reasoning at the
+time was that it is a text background, the pair was already load-bearing and
+already proven above, and no new figure was needed to reuse it here. That
+reasoning covered only the text; see the defect fix immediately below for
+what it missed.
+
+**Defect fix, orchestrator-observed on the built macOS binary (dark
+appearance): reusing `{colors.primary-tint}` for the selection was wrong,
+because the load-bearing figure it reused (`text`/`primary-tint`, above)
+proves only that the selection's *text* is readable -- it says nothing about
+whether the selection itself is visible against the field it paints over.**
+`{colors.primary-tint-dark}` and `{colors.fill-dark}` are close enough
+(1.021:1) that in dark mode the highlight was there -- Cmd+C still copied the
+right value -- but a sender could not see that anything was selected at all.
+Before Story 10.1 the engine's own default selection colour (blue) was at
+least visible against both fills, so this was a regression the ship-time
+review missed by checking only the pair it already had a figure for.
+
+The fix is a dedicated `{colors.selection}` token (Colors table, Selection
+row), authored against both floors this selection actually needs rather than
+against one of them:
+
+| Visibility pair | Light ratio | Dark ratio |
+|---|---:|---:|
+| `selection` on `fill` (the URL field's own background) | 1.921761995 | 1.917235399 |
+
+This is a **visibility** floor (≥1.5:1, "can the selection be told apart from
+the row it sits on"), not the ≥4.5:1 **text** floor the table above checks --
+the two are different questions about the same token, and `{colors.selection}`
+had to clear both: `text`/`selection` stays ≥4.5:1 in both modes exactly as
+`text`/`primary-tint` did, while `selection`/`fill` recovers from 1.016:1
+light / 1.021:1 dark (the failing figures `{colors.primary-tint}` measured
+here before the fix) to the figures published above.
 
 **The sheen row above is a third finding of the same shape, from the
 black-flash defect fix.** This is the third time in this epic a colour
@@ -228,6 +266,38 @@ rest/hover x light/dark combinations and the figure the sheen's alpha
 (0.08) is chosen against. Re-derived, unrounded, from
 `frontend/src/ui/styles.test.ts`, not hand-computed: raising the alpha
 towards 0.12 fails this floor, which is why it is not raised.
+
+**The notification material is a fourth finding of the same shape, Story
+10.2.** Same pattern as the hover fill, `primary-tint` and the button sheen
+above: a text background that is not a named `--color-*` token at all,
+because it is translucent -- `rgb(255 255 255 / 0.75)` light,
+`rgb(39 39 43 / 0.75)` dark, composited over whichever of the two worst-case
+backdrops (`{colors.canvas}`, `{colors.surface}`) sits behind the window at
+the moment a cancellation lands. Both are checked, in both authored modes,
+because the material's own contrast proof is computed from the composite,
+not from the token in isolation. Every figure below is copied verbatim from
+`frontend/src/ui/styles.test.ts`'s own output ("the notification's title and
+body clear 4.5:1 against the material it actually resolves to"), never
+hand-computed:
+
+| Notification pair | Composited over | Ratio |
+|---|---|---:|
+| `text` on the light notification | `canvas` | 16.938172843 |
+| `text` on the light notification | `surface` | 17.377657264 |
+| `muted` on the light notification | `canvas` | 5.643294609 |
+| `muted` on the light notification | `surface` | 5.789717726 |
+| `text` on the dark notification | `canvas` | 14.018293623 |
+| `text` on the dark notification | `surface` | 13.657025243 |
+| `muted` on the dark notification | `canvas` | 5.750604244 |
+| `muted` on the dark notification | `surface` | 5.602404218 |
+
+The opaque fallback, painted unconditionally and replaced only where
+`@supports` confirms `backdrop-filter` (or `-webkit-backdrop-filter`) is
+available, is `{colors.elevated}` itself -- not a new value derived for this
+one component. Its own text/muted rows are already proven above (the
+`text`/`elevated` and `muted`/`elevated` rows in the first contrast table),
+so "an opaque value that meets the same contrast" needs no new derivation:
+it is a token already held to that floor.
 
 Status text placed on its own panel (`.fd-button--quiet`'s muted/error on
 elevated is the row above; `warning`/`success`/`error` on `surface` is what the
@@ -527,7 +597,7 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 | **Item Kind Pill** | **Superseded by Story 9.4.** This described the `fd-packet-tab` label above the card (File/Folder, `{rounded.full}`, `{colors.primary-tint}` on `{colors.primary}`), which Story 9.4 removed along with the card it sat above. The item's kind is now a plain glyph beside its name in the item row (`.fd-item__icon`, `{colors.fill}` on `{colors.muted}`) -- decorative, not a badge, exactly as this row already required. |
 | **Item Summary** | `{typography.headline}` name in a bidi isolate beside a kind glyph; kind, logical size and the ZIP note in `{typography.meta}`. **Story 9.4:** the name always wraps (`overflow-wrap: anywhere`); the persistent full-name control this row used to mention is removed along with the two-line clamp it existed to expand. |
 | **QR Panel** | Fixed white substrate, 12px padding, `{rounded.lg}`, `{elevation.sh-2}` plus a functional boundary, ~216px square (Story 9.4; was 224px at `{rounded.xs}` before the QR became the card's whole point rather than sharing weight with an always-visible link row). Crisp, generous quiet zone, no rotation or overlay. |
-| **Direct URL Row** | **Story 9.4:** not rendered until Show Link (`copy.direct_link.show`/`copy.direct_link.hide`, secondary) is activated, using the same `grid-template-rows`/transitioned-`visibility` mechanism as `Disclosure` (its own rule, `.fd-url-reveal`, since the trigger is a plain button rather than a heading-wrapped summary). Revealed: readonly monospace `<textarea>` on `{colors.fill}` with a functional boundary, unchanged from Story 7.9's CSS-grid mirror sizing. Copy Link (primary) copies without revealing it, named by `EXPERIENCE.md` key `copy.direct_link.action`. Never a sender-side activation link. |
+| **Direct URL Row** | **Story 9.4:** not rendered until Show Link (`copy.direct_link.show`/`copy.direct_link.hide`, secondary) is activated, using the same `grid-template-rows`/transitioned-`visibility` mechanism as `Disclosure` (its own rule, `.fd-url-reveal`, since the trigger is a plain button rather than a heading-wrapped summary). Revealed: readonly monospace `<textarea>` on `{colors.fill}` with a functional boundary, unchanged from Story 7.9's CSS-grid mirror sizing. Copy Link (primary) copies without revealing it, named by `EXPERIENCE.md` key `copy.direct_link.action`. Never a sender-side activation link. **Story 10.1 defect fix:** the focused field now draws the same complete, unclipped two-tone ring every other control uses -- `.fd-url-reveal__body` (not the clipping `.fd-url-reveal__inner`, which the open/close animation still squeezes to zero when collapsed) carries padding equal to the ring's own reach on every side, so `__inner` simply auto-sizes around the larger box when open and clips it away whole, ring room included, when collapsed. The select-all-on-focus highlight is `{colors.text}` on `{colors.selection}` (`.fd-url::selection`) instead of the engine default. **Defect fix:** originally reused `{colors.primary-tint}` on the reasoning that the text pair was already proven, but nothing had measured the tint itself against this field's own `{colors.fill}` -- see the Colors table's Selection row and the defect-fix note under the contrast tables for the figures a dedicated token was needed to clear. |
 | **Copy Feedback** | Label swaps to `copy.copy.confirmation` with a check glyph, as a non-reflowing crossfade (Story 9.4: both faces occupy the same grid cell, the inactive one `aria-hidden`) rather than a jump cut; the control takes the success tint and boundary. Fixed width so the swap cannot reflow the row; reverts on blur (D-114). No toast. |
 | **Warning Banner** | `{rounded.md}`, warning tint, inset warning boundary, leading glyph, heading plus message. Inline, non-modal, never a full fill. |
 | **Trusted-LAN Note** | Muted copy, each line with its own inline SVG glyph rather than a single shared warning-coloured bar (Story 9.4: an info glyph on the first-opener line, a lock glyph on the network line -- both `{colors.muted}`, matching the owner-approved prototype's `.caveats`, not warning-tinted). **This amends the previous "never green or lock-shaped" wording**, written before this story's approved prototype used exactly a lock glyph for the network disclosure; the story's own acceptance criteria name the lock glyph explicitly, and the story's text wins over an earlier row it contradicts. Literal plain-HTTP and local-network disclosure; still never green, and still never a claim of encryption. |
@@ -539,6 +609,7 @@ Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 | **Outcome Receipt** | **Story 9.6 replaces the two-cell grid.** One pill-shaped line on `{colors.fill}`: a kind glyph, the item name, and `· <wire bytes actually sent>` for Done; the item name alone for an Error whose outcome retained one (Story 9.2). No elapsed-time figure anywhere -- no clock is tracked and `EXPERIENCE.md` forbids frontend lifecycle timers. Every value comes from retained state, never a placeholder; the name truncates with an ellipsis rather than wrapping or overflowing the pill. |
 | **Outcome Panel — Error** | **Story 9.6 rebuild**, the same one-card shape as Done: the error disc, the fixed heading and fixed `PublicError.message` from the registry (unchanged), the outcome receipt when an item name was retained, and the primary action `selectEffectiveErrorAction` (Story 9.2) chooses -- **Try Again** (a refresh glyph, calls `retry()`) for `retry`, **Choose Another** (the `BrowseControl` menu) for `choose`, or no primary for `dismiss`. Every error card also carries **Dismiss** (quiet unless it is the card's only control, matching the Done panel's weight rule). No raw diagnostics. |
 | **Status Announcer** | Visually hidden, pre-mounted, atomic, layout-free. Never duplicates focused content. |
+| **Notification** | **Story 10.2.** A top-centre overlay, `position: fixed` so it never displaces the Idle layout beneath it -- width to its content up to ~420px, never wider than the window gutter allows, ~14px below the top edge. A small glyph in a warning-tinted disc (never the error tint: the spine's rule for `cancelled` is "return to Idle; never render as Error") beside a bold title and a muted body line. Material: `{rounded.xl}`, `{elevation.sh-3}`, a `{colors.separator}` hairline boundary (decorative, matching `.fd-packet`'s own precedent), and a translucent surface -- `backdrop-filter: blur(24px) saturate(1.6)` plus `-webkit-backdrop-filter` for WKWebView, gated behind `@supports` so an engine without either falls back to the already-proven opaque `{colors.elevated}` fill unconditionally (true progressive enhancement: nothing to detect, no branch to maintain). Not interactive: no controls, no focus, not `role="alert"`, not a live region -- the one focus move a cancellation makes lands on the Idle heading instead (see EXPERIENCE.md's routing table), whose `aria-describedby` points at this component's text while it is mounted. Built generically (`Notification.tsx`) so a later transient message can reuse it; only the cancellation notification wires it today. |
 
 ### FR23 and the disclosures
 
@@ -624,6 +695,22 @@ Story 9.1 gives it a foundation every later Epic 9 story builds on.
   and the browse menu all animate in too -- but it remains the only moment marked
   by *drawing* rather than by fading or rising, which is still worth marking on its
   own terms.
+- **Story 10.2: the one component that does animate out.** The cancellation
+  notification slides down into place (`translate: 0 -16px` -> `none` plus a
+  fade, ~420ms) via `@starting-style`, exactly like a phase view's entrance,
+  but unlike every phase view it is genuinely transient -- it holds for ~4s
+  (paused while the pointer is over it) and then slides up and fades out
+  again (~260ms) before unmounting. This is a deliberate, narrow exception to
+  "views animate in and never out": the identity hazard that rule protects
+  against (two nodes both claiming to be the current view, at the moment an
+  outgoing one is kept alive to animate away) cannot arise here, because the
+  notification is not a view -- it owns no phase, no focus, and nothing else
+  in the product is waiting to inherit its slot. The exit is driven entirely
+  by the component's own dismissal timer, never by a `transitionend` event:
+  an engine that cannot transition would never fire one, and the
+  notification would never leave. `prefers-reduced-motion: reduce` fades it
+  in and out without moving, the same universal `translate: none !important`
+  rule every other entrance already relies on.
 - **Story 9.6: the outcome card's own disc** scales in from ~0.7 (its own
   fade-plus-scale rule, unstaggered -- the same "cards and discs" pattern the
   QR tile uses), while the heading, receipt and actions row stagger in behind
