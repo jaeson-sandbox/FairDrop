@@ -388,3 +388,105 @@ describe('Staged view resizes seamlessly across a continuous width sweep (Story 
         ).toBe(1)
     })
 })
+
+/*
+  Story 10.1 defect fix: the owner's screenshot of the built 1.3.0 binary
+  showed a mocha band above and below the focused field, cut off square at
+  both sides, instead of a complete ring -- `.fd-url:focus-visible`'s shared
+  two-tone `box-shadow` ring (style.css) paints `--focus-ring-offset +
+  --focus-ring-width` outside the field's own border box, and
+  `.fd-url-reveal__inner`'s `overflow: hidden` (needed for the grid-rows
+  open/close animation) clipped it at the field's own edges, with no room on
+  any side.
+
+  jsdom cannot see this either, for the same reason the sizing suite above
+  lives here rather than under `src/`: it performs no layout, so both
+  `getBoundingClientRect()` calls below would report the same zeroed rect
+  regardless of whether the CSS clips anything.
+
+  The literal `4` here (not a value read back out of style.css) is
+  `--focus-ring-offset` (2px) plus `--focus-ring-width` (2px), written out at
+  the assertion site per AGENTS.md's testing standard -- reading the same
+  custom properties the fix itself declares would let a regression that
+  shrinks both tokens together still pass.
+*/
+describe("Staged direct URL field draws its focus ring whole (Story 10.1)", () => {
+    const ringExtent = 4 // --focus-ring-offset (2px) + --focus-ring-width (2px)
+
+    /*
+      Same reasoning as `accessibility.test.tsx`'s `waitForEntranceToSettle`:
+      a rendered-geometry measurement taken the instant after `revealLink()`
+      can land mid-transition (the `grid-template-rows` open animation is
+      320ms) rather than on the settled, fully-open row -- `getAnimations()`
+      returns a running CSS transition exactly like it returns a running CSS
+      animation, so the identical wait covers both.
+    */
+    async function waitForRevealToSettle(element: Element): Promise<void> {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        await Promise.all(element.getAnimations({subtree: true}).map((animation) => animation.finished))
+    }
+
+    async function revealAndFocusField(width: number, height: number): Promise<{field: HTMLTextAreaElement; clip: HTMLElement}> {
+        await page.viewport(width, height)
+        const url = `http://192.168.1.168:63367/download/${token}`
+        const container = renderStagedWithURL(url)
+        await waitForRevealToSettle(container)
+
+        const field = container.querySelector<HTMLTextAreaElement>('.fd-url')
+        const clip = container.querySelector<HTMLElement>('.fd-url-reveal__inner')
+        if (field === null || clip === null) throw new Error('.fd-url or .fd-url-reveal__inner did not render')
+
+        field.focus()
+        expect(document.activeElement, 'the field never took focus').toBe(field)
+
+        return {field, clip}
+    }
+
+    it.each([
+        [1024, 768],
+        [640, 480],
+    ])('is never clipped by the reveal region at %ix%i', async (width, height) => {
+        const {field, clip} = await revealAndFocusField(width, height)
+
+        const fieldRect = field.getBoundingClientRect()
+        const clipRect = clip.getBoundingClientRect()
+
+        // The clip container's bounds must contain the field's rect expanded
+        // by the ring's own reach on every side -- anything tighter than
+        // this is exactly the clipping the owner saw.
+        expect(clipRect.top, 'top: no room for the ring').toBeLessThanOrEqual(fieldRect.top - ringExtent + 0.5)
+        expect(clipRect.left, 'left: no room for the ring').toBeLessThanOrEqual(fieldRect.left - ringExtent + 0.5)
+        expect(clipRect.right, 'right: no room for the ring').toBeGreaterThanOrEqual(fieldRect.right + ringExtent - 0.5)
+        expect(clipRect.bottom, 'bottom: no room for the ring').toBeGreaterThanOrEqual(fieldRect.bottom + ringExtent - 0.5)
+    })
+
+    it('still collapses to nothing visible or focusable when Show Link is toggled back off', async () => {
+        await page.viewport(1024, 768)
+        const url = `http://192.168.1.168:63367/download/${token}`
+        const container = render(<StagedView state={staged(url)} onCancel={() => undefined}/>).container
+        revealLink() // open
+        fireEvent.click(screen.getByRole('button', {name: 'Hide Link'})) // and close again
+
+        const region = container.querySelector('.fd-url-reveal')
+        if (region === null) throw new Error('.fd-url-reveal did not render')
+        expect(region.hasAttribute('data-open')).toBe(false)
+
+        // Waits out the same `grid-template-rows` transition
+        // `accessibility.test.tsx`'s `waitForEntranceToSettle` waits out for
+        // the entrance animation -- `getAnimations()` returns a running CSS
+        // transition exactly like it returns a running CSS animation, so the
+        // one helper covers both.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        await Promise.all(container.getAnimations({subtree: true}).map((animation) => animation.finished))
+
+        // The ring-room padding lives on `__body`, one level inside the
+        // clipped `__inner` -- exactly so `__inner` (unpadded, and squeezed
+        // to zero by the collapsed grid track regardless of `__body`'s own,
+        // now-taller, natural size) still reaches zero height here.
+        const clip = container.querySelector<HTMLElement>('.fd-url-reveal__inner')
+        if (clip === null) throw new Error('.fd-url-reveal__inner did not render')
+        expect(clip.getBoundingClientRect().height, 'the collapsed reveal region is not zero height').toBeLessThanOrEqual(0.5)
+    })
+})

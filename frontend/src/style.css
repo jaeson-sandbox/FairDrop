@@ -1667,8 +1667,47 @@ body {
     min-height: 0;
 }
 
+/*
+  Defect fix (Story 10.1, owner screenshot of the 1.3.0 binary): clicking the
+  revealed field painted a mocha band above and below it, cut off square at
+  both sides, instead of a ring. `.fd-url:focus-visible` below paints the
+  same two-tone `box-shadow` ring every other control uses -- drawn
+  `--focus-ring-offset + --focus-ring-width` outside the field's own border
+  box -- and `.fd-url-reveal__inner` above clips anything outside *its* own
+  box to make the grid-rows height animation read as a clean accordion. Before
+  this fix, `__inner`'s box hugged this body so tightly (no horizontal
+  padding, no bottom padding) that the ring had no room on any side: fully
+  clipped left and right, and only a flat sliver of the ring's straight edge
+  survived top and bottom because there was no room for its rounded corners
+  either -- exactly the "band, cut off square" the owner described.
+
+  The fix gives the ring room on `__body`, not on `__inner` itself, and that
+  choice is load-bearing, not a style preference: `__inner` is the element
+  the `0fr`/`1fr` grid-rows animation squeezes to zero height when collapsed,
+  and `box-sizing: border-box` has a hard floor at an element's own padding
+  sum -- a border-box element can be *told* to be shorter than its padding,
+  but it will never actually render shorter than that sum. Padding placed on
+  `__inner` would leave a permanent few-pixel gap the reveal could never
+  fully close, `min-height: 0` above notwithstanding (that override defeats
+  the *content-based* automatic minimum size grid items get by default; it
+  does not defeat the padding floor, which is a separate rule of the box
+  model). Padding here, on `__body`, has no such floor: `__body` is an
+  ordinary block whose own height is simply whatever its padding and content
+  add up to, and `__inner` -- unpadded, and sized only by its single child --
+  auto-sizes around that larger box when open and clips it away entirely,
+  ring room included, when collapsed. Nothing about the closed state changes:
+  `__inner` still has zero padding of its own, so it still genuinely reaches
+  zero height.
+
+  The existing top padding folds into the same ring-room figure rather than
+  stacking with it, so all four sides read as one consistent gap around the
+  field rather than a taller one on top by coincidence.
+*/
 .fd-url-reveal__body {
-    padding-top: var(--spacing-3);
+    padding:
+        calc(var(--spacing-3) + var(--focus-ring-offset) + var(--focus-ring-width))
+        calc(var(--focus-ring-offset) + var(--focus-ring-width))
+        calc(var(--focus-ring-offset) + var(--focus-ring-width));
 }
 
 /*
@@ -1802,6 +1841,21 @@ body {
     font-size: var(--text-code);
     font-weight: var(--font-weight-code);
     line-height: var(--leading-code);
+}
+
+/*
+  Defect fix (Story 10.1): the select-all-on-focus highlight (see the
+  `onFocus` handler in `StagedView.tsx`) painted the engine's default
+  selection colour instead of the product's accent family. `{colors.text}` on
+  `{colors.primary-tint}` is not a new pair invented for this rule -- it is
+  already load-bearing and already published in `styles.test.ts`/DESIGN.md
+  ("the unrounded contrast proof") as the drop zone's drag-active text
+  background, so reusing it here needs no new figure: 15.153268673 light,
+  11.826910776 dark, both clearing 4.5:1 with room to spare.
+*/
+.fd-url::selection {
+    background: var(--color-primary-tint);
+    color: var(--color-text);
 }
 
 .fd-copy-feedback {
