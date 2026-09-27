@@ -94,7 +94,7 @@ development_status:
 
   epic-10: in-progress
   10-1-draw-the-link-fields-focus-ring-whole: ready-for-dev
-  10-2-announce-a-cancellation-with-a-sliding-notification: ready-for-dev
+  10-2-announce-a-cancellation-with-a-sliding-notification: review
 action_items:
   - id: "epic-1-retro-item-1-stop-offering-a-folder-path-this-build-r"
     epic: 1
