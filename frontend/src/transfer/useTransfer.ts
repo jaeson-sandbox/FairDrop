@@ -68,6 +68,8 @@ export interface TransferController {
      * with `canRetry` and `selectErrorAction`/`selectEffectiveErrorAction`.
      */
     readonly retry: () => Promise<void>
+    readonly sendAgain: () => Promise<void>
+    readonly canSendAgain: boolean
     /**
      * Whether `retry()` currently has a remembered path to act on.
      *
@@ -84,6 +86,7 @@ export interface TransferController {
 /** Owns the one local command generation and the five session event listeners. */
 export function useTransfer(): TransferController {
     const [state, dispatch] = useReducer(transferReducer, undefined, createInitialTransferState)
+    const [, refreshAvailability] = useReducer((value: number) => value + 1, 0)
     const stateRef = useRef<TransferState>(state)
     const mountedRef = useRef(false)
     const stageGenerationRef = useRef(0)
@@ -94,27 +97,17 @@ export function useTransfer(): TransferController {
     const subscriptionEpochRef = useRef(0)
     // The absolute path passed to the most recent StageTransfer -- JS memory
     // only (Story 9.2 AC1). Never localStorage, never a Go call beyond the
-    // ordinary StageTransfer a retry issues, never logged, never rendered:
-    // it is written only in `stage()` below and read only by `retry()`: no
-    // selector, view, or serialized state ever sees it, only `canRetry`'s
-    // boolean. See `stage()`, `dispatchStageFailed`, and `dismissRetained`
+    // ordinary StageTransfer a retry or Send Again issues, never logged or rendered:
+    // it is written only in `stage()` below and read by `retry()` and
+    // `sendAgain()`: no selector, view, or serialized state ever sees it,
+    // only `canRetry`/`canSendAgain` booleans. See `stage()`,
+    // `dispatchStageFailed`, and `dismissRetained`
     // for where it is replaced or cleared.
     const rememberedPathRef = useRef<string | null>(null)
-    const previousPhaseRef = useRef<TransferState['phase']>(state.phase)
+    const selectionEpochRef = useRef(0)
+    const sendAgainPendingRef = useRef(false)
     const idleWaitersRef = useRef<Set<() => void>>(new Set())
     stateRef.current = state
-
-    // A completed Done needs no retry target: the item was sent, and the next
-    // thing the sender does is a fresh Stage, which remembers its own path
-    // anyway. This lives here rather than in the reducer because the
-    // remembered path is controller memory, not reducer state (see
-    // `rememberedPathRef` above); mirrors the existing `stateRef.current =
-    // state` line just above, which is likewise a synchronous, idempotent
-    // ref sync safe to run twice under StrictMode's double render.
-    if (state.phase === 'done' && previousPhaseRef.current !== 'done') {
-        rememberedPathRef.current = null
-    }
-    previousPhaseRef.current = state.phase
 
     useEffect(() => {
         mountedRef.current = true
@@ -131,6 +124,9 @@ export function useTransfer(): TransferController {
             activeCancelRef.current = null
             browseOperationRef.current = null
             rememberedPathRef.current = null
+            selectionEpochRef.current += 1
+            sendAgainPendingRef.current = false
+            for (const resolve of idleWaitersRef.current) resolve()
             idleWaitersRef.current = new Set()
         }
     }, [])
@@ -191,7 +187,8 @@ export function useTransfer(): TransferController {
         // funnels through this one function, so this is the single place
         // "the absolute path passed to StageTransfer" needs recording (Story
         // 9.2 AC1). Replaced by the next Stage; cleared elsewhere on Dismiss,
-        // a completed Done, and a non-retryable Stage failure.
+        // user cancellation, and a non-retryable Stage failure.
+        selectionEpochRef.current += 1
         rememberedPathRef.current = absolutePath
         const promise = Promise.resolve().then(() => StageTransfer(absolutePath) as Promise<unknown>)
         const operation: StageOperation = {generation, promise, cancelRequested: false}
@@ -300,8 +297,16 @@ export function useTransfer(): TransferController {
     const selectFile = useCallback(() => browse(SelectFile, 'file'), [browse])
     const selectDirectory = useCallback(() => browse(SelectDirectory, 'directory'), [browse])
 
-    const cancel = useCallback(async (): Promise<void> => {
+    const cancelImpl = useCallback(async (releaseForOutcome: boolean): Promise<boolean | void> => {
         const current = stateRef.current
+        if (!releaseForOutcome) {
+            rememberedPathRef.current = null
+            selectionEpochRef.current += 1
+            // A live terminal Cancel can reject without a reset event. The
+            // reducer then stays on Done, so refresh the derived action
+            // availability after forgetting the path.
+            if (current.phase === 'done' || current.phase === 'error') refreshAvailability()
+        }
         if (current.phase === 'pending') {
             const operation = stageOperationRef.current
             if (operation === null || operation.cancelRequested || current.cancelPending) return
@@ -349,11 +354,14 @@ export function useTransfer(): TransferController {
                 // and the reset this was trying to force is what would have
                 // produced the Idle that could show one. The rejection text is
                 // adapter text either way, and the outcome panel the user is
-                // looking at is still correct about what happened.
+                // looking at is still correct about what happened. An internal
+                // release must report failure so its waiting action settles
+                // without staging before a reset that may never arrive.
+                if (releaseForOutcome) return false
             } finally {
                 if (activeCancelRef.current === terminal) activeCancelRef.current = null
             }
-            return
+            return true
         }
 
         if (current.phase !== 'staged' && current.phase !== 'transferring') return
@@ -381,6 +389,7 @@ export function useTransfer(): TransferController {
             if (activeCancelRef.current === operation) activeCancelRef.current = null
         }
     }, [])
+    const cancel = useCallback(async (): Promise<void> => { await cancelImpl(false) }, [cancelImpl])
 
     const rejectSelection = useCallback(() => dispatch({type: 'invalid-selection'}), [])
     const dismissRetained = useCallback(() => {
@@ -390,6 +399,7 @@ export function useTransfer(): TransferController {
         // simply returns the same state, and clearing an already-null ref a
         // second time is a no-op.
         rememberedPathRef.current = null
+        selectionEpochRef.current += 1
         dispatch({type: 'dismiss-retained'})
     }, [])
     const reportCopyFailure = useCallback((sessionId: string) => {
@@ -400,6 +410,7 @@ export function useTransfer(): TransferController {
         absolutePath: string,
         itemKind: PendingItemKind = 'unknown',
     ): Promise<void> => {
+        selectionEpochRef.current += 1
         if (stateRef.current.phase === 'done' || stateRef.current.phase === 'error') {
             // D-059: a live terminal outcome still holds the backend's ~3s
             // lease until its own transfer-reset arrives. Staging straight
@@ -409,25 +420,52 @@ export function useTransfer(): TransferController {
             // the actual transition to Idle, not just for the Cancel command
             // to settle: the reset event that retires the session is a
             // separate, later message from the backend.
-            await cancel()
+            if (await cancelImpl(true) === false) return
             await waitForIdle()
         }
         if (!mountedRef.current) return
         await stage(absolutePath, itemKind)
-    }, [cancel, stage])
+    }, [cancelImpl, stage])
 
     const selectFromOutcome = useCallback(async (itemKind: 'file' | 'directory'): Promise<void> => {
+        selectionEpochRef.current += 1
         if (stateRef.current.phase === 'done' || stateRef.current.phase === 'error') {
             // Same D-059 lease release as stageFromOutcome, ahead of opening
             // the chooser rather than ahead of staging a path already in
             // hand -- neither SelectFile nor SelectDirectory is called until
             // this settles.
-            await cancel()
+            if (await cancelImpl(true) === false) return
             await waitForIdle()
         }
         if (!mountedRef.current) return
         await (itemKind === 'file' ? selectFile() : selectDirectory())
-    }, [cancel, selectFile, selectDirectory])
+    }, [cancelImpl, selectFile, selectDirectory])
+
+    const sendAgain = useCallback(async (): Promise<void> => {
+        const current = stateRef.current
+        const isDone = current.phase === 'done' ||
+            (current.phase === 'idle' && current.retainedOutcome?.kind === 'done')
+        const path = rememberedPathRef.current
+        const itemKind: PendingItemKind = current.phase === 'done'
+            ? (current.outcome.receipt.isDir ? 'directory' : 'file')
+            : current.phase === 'idle' && current.retainedOutcome?.kind === 'done'
+                ? (current.retainedOutcome.receipt.isDir ? 'directory' : 'file')
+                : 'unknown'
+        if (!mountedRef.current || !isDone || path === null || sendAgainPendingRef.current) return
+        sendAgainPendingRef.current = true
+        const epoch = selectionEpochRef.current
+        try {
+            if (current.phase === 'done') {
+                if (await cancelImpl(true) === false) return
+                await waitForIdle()
+            }
+            if (!mountedRef.current || selectionEpochRef.current !== epoch ||
+                rememberedPathRef.current !== path || stateRef.current.phase !== 'idle') return
+            await stage(path, itemKind)
+        } finally {
+            sendAgainPendingRef.current = false
+        }
+    }, [cancelImpl, stage])
 
     const retry = useCallback(async (): Promise<void> => {
         const path = rememberedPathRef.current
@@ -439,11 +477,14 @@ export function useTransfer(): TransferController {
 
     return {
         state, stage, selectFile, selectDirectory, cancel, rejectSelection, reportCopyFailure, dismissRetained,
-        stageFromOutcome, selectFromOutcome, retry, canRetry: rememberedPathRef.current !== null,
+        stageFromOutcome, selectFromOutcome, retry, sendAgain,
+        canRetry: rememberedPathRef.current !== null,
+        canSendAgain: rememberedPathRef.current !== null &&
+            (state.phase === 'done' || (state.phase === 'idle' && state.retainedOutcome?.kind === 'done')),
     }
 
     function waitForIdle(): Promise<void> {
-        if (stateRef.current.phase === 'idle') return Promise.resolve()
+        if (!mountedRef.current || stateRef.current.phase === 'idle') return Promise.resolve()
         return new Promise<void>((resolve) => { idleWaitersRef.current.add(resolve) })
     }
 

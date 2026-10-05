@@ -6,10 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"mime"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -108,7 +110,24 @@ func assertNativeDownloadWithApp(t *testing.T, app *App, inspector *inspectedNat
 		t.Fatal("native returned metadata differs from selected fixture")
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
-	response, err := client.Get(metadata.URL)
+	page, err := client.Get(metadata.URL)
+	if err != nil {
+		t.Fatal("native inspection request failed")
+	}
+	pageBody, err := io.ReadAll(page.Body)
+	_ = page.Body.Close()
+	if err != nil || page.StatusCode != http.StatusOK || !bytes.Contains(pageBody, []byte(`<form method="post" action="">`)) || !bytes.Contains(pageBody, []byte(html.EscapeString(name))) || bytes.Contains(pageBody, []byte(selected)) {
+		t.Fatalf("native inspection page invalid: status=%d read_error=%v", page.StatusCode, err)
+	}
+	select {
+	case event := <-inspector.events:
+		t.Fatalf("GET published lifecycle event %q before Download", event.Kind)
+	default:
+	}
+	if _, err := app.StageTransfer(selected); transfer.ErrorCodeOf(err) != transfer.ErrBusy {
+		t.Fatalf("GET left the staged session replaceable: second Stage code=%s, want busy", transfer.ErrorCodeOf(err))
+	}
+	response, err := client.Post(metadata.URL, "", nil)
 	if err != nil {
 		t.Fatal("native download request failed")
 	}
@@ -183,6 +202,211 @@ func assertNativeDownloadWithApp(t *testing.T, app *App, inspector *inspectedNat
 		case <-deadline.C:
 			t.Fatal("native lifecycle omitted matching natural Complete before cleanup")
 		}
+	}
+}
+
+func TestNativeInspectedPageCancelRetiresOldCapability(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected := filepath.Join(base, "a&b.txt")
+	if err := os.WriteFile(selected, []byte("native matrix payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app, inspector := nativeMatrixApp(t)
+	metadata, err := app.StageTransfer(selected)
+	if err != nil {
+		t.Fatalf("Stage code=%s", transfer.ErrorCodeOf(err))
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	page, err := client.Get(metadata.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(page.Body)
+	_ = page.Body.Close()
+	if err != nil || page.StatusCode != http.StatusOK || !bytes.Contains(body, []byte("a&amp;b.txt")) || bytes.Contains(body, []byte(selected)) {
+		t.Fatalf("escaped native GET invalid: status=%d err=%v", page.StatusCode, err)
+	}
+	select {
+	case event := <-inspector.events:
+		t.Fatalf("inspection emitted %q before Cancel", event.Kind)
+	default:
+	}
+	if err := app.CancelTransfer(); err != nil {
+		t.Fatalf("Cancel code=%s", transfer.ErrorCodeOf(err))
+	}
+	oldResponse, err := client.Post(metadata.URL, "", nil)
+	if err == nil {
+		defer oldResponse.Body.Close()
+		if oldResponse.StatusCode == http.StatusOK {
+			t.Fatal("cancelled inspected URL still downloaded")
+		}
+	}
+	fresh, err := app.StageTransfer(selected)
+	if err != nil || fresh.URL == metadata.URL {
+		t.Fatalf("Cancel did not release staged session for a fresh capability: code=%s", transfer.ErrorCodeOf(err))
+	}
+}
+
+func TestNativeCompletedItemCanBeStagedAgainWithFreshCapability(t *testing.T) {
+	for _, folder := range []bool{false, true} {
+		name := "file"
+		if folder {
+			name = "folder"
+		}
+		t.Run(name, func(t *testing.T) {
+			base, err := filepath.EvalSymlinks(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			selected := filepath.Join(base, "report.txt")
+			if folder {
+				selected = filepath.Join(base, "Shared")
+				if err := os.Mkdir(selected, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(selected, "report.txt"), []byte("send again payload"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := os.WriteFile(selected, []byte("send again payload"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			app, inspector := nativeMatrixApp(t)
+			first, err := app.StageTransfer(selected)
+			if err != nil {
+				t.Fatalf("first Stage code=%s", transfer.ErrorCodeOf(err))
+			}
+			client := &http.Client{Timeout: 10 * time.Second}
+			download := func(rawURL string) {
+				t.Helper()
+				response, err := client.Post(rawURL, "", nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer response.Body.Close()
+				body, readErr := io.ReadAll(response.Body)
+				if readErr != nil || response.StatusCode != http.StatusOK {
+					t.Fatalf("download status=%d read_error=%v", response.StatusCode, readErr)
+				}
+				if !folder {
+					if string(body) != "send again payload" {
+						t.Fatal("file bytes differ")
+					}
+					return
+				}
+				archive, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+				if err != nil {
+					t.Fatal("folder download is not a valid ZIP")
+				}
+				found := false
+				for _, entry := range archive.File {
+					if entry.Name != "Shared/report.txt" {
+						continue
+					}
+					reader, err := entry.Open()
+					if err != nil {
+						t.Fatal(err)
+					}
+					payload, err := io.ReadAll(reader)
+					_ = reader.Close()
+					if err != nil || string(payload) != "send again payload" {
+						t.Fatal("ZIP entry bytes differ")
+					}
+					found = true
+				}
+				if !found {
+					t.Fatal("ZIP omitted selected file")
+				}
+			}
+			download(first.URL)
+			deadline := time.NewTimer(5 * time.Second)
+			defer deadline.Stop()
+			completed := false
+			for !completed {
+				select {
+				case event := <-inspector.events:
+					completed = event.Kind == transfer.TransferComplete && event.SessionID == first.SessionID
+				case <-deadline.C:
+					t.Fatal("first download did not complete")
+				}
+			}
+			if err := app.CancelTransfer(); err != nil {
+				t.Fatalf("terminal lease release code=%s", transfer.ErrorCodeOf(err))
+			}
+			second, err := app.StageTransfer(selected)
+			if err != nil {
+				t.Fatalf("same selected path could not be revalidated: code=%s", transfer.ErrorCodeOf(err))
+			}
+			oldURL, err := url.Parse(first.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			freshURL, err := url.Parse(second.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if second.SessionID == first.SessionID || freshURL.Path == oldURL.Path {
+				t.Fatal("re-staging reused a session identifier or capability token path")
+			}
+			if old, err := client.Post(first.URL, "", nil); err == nil {
+				defer old.Body.Close()
+				if old.StatusCode == http.StatusOK {
+					t.Fatal("retired first capability still delivered")
+				}
+			}
+			download(second.URL)
+		})
+	}
+}
+
+func TestNativeSendAgainRevalidatesDeletedSource(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected := filepath.Join(base, "report.txt")
+	if err := os.WriteFile(selected, []byte("send again payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app, inspector := nativeMatrixApp(t)
+	first, err := app.StageTransfer(selected)
+	if err != nil {
+		t.Fatalf("first Stage code=%s", transfer.ErrorCodeOf(err))
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Post(first.URL, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = io.Copy(io.Discard, response.Body)
+	_ = response.Body.Close()
+	if err != nil || response.StatusCode != http.StatusOK {
+		t.Fatal("first download failed")
+	}
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	for {
+		select {
+		case event := <-inspector.events:
+			if event.Kind == transfer.TransferComplete && event.SessionID == first.SessionID {
+				goto completed
+			}
+		case <-deadline.C:
+			t.Fatal("first download did not complete")
+		}
+	}
+completed:
+	if err := app.CancelTransfer(); err != nil {
+		t.Fatalf("terminal lease release code=%s", transfer.ErrorCodeOf(err))
+	}
+	if err := os.Remove(selected); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.StageTransfer(selected); transfer.ErrorCodeOf(err) != transfer.ErrPathNotFound {
+		t.Fatalf("deleted source Stage code=%s, want path_not_found", transfer.ErrorCodeOf(err))
 	}
 }
 

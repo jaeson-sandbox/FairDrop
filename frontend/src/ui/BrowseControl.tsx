@@ -28,6 +28,7 @@ interface BrowseControlProps {
      * browse control (which never passes this prop) is unaffected.
      */
     readonly disabled?: boolean
+    readonly appearance?: 'primary' | 'secondary'
 }
 
 /**
@@ -46,7 +47,7 @@ interface BrowseControlProps {
  * not reducer state -- because nothing about it survives a re-render of Idle
  * or needs to be reconstructed from a lifecycle event.
  */
-export function BrowseControl({label, onSelectFile, onSelectDirectory, disabled = false}: BrowseControlProps) {
+export function BrowseControl({label, onSelectFile, onSelectDirectory, disabled = false, appearance = 'primary'}: BrowseControlProps) {
     const [open, setOpen] = useState(false)
     // Story 7.10: WebKit does not match `:focus-visible` for an element
     // focused by script (see the CSS comment above `.fd-button:focus-visible,
@@ -385,7 +386,7 @@ export function BrowseControl({label, onSelectFile, onSelectDirectory, disabled 
                 // full-width row below it. See `IdleView.test.tsx`'s inverted
                 // assertion, which names this second reversal explicitly
                 // rather than merely deleting the first one's comment.
-                className="fd-button fd-button--primary fd-button--pill fd-target"
+                className={`fd-button fd-button--${appearance} fd-button--pill fd-target`}
                 aria-haspopup="menu"
                 aria-expanded={open}
                 aria-disabled={disabled || undefined}

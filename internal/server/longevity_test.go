@@ -63,7 +63,7 @@ func TestATransferLongerThanEveryTimeoutStillCompletes(t *testing.T) {
 	client := &http.Client{
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	response, err := client.Get(downloadURL(handle.Port, string(testToken)))
+	response, err := client.Post(downloadURL(handle.Port, string(testToken)), "", nil)
 	if err != nil {
 		t.Fatalf("GET error = %v", err)
 	}

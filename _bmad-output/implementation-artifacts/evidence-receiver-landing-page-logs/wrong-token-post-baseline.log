@@ -1,0 +1,82 @@
+=== RUN   TestRejectedRequestsNeverReachClaimLogic
+=== PAUSE TestRejectedRequestsNeverReachClaimLogic
+=== CONT  TestRejectedRequestsNeverReachClaimLogic
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/put_on_the_exact_route_PUT
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/delete_on_the_exact_route_DELETE
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/head_on_the_exact_route_HEAD
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/options_on_the_exact_route_OPTIONS
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/root_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/root_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/route_prefix_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/route_prefix_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/empty_token_segment_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/empty_token_segment_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/trailing_slash_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/trailing_slash_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/extra_segment_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/extra_segment_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/doubled_separator_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/doubled_separator_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/leading_doubled_separator_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/leading_doubled_separator_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/single_dot_prefix_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/single_dot_prefix_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/single_dot_segment_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/single_dot_segment_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/dot-dot_rewind_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/dot-dot_rewind_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/percent-encoded_traversal_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/percent-encoded_traversal_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/dot-dot_traversal_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/dot-dot_traversal_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/unrelated_path_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/unrelated_path_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/oversized_token_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/oversized_token_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/empty_token_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/empty_token_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/token_prefix_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/token_prefix_POST
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/token_with_one_wrong_byte_GET
+=== RUN   TestRejectedRequestsNeverReachClaimLogic/token_with_one_wrong_byte_POST
+--- PASS: TestRejectedRequestsNeverReachClaimLogic (0.02s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/put_on_the_exact_route_PUT (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/delete_on_the_exact_route_DELETE (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/head_on_the_exact_route_HEAD (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/options_on_the_exact_route_OPTIONS (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/root_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/root_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/route_prefix_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/route_prefix_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/empty_token_segment_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/empty_token_segment_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/trailing_slash_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/trailing_slash_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/extra_segment_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/extra_segment_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/doubled_separator_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/doubled_separator_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/leading_doubled_separator_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/leading_doubled_separator_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/single_dot_prefix_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/single_dot_prefix_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/single_dot_segment_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/single_dot_segment_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/dot-dot_rewind_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/dot-dot_rewind_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/percent-encoded_traversal_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/percent-encoded_traversal_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/dot-dot_traversal_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/dot-dot_traversal_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/unrelated_path_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/unrelated_path_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/oversized_token_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/oversized_token_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/empty_token_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/empty_token_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/token_prefix_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/token_prefix_POST (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/token_with_one_wrong_byte_GET (0.00s)
+    --- PASS: TestRejectedRequestsNeverReachClaimLogic/token_with_one_wrong_byte_POST (0.00s)
+PASS
+ok  	fairdrop/internal/server	0.333s

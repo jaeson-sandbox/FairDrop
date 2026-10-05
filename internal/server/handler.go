@@ -75,9 +75,9 @@ func isCanonicalPath(escapedPath string) bool {
 // coordinator the only thing that can authorize a transfer.
 func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 	// The route is registered without a method, so every method arrives here
-	// and this check -- not the router -- is what makes HEAD, POST, and the
+	// and this check -- not the router -- is what makes HEAD and unsupported
 	// rest answer exactly like a path that does not exist.
-	if request.Method != http.MethodGet {
+	if request.Method != http.MethodGet && request.Method != http.MethodPost {
 		writeStatus(writer, http.StatusNotFound)
 		return
 	}
@@ -85,6 +85,14 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 	// so no path splitting here can disagree with what it matched.
 	if !tokenMatches(request.PathValue("token"), r.token) {
 		writeStatus(writer, http.StatusNotFound)
+		return
+	}
+	if r.claimed.Load() {
+		writeStatus(writer, http.StatusLocked)
+		return
+	}
+	if request.Method == http.MethodGet {
+		r.landing(writer, request)
 		return
 	}
 

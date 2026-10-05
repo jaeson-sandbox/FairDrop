@@ -34,7 +34,7 @@ func TestNaturalCompletionWaitsForHTTPFinalization(t *testing.T) {
 				gate := installFinalWriteGate(server, 2, outcome)
 				handle := startTestServer(t, server, &stubAuthorizer{})
 				t.Cleanup(gate.release)
-				response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+				response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 				wire := awaitFinalWrite(t, gate)
 				if known && !bytes.Equal(wire, body) {
 					t.Fatal("gate did not intercept the buffered file body")
@@ -108,7 +108,7 @@ func TestPreparationFailureFinalizes410BeforeTerminalTeardown(t *testing.T) {
 	responseReady := make(chan *http.Response, 1)
 	requestFailed := make(chan error, 1)
 	go func() {
-		response, err := testClient().Get(downloadURL(handle.Port, string(testToken)))
+		response, err := testClient().Post(downloadURL(handle.Port, string(testToken)), "", nil)
 		if err != nil {
 			requestFailed <- err
 			return
@@ -164,7 +164,7 @@ func TestHeaderOnlyFinalizationWaitsAndRetainsFailureCodes(t *testing.T) {
 				}
 				ready := make(chan result, 1)
 				go func() {
-					response, err := testClient().Get(downloadURL(handle.Port, string(testToken)))
+					response, err := testClient().Post(downloadURL(handle.Port, string(testToken)), "", nil)
 					ready <- result{response, err}
 				}()
 				wire := awaitFinalWrite(t, gate)

@@ -1,0 +1,20 @@
+=== RUN   TestLandingVisitsDoNotClaimOrRead
+=== PAUSE TestLandingVisitsDoNotClaimOrRead
+=== CONT  TestLandingVisitsDoNotClaimOrRead
+    landing_test.go:29: GET did not render the real metadata and POST form: status 200, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:29: GET did not render the real metadata and POST form: status 423, body ""
+    landing_test.go:35: GET reserved, authorized or prepared the payload
+--- FAIL: TestLandingVisitsDoNotClaimOrRead (0.00s)
+FAIL
+FAIL	fairdrop/internal/server	0.505s
+FAIL

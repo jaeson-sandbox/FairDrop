@@ -1,0 +1,6 @@
+=== RUN   TestLandingEscapesMetadataAndCarriesPagePolicies
+=== PAUSE TestLandingEscapesMetadataAndCarriesPagePolicies
+=== CONT  TestLandingEscapesMetadataAndCarriesPagePolicies
+--- PASS: TestLandingEscapesMetadataAndCarriesPagePolicies (0.00s)
+PASS
+ok  	fairdrop/internal/server	0.282s

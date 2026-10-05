@@ -117,7 +117,7 @@ func TestStartRefusesASecondSession(t *testing.T) {
 	assertStartFailed(t, second, err)
 
 	// The first server is untouched.
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("the live server stopped answering: status = %d", response.StatusCode)
 	}
@@ -197,7 +197,7 @@ func TestStopIsSafeAtEveryPointInTheLifecycle(t *testing.T) {
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	active := server.active
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	readBody(t, response)
 
 	awaitNaturalCompletion(t, server)
@@ -249,7 +249,7 @@ func TestStopMidTransferIsQuiescentAndSilent(t *testing.T) {
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	active := server.active
 
-	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	request, err := http.NewRequest(http.MethodPost, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +302,7 @@ func TestStopUnblocksAStalledPayload(t *testing.T) {
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	active := server.active
 
-	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	request, err := http.NewRequest(http.MethodPost, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +361,7 @@ func TestStopReturnsACodedFailureWhenAHandlerNeverReturns(t *testing.T) {
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	t.Cleanup(func() { unblockOnce.Do(func() { close(unblock) }) })
 
-	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	request, err := http.NewRequest(http.MethodPost, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,7 +457,7 @@ func TestStopReleasesItsMutexBeforeWaitingAndFencesAConcurrentStart(t *testing.T
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	t.Cleanup(func() { close(unblock) })
 
-	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	request, err := http.NewRequest(http.MethodPost, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -533,7 +533,7 @@ func TestStopBoundsAHandlerStuckInAuthorizeClaim(t *testing.T) {
 	handle := startTestServer(t, server, authorizer)
 	t.Cleanup(func() { close(unblock) })
 
-	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	request, err := http.NewRequest(http.MethodPost, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,7 +562,7 @@ func TestStartAfterStopBuildsAFreshRun(t *testing.T) {
 
 	server := newTestServer(t, payloadsReturning(&stubPayload{name: "first.pdf", known: true}))
 	first := startTestServer(t, server, &stubAuthorizer{})
-	firstResponse := do(t, http.MethodGet, downloadURL(first.Port, string(testToken)))
+	firstResponse := do(t, http.MethodPost, downloadURL(first.Port, string(testToken)))
 	readBody(t, firstResponse)
 	if firstResponse.StatusCode != http.StatusOK {
 		t.Fatalf("first transfer status = %d, want 200", firstResponse.StatusCode)
@@ -580,7 +580,7 @@ func TestStartAfterStopBuildsAFreshRun(t *testing.T) {
 	// The same fixed token is reused deliberately: the restart contract this
 	// pins is that a fresh run answers it again, not merely that it accepts a
 	// different one.
-	secondResponse := do(t, http.MethodGet, downloadURL(second.Port, string(testToken)))
+	secondResponse := do(t, http.MethodPost, downloadURL(second.Port, string(testToken)))
 	readBody(t, secondResponse)
 	if secondResponse.StatusCode != http.StatusOK {
 		t.Fatalf("second transfer status = %d, want 200 -- restart must serve a fresh transfer", secondResponse.StatusCode)
@@ -649,7 +649,7 @@ func TestServerConfigurationIsPinned(t *testing.T) {
 			"output again or a genuine handler panic is swallowed with them (D-021)")
 	}
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	readBody(t, response)
 	if !response.Close {
 		t.Fatal("the response kept the connection alive after a one-shot download")
@@ -799,7 +799,7 @@ func TestRequestArrivingDuringStopIsRefused(t *testing.T) {
 		requests.Add(1)
 		go func() {
 			defer requests.Done()
-			request, err := http.NewRequest(http.MethodGet, url, nil)
+			request, err := http.NewRequest(http.MethodPost, url, nil)
 			if err != nil {
 				t.Error(err)
 				return
@@ -914,7 +914,7 @@ func TestARepeatedStopDoesNotUpgradeAnUnresolvedTeardownToSuccess(t *testing.T) 
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	t.Cleanup(func() { close(unblock) })
 
-	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	request, err := http.NewRequest(http.MethodPost, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1007,7 +1007,7 @@ func TestARealHandlerPanicIsReportedThroughErrorLog(t *testing.T) {
 	server.panicked = func() { reports.Add(1) }
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	request, err := http.NewRequest(http.MethodPost, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

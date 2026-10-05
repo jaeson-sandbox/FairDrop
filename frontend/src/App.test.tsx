@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
     reportCopyFailure: vi.fn(),
     dismissRetained: vi.fn(),
     retry: vi.fn(),
+    sendAgain: vi.fn(),
     stageFromOutcome: vi.fn(),
     // Story 9.6 review follow-up: the outcome card's own chooser action
     // routes through this controller command now, not through the Go-bound
@@ -79,6 +80,7 @@ beforeEach(() => {
     mocks.copyToClipboard.mockResolvedValue(undefined)
     mocks.stageFromOutcome.mockResolvedValue(undefined)
     mocks.retry.mockResolvedValue(undefined)
+    mocks.sendAgain.mockResolvedValue(undefined)
     mocks.selectFromOutcome.mockResolvedValue(undefined)
     mocks.useTransfer.mockReturnValue({
         state: {phase: 'idle', retainedOutcome: null, commandError: null},
@@ -89,9 +91,11 @@ beforeEach(() => {
         rejectSelection: mocks.rejectSelection,
         dismissRetained: mocks.dismissRetained,
         retry: mocks.retry,
+        sendAgain: mocks.sendAgain,
         stageFromOutcome: mocks.stageFromOutcome,
         selectFromOutcome: mocks.selectFromOutcome,
         canRetry: false,
+        canSendAgain: false,
         reportCopyFailure: mocks.reportCopyFailure,
     })
 })
@@ -226,9 +230,11 @@ const commands: ControllerCommands = {
     reportCopyFailure: mocks.reportCopyFailure,
     dismissRetained: mocks.dismissRetained,
     retry: mocks.retry,
+    sendAgain: mocks.sendAgain,
     stageFromOutcome: mocks.stageFromOutcome,
     selectFromOutcome: mocks.selectFromOutcome,
     canRetry: false,
+    canSendAgain: false,
 }
 
 function mountWith(state: TransferState) {
@@ -887,6 +893,38 @@ describe('a native drop on the outcome card (Story 9.6)', () => {
   the right control from each menu item.
 */
 describe('the outcome card\'s own "Send Another"/"Choose Another" (Story 9.6)', () => {
+    it('wires Send Again on a Done card only when the controller has a target', async () => {
+        const done = {phase: 'done', session: {sessionId, lastSeq: 4},
+            outcome: {kind: 'done', receipt: doneReceipt}} as TransferState
+        const view = harnessMountWith(mocks.useTransfer, done, {...commands, canSendAgain: true})
+        await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Send Again'})) })
+        expect(mocks.sendAgain).toHaveBeenCalledTimes(1)
+        expect(mocks.selectFromOutcome).not.toHaveBeenCalled()
+        view.unmount()
+        mountWith(done)
+        expect(screen.queryByRole('button', {name: 'Send Again'})).toBeNull()
+        expect(screen.getByRole('button', {name: 'Send Another'})).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Done'})).toBeTruthy()
+    })
+
+    it('admits one Send Again operation and keeps all outcome actions busy until it settles', async () => {
+        let resolve!: () => void
+        mocks.sendAgain.mockReturnValueOnce(new Promise<void>((done) => { resolve = done }))
+        harnessMountWith(mocks.useTransfer, {phase: 'done', session: {sessionId, lastSeq: 4},
+            outcome: {kind: 'done', receipt: doneReceipt}} as TransferState,
+        {...commands, canSendAgain: true})
+        const sendAgain = screen.getByRole('button', {name: 'Send Again'})
+        fireEvent.click(sendAgain)
+        fireEvent.click(sendAgain)
+        expect(mocks.sendAgain).toHaveBeenCalledTimes(1)
+        for (const name of ['Send Again', 'Send Another', 'Done']) {
+            expect(screen.getByRole('button', {name}).getAttribute('aria-disabled')).toBe('true')
+        }
+        fireEvent.click(screen.getByRole('button', {name: 'Done'}))
+        expect(mocks.cancel).not.toHaveBeenCalled()
+        await act(async () => { resolve() })
+        expect(screen.getByRole('button', {name: 'Send Again'}).getAttribute('aria-disabled')).toBeNull()
+    })
     it('wires the File/Folder menu items to selectFromOutcome(\'file\'/\'directory\'), on a live Done card', async () => {
         mountWith({phase: 'done', session: {sessionId, lastSeq: 4}, outcome: {kind: 'done', receipt: doneReceipt}} as TransferState)
 

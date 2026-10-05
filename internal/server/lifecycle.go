@@ -24,9 +24,9 @@ const (
 	// because the listener lives only as long as one staged transfer.
 	listenAddress = "0.0.0.0:0"
 
-	// maxHeaderBytes is far below net/http's 1 MiB default. The only request
-	// this server answers is a bare GET of a fixed-shape path, so anything
-	// larger is either a mistake or an attempt to make the sender hold memory.
+	// maxHeaderBytes is far below net/http's 1 MiB default. The server accepts
+	// a metadata GET or an explicit empty-form POST on a fixed-shape path, so
+	// larger headers are a mistake or an attempt to make the sender hold memory.
 	maxHeaderBytes = 8 << 10
 
 	// readHeaderTimeout bounds a receiver that opens a connection and dribbles

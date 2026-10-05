@@ -1,7 +1,7 @@
 import type {} from '@vitest/browser-playwright' // pulls in the CDPSession#send() augmentation for the playwright provider
 import type {CSSProperties} from 'react'
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
-import {cdp, page} from 'vitest/browser'
+import {cdp, page, userEvent} from 'vitest/browser'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {IdleTransferState, StagedTransferState, TransferringTransferState} from '../src/transfer/state'
 import type {FileMetadata, ProgressSnapshot} from '../src/transfer/types'
@@ -1258,7 +1258,7 @@ describe('the Staged foot row keeps "Trouble connecting?" and Cancel on one row 
             'Not downloading?',
             'Browser says Not Found',
             'FairDrop keeps no copy.',
-            'Link previews in chat apps',
+            'Opening the link shows the item',
         ]) {
             expect(region.textContent, `"${text}" missing from the opened help region`).toContain(text)
         }
@@ -1568,6 +1568,60 @@ describe('the Sending figures and Cancel read as plain text, not boxed controls 
   the same class of gap Story 9.4's own defect-fix section documents.
 */
 describe('the outcome card is one centred, column-width card (Story 9.6)', () => {
+    it.each(['normal', '200%', 'forced colors'])(
+        'keeps all three Send Again actions visible and operable at 320px with %s', async (mode) => {
+            await page.viewport(320, 700)
+            if (mode === '200%') doubleTextTokens()
+            if (mode === 'forced colors') await setForcedColorsActive(true)
+            const onSendAgain = vi.fn()
+            const {container} = render(
+                <div className="fd-app" style={{height: '100vh'}}>
+                    <OutcomePanel
+                        outcome={{kind: 'done', retained: true,
+                            receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}}}
+                        onSendAgain={onSendAgain}
+                        onDismiss={() => undefined}
+                        browse={{label: 'Send Another', onSelectFile: () => undefined,
+                            onSelectDirectory: () => undefined}}
+                    />
+                </div>,
+            )
+            await waitForEntranceToSettle(container)
+            const card = container.querySelector<HTMLElement>('.fd-outcome')!
+            const bounds = card.getBoundingClientRect()
+            for (const name of ['Send Again', 'Send Another', 'Done']) {
+                const button = screen.getByRole('button', {name}) as HTMLButtonElement
+                const rect = button.getBoundingClientRect()
+                expect(rect.width, `${name} width`).toBeGreaterThanOrEqual(44)
+                expect(rect.height, `${name} height`).toBeGreaterThanOrEqual(43.9)
+                expect(rect.left, `${name} left`).toBeGreaterThanOrEqual(bounds.left - 1)
+                expect(rect.right, `${name} right`).toBeLessThanOrEqual(bounds.right + 1)
+                expect(button.scrollWidth, `${name} text is not clipped`).toBeLessThanOrEqual(button.clientWidth + 1)
+            }
+            const sendAgain = screen.getByRole('button', {name: 'Send Again'}) as HTMLButtonElement
+            await userEvent.tab()
+            expect(document.activeElement).toBe(sendAgain)
+            if (mode === 'forced colors') {
+                const style = getComputedStyle(sendAgain)
+                expect(style.outlineStyle).toBe('solid')
+                expect(parseFloat(style.outlineWidth)).toBeGreaterThan(0)
+            }
+            await userEvent.keyboard('{Enter}')
+            expect(onSendAgain).toHaveBeenCalledTimes(1)
+            await userEvent.tab()
+            const sendAnother = screen.getByRole('button', {name: 'Send Another'})
+            expect(document.activeElement).toBe(sendAnother)
+            if (mode === 'forced colors') {
+                const style = getComputedStyle(sendAnother)
+                expect(style.outlineStyle).toBe('solid')
+                expect(parseFloat(style.borderTopWidth)).toBeGreaterThan(0)
+            }
+            await userEvent.keyboard('{ArrowDown}')
+            expect(screen.getByRole('menu')).toBeTruthy()
+            expect(document.activeElement).toBe(screen.getByRole('menuitem', {name: 'File'}))
+            assertNoHorizontalOverflow(container)
+        },
+    )
     it.each([[1024, 768], [640, 480]])(
         'never renders wider than the Staged card\'s own column at %ix%i',
         async (width, height) => {

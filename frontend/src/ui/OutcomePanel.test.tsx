@@ -26,6 +26,35 @@ function browseHandlers() {
 }
 
 describe('the Done card', () => {
+    it('orders Send Again, Send Another, and Done with one primary action', () => {
+        const onSendAgain = vi.fn()
+        const onDismiss = vi.fn()
+        render(<OutcomePanel outcome={doneOutcome(false)} onSendAgain={onSendAgain}
+            browse={{label: 'Send Another', ...browseHandlers()}} onDismiss={onDismiss}/>)
+        const actions = [...panel().querySelectorAll<HTMLElement>('.fd-outcome__actions > button, .fd-outcome__actions .fd-selection > button')]
+        expect(actions.map((button) => button.textContent?.trim())).toEqual(['Send Again', 'Send Another', 'Done'])
+        expect(actions[0].className).toContain('fd-button--primary')
+        expect(actions[1].className).toContain('fd-button--secondary')
+        expect(actions[2].className).toContain('fd-button--quiet')
+        fireEvent.click(actions[0])
+        expect(onSendAgain).toHaveBeenCalledTimes(1)
+        expect(onDismiss).not.toHaveBeenCalled()
+    })
+
+    it('keeps all three actions discoverable but inert while staging again', () => {
+        const onSendAgain = vi.fn()
+        const onDismiss = vi.fn()
+        render(<OutcomePanel outcome={doneOutcome(true)} onSendAgain={onSendAgain}
+            browse={{label: 'Send Another', ...browseHandlers()}} onDismiss={onDismiss} busy/>)
+        for (const name of ['Send Again', 'Send Another', 'Done']) {
+            const button = screen.getByRole('button', {name})
+            expect(button.getAttribute('aria-disabled')).toBe('true')
+            fireEvent.click(button)
+        }
+        expect(onSendAgain).not.toHaveBeenCalled()
+        expect(onDismiss).not.toHaveBeenCalled()
+        expect(screen.queryByRole('menu')).toBeNull()
+    })
     it('says only "Sent", with no body paragraph', () => {
         render(<OutcomePanel outcome={doneOutcome(false)}/>)
 

@@ -1,0 +1,8 @@
+=== RUN   TestLandingEscapesMetadataAndCarriesPagePolicies
+=== PAUSE TestLandingEscapesMetadataAndCarriesPagePolicies
+=== CONT  TestLandingEscapesMetadataAndCarriesPagePolicies
+    landing_test.go:72: CSP = "", want script/resource refusal and same-origin form
+--- FAIL: TestLandingEscapesMetadataAndCarriesPagePolicies (0.00s)
+FAIL
+FAIL	fairdrop/internal/server	0.286s
+FAIL

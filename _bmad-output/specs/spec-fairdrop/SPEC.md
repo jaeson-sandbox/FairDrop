@@ -36,7 +36,7 @@ People need a quick way to move a local file or directory from a Windows or macO
 
 - **CAP-3**
   - **intent:** One receiver can download the selected regular file through its capability URL.
-  - **success:** The first exact-token GET receives the exact bytes and safe filename headers; a wrong method, route, or token receives 404, while a competing valid request receives 423 only while the listener remains live.
+  - **success:** An exact-token GET displays escaped staged metadata without claiming or opening the payload. The first exact-token POST receives the exact bytes and safe filename headers; unsupported methods, wrong routes and token mismatches receive 404, while a competing valid request receives 423 only while the listener remains live.
 
 - **CAP-4**
   - **intent:** One receiver can download the selected directory as a browser-compatible ZIP without a staged archive.
@@ -53,6 +53,10 @@ People need a quick way to move a local file or directory from a Windows or macO
 - **CAP-7**
   - **intent:** Maintainers can reproducibly verify and ship FairDrop on supported desktop platforms.
   - **success:** Locked Go and npm builds, unit and integration tests, race checks on capable native CI, Wails builds, and Windows and macOS smoke tests pass without relying on cross-compiled release claims.
+
+- **CAP-8**
+  - **intent:** A sender can offer a successfully sent file or folder again without selecting it again.
+  - **success:** Send Again revalidates the in-memory selection through ordinary Stage and displays a fresh session/token/QR after the prior terminal lease resets. One activation stages once; a failed lease release restores usable outcome controls without staging early. User cancellation, dismissal, replacement and unmount forget the selection. Send Another and error retry remain available in their permitted states.
 
 ## Constraints
 

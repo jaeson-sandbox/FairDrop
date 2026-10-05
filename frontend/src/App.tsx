@@ -68,6 +68,19 @@ function App() {
       completing immediately and leaving the queued stage to land afterwards.
     */
     const [outcomeActionPending, setOutcomeActionPending] = useState(false)
+    const outcomeActionInFlight = useRef(false)
+
+    async function runOutcomeAction(action: () => Promise<void>): Promise<void> {
+        if (outcomeActionInFlight.current) return
+        outcomeActionInFlight.current = true
+        setOutcomeActionPending(true)
+        try {
+            await action()
+        } finally {
+            outcomeActionInFlight.current = false
+            setOutcomeActionPending(false)
+        }
+    }
 
     /**
      * "Send Another"/"Choose Another"'s own action: `transfer.selectFromOutcome`
@@ -82,22 +95,16 @@ function App() {
      * entirely -- fixed by routing through the controller instead.
      */
     async function chooseForOutcome(kind: 'file' | 'directory'): Promise<void> {
-        setOutcomeActionPending(true)
-        try {
-            await transfer.selectFromOutcome(kind)
-        } finally {
-            setOutcomeActionPending(false)
-        }
+        await runOutcomeAction(() => transfer.selectFromOutcome(kind))
     }
 
     /** "Try Again": `retry()` plus the busy-state bookkeeping every outcome-card action shares. */
     async function retryOutcome(): Promise<void> {
-        setOutcomeActionPending(true)
-        try {
-            await transfer.retry()
-        } finally {
-            setOutcomeActionPending(false)
-        }
+        await runOutcomeAction(transfer.retry)
+    }
+
+    async function sendAgainOutcome(): Promise<void> {
+        await runOutcomeAction(transfer.sendAgain)
     }
 
     /**
@@ -109,12 +116,7 @@ function App() {
      * inherited `--wails-drop-target: drop` style and route here alike.
      */
     async function stageDroppedPath(path: string): Promise<void> {
-        setOutcomeActionPending(true)
-        try {
-            await transfer.stageFromOutcome(path, 'unknown')
-        } finally {
-            setOutcomeActionPending(false)
-        }
+        await runOutcomeAction(() => transfer.stageFromOutcome(path, 'unknown'))
     }
 
     function outcomeBrowseAction(label: string): OutcomeBrowseAction {
@@ -130,6 +132,7 @@ function App() {
         return {
             dropTargetStyle,
             onDismiss: dismiss,
+            onSendAgain: transfer.canSendAgain ? sendAgainOutcome : undefined,
             browse: outcomeBrowseAction(copy.done.sendAnother),
             busy: outcomeActionPending,
         }

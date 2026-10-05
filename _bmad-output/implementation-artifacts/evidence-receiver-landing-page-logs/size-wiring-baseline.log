@@ -1,0 +1,20 @@
+=== RUN   TestFileLandingRendersStagedSize
+=== RUN   TestFileLandingRendersStagedSize/empty
+=== RUN   TestFileLandingRendersStagedSize/singular
+=== RUN   TestFileLandingRendersStagedSize/logical_bytes
+=== RUN   TestFileLandingRendersStagedSize/kilobyte_boundary
+=== RUN   TestFileLandingRendersStagedSize/megabyte_boundary
+=== RUN   TestFileLandingRendersStagedSize/gigabyte_boundary
+=== RUN   TestFileLandingRendersStagedSize/terabyte_boundary
+=== RUN   TestFileLandingRendersStagedSize/unavailable
+--- PASS: TestFileLandingRendersStagedSize (0.01s)
+    --- PASS: TestFileLandingRendersStagedSize/empty (0.00s)
+    --- PASS: TestFileLandingRendersStagedSize/singular (0.00s)
+    --- PASS: TestFileLandingRendersStagedSize/logical_bytes (0.00s)
+    --- PASS: TestFileLandingRendersStagedSize/kilobyte_boundary (0.00s)
+    --- PASS: TestFileLandingRendersStagedSize/megabyte_boundary (0.00s)
+    --- PASS: TestFileLandingRendersStagedSize/gigabyte_boundary (0.00s)
+    --- PASS: TestFileLandingRendersStagedSize/terabyte_boundary (0.00s)
+    --- PASS: TestFileLandingRendersStagedSize/unavailable (0.00s)
+PASS
+ok  	fairdrop/internal/server	0.295s

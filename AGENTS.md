@@ -208,21 +208,13 @@ supported no-follow queries; preserve content-read separation and identity check
 
 ## Subagent model budget
 
-- **Owner instruction (2026-09-20, current): delegate story implementation to
-  `sonnet` subagents.** Keep the main session as orchestrator for review,
-  verification, integration and release coordination. Do not repeatedly request
-  approval for work already authorized; raise only material scope changes or
-  blockers.
+- **Owner instruction (2026-10-04, current): create the spec first, then
+  delegate story implementation to Sol (`gpt-6-sol`) subagents.** Keep the
+  main session as orchestrator for specification, review, verification,
+  integration and release coordination. Do not repeatedly request approval
+  for work already authorized; raise only material scope changes or blockers.
 
-- Superseded, kept for the record: an earlier 2026-09-20 instruction named
-  `gpt-5.6-sol` for story implementation, and a 2026-09-12 preference paired
-  `gpt-5.6-sol` with `gpt-5.6-luna` for smaller bounded tasks. **Do not follow
-  either.** They are listed only because three Epic 7 subagents in a row read
-  the stale text, noticed it contradicted their actual assignment, and spent
-  part of their run reasoning about it -- one concluded the file was not a
-  valid instruction source at all. It is: standing repo guidance is
-  authoritative. It was simply out of date, which is a different failure and
-  has a different fix, namely this edit.
+- This supersedes the 2026-09-20 Sonnet preference and earlier model budgets.
 
 - The general rule this incident illustrates: repo instruction files are
   authoritative but supersedable. A more recent instruction from the owner
