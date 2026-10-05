@@ -56,7 +56,7 @@ describe('the staged handoff', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         expect(screen.getByRole('heading', {level: 1, name: 'Ready to send'})).toBeTruthy()
-        expect(screen.getByText('Scan the code with the receiving device’s camera.')).toBeTruthy()
+        expect(screen.getByText('Scan the code, then tap Download on the receiving device.')).toBeTruthy()
     })
 
     it('renders the QR from the bare base64, prefixing the data URL only at render', () => {
@@ -536,7 +536,7 @@ describe('trust disclosures', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         const caveats = document.querySelector('.fd-caveats') as HTMLElement
-        expect(caveats.textContent).toContain('Works once: the first device to open it gets the file.')
+        expect(caveats.textContent).toContain('Works once: the first device to tap Download gets the item.')
         expect(caveats.textContent).toContain('Not encrypted. Use it only on a network you trust.')
 
         const glyphs = caveats.querySelectorAll('.fd-caveats__glyph')
@@ -544,7 +544,7 @@ describe('trust disclosures', () => {
         for (const glyph of glyphs) expect(glyph.getAttribute('aria-hidden')).toBe('true')
     })
 
-    it('states the no-extra-copy fact and the link-preview caveat inside "Trouble connecting?", not on the always-visible card', () => {
+    it('states the no-extra-copy fact and the inspection guidance inside "Trouble connecting?", not on the always-visible card', () => {
         render(<StagedView state={staged()} onCancel={vi.fn()}/>)
 
         // The disclosure's own content stays mounted in the DOM regardless of
@@ -556,10 +556,10 @@ describe('trust disclosures', () => {
         const caveats = document.querySelector('.fd-caveats') as HTMLElement
         const help = document.querySelector('.fd-help .fd-disclosure__region') as HTMLElement
         expect(caveats.textContent).not.toContain('FairDrop keeps no copy.')
-        expect(caveats.textContent).not.toContain('Link previews in chat apps')
+        expect(caveats.textContent).not.toContain('Opening the link shows the item')
         expect(help.textContent).toContain('FairDrop keeps no copy. The receiving device keeps what it downloads.')
         expect(help.textContent).toContain(
-            'Link previews in chat apps can count as that first device, so paste the link straight into a browser.',
+            'Opening the link shows the item before download. Tap Download to receive it.',
         )
     })
 
@@ -718,7 +718,7 @@ describe('recovery help behind "Trouble connecting?"', () => {
             'isolated networks may block device-to-device traffic. Then cancel and prepare the item again for ' +
             'a fresh link.')).toBeTruthy()
         expect(screen.getByText('Browser says Not Found: the link may be wrong or expired. Locked: another ' +
-            'opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a ' +
+            'downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a ' +
             'fresh link.')).toBeTruthy()
     })
 
@@ -732,7 +732,7 @@ describe('recovery help behind "Trouble connecting?"', () => {
             'Not downloading?',
             'Browser says Not Found',
             'FairDrop keeps no copy.',
-            'Link previews in chat apps',
+            'Opening the link shows the item',
         ]) {
             expect(region.textContent, text).toContain(text)
         }

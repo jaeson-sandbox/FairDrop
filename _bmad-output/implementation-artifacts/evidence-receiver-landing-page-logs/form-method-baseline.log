@@ -1,0 +1,6 @@
+=== RUN   TestLandingVisitsDoNotClaimOrRead
+=== PAUSE TestLandingVisitsDoNotClaimOrRead
+=== CONT  TestLandingVisitsDoNotClaimOrRead
+--- PASS: TestLandingVisitsDoNotClaimOrRead (0.00s)
+PASS
+ok  	fairdrop/internal/server	0.284s

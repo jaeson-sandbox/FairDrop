@@ -68,7 +68,8 @@ stateDiagram-v2
     IDLE --> STAGING: Stage(exactly one path)
     STAGING --> STAGED: resources ready
     STAGING --> IDLE: setup fails, Cancel, or Shutdown
-    STAGED --> CLAIMING: first valid GET requests claim
+    STAGED --> STAGED: valid GET inspects metadata
+    STAGED --> CLAIMING: first valid POST requests claim
     CLAIMING --> TRANSFERRING: beacon stopped and claim allowed
     CLAIMING --> IDLE: Cancel or Shutdown wins
     STAGED --> IDLE: Cancel
@@ -95,7 +96,7 @@ stateDiagram-v2
 
 - **Binds:** FR3, FR6-FR7, FR11-FR13, NFR4-NFR6
 - **Prevents:** blind port scans claiming a transfer, dual receivers, filename injection, and unbounded HTTP resource use
-- **Rule:** bind `0.0.0.0:0`; the coordinator generates a session ID and a separate capability token, each from at least 128 random bits through an injectable `crypto/rand`-backed source, then passes the token to the server. Register the methodless Go `http.ServeMux` path-variable pattern defined verbatim by AD-12 and explicitly require `request.Method == http.MethodGet` in the handler; a method-qualified pattern would return `405` and route `HEAD` to `GET`, violating the disguise rule. The first exact-token GET reserves locally, then synchronously asks the coordinator to authorize; no payload is opened and no header/event is emitted until authorization stops the beacon and commits TRANSFERRING. Wrong methods/routes/tokens are 404 without claiming; another exact-token GET is 423 only while the first listener is live; terminal teardown closes the listener. Apply safe attachment `Content-Disposition`, `Cache-Control: no-store`, `Access-Control-Allow-Origin: *`, `X-Content-Type-Options: nosniff`, and `Content-Length` for regular files only; bound header/read-idle limits and set no whole-transfer write deadline.
+- **Rule:** bind `0.0.0.0:0`; the coordinator generates a session ID and a separate capability token, each from at least 128 random bits through an injectable `crypto/rand`-backed source, then passes the token to the server. Register the methodless Go `http.ServeMux` path-variable pattern defined verbatim by AD-12 and explicitly allow only GET and POST in the handler; a method-qualified pattern would return `405` and route `HEAD` to `GET`, violating the disguise rule. An unclaimed exact-token GET returns escaped staged metadata and a native POST Download form without reserving, opening payloads or publishing lifecycle events. The first exact-token POST reserves locally, then synchronously asks the coordinator to authorize; no payload is opened and no download header/event is emitted until authorization stops the beacon and commits TRANSFERRING. Wrong methods/routes/tokens are 404 without claiming; another exact-token GET or POST is 423 only while the first listener is live; terminal teardown closes the listener. Receiver HTML is self-contained with no-store, no-referrer, nosniff and restrictive CSP; it reveals no source path. For the download response apply safe attachment `Content-Disposition`, `Cache-Control: no-store`, `Access-Control-Allow-Origin: *`, `X-Content-Type-Options: nosniff`, and `Content-Length` for regular files only; bound header/read-idle limits and set no whole-transfer write deadline.
 
 ### AD-6 — Stream payloads without persistence
 

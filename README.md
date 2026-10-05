@@ -13,7 +13,10 @@ field's focus ring and selection highlight. Transfer behavior remains the same c
 FR1-FR24 scope proven for v1.0.0: one file or folder, one receiver, plain HTTP on a trusted
 LAN, nothing persisted.
 
-## Using it
+## Using the development build
+
+The receiver page and explicit Download step below are planned for the next release. In the
+published v1.3.1 binary, opening the link starts the one-shot download immediately.
 
 1. Launch FairDrop. The first run asks for firewall access — allow it on **Private networks
    only**, and leave Public off. Only one copy runs at a time; launching it again restores the
@@ -22,8 +25,8 @@ LAN, nothing persisted.
    **Choose File or Folder** button inside it. That button opens a small menu because Windows'
    native dialog cannot offer both kinds at once; either item leads to the matching chooser.
 3. Scan the QR code from a browser on the same Wi-Fi, or use **Copy Link** or **Show Link** to
-   open the direct link instead. **The first device to open the link gets the download** —
-   including a link preview, so avoid pasting it into a chat that fetches URLs.
+   open the direct link instead. The receiving browser shows the item first. Tap **Download** there;
+   the first device to do so gets the one-shot transfer.
 4. A folder arrives as a ZIP, streamed rather than staged, so nothing extra is written on the
    sending side.
 

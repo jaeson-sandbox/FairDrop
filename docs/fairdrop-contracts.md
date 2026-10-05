@@ -334,13 +334,13 @@ Setup failure or cancellation before a successful Stage acknowledgement unwinds 
 ## Claim and HTTP ordering
 
 1. Reject malformed/oversized paths, wrong methods, wrong routes, and token mismatches as `404` without reserving or claiming.
-2. The first exact-token GET atomically reserves the server. A second exact-token GET receives `423` only while that reserved/claimed listener remains live.
+2. Exact-token GET renders escaped staged metadata and an explicit same-origin POST form without reserving or opening the payload. The first exact-token POST atomically reserves the server. Further valid GET/POST requests receive `423` while that reserved listener remains live.
 3. The reserved handler calls `AuthorizeClaim` synchronously. It opens no payload and writes no header first.
 4. Authorization generation-checks the session, enters CLAIMING, stops the beacon, commits TRANSFERRING, and synchronously publishes `transfer-started`. `StopBeacon` diagnostics are safe because the port guarantees the advertisement is gone before return.
 5. Only after authorization succeeds may the handler prepare the payload and write headers/body. If Cancel/Shutdown wins, authorization returns `cancelled`; the handler returns `404` if it can still respond, otherwise closes.
 6. Terminal teardown closes the listener immediately. No replay HTTP status is promised after the listener closes.
 
-The server registers the Go 1.22+ methodless `http.ServeMux` pattern `/download/{token}`, obtains the token only through `request.PathValue("token")`, and explicitly checks `request.Method == http.MethodGet` before any claim logic. A method-qualified `GET /download/{token}` pattern is forbidden because `ServeMux` would answer other methods with `405 Method Not Allowed` and route `HEAD` to the GET handler; FairDrop requires both to look nonexistent (`404`). No third-party router syntax or manual path splitting defines this boundary.
+The server registers the Go 1.22+ methodless `http.ServeMux` pattern `/download/{token}`, obtains the token only through `request.PathValue("token")`, and explicitly accepts GET and POST after matching the token; only POST enters claim logic. A method-qualified route is forbidden because `ServeMux` would answer other methods with `405 Method Not Allowed` and route `HEAD` to GET; FairDrop requires unsupported methods to look nonexistent (`404`). No third-party router syntax or manual path splitting defines this boundary.
 
 After authorization, a `PayloadPort.Prepare` failure returns a generic `410 Gone` response with no path/token details, emits `ServerFailed` preserving a recognized local code such as `source_changed` or `path_not_found`, and closes the listener. Its UI grammar is started, optional final progress, error, reset.
 

@@ -1,0 +1,784 @@
+
+> fairdrop-frontend@1.3.1 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/jaesonmartin/Projects/FairDrop/frontend
+
+ ❯ src/ui/IdleView.test.tsx (43 tests | 2 failed) 557ms
+     × offers platform firewall recovery and receiver help from Idle 27ms
+     × still renders the receiver-error guidance 9ms
+ ❯ src/ui/StagedView.test.tsx (51 tests | 1 failed) 1337ms
+     × covers platform firewall recovery and every generic receiver failure once opened 17ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/IdleView.test.tsx > Idle at rest > offers platform firewall recovery and receiver help from Idle
+TestingLibraryElementError: Unable to find an element with the text: Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"fd-region"[39m
+      [33mdata-phase-view[39m=[32m"idle"[39m
+    [36m>[39m
+      [36m<section[39m
+        [33mclass[39m=[32m"fd-idle"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"fd-drop-zone"[39m
+          [33mstyle[39m=[32m"--wails-drop-target: drop;"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-drop-zone__inner"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-drop-symbol fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 0;"[39m
+            [36m>[39m
+              [0m↓[0m
+            [36m</div>[39m
+            [36m<h1[39m
+              [33mclass[39m=[32m"fd-state-heading fd-rise"[39m
+              [33mdata-focus-target[39m=[32m"idle-instruction"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 1;"[39m
+              [33mtabindex[39m=[32m"-1"[39m
+            [36m>[39m
+              [0mDrop one file or folder[0m
+            [36m</h1>[39m
+            [36m<p[39m
+              [33mclass[39m=[32m"fd-meta fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 2;"[39m
+            [36m>[39m
+              [0mSends to one browser on the same local network. No account or receiver app.[0m
+            [36m</p>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 3;"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-selection"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33maria-expanded[39m=[32m"false"[39m
+                  [33maria-haspopup[39m=[32m"menu"[39m
+                  [33mclass[39m=[32m"fd-button fd-button--primary fd-button--pill fd-target"[39m
+                  [33mid[39m=[32m"_r_10_"[39m
+                  [33mtype[39m=[32m"button"[39m
+                [36m>[39m
+                  [0mChoose File or Folder[0m
+                  [36m<span[39m
+                    [33maria-hidden[39m=[32m"true"[39m
+                    [33mclass[39m=[32m"fd-browse-trigger__chevron"[39m
+                  [36m/>[39m
+                [36m</button>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"fd-idle-disclosures fd-rise"[39m
+          [33mstyle[39m=[32m"--fd-stagger: 4;"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-preflight fd-disclosure"[39m
+          [36m>[39m
+            [36m<h2[39m
+              [33mclass[39m=[32m"fd-disclosure__heading"[39m
+              [33mid[39m=[32m"fd-firewall-heading"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33maria-controls[39m=[32m"_r_12_"[39m
+                [33maria-expanded[39m=[32m"false"[39m
+                [33mclass[39m=[32m"fd-disclosure__summary"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [0mLocal network access[0m
+                [36m<span[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"fd-disclosure__chevron"[39m
+                [36m/>[39m
+              [36m</button>[39m
+            [36m</h2>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-disclosure__region"[39m
+              [33mid[39m=[32m"_r_12_"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-disclosure__region-inner"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"fd-disclosure__body"[39m
+                [36m>[39m
+                  [36m<p[39m
+                    [33mclass[39m=[32m"fd-body"[39m
+                  [36m>[39m
+                    [0mYour first transfer may ask to allow FairDrop on this local network.[0m
+                  [36m</p>[39m
+                  [36m<dl>[39m
+                    [36m<div>[39m
+                      [36m<dt>[39m
+                        [0mWindows[0m
+                      [36m</dt>[39m
+                      [36m<dd>[39m
+                        [0mAllow FairDrop on Private networks only. Leave Public networks off.[0m
+                      [36m</dd>[39m
+                    [36m</div>[39m
+                    [36m<div>[39m
+                      [36m<dt>[39m
+                        [0mmacOS[0m
+                      [36m</dt>[39m
+                      [36m<dd>[39m
+                        [0mAllow incoming connections for FairDrop.[0m
+                      [36m</dd>[39m
+                    [36m</div>[39m
+                  [36m</dl>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-help fd-disclosure"[39m
+          [36m>[39m
+            [36m<h2[39m
+              [33mclass[39m=[32m"fd-disclosure__heading"[39m
+              [33mid[39m=[32m"fd-recovery-heading"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33maria-controls[39m=[32m"_r_13_"[39m
+                [33maria-expanded[39m=[32m"false"[39m
+                [33mclass[39m=[32m"fd-disclosure__summary"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [0mTroubleshooting[0m
+                [36m<span[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"fd-disclosure__chevron"[39m
+                [36m/>[39m
+              [36m</button>[39m
+            [36m</h2>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-disclosure__region"[39m
+              [33mid[39m=[32m"_r_13_"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-disclosure__region-inner"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"fd-disclosure__body"[39m
+                [36m>[39m
+                  [36m<dl[39m
+                    [33mclass[39m=[32m"fd-help__platforms"[39m
+                  [36m>[39m
+                    [36m<div>[39m
+                      [36m<dt>[39m
+                        [0mWindows recovery[0m
+                      [36m</dt>[39m
+                      [36m<dd>[39m
+                        [0mOpen Windows Firewall settings and allow FairDrop on Private networks only, then prepare the item again.[0m
+                      [36m</dd>[39m
+                    [36m</div>[39m
+                    [36m<div>[39m
+                      [36m<dt>[39m
+                        [0mmacOS recovery[0m
+                      [36m</dt>[39m
+                      [36m<dd>[39m
+                        [0mOpen System Settings → Network → Firewall → Options, allow incoming connections for FairDrop, then prepare the item again.[0m
+                      [36m</dd>[39m
+                    [36m</div>[39m
+                  [36m</dl>[39m
+                  [36m<p[39m
+                    [33mclass[39m=[32m"fd-body"[39m
+                  [36m>[39m
+                    [0mNot downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.[0m
+                  [36m</p>[39m
+                  [36m<p[39m
+                    [33mclass[39m=[32m"fd-body"[39m
+                  [36m>[39m
+                    [0mBrowser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.[0m
+                  [36m</p>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/IdleView.test.tsx:136:23
+    134|             'isolated networks may block device-to-device traffic. The…
+    135|             'a fresh link.')).toBeTruthy()
+    136|         expect(screen.getByText('Browser says Not Found: the link may …
+       |                       ^
+    137|             'opener claimed it. Gone: the selected item changed. Cance…
+    138|             'fresh link.')).toBeTruthy()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/ui/IdleView.test.tsx > recovery guidance is a second collapsed disclosure > still renders the receiver-error guidance
+TestingLibraryElementError: Unable to find an element with the text: Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"fd-region"[39m
+      [33mdata-phase-view[39m=[32m"idle"[39m
+    [36m>[39m
+      [36m<section[39m
+        [33mclass[39m=[32m"fd-idle"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"fd-drop-zone"[39m
+          [33mstyle[39m=[32m"--wails-drop-target: drop;"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-drop-zone__inner"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-drop-symbol fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 0;"[39m
+            [36m>[39m
+              [0m↓[0m
+            [36m</div>[39m
+            [36m<h1[39m
+              [33mclass[39m=[32m"fd-state-heading fd-rise"[39m
+              [33mdata-focus-target[39m=[32m"idle-instruction"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 1;"[39m
+              [33mtabindex[39m=[32m"-1"[39m
+            [36m>[39m
+              [0mDrop one file or folder[0m
+            [36m</h1>[39m
+            [36m<p[39m
+              [33mclass[39m=[32m"fd-meta fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 2;"[39m
+            [36m>[39m
+              [0mSends to one browser on the same local network. No account or receiver app.[0m
+            [36m</p>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 3;"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-selection"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33maria-expanded[39m=[32m"false"[39m
+                  [33maria-haspopup[39m=[32m"menu"[39m
+                  [33mclass[39m=[32m"fd-button fd-button--primary fd-button--pill fd-target"[39m
+                  [33mid[39m=[32m"_r_3o_"[39m
+                  [33mtype[39m=[32m"button"[39m
+                [36m>[39m
+                  [0mChoose File or Folder[0m
+                  [36m<span[39m
+                    [33maria-hidden[39m=[32m"true"[39m
+                    [33mclass[39m=[32m"fd-browse-trigger__chevron"[39m
+                  [36m/>[39m
+                [36m</button>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"fd-idle-disclosures fd-rise"[39m
+          [33mstyle[39m=[32m"--fd-stagger: 4;"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-preflight fd-disclosure"[39m
+          [36m>[39m
+            [36m<h2[39m
+              [33mclass[39m=[32m"fd-disclosure__heading"[39m
+              [33mid[39m=[32m"fd-firewall-heading"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33maria-controls[39m=[32m"_r_3q_"[39m
+                [33maria-expanded[39m=[32m"false"[39m
+                [33mclass[39m=[32m"fd-disclosure__summary"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [0mLocal network access[0m
+                [36m<span[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"fd-disclosure__chevron"[39m
+                [36m/>[39m
+              [36m</button>[39m
+            [36m</h2>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-disclosure__region"[39m
+              [33mid[39m=[32m"_r_3q_"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-disclosure__region-inner"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"fd-disclosure__body"[39m
+                [36m>[39m
+                  [36m<p[39m
+                    [33mclass[39m=[32m"fd-body"[39m
+                  [36m>[39m
+                    [0mYour first transfer may ask to allow FairDrop on this local network.[0m
+                  [36m</p>[39m
+                  [36m<dl>[39m
+                    [36m<div>[39m
+                      [36m<dt>[39m
+                        [0mWindows[0m
+                      [36m</dt>[39m
+                      [36m<dd>[39m
+                        [0mAllow FairDrop on Private networks only. Leave Public networks off.[0m
+                      [36m</dd>[39m
+                    [36m</div>[39m
+                    [36m<div>[39m
+                      [36m<dt>[39m
+                        [0mmacOS[0m
+                      [36m</dt>[39m
+                      [36m<dd>[39m
+                        [0mAllow incoming connections for FairDrop.[0m
+                      [36m</dd>[39m
+                    [36m</div>[39m
+                  [36m</dl>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-help fd-disclosure"[39m
+          [36m>[39m
+            [36m<h2[39m
+              [33mclass[39m=[32m"fd-disclosure__heading"[39m
+              [33mid[39m=[32m"fd-recovery-heading"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33maria-controls[39m=[32m"_r_3r_"[39m
+                [33maria-expanded[39m=[32m"false"[39m
+                [33mclass[39m=[32m"fd-disclosure__summary"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [0mTroubleshooting[0m
+                [36m<span[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"fd-disclosure__chevron"[39m
+                [36m/>[39m
+              [36m</button>[39m
+            [36m</h2>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-disclosure__region"[39m
+              [33mid[39m=[32m"_r_3r_"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-disclosure__region-inner"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"fd-disclosure__body"[39m
+                [36m>[39m
+                  [36m<dl[39m
+                    [33mclass[39m=[32m"fd-help__platforms"[39m
+                  [36m>[39m
+                    [36m<div>[39m
+                      [36m<dt>[39m
+                        [0mWindows recovery[0m
+                      [36m</dt>[39m
+                      [36m<dd>[39m
+                        [0mOpen Windows Firewall settings and allow FairDrop on Private networks only, then prepare the item again.[0m
+                      [36m</dd>[39m
+                    [36m</div>[39m
+                    [36m<div>[39m
+                      [36m<dt>[39m
+                        [0mmacOS recovery[0m
+                      [36m</dt>[39m
+                      [36m<dd>[39m
+                        [0mOpen System Settings → Network → Firewall → Options, allow incoming connections for FairDrop, then prepare the item again.[0m
+                      [36m</dd>[39m
+                    [36m</div>[39m
+                  [36m</dl>[39m
+                  [36m<p[39m
+                    [33mclass[39m=[32m"fd-body"[39m
+                  [36m>[39m
+                    [0mNot downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.[0m
+                  [36m</p>[39m
+                  [36m<p[39m
+                    [33mclass[39m=[32m"fd-body"[39m
+                  [36m>[39m
+                    [0mBrowser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.[0m
+                  [36m</p>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/IdleView.test.tsx:415:23
+    413|         show()
+    414|
+    415|         expect(screen.getByText(text)).toBeTruthy()
+       |                       ^
+    416|     })
+    417|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/ui/StagedView.test.tsx > recovery help behind "Trouble connecting?" > covers platform firewall recovery and every generic receiver failure once opened
+TestingLibraryElementError: Unable to find an element with the text: Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"fd-region"[39m
+      [33mdata-phase-view[39m=[32m"staged"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"fd-staged-head"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"fd-state-heading"[39m
+          [33mdata-focus-target[39m=[32m"staged-heading"[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mReady to send[0m
+        [36m</h1>[39m
+        [36m<p[39m
+          [33mclass[39m=[32m"fd-meta"[39m
+        [36m>[39m
+          [0mScan the code, then tap Download on the receiving device.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<section[39m
+        [33mclass[39m=[32m"fd-packet"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"fd-hero"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-qr-panel"[39m
+          [36m>[39m
+            [36m<img[39m
+              [33malt[39m=[32m"Download QR code for Travel Notes.pdf"[39m
+              [33mclass[39m=[32m"fd-qr"[39m
+              [33mdraggable[39m=[32m"false"[39m
+              [33msrc[39m=[32m"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-hero__details"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-item fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 0;"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"fd-item__icon"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"fd-item__glyph"[39m
+                  [33mfill[39m=[32m"none"[39m
+                  [33mfocusable[39m=[32m"false"[39m
+                  [33mstroke[39m=[32m"currentColor"[39m
+                  [33mstroke-linejoin[39m=[32m"round"[39m
+                  [33mstroke-width[39m=[32m"1.6"[39m
+                  [33mviewBox[39m=[32m"0 0 20 20"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M5 2.5h6.5L15.5 6.5v11H5z"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M11.5 2.5v4h4"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+              [36m</span>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-item__text"[39m
+              [36m>[39m
+                [36m<h2[39m
+                  [33mclass[39m=[32m"fd-headline"[39m
+                  [33mid[39m=[32m"fd-item-name"[39m
+                [36m>[39m
+                  [36m<bdi[39m
+                    [33mdir[39m=[32m"auto"[39m
+                  [36m>[39m
+                    [0mTravel Notes.pdf[0m
+                  [36m</bdi>[39m
+                [36m</h2>[39m
+                [36m<p[39m
+                  [33mclass[39m=[32m"fd-meta"[39m
+                [36m>[39m
+                  [0mFile · 8.4 MB[0m
+                [36m</p>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-direct-row fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 1;"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"fd-button fd-target fd-button--primary"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"fd-button__swap"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"fd-button__swap-face"[39m
+                  [36m>[39m
+                    [36m<svg[39m
+                      [33maria-hidden[39m=[32m"true"[39m
+                      [33mclass[39m=[32m"fd-button__glyph"[39m
+                      [33mfill[39m=[32m"none"[39m
+                      [33mfocusable[39m=[32m"false"[39m
+                      [33mstroke[39m=[32m"currentColor"[39m
+                      [33mstroke-linecap[39m=[32m"round"[39m
+                      [33mstroke-width[39m=[32m"1.7"[39m
+                      [33mviewBox[39m=[32m"0 0 16 16"[39m
+                    [36m>[39m
+                      [36m<path[39m
+                        [33md[39m=[32m"M6.5 9.5a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0-4.2-4.2l-.7.7"[39m
+                      [36m/>[39m
+                      [36m<path[39m
+                        [33md[39m=[32m"M9.5 6.5a3 3 0 0 0-4.2 0L3.2 8.6a3 3 0 0 0 4.2 4.2l.7-.7"[39m
+                      [36m/>[39m
+                    [36m</svg>[39m
+                    [0mCopy Link[0m
+                  [36m</span>[39m
+                  [36m<span[39m
+                    [33maria-hidden[39m=[32m"true"[39m
+                    [33mclass[39m=[32m"fd-button__swap-face"[39m
+                  [36m>[39m
+                    [36m<svg[39m
+                      [33maria-hidden[39m=[32m"true"[39m
+                      [33mclass[39m=[32m"fd-button__glyph"[39m
+                      [33mfill[39m=[32m"none"[39m
+                      [33mfocusable[39m=[32m"false"[39m
+                      [33mstroke[39m=[32m"currentColor"[39m
+                      [33mstroke-linecap[39m=[32m"round"[39m
+                      [33mstroke-linejoin[39m=[32m"round"[39m
+                      [33mstroke-width[39m=[32m"2"[39m
+                      [33mviewBox[39m=[32m"0 0 16 16"[39m
+                    [36m>[39m
+                      [36m<path[39m
+                        [33md[39m=[32m"m3.5 8.5 3 3 6-7"[39m
+                      [36m/>[39m
+                    [36m</svg>[39m
+                    [0mCopied[0m
+                  [36m</span>[39m
+                [36m</span>[39m
+              [36m</button>[39m
+              [36m<button[39m
+                [33maria-controls[39m=[32m"_r_2k_"[39m
+                [33maria-expanded[39m=[32m"false"[39m
+                [33mclass[39m=[32m"fd-button fd-button--secondary fd-target"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [0mShow Link[0m
+              [36m</button>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-url-reveal"[39m
+              [33mid[39m=[32m"_r_2k_"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-url-reveal__inner"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"fd-url-reveal__body"[39m
+                [36m>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"fd-url-wrap"[39m
+                  [36m>[39m
+                    [36m<div[39m
+                      [33maria-hidden[39m=[32m"true"[39m
+                      [33mclass[39m=[32m"fd-url-mirror"[39m
+                    [36m>[39m
+                      [0mhttp://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210 [0m
+                    [36m</div>[39m
+                    [36m<textarea[39m
+                      [33maria-label[39m=[32m"Direct download link"[39m
+                      [33mclass[39m=[32m"fd-url fd-target"[39m
+                      [33mreadonly[39m=[32m""[39m
+                      [33mrows[39m=[32m"1"[39m
+                    [36m>[39m
+                      [0mhttp://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210[0m
+                    [36m</textarea>[39m
+                  [36m</div>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+            [36m<ul[39m
+              [33mclass[39m=[32m"fd-caveats fd-rise"[39m
+              [33mstyle[39m=[32m"--fd-stagger: 2;"[39m
+            [36m>[39m
+              [36m<li>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"fd-caveats__glyph"[39m
+                  [33mfill[39m=[32m"none"[39m
+                  [33mfocusable[39m=[32m"false"[39m
+                  [33mstroke[39m=[32m"currentColor"[39m
+                  [33mstroke-width[39m=[32m"1.5"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<circle[39m
+                    [33mcx[39m=[32m"8"[39m
+                    [33mcy[39m=[32m"8"[39m
+                    [33mr[39m=[32m"6.2"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M8 7.2v3.8M8 5v.1"[39m
+                    [33mstroke-linecap[39m=[32m"round"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+                [0mWorks once: the first device to tap Download gets the item.[0m
+              [36m</li>[39m
+              [36m<li>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"fd-caveats__glyph"[39m
+                  [33mfill[39m=[32m"none"[39m
+                  [33mfocusable[39m=[32m"false"[39m
+                  [33mstroke[39m=[32m"currentColor"[39m
+                  [33mstroke-linejoin[39m=[32m"round"[39m
+                  [33mstroke-width[39m=[32m"1.5"[39m
+                  [33mviewBox[39m=[32m"0 0 16 16"[39m
+                [36m>[39m
+                  [36m<rect[39m
+                    [33mheight[39m=[32m"7"[39m
+                    [33mrx[39m=[32m"1.5"[39m
+                    [33mwidth[39m=[32m"10"[39m
+                    [33mx[39m=[32m"3"[39m
+                    [33my[39m=[32m"7"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M5.5 7V5a2.5 2.5 0 0 1 4.8-1"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+                [0mNot encrypted. Use it only on a network you trust.[0m
+              [36m</li>[39m
+            [36m</ul>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</section>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"fd-staged-foot fd-rise"[39m
+        [33mstyle[39m=[32m"--fd-stagger: 3;"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"fd-help fd-disclosure"[39m
+          [33mdata-open[39m=[32m"true"[39m
+        [36m>[39m
+          [36m<h2[39m
+            [33mclass[39m=[32m"fd-disclosure__heading"[39m
+            [33mid[39m=[32m"fd-staged-help-heading"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-controls[39m=[32m"_r_2l_"[39m
+              [33maria-expanded[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-disclosure__summary"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mTrouble connecting?[0m
+              [36m<span[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"fd-disclosure__chevron"[39m
+              [36m/>[39m
+            [36m</button>[39m
+          [36m</h2>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-disclosure__region"[39m
+            [33mdata-open[39m=[32m"true"[39m
+            [33mid[39m=[32m"_r_2l_"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fd-disclosure__region-inner"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fd-disclosure__body"[39m
+              [36m>[39m
+                [36m<p[39m
+                  [33mclass[39m=[32m"fd-body"[39m
+                [36m>[39m
+                  [0mFairDrop keeps no copy. The receiving device keeps what it downloads.[0m
+                [36m</p>[39m
+                [36m<p[39m
+                  [33mclass[39m=[32m"fd-body"[39m
+                [36m>[39m
+                  [0mOpening the link shows the item before download. Tap Download to receive it.[0m
+                [36m</p>[39m
+                [36m<dl[39m
+                  [33mclass[39m=[32m"fd-help__platforms"[39m
+                [36m>[39m
+                  [36m<div>[39m
+                    [36m<dt>[39m
+                      [0mWindows recovery[0m
+                    [36m</dt>[39m
+                    [36m<dd>[39m
+                      [0mOpen Windows Firewall settings and allow FairDrop on Private networks only, then prepare the item again.[0m
+                    [36m</dd>[39m
+                  [36m</div>[39m
+                  [36m<div>[39m
+                    [36m<dt>[39m
+                      [0mmacOS recovery[0m
+                    [36m</dt>[39m
+                    [36m<dd>[39m
+                      [0mOpen System Settings → Network → Firewall → Options, allow incoming connections for FairDrop, then prepare the item again.[0m
+                    [36m</dd>[39m
+                  [36m</div>[39m
+                [36m</dl>[39m
+                [36m<p[39m
+                  [33mclass[39m=[32m"fd-body"[39m
+                [36m>[39m
+                  [0mNot downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.[0m
+                [36m</p>[39m
+                [36m<p[39m
+                  [33mclass[39m=[32m"fd-body"[39m
+                [36m>[39m
+                  [0mBrowser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.[0m
+                [36m</p>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCancel[0m
+        [36m</button>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/StagedView.test.tsx:720:23
+    718|             'isolated networks may block device-to-device traffic. The…
+    719|             'a fresh link.')).toBeTruthy()
+    720|         expect(screen.getByText('Browser says Not Found: the link may …
+       |                       ^
+    721|             'opener claimed it. Gone: the selected item changed. Cance…
+    722|             'fresh link.')).toBeTruthy()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed | 18 passed (20)
+      Tests  3 failed | 826 passed (829)
+   Start at  20:07:30
+   Duration  3.17s (transform 1.70s, setup 0ms, import 3.47s, tests 5.44s, environment 14.26s)
+

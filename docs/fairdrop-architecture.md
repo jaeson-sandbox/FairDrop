@@ -67,8 +67,8 @@ If any step fails before Stage acknowledgement, cancel and unwind every acquired
 
 ### Download transaction
 
-1. The server registers only the methodless Go `http.ServeMux` pattern `/download/{token}` and explicitly accepts exactly `GET` in the handler. A method-qualified pattern would make `ServeMux` return `405` and route `HEAD` to `GET`, contrary to the required disguise. Wrong methods, malformed routes, and token mismatches look nonexistent (`404`).
-2. The first exact-token request atomically reserves the transfer before authorization; another valid request receives `423 Locked` while the listener remains live.
+1. The server registers only the methodless Go `http.ServeMux` pattern `/download/{token}` and explicitly accepts `GET` for a metadata page and `POST` for the one-shot claim in the handler. A method-qualified pattern would make `ServeMux` return `405` and route `HEAD` to `GET`, contrary to the required disguise. Wrong methods, malformed routes, and token mismatches look nonexistent (`404`).
+2. The first exact-token POST atomically reserves the transfer before authorization; another valid request receives `423 Locked` while the listener remains live.
 3. The reserved handler synchronously requests authorization. The coordinator enters `CLAIMING`, generation-checks, stops mDNS, commits `TRANSFERRING`, and publishes `transfer-started` before authorization returns. Stop guarantees the advertisement is gone even if it reports a cleanup diagnostic. The stop call is bounded (Story 3.4): an mDNS shutdown that never returns cannot hang the handshake, and authorization still commits once the bound elapses, with a diagnostic recorded rather than a claim that hangs forever.
 4. Only after authorization succeeds does the server prepare the payload, write safe response headers, and stream through the appropriate adapter.
 5. Successful completion supplies authoritative terminal progress, quiesces resources, emits final progress then `transfer-complete`, enters `DONE`, and emits `transfer-reset` after three seconds.

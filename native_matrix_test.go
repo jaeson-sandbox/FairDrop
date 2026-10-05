@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"mime"
 	"net/http"
@@ -108,7 +109,24 @@ func assertNativeDownloadWithApp(t *testing.T, app *App, inspector *inspectedNat
 		t.Fatal("native returned metadata differs from selected fixture")
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
-	response, err := client.Get(metadata.URL)
+	page, err := client.Get(metadata.URL)
+	if err != nil {
+		t.Fatal("native inspection request failed")
+	}
+	pageBody, err := io.ReadAll(page.Body)
+	_ = page.Body.Close()
+	if err != nil || page.StatusCode != http.StatusOK || !bytes.Contains(pageBody, []byte(`<form method="post" action="">`)) || !bytes.Contains(pageBody, []byte(html.EscapeString(name))) || bytes.Contains(pageBody, []byte(selected)) {
+		t.Fatalf("native inspection page invalid: status=%d read_error=%v", page.StatusCode, err)
+	}
+	select {
+	case event := <-inspector.events:
+		t.Fatalf("GET published lifecycle event %q before Download", event.Kind)
+	default:
+	}
+	if _, err := app.StageTransfer(selected); transfer.ErrorCodeOf(err) != transfer.ErrBusy {
+		t.Fatalf("GET left the staged session replaceable: second Stage code=%s, want busy", transfer.ErrorCodeOf(err))
+	}
+	response, err := client.Post(metadata.URL, "", nil)
 	if err != nil {
 		t.Fatal("native download request failed")
 	}
@@ -183,6 +201,51 @@ func assertNativeDownloadWithApp(t *testing.T, app *App, inspector *inspectedNat
 		case <-deadline.C:
 			t.Fatal("native lifecycle omitted matching natural Complete before cleanup")
 		}
+	}
+}
+
+func TestNativeInspectedPageCancelRetiresOldCapability(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected := filepath.Join(base, "a&b.txt")
+	if err := os.WriteFile(selected, []byte("native matrix payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app, inspector := nativeMatrixApp(t)
+	metadata, err := app.StageTransfer(selected)
+	if err != nil {
+		t.Fatalf("Stage code=%s", transfer.ErrorCodeOf(err))
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	page, err := client.Get(metadata.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(page.Body)
+	_ = page.Body.Close()
+	if err != nil || page.StatusCode != http.StatusOK || !bytes.Contains(body, []byte("a&amp;b.txt")) || bytes.Contains(body, []byte(selected)) {
+		t.Fatalf("escaped native GET invalid: status=%d err=%v", page.StatusCode, err)
+	}
+	select {
+	case event := <-inspector.events:
+		t.Fatalf("inspection emitted %q before Cancel", event.Kind)
+	default:
+	}
+	if err := app.CancelTransfer(); err != nil {
+		t.Fatalf("Cancel code=%s", transfer.ErrorCodeOf(err))
+	}
+	oldResponse, err := client.Post(metadata.URL, "", nil)
+	if err == nil {
+		defer oldResponse.Body.Close()
+		if oldResponse.StatusCode == http.StatusOK {
+			t.Fatal("cancelled inspected URL still downloaded")
+		}
+	}
+	fresh, err := app.StageTransfer(selected)
+	if err != nil || fresh.URL == metadata.URL {
+		t.Fatalf("Cancel did not release staged session for a fresh capability: code=%s", transfer.ErrorCodeOf(err))
 	}
 }
 

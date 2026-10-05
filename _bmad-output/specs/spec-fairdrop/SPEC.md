@@ -36,7 +36,7 @@ People need a quick way to move a local file or directory from a Windows or macO
 
 - **CAP-3**
   - **intent:** One receiver can download the selected regular file through its capability URL.
-  - **success:** The first exact-token GET receives the exact bytes and safe filename headers; a wrong method, route, or token receives 404, while a competing valid request receives 423 only while the listener remains live.
+  - **success:** An exact-token GET displays escaped staged metadata without claiming or opening the payload. The first exact-token POST receives the exact bytes and safe filename headers; unsupported methods, wrong routes and token mismatches receive 404, while a competing valid request receives 423 only while the listener remains live.
 
 - **CAP-4**
   - **intent:** One receiver can download the selected directory as a browser-compatible ZIP without a staged archive.

@@ -387,7 +387,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                           Story 9.4: the caveat lines. First-opener and network
                           stay visible on the card -- an info glyph and a lock
                           glyph respectively, per the acceptance criteria --
-                          while the local-copy line and the link-preview
+                          while the local-copy line and inspection guidance
                           caveat move into "Trouble connecting?" below. The
                           folder note (when present) is the third line, with
                           no glyph of its own.

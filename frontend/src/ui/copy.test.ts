@@ -50,7 +50,7 @@ describe('approved product copy', () => {
             'Ready to send',
         )
         expect(copy.qr.instruction, 'copy.qr.instruction').toBe(
-            'Scan the code with the receiving device’s camera.',
+            'Scan the code, then tap Download on the receiving device.',
         )
         expect(copy.qr.alt, 'copy.qr.alt').toBe(
             'Download QR code for [item name]',
@@ -68,10 +68,10 @@ describe('approved product copy', () => {
             'Hide Link',
         )
         expect(copy.firstOpener.warning, 'copy.first_opener.warning').toBe(
-            'Works once: the first device to open it gets the file.',
+            'Works once: the first device to tap Download gets the item.',
         )
-        expect(copy.firstOpener.previews, 'copy.first_opener.previews').toBe(
-            'Link previews in chat apps can count as that first device, so paste the link straight into a browser.',
+        expect(copy.firstOpener.inspect, 'copy.first_opener.inspect').toBe(
+            'Opening the link shows the item before download. Tap Download to receive it.',
         )
         expect(copy.network.disclosure, 'copy.network.disclosure').toBe(
             'Not encrypted. Use it only on a network you trust.',
@@ -136,7 +136,7 @@ describe('approved product copy', () => {
             'Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.',
         )
         expect(copy.help.receiverHttp, 'copy.help.receiver_http').toBe(
-            'Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.',
+            'Browser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.',
         )
     })
 
@@ -178,7 +178,7 @@ describe('approved product copy', () => {
             'firewall.preflight',
             'firewall.windows',
             'firewall.windowsRecovery',
-            'firstOpener.previews',
+            'firstOpener.inspect',
             'firstOpener.warning',
             'folder.note',
             'help.differentLan',

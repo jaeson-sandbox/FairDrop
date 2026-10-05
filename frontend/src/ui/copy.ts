@@ -60,7 +60,7 @@ export const copy = {
         heading: 'Ready to send',
     },
     qr: {
-        instruction: 'Scan the code with the receiving device’s camera.',
+        instruction: 'Scan the code, then tap Download on the receiving device.',
         alt: 'Download QR code for [item name]',
     },
     folder: {
@@ -79,14 +79,12 @@ export const copy = {
         hide: 'Hide Link',
     },
     firstOpener: {
-        warning: 'Works once: the first device to open it gets the file.',
+        warning: 'Works once: the first device to tap Download gets the item.',
         /**
-         * Story 9.4: moved out of the always-visible card into "Trouble
-         * connecting?" -- a link preview is the one first-opener case a
-         * sender can actually act on, so it belongs beside the rest of the
-         * troubleshooting guidance rather than in the one-line visible caveat.
+         * Receiver handoff: explain the inspection step inside "Trouble
+         * connecting?", beside the rest of the connection guidance.
          */
-        previews: 'Link previews in chat apps can count as that first device, so paste the link straight into a browser.',
+        inspect: 'Opening the link shows the item before download. Tap Download to receive it.',
     },
     network: {
         disclosure: 'Not encrypted. Use it only on a network you trust.',
@@ -148,7 +146,7 @@ export const copy = {
          */
         heading: 'Trouble connecting?',
         differentLan: 'Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.',
-        receiverHttp: 'Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.',
+        receiverHttp: 'Browser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.',
     },
 
     /** Functional words the spine names in prose rather than in the copy table. */

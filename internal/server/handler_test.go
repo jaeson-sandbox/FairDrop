@@ -35,7 +35,6 @@ func TestRejectedRequestsNeverReachClaimLogic(t *testing.T) {
 		method string
 		url    string
 	}{
-		{"post on the exact route", http.MethodPost, valid},
 		{"put on the exact route", http.MethodPut, valid},
 		{"delete on the exact route", http.MethodDelete, valid},
 		// HEAD is the reason the route pattern carries no method: a
@@ -65,25 +64,31 @@ func TestRejectedRequestsNeverReachClaimLogic(t *testing.T) {
 	}
 
 	for _, test := range rejected {
-		t.Run(test.name, func(t *testing.T) {
-			response := do(t, test.method, test.url)
-			body := readBody(t, response)
+		methods := []string{test.method}
+		if test.method == http.MethodGet {
+			methods = append(methods, http.MethodPost)
+		}
+		for _, method := range methods {
+			t.Run(test.name+" "+method, func(t *testing.T) {
+				response := do(t, method, test.url)
+				body := readBody(t, response)
 
-			if response.StatusCode != http.StatusNotFound {
-				t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusNotFound)
-			}
-			if location := response.Header.Get("Location"); location != "" {
-				t.Fatalf("rejection redirected to %q", location)
-			}
-			if allow := response.Header.Get("Allow"); allow != "" {
-				t.Fatalf("rejection advertised methods: %q", allow)
-			}
-			// A HEAD response legitimately carries no body; every other
-			// rejection must be empty for the same reason.
-			if test.method != http.MethodHead {
-				assertNoDisclosure(t, response, body)
-			}
-		})
+				if response.StatusCode != http.StatusNotFound {
+					t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusNotFound)
+				}
+				if location := response.Header.Get("Location"); location != "" {
+					t.Fatalf("rejection redirected to %q", location)
+				}
+				if allow := response.Header.Get("Allow"); allow != "" {
+					t.Fatalf("rejection advertised methods: %q", allow)
+				}
+				// A HEAD response legitimately carries no body; every other
+				// rejection must be empty for the same reason.
+				if method != http.MethodHead {
+					assertNoDisclosure(t, response, body)
+				}
+			})
+		}
 	}
 
 	if got := authorizer.calls.Load(); got != 0 {
@@ -92,10 +97,13 @@ func TestRejectedRequestsNeverReachClaimLogic(t *testing.T) {
 	if got := payloads.calls.Load(); got != 0 {
 		t.Fatalf("Prepare ran %d times for rejected requests, want 0", got)
 	}
+	if server.active.claimed.Load() {
+		t.Fatal("a rejected GET or POST reserved the capability")
+	}
 	assertNoEvents(t, handle.Events)
 
 	// Nothing above reserved the capability, so the real receiver still works.
-	response := do(t, http.MethodGet, valid)
+	response := do(t, http.MethodPost, valid)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status after rejected requests = %d, want %d", response.StatusCode, http.StatusOK)
 	}
@@ -127,7 +135,7 @@ func TestEveryRejectionCarriesTheCrossOriginHeader(t *testing.T) {
 	}{
 		"wrong token":               {http.MethodGet, downloadURL(handle.Port, strings.Repeat("b", len(testToken)))},
 		"wrong path":                {http.MethodGet, baseURL(handle.Port) + "/nope"},
-		"right token, wrong method": {http.MethodPost, downloadURL(handle.Port, string(testToken))},
+		"right token, wrong method": {http.MethodPut, downloadURL(handle.Port, string(testToken))},
 	}
 
 	for name, shape := range shapes {
@@ -157,7 +165,7 @@ func TestRejectionsAreIndistinguishable(t *testing.T) {
 	for name, url := range shapes {
 		method := http.MethodGet
 		if strings.Contains(name, "wrong method") {
-			method = http.MethodPost
+			method = http.MethodPut
 		}
 		response := do(t, method, url)
 		rendered := renderResponse(t, response)
@@ -195,7 +203,7 @@ func TestFirstClaimAuthorizesOnceBeforeOpeningPayload(t *testing.T) {
 	server := newTestServer(t, payloads)
 	handle := startTestServer(t, server, authorizer)
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	readBody(t, response)
 
 	if response.StatusCode != http.StatusOK {
@@ -256,7 +264,7 @@ func TestCompetingClaimsAuthorizeExactlyOnce(t *testing.T) {
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			request, err := http.NewRequest(http.MethodGet, url, nil)
+			request, err := http.NewRequest(http.MethodPost, url, nil)
 			if err != nil {
 				t.Error(err)
 				return
@@ -355,7 +363,7 @@ func TestRefusedAuthorizationOpensNoPayload(t *testing.T) {
 			server := newTestServer(t, payloads)
 			handle := startTestServer(t, server, refusingAuthorizer(refusal))
 
-			response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+			response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 			body := readBody(t, response)
 
 			if response.StatusCode != http.StatusNotFound {
@@ -382,7 +390,7 @@ func TestPrepareFailureIsGenericGone(t *testing.T) {
 	server := newTestServer(t, payloadsFailing(failure))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	body := readBody(t, response)
 
 	if response.StatusCode != http.StatusGone {
@@ -421,7 +429,7 @@ func TestPrepareFailureClosesTheListener(t *testing.T) {
 	handle := startTestServer(t, server, &stubAuthorizer{})
 	url := downloadURL(handle.Port, string(testToken))
 
-	if response := do(t, http.MethodGet, url); response.StatusCode != http.StatusGone {
+	if response := do(t, http.MethodPost, url); response.StatusCode != http.StatusGone {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusGone)
 	}
 
@@ -443,7 +451,7 @@ func TestSuccessfulDownloadServesHeadersBodyAndOneCompleteEvent(t *testing.T) {
 	server := newTestServer(t, payloadsReturning(payload))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	received := readBody(t, response)
 
 	if response.StatusCode != http.StatusOK {
@@ -535,7 +543,7 @@ func TestShortBodyIsNotReportedAsComplete(t *testing.T) {
 	server := newTestServer(t, payloadsReturning(payload))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response, err := testClient().Do(mustGet(t, downloadURL(handle.Port, string(testToken))))
+	response, err := testClient().Do(mustPost(t, downloadURL(handle.Port, string(testToken))))
 	if err == nil {
 		_, _ = io.Copy(io.Discard, response.Body)
 		_ = response.Body.Close()
@@ -583,7 +591,7 @@ func TestPayloadIsReleasedBeforeCompleteIsPublished(t *testing.T) {
 	t.Cleanup(release)
 
 	go func() {
-		response, err := testClient().Do(mustGet(t, downloadURL(handle.Port, string(testToken))))
+		response, err := testClient().Do(mustPost(t, downloadURL(handle.Port, string(testToken))))
 		if err != nil {
 			return
 		}
@@ -617,7 +625,7 @@ func TestUnknownLengthOmitsContentLength(t *testing.T) {
 	server := newTestServer(t, payloadsReturning(payload))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	received := readBody(t, response)
 
 	if !bytes.Equal(received, body) {
@@ -650,7 +658,7 @@ func TestKnownEmptyPayloadCompletesAtZeroPercent(t *testing.T) {
 	server := newTestServer(t, payloadsReturning(payload))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	received := readBody(t, response)
 
 	if response.StatusCode != http.StatusOK {
@@ -703,7 +711,7 @@ func TestStreamFailureAfterHeadersAbortsTheConnection(t *testing.T) {
 	server := newTestServer(t, payloadsReturning(payload))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
@@ -765,7 +773,7 @@ func TestReceiverDisconnectFailsTheTransfer(t *testing.T) {
 	server := newTestServer(t, payloadsReturning(payload))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	request, err := http.NewRequest(http.MethodGet, downloadURL(handle.Port, string(testToken)), nil)
+	request, err := http.NewRequest(http.MethodPost, downloadURL(handle.Port, string(testToken)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -820,7 +828,7 @@ func TestProgressIsCappedAndCountsOnlyAcceptedBytes(t *testing.T) {
 	server.now = newTestClock(100 * time.Millisecond).now
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	if received := readBody(t, response); len(received) != len(body) {
 		t.Fatalf("received %d bytes, want %d", len(received), len(body))
 	}
@@ -878,7 +886,7 @@ func TestEventDeliveryNeverBlocksTheHandler(t *testing.T) {
 	server.now = newTestClock(time.Second).now
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	if received := readBody(t, response); len(received) != len(body) {
 		t.Fatalf("received %d bytes, want %d", len(received), len(body))
 	}
@@ -974,9 +982,9 @@ func TestContentDispositionResistsHeaderInjection(t *testing.T) {
 	}
 }
 
-func mustGet(t *testing.T, url string) *http.Request {
+func mustPost(t *testing.T, url string) *http.Request {
 	t.Helper()
-	request, err := http.NewRequest(http.MethodGet, url, nil)
+	request, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		t.Fatalf("NewRequest(%q) error = %v", url, err)
 	}
@@ -1037,7 +1045,7 @@ func waitForClosedListener(t *testing.T, url string) {
 	t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
 	for {
-		request, err := http.NewRequest(http.MethodGet, url, nil)
+		request, err := http.NewRequest(http.MethodPost, url, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1083,7 +1091,7 @@ func TestPrepareReturningNoPayloadIsASetupFailure(t *testing.T) {
 	server := newTestServer(t, payloadsReturning(nil))
 	handle := startTestServer(t, server, &stubAuthorizer{})
 
-	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
 	body := readBody(t, response)
 	if response.StatusCode != http.StatusGone {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusGone)

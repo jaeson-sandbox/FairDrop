@@ -30,7 +30,7 @@ V1 is a compact Wails v2 sender for Windows amd64 and macOS that serves one sele
 
 Windows and macOS are native senders. Windows, macOS, and iPhone are browser receivers only when their combinations pass **Compatibility and Evidence Gates**; iPhone sending is roadmap-only. Thus “Mac → Windows” and “Windows → Mac” mean a native FairDrop sender transferring to the other platform’s browser.
 
-One process owns one live session and receiver. V1 has no receiver app or branded receiver page, account, cloud service, history, settings, telemetry, persistent log, payload archive, resume, or multiple-receiver path. Detailed behavior and boundaries live in the component, interaction, platform, trust, and anti-pattern sections. The approved external promise is `copy.external.promise`; AirDrop is an internal benchmark only and never product or release copy.
+One process owns one live session and receiver. V1 has no receiver app, account, cloud service, history, settings, telemetry, persistent log, payload archive, resume, or multiple-receiver path. Detailed behavior and boundaries live in the component, interaction, platform, trust, and anti-pattern sections. The approved external promise is `copy.external.promise`; AirDrop is an internal benchmark only and never product or release copy.
 
 ## Information Architecture
 
@@ -43,7 +43,7 @@ One process owns one live session and receiver. V1 has no receiver app or brande
 | **FairDrop desktop window — Transferring** | Accepted `transfer-started` | Honest wire progress/bytes, throughput, and Cancel. |
 | **FairDrop desktop window — Done / Error** | Accepted `transfer-complete` / `transfer-error` | Sender-observed terminal outcome. Backend normally clears the session after about three seconds. |
 | **Idle with retained outcome** | Matching `transfer-reset` after Done/Error | Same visible Done/Error content becomes a dismissible, non-session current status until the next Stage attempt or Dismiss. It is not history and is never persisted. |
-| **Receiver browser/download UI** | First exact-token `GET` | Browser/OS-owned attachment download; no FairDrop receiver page. |
+| **Receiver browser/download UI** | Exact-token `GET` shows the FairDrop item page; its Download form sends `POST` | Browser/OS-owned attachment download starts only after Download. |
 | **Product firewall guidance** | Always in Idle before first Stage | Explains the possible OS prompt and platform-specific allow/deny recovery in document order. |
 | **OS firewall prompt** | First inbound-LAN use, platform-controlled | OS-owned permission UI; FairDrop neither restyles nor duplicates it. |
 | **Second-instance restoration** | Another FairDrop launch | Shows/unminimizes the existing window and preserves its active session and current focus context. |
@@ -86,7 +86,7 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.stage.pending.folder` | Folder Stage pending | “Preparing your folder…” |
 | `copy.stage.pending.item` | Native-drop Stage pending before kind is known | “Preparing your item…” |
 | `copy.stage.heading` | Staged heading | “Ready to send” |
-| `copy.qr.instruction` | QR instruction | “Scan the code with the receiving device’s camera.” |
+| `copy.qr.instruction` | QR instruction | “Scan the code, then tap Download on the receiving device.” |
 | `copy.qr.alt` | QR accessible-name template | “Download QR code for [item name]” |
 | `copy.folder.note` | Folder note | “This folder downloads as a ZIP.” |
 | `copy.direct_link.action` | Direct-link action (copies without revealing) | “Copy Link” |
@@ -95,8 +95,8 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.label.choose_file_or_folder` | Browse control | “Choose File or Folder” |
 | `copy.label.file` | Item kind, file | “File” |
 | `copy.label.folder` | Item kind, folder | “Folder” |
-| `copy.first_opener.warning` | First-opener warning, always visible | “Works once: the first device to open it gets the file.” |
-| `copy.first_opener.previews` | First-opener link-preview caveat, inside “Trouble connecting?” | “Link previews in chat apps can count as that first device, so paste the link straight into a browser.” |
+| `copy.first_opener.warning` | First-opener warning, always visible | “Works once: the first device to tap Download gets the item.” |
+| `copy.first_opener.inspect` | Receiver inspection guidance, inside “Trouble connecting?” | “Opening the link shows the item before download. Tap Download to receive it.” |
 | `copy.network.disclosure` | Network disclosure, always visible | “Not encrypted. Use it only on a network you trust.” |
 | `copy.local_copy.disclosure` | Local/no-extra-copy disclosure, inside “Trouble connecting?” | “FairDrop keeps no copy. The receiving device keeps what it downloads.” |
 | `copy.copy.confirmation` | Copy confirmation | “Copied” |
@@ -117,9 +117,20 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.outcome.choose_another` | Error card's primary action when `selectEffectiveErrorAction` returns `choose` | “Choose Another” |
 | `copy.help.heading` | Staged troubleshooting disclosure summary | “Trouble connecting?” |
 | `copy.help.different_lan` | Different-LAN help | “Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.” |
-| `copy.help.receiver_http` | Generic receiver-error help | “Browser says Not Found: the link may be wrong or expired. Locked: another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.” |
+| `copy.help.receiver_http` | Generic receiver-error help | “Browser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.” |
 
 `copy.done.heading` means sender-observed response-stream completion only. It never asserts where the browser saved the item, that iOS Files contains it, or that the receiver opened it.
+
+The receiver page uses a separate Go-owned copy registry in `internal/server/landing.go`; it does not mount the desktop React UI or duplicate strings in the TypeScript registry.
+
+| Receiver key | Use | Literal copy |
+| --- | --- | --- |
+| `receiver.heading` | Page heading | “Ready to download” |
+| `receiver.button` | Native form submit | “Download” |
+| `receiver.filePrefix` | File detail before formatted size | “File · ” |
+| `receiver.folderDetail` | Folder detail | “Folder · Downloads as a ZIP.” |
+| `receiver.sizeUnavailable` | Unknown logical size | “Size unavailable” |
+| `receiver.trust` | Local-network and single-download guidance | “Use only on a local network you trust. FairDrop keeps no copy; the receiving device keeps what it downloads. The first device to download gets this item.” |
 
 Use **file**, **folder**, **download**, **ZIP**, **same local network**, **plain HTTP**, and **not encrypted**. **Cloud** and **upload** are allowed only in the truthful negated disclosure above. Do not use **secure**, **private**, **pair**, **sync**, “AirDrop for any device,” “works with every device,” or any claim of receiver identity, storage completion, or universal compatibility. Release copy additionally never claims **signed**, **notarized**, **auto-update**, or **Linux** support.
 
@@ -164,7 +175,7 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 | **QR Panel** | Staged | Prepends `data:image/png;base64,` only at render. The noninteractive image uses `copy.qr.alt`; it never exposes or spells the token. |
 | **Direct URL Row** | Staged | **Story 9.4:** not rendered, focusable, or exposed to assistive technology until requested -- SPEC.md's "expose the QR code and URL" is met by the URL being one activation away, not always present. `copy.direct_link.action` (Copy Link, primary) copies without revealing it, through the same bound `CopyToClipboard` as before; `copy.direct_link.show`/`copy.direct_link.hide` (secondary, `aria-expanded`/`aria-controls`) reveals or hides the readonly selectable field with a smooth expansion, never a sender-side activation link. `copy.direct_link.helper` is retired along with the always-visible field it used to sit beside. Every Story 7.9 guarantee (readonly `textarea`, CSS-grid mirror sizing, select-on-focus, Escape blurs) applies to the revealed field unchanged. |
 | **Copy Feedback** | Staged | Label becomes `copy.copy.confirmation` with a check glyph and success tint, as a non-reflowing crossfade (Story 9.4) rather than a jump cut; one polite update, no toast, focus move, lifecycle change, or clipboard clearing. Reverts to `copy.direct_link.action` the moment focus leaves the control (D-114) -- an event the sender's own action triggers, not a timer, so the one control that reaches the capability URL still names what it does whenever the sender returns to it. This row's "no toast" still holds -- copy feedback keeps its in-button label, never a toast of its own. Story 10.2's cancellation notification is the one sanctioned transient notification in the product; it is not this row's concern, and this row is not an exception to it. |
-| **Trusted-LAN Note** | Staged | **Story 9.4:** the first-opener (`copy.first_opener.warning`) and network (`copy.network.disclosure`) disclosures stay visible on the card, each with its own inline SVG glyph -- an info glyph and a lock glyph respectively -- rather than a single shared warning marker. The local-copy disclosure (`copy.local_copy.disclosure`) and the link-preview caveat (`copy.first_opener.previews`) move into "Trouble connecting?" alongside firewall/receiver recovery. |
+| **Trusted-LAN Note** | Staged | **Story 9.4:** the first-opener (`copy.first_opener.warning`) and network (`copy.network.disclosure`) disclosures stay visible on the card, each with its own inline SVG glyph -- an info glyph and a lock glyph respectively -- rather than a single shared warning marker. The local-copy disclosure (`copy.local_copy.disclosure`) and inspection guidance (`copy.first_opener.inspect`) move into "Trouble connecting?" alongside firewall/receiver recovery. |
 | **Warning Banner** | Staged or Idle recovery | Renders safe `Warning` or firewall/recovery copy. `beacon_warning` remains non-terminal. |
 | **TransferView** | Transferring | Appears only after accepted `transfer-started`; never from scan animation, browser navigation, or frontend inference. **Story 9.5 rebuild:** reuses Staged's own card geometry (`.fd-packet`/`.fd-hero`) verbatim rather than a standalone progress card, so the card never changes shape moving from Staged to Sending; the `fd-packet-tab` kind label is gone, replaced by the same plain item-row glyph Staged uses. |
 | **Progress Ring** | Transferring | **Replaces the Progress Meter (Story 9.5):** the QR's own ~216px slot becomes a ring rather than a separate track element. Three modes, each keeping its ARIA and text guarantees: known positive -- a determinate `role="progressbar"` ring with `aria-valuenow`, its tabular-numeral percentage centred inside it; directory/unknown -- a static, non-directional dashed ring (`role="progressbar"`, no `aria-valuenow`), `copy.progress.unknown` beneath it; known-empty -- the track only, `aria-hidden`, no progressbar role anywhere, `copy.progress.knownEmpty` shown as literal text beside the item row. No fake ZIP or empty-file percentage. Reduced motion updates the fill without a transition; nothing on the ring rotates as motion (its `-90deg` orientation is a fixed, permanent value, not an animation). |
@@ -208,16 +219,16 @@ State composition references: [Idle and local preparation](mockups/key-idle-prep
 | Error | Focused safe Error heading/panel; fixed code/message only. |
 | Reset after Done/Error | Clear the matching session. **Story 9.6 amends "expose Idle controls while preserving the same visible outcome node" to "the outcome node is preserved and itself offers the Idle actions"**: the retained card replaces Idle's composition rather than sitting above it, and its own Send Another/Choose Another (BrowseControl) and native-drop wiring are what let a sender start a fresh Stage, not a separately-rendered Idle underneath it. No announcement and no focus move; if focus is in the outcome, it remains there. |
 | Dismiss retained outcome | Remove sessionless status, focus Idle instruction, and use focus as the sole announcement owner. **Story 9.6:** the same Dismiss (labelled "Done" on a Done card) also clears a Stage-time command failure now, landing on the same target -- the failure was never a "retained outcome" by name, but is one of the outcome card's own three shapes, and every one of them dismisses the same way. |
-| Receiver/valid first claim | First device or software issuing exact-token GET starts attachment response; sender moves only on accepted backend start. |
+| Receiver/valid first claim | First exact-token POST from the Download form starts attachment response; sender moves only on accepted backend start. |
 | Receiver/wrong method, route, or token | Generic browser 404; sender cannot diagnose it. Sender help covers wrong/expired link and creating a fresh one. |
-| Receiver/competing valid claim | Generic browser 423 while listener lives; first opener continues. Sender help explains another opener may have claimed it. |
+| Receiver/competing valid claim | Generic browser 423 while listener lives; first download continues. Sender help explains another downloader may have claimed it. |
 | Receiver/source changed before headers | Generic browser 410; sender gets fixed `source_changed` Error and recovery. |
 | Firewall/allowed | OS prompt returns; focus goes to current Stage Pending or next authoritative heading. |
 | Firewall/denied or blocked | If observable through command failure, show/focus applicable network/server Error and platform recovery. If not observable, Staged troubleshooting remains available. |
 | Second instance | Restore/show/unminimize existing window; preserve active session, retained status, and logical focus. |
 | Offline/different LAN | No cloud fallback. Sender-side same-Wi-Fi/guest-isolation help instructs Cancel and a fresh link. |
 
-Generic 404/423/410 receiver pages are an accepted V1 limitation. No friendly receiver page or protocol change is authorized. Sender help uses `copy.help.receiver_http`.
+Generic 404/423/410 error responses remain part of the receiver protocol. A valid GET renders the item page and its Download form submits POST. Sender help uses `copy.help.receiver_http`.
 
 ## Interaction Primitives
 
@@ -282,12 +293,12 @@ Recovery remains available from Idle and Staged:
 
 - V1 uses plain HTTP on a trusted LAN. The capability URL reduces blind discovery but does not provide confidentiality, receiver identity, or protection from a LAN observer.
 - QR is primary. `copy.direct_link.action` is for direct opening in the receiving browser, not a promise of cross-device clipboard transfer. Once copied into another app, FairDrop cannot control storage, forwarding, or previews.
-- The first device or software to issue the exact-token GET claims V1. Link-preview consumption is an accepted limitation; no protocol hardening is added here.
+- A valid GET displays the item without claiming it. The first exact-token POST claims the one-shot transfer. An ordinary link preview that only fetches GET cannot consume it.
 - The capability token appears only in the local URL/QR and receiver request path. Source paths and arbitrary adapter text never appear in UI, browser errors, mDNS, or persistent storage.
 - FairDrop sends directly over the local network and does not upload or store an extra copy of the payload. The original remains on the sender; the receiving browser/device retains its downloaded copy.
 - Done is limited to sender-observed transport completion. Browser saving, filename prompts, Files integration, ZIP opening, and subsequent storage are receiver-owned actions.
 - Generic receiver failures remain canonical. Sender-side troubleshooting and new-link guidance are the V1 recovery experience.
-- No cloud fallback or queue exists. After correcting network/firewall/preview issues, Cancel and prepare the item again to create a fresh capability link.
+- No cloud fallback or queue exists. After correcting network/firewall issues or a competing downloader claim, Cancel and prepare the item again to create a fresh capability link.
 - Release artifacts and their copy make no signing, notarization, auto-update, or Linux-packaging claim. The macOS build carries only an ad-hoc signature (`codesign --sign -`) so the OS will launch it unsigned by a developer identity; that is not notarization and must never be described as one.
 
 ## Accessibility Floor
@@ -311,7 +322,7 @@ Recovery remains available from Idle and Staged:
 | 640–759px | Stack QR above URL/actions; retain Cancel, disclosures, outcome, and help. |
 | 640×480 native minimum | Vertical scroll allowed; QR remains scan-ready; actions stay ≥44px. |
 | 320 CSS-pixel effective width | One column, vertical scroll only, no clipped information/actions or page-level horizontal scroll. |
-| Receiver browser | Browser/OS attachment UI only; no FairDrop receiver page. |
+| Receiver browser | FairDrop item page for inspection and a Download form; browser/OS owns attachment saving after POST. |
 | Theme | Follow OS light/dark; no preference persistence or opposite-theme flash. Forced colors take precedence. |
 | V1 roles | Windows/Mac native sender → one supported same-LAN browser receiver. iPhone is receiver-only. |
 | Roadmap | Native iPhone sender → Windows receiver is later scope and is not represented as a V1 surface. |
@@ -342,12 +353,12 @@ APIs before anyone checks.
 
 | Priority combination | Required acceptance scenarios | Evidence state |
 |---|---|---|
-| **Windows FairDrop sender → current iPhone Safari receiver** | QR scan; exact one-file bytes/name; folder ZIP download, valid archive, and user can open it through browser/Files; first-opener and preview-claim behavior; browser prompt; 404/423/410 observations; sender Done wording | Required before primary journey/support claim; not yet verified. |
-| **Mac FairDrop sender → current Windows Microsoft Edge receiver** | QR and direct-browser link; exact file bytes/name; valid folder ZIP; first opener; browser prompt; generic failures; sender progress/Done | Required next-phase cross-device gate; not yet verified. |
+| **Windows FairDrop sender → current iPhone Safari receiver** | QR scan; exact one-file bytes/name; folder ZIP download, valid archive, and user can open it through browser/Files; first-downloader and inspection behavior; browser prompt; 404/423/410 observations; sender Done wording | Required before primary journey/support claim; not yet verified. |
+| **Mac FairDrop sender → current Windows Microsoft Edge receiver** | QR and direct-browser link; exact file bytes/name; valid folder ZIP; first downloader; browser prompt; generic failures; sender progress/Done | Required next-phase cross-device gate; not yet verified. |
 | Windows FairDrop sender → current Mac Safari receiver | Same file/folder/claim/failure checks | Required before claiming this combination; not yet verified. |
 | Mac FairDrop sender → current iPhone Safari receiver | Same mobile file/folder/QR/Files checks | Required before claiming this combination; not yet verified. |
 
-Link-preview evidence intentionally confirms the accepted limitation: a preview agent that issues GET may consume the V1 link. The UI must disclose that result; a test must not reinterpret it as a protected link.
+Receiver-page evidence confirms a GET leaves the item staged; the first POST still consumes the capability. The page does not protect against an intentional capability holder.
 
 Native accessibility evidence is also a release gate:
 
@@ -365,7 +376,7 @@ Automated acceptance evidence must additionally prove: token contrast using unro
 - **Reject security theater:** do not use lock or shield icons or describe plain HTTP as secure, private, or encrypted.
 - **Reject transfer fiction:** no folder percentage from logical size, empty-file 0% fiction, optimistic completion, or animation-driven reset.
 - **Keep backend authority visible:** preserve terminal outcomes across reset, and never let animation timing drive lifecycle, cancellation, completion, or reset.
-- **Reject utility sprawl:** no history, settings, notifications, queue, tray, cloud fallback, custom receiver page, or compatibility claims without evidence.
+- **Reject utility sprawl:** no history, settings, notifications, queue, tray, cloud fallback, receiver app, or compatibility claims without evidence.
 
 ## Key Flows
 
@@ -374,14 +385,14 @@ Automated acceptance evidence must additionally prove: token contrast using unro
 ### Flow 1 — Windows sender to iPhone receiver (Jaeson, leaving home with PDFs from his dad)
 
 1. Jaeson opens FairDrop on Windows, reads the firewall preflight, and drops one folder; Stage Pending takes focus before successful metadata opens Staged with the name, logical size, and `copy.folder.note`.
-2. The QR remains primary; the link, first-opener and preview warning, unencrypted-network disclosure, no-extra-copy disclosure, troubleshooting, and Cancel are available.
-3. He scans the QR in current iPhone Safari on the same local Wi-Fi; the first exact-token GET starts browser-owned attachment handling and the sender accepts `transfer-started`.
+2. The QR remains primary; the link, first-downloader and inspection guidance, unencrypted-network disclosure, no-extra-copy disclosure, troubleshooting, and Cancel are available.
+3. He scans the QR in current iPhone Safari on the same local Wi-Fi; the receiver page opens without claiming, then Download sends POST to start browser-owned attachment handling and the sender accepts `transfer-started`.
 4. **Climax:** the download begins with no account, receiver app, pairing code, or OS-choice step.
 5. FairDrop shows static unknown-total ZIP treatment, actual wire bytes, and visual throughput.
 6. After the browser completes the download, Jaeson chooses where to keep or open the ZIP in Safari or Files; FairDrop does not claim to observe that action.
 7. Sender-observed Done reports only sending completion; reset exposes Idle while the outcome remains until Dismiss or the next Stage.
 
-Failure: discovery warning leaves QR/link usable. Different network, guest isolation, firewall denial, source change, or a preview claim uses the exact sender-side recovery and fresh-link guidance. This flow is a support claim only after its matrix row passes.
+Failure: discovery warning leaves QR/link usable. Different network, guest isolation, firewall denial, source change, or a competing downloader claim uses the exact sender-side recovery and fresh-link guidance. This flow is a support claim only after its matrix row passes.
 
 ### Flow 2 — Mac sender to Windows browser receiver (Jaeson, handing off one document)
 
@@ -391,7 +402,7 @@ Failure: discovery warning leaves QR/link usable. Different network, guest isola
 4. **Climax:** accepted `transfer-started` replaces waiting with determinate wire progress.
 5. Authoritative final progress precedes complete; Done remains visible through reset until Jaeson dismisses it or starts another item.
 
-Failure: quiet dialog cancel remains quiet. Invalid selection uses fixed focused copy. A preview/other opener may claim V1; sender help instructs a fresh link. This combination is supported only after its matrix row passes.
+Failure: quiet dialog cancel remains quiet. Invalid selection uses fixed focused copy. Another downloader may claim the item; sender help instructs a fresh link. This combination is supported only after its matrix row passes.
 
 ### Flow 3 — Cancel, fail, and recover (Jaeson, stopping the PDF handoff)
 

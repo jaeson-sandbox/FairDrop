@@ -1258,7 +1258,7 @@ describe('the Staged foot row keeps "Trouble connecting?" and Cancel on one row 
             'Not downloading?',
             'Browser says Not Found',
             'FairDrop keeps no copy.',
-            'Link previews in chat apps',
+            'Opening the link shows the item',
         ]) {
             expect(region.textContent, `"${text}" missing from the opened help region`).toContain(text)
         }

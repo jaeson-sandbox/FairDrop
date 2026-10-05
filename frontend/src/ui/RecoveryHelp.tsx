@@ -40,7 +40,7 @@ export function RecoveryHelpContent() {
 
 /**
  * Staged's own "Trouble connecting?" content (Story 9.4): the local-copy
- * disclosure and the link-preview caveat -- both moved out of the
+ * disclosure and the inspection guidance -- both moved out of the
  * always-visible card into this disclosure -- prepended to the same
  * firewall/receiver guidance `IdleView`'s "Troubleshooting" disclosure shows.
  * A separate component rather than added paragraphs on `RecoveryHelpContent`
@@ -52,7 +52,7 @@ export function StagedHelpContent() {
     return (
         <>
             <p className="fd-body">{copy.localCopy.disclosure}</p>
-            <p className="fd-body">{copy.firstOpener.previews}</p>
+            <p className="fd-body">{copy.firstOpener.inspect}</p>
             <RecoveryHelpContent/>
         </>
     )

@@ -134,7 +134,7 @@ describe('Idle at rest', () => {
             'isolated networks may block device-to-device traffic. Then cancel and prepare the item again for ' +
             'a fresh link.')).toBeTruthy()
         expect(screen.getByText('Browser says Not Found: the link may be wrong or expired. Locked: another ' +
-            'opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for a ' +
+            'downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a ' +
             'fresh link.')).toBeTruthy()
     })
 
@@ -407,7 +407,7 @@ describe('recovery guidance is a second collapsed disclosure', () => {
             'Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item ' +
             'again for a fresh link.'],
         ['the receiver-error guidance', 'Browser says Not Found: the link may be wrong or expired. Locked: ' +
-            'another opener claimed it. Gone: the selected item changed. Cancel and prepare the item again for ' +
+            'another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for ' +
             'a fresh link.'],
     ])('still renders %s', (_label, text) => {
         show()
