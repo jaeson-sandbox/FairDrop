@@ -1,0 +1,9 @@
+ok  	fairdrop	2.970s
+ok  	fairdrop/internal/network	2.560s [no tests to run]
+ok  	fairdrop/internal/qr	2.106s [no tests to run]
+ok  	fairdrop/internal/server	1.420s [no tests to run]
+ok  	fairdrop/internal/source	1.780s [no tests to run]
+ok  	fairdrop/internal/stream	1.611s [no tests to run]
+ok  	fairdrop/internal/transfer	2.751s [no tests to run]
+ok  	fairdrop/scripts	1.935s [no tests to run]
+ok  	fairdrop/scripts/mutationverdict	2.914s [no tests to run]

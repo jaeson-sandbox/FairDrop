@@ -1,0 +1,90 @@
+
+> fairdrop-frontend@1.3.1 test
+> vitest run --reporter=dot
+
+
+ RUN  v4.1.11 /private/tmp/fairdrop-send-again-review-verification/frontend
+
+········stderr | src/App.test.tsx > production transfer controller integration > routes exactly one native path through stageFromOutcome as unknown kind
+The current testing environment is not configured to support act(...)
+
+··································································································································stderr | src/App.test.tsx > native drop gate lifecycle > keeps exactly one live native listener under StrictMode effect replay
+The current testing environment is not configured to support act(...)
+
+··························································································································stderr | src/App.test.tsx > announcer-owned transitions > refuses a copy result that belongs to a session the view has left
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > announcer-owned transitions > re-announces a repeated message instead of going silent
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > announcer-owned transitions > re-announces a repeated message instead of going silent
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+····stderr | src/App.test.tsx > announcer-owned transitions > reports a copy success without moving focus or changing the lifecycle
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > announcer-owned transitions > keeps the cancellation acknowledgement when a copy resolves behind it
+The current testing environment is not configured to support act(...)
+
+·············stderr | src/App.test.tsx > a native drop on the outcome card (Story 9.6) > carries the drop target on a retained outcome, and stages a dropped path through stageFromOutcome
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > a native drop on the outcome card (Story 9.6) > carries the drop target on a live terminal outcome too
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > a native drop on the outcome card (Story 9.6) > carries the drop target on an Idle Stage-time command-failure card too
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > the outcome card's own "Send Another"/"Choose Another" (Story 9.6) > wires Send Again on a Done card only when the controller has a target
+The current testing environment is not configured to support act(...)
+
+·························stderr | src/ui/Notification.test.tsx > lifetime: shows, stays, exits, then unmounts > stays visible for the full duration and only then begins to exit
+The current testing environment is not configured to support act(...)
+
+stderr | src/ui/Notification.test.tsx > lifetime: shows, stays, exits, then unmounts > unmounts (calls onDismiss) once the exit duration elapses, without any transitionend event
+The current testing environment is not configured to support act(...)
+
+stderr | src/ui/Notification.test.tsx > lifetime: shows, stays, exits, then unmounts > never calls onDismiss before the full visible-plus-exit duration has elapsed
+The current testing environment is not configured to support act(...)
+
+stderr | src/ui/Notification.test.tsx > hover pauses the dismissal timer > pauses while the pointer is over it and resumes with the remaining time when it leaves
+The current testing environment is not configured to support act(...)
+
+stderr | src/ui/Notification.test.tsx > hover pauses the dismissal timer > does nothing on a hover that starts after the notification has already begun leaving
+The current testing environment is not configured to support act(...)
+
+stderr | src/ui/Notification.test.tsx > the timer is presentation-only > calls onDismiss and nothing else -- no dispatch, no bound command, no focus move
+The current testing environment is not configured to support act(...)
+
+············································································································································································································stderr | src/App.test.tsx > the outcome card's own "Send Another"/"Choose Another" (Story 9.6) > admits one Send Again operation and keeps all outcome actions busy until it settles
+The current testing environment is not configured to support act(...)
+
+·······stderr | src/App.test.tsx > the outcome card's own "Send Another"/"Choose Another" (Story 9.6) > wires the File/Folder menu items to selectFromOutcome('file'/'directory'), on a live Done card
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > the outcome card's own "Send Another"/"Choose Another" (Story 9.6) > wires the File/Folder menu items to selectFromOutcome('file'/'directory'), on a live Done card
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > the outcome card's own "Send Another"/"Choose Another" (Story 9.6) > offers Choose Another, wired the same way, for an Error whose action is choose
+The current testing environment is not configured to support act(...)
+
+stderr | src/App.test.tsx > App wires the outcome card's primary action from selectEffectiveErrorAction (Story 9.6 AC3) > wires Try Again to retry(), never to the chooser
+The current testing environment is not configured to support act(...)
+
+································································································································································stderr | src/App.test.tsx > the routing table still works after mounting under StrictMode > still makes exactly one focus move for a focus-owned transition
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+········································································stderr | src/App.test.tsx > the routing table still works after mounting under StrictMode > still leaves focus alone for an announcer-owned transition
+The current testing environment is not configured to support act(...)
+
+·································································································
+
+ Test Files  20 passed (20)
+      Tests  842 passed (842)
+   Start at  20:43:00
+   Duration  4.80s (transform 2.42s, setup 0ms, import 5.46s, tests 12.68s, environment 18.59s)

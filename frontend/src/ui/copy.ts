@@ -110,6 +110,7 @@ export const copy = {
          * it out is redundant beside it.
          */
         heading: 'Sent',
+        sendAgain: 'Send Again',
         /** Story 9.6: the Done card's primary action -- the extracted BrowseControl, reused verbatim. */
         sendAnother: 'Send Another',
         /** Story 9.6: the Done card's own Dismiss, distinct wording from an Error card's. */

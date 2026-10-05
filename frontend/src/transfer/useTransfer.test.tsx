@@ -1004,7 +1004,7 @@ describe('remembering the staged item for retry (Story 9.2)', () => {
         act(() => emit('transfer-reset', {sessionId, seq: 3}))
         await act(async () => { await cancelPromise })
         expect(hook.result.current.state.phase).toBe('idle')
-        expect(hook.result.current.canRetry, 'still remembered while retained').toBe(true)
+        expect(hook.result.current.canRetry, 'user cancellation abandons the remembered target').toBe(false)
 
         act(() => { hook.result.current.dismissRetained() })
 
@@ -1014,7 +1014,7 @@ describe('remembering the staged item for retry (Story 9.2)', () => {
         expect(mocks.stageTransfer).not.toHaveBeenCalled()
     })
 
-    it('clears the remembered path on a completed Done', async () => {
+    it('retains the remembered path on a completed Done for Send Again', async () => {
         mocks.stageTransfer.mockResolvedValueOnce(metadata())
         const hook = renderHook(() => useTransfer())
         await act(async () => { await hook.result.current.stage(rememberedPath) })
@@ -1026,7 +1026,7 @@ describe('remembering the staged item for retry (Story 9.2)', () => {
         })
 
         expect(hook.result.current.state.phase).toBe('done')
-        expect(hook.result.current.canRetry, 'a completed Done needs no retry target').toBe(false)
+        expect(hook.result.current.canSendAgain).toBe(true)
     })
 
     it('clears the remembered path when a Stage fails with a non-retry code, keeps it for a retry code', async () => {
@@ -1128,11 +1128,7 @@ describe('remembering the staged item for retry (Story 9.2)', () => {
     it('retries directly from a retained (already Idle) Error with no Cancel call at all', async () => {
         const hook = renderHook(() => useTransfer())
         await driveToLiveError(hook)
-        mocks.cancelTransfer.mockResolvedValue(undefined)
-        let cancelPromise!: Promise<void>
-        act(() => { cancelPromise = hook.result.current.cancel() })
         act(() => emit('transfer-reset', {sessionId, seq: 3}))
-        await act(async () => { await cancelPromise })
         expect(hook.result.current.state.phase).toBe('idle')
         mocks.cancelTransfer.mockClear()
         mocks.stageTransfer.mockClear()
@@ -1205,6 +1201,249 @@ describe('stageFromOutcome releases a live lease before staging a new item (Stor
         expect(mocks.stageTransfer).toHaveBeenCalledTimes(2)
         expect(mocks.stageTransfer).toHaveBeenLastCalledWith('C:\\second.pdf')
         expect(hook.result.current.state.phase).toBe('staged')
+    })
+})
+
+describe('Send Again keeps only a revalidatable selection', () => {
+    const path = String.raw`C:\Shared\report.pdf`
+    const nextSessionId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+    async function completed(hook: {result: {current: ReturnType<typeof useTransfer>}}) {
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        await act(async () => { await hook.result.current.stage(path, 'file') })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+        })
+        expect(hook.result.current.state.phase).toBe('done')
+    }
+
+    it('waits for actual reset after releasing a live Done lease, then stages once with a fresh result', async () => {
+        const hook = renderHook(() => useTransfer())
+        await completed(hook)
+        const release = deferred<void>()
+        mocks.cancelTransfer.mockReturnValueOnce(release.promise)
+        mocks.stageTransfer.mockResolvedValueOnce(metadata({sessionId: nextSessionId,
+            url: 'http://192.0.2.1:34123/download/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'}))
+
+        let send!: Promise<void>
+        let duplicateSettled = false
+        act(() => {
+            send = hook.result.current.sendAgain()
+            void hook.result.current.sendAgain().then(() => { duplicateSettled = true })
+        })
+        await act(async () => { await Promise.resolve() })
+        expect(duplicateSettled, 'duplicate activation is refused before lease release').toBe(true)
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+        await act(async () => { release.resolve() })
+        expect(mocks.stageTransfer, 'settled Cancel is not a reset').toHaveBeenCalledTimes(1)
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await send })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(2)
+        expect(mocks.stageTransfer).toHaveBeenLastCalledWith(path)
+        expect(hook.result.current.state).toMatchObject({phase: 'staged', session: {sessionId: nextSessionId}})
+    })
+
+    it('stages directly from retained Done and refuses overlapping activations', async () => {
+        const hook = renderHook(() => useTransfer())
+        await completed(hook)
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        expect(hook.result.current.canSendAgain).toBe(true)
+        mocks.cancelTransfer.mockClear()
+        const stage = deferred<Record<string, unknown>>()
+        mocks.stageTransfer.mockReturnValueOnce(stage.promise)
+        let first!: Promise<void>
+        let second!: Promise<void>
+        let secondSettled = false
+        act(() => {
+            first = hook.result.current.sendAgain()
+            second = hook.result.current.sendAgain()
+            void second.then(() => { secondSettled = true })
+        })
+        await act(async () => { await Promise.resolve() })
+        expect(secondSettled, 'the second activation is refused synchronously').toBe(true)
+        await waitFor(() => expect(mocks.stageTransfer).toHaveBeenCalledTimes(2))
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+        await act(async () => { stage.resolve(metadata({sessionId: nextSessionId})) })
+        await act(async () => { await Promise.all([first, second]) })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(2)
+    })
+
+    it('settles a failed terminal lease release without staging or hiding the outcome', async () => {
+        const hook = renderHook(() => useTransfer())
+        await completed(hook)
+        mocks.cancelTransfer.mockRejectedValueOnce(new Error('release failed'))
+        mocks.stageTransfer.mockResolvedValueOnce(metadata({sessionId: nextSessionId}))
+        let send!: Promise<void>
+        let settled = false
+        act(() => {
+            send = hook.result.current.sendAgain()
+            void send.then(() => { settled = true })
+        })
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+        await waitFor(() => expect(settled, 'rejected release must settle the action').toBe(true))
+        await act(async () => { await send })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+        expect(hook.result.current.state.phase).toBe('done')
+        expect(hook.result.current.canSendAgain).toBe(true)
+    })
+
+    it('preserves folder kind in the pending view when revalidating a completed folder', async () => {
+        const hook = renderHook(() => useTransfer())
+        mocks.stageTransfer.mockResolvedValueOnce(metadata({isDir: true, name: 'Shared'}))
+        await act(async () => { await hook.result.current.stage(String.raw`C:\Shared`, 'directory') })
+        expect(hook.result.current.state.phase).toBe('staged')
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: {
+                bytesSent: 100, totalBytes: 0, totalKnown: false, percent: 0, speedBytesPerSec: 10,
+            }})
+            emit('transfer-reset', {sessionId, seq: 3})
+        })
+        expect(hook.result.current.state).toMatchObject({phase: 'idle', retainedOutcome: {kind: 'done'}})
+        expect(hook.result.current.canSendAgain).toBe(true)
+        const next = deferred<Record<string, unknown>>()
+        mocks.stageTransfer.mockReturnValueOnce(next.promise)
+        let send!: Promise<void>
+        act(() => { send = hook.result.current.sendAgain() })
+        await waitFor(() => expect(hook.result.current.state).toMatchObject({phase: 'pending', itemKind: 'directory'}))
+        next.resolve(metadata({sessionId: nextSessionId, isDir: true, name: 'Shared'}))
+        await act(async () => { await send })
+    })
+
+    it('uses normal Stage validation when the remembered item has changed', async () => {
+        const hook = renderHook(() => useTransfer())
+        await completed(hook)
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        mocks.stageTransfer.mockRejectedValueOnce(new Error(JSON.stringify({code: 'path_not_found', message: 'gone'})))
+        await act(async () => { await hook.result.current.sendAgain() })
+        expect(mocks.stageTransfer).toHaveBeenLastCalledWith(path)
+        expect(hook.result.current.state).toMatchObject({phase: 'idle', commandError: {code: 'path_not_found'}})
+        expect(hook.result.current.canSendAgain).toBe(false)
+    })
+
+    it('keeps the target when an outcome chooser is cancelled, then replaces it on a new Stage', async () => {
+        const hook = renderHook(() => useTransfer())
+        await completed(hook)
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        mocks.selectFile.mockResolvedValueOnce('')
+        await act(async () => { await hook.result.current.selectFromOutcome('file') })
+        expect(hook.result.current.canSendAgain).toBe(true)
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+        mocks.stageTransfer.mockResolvedValueOnce(metadata({sessionId: nextSessionId}))
+        mocks.selectFile.mockResolvedValueOnce(String.raw`C:\Shared\replacement.pdf`)
+        await act(async () => { await hook.result.current.selectFromOutcome('file') })
+        expect(mocks.stageTransfer).toHaveBeenLastCalledWith(String.raw`C:\Shared\replacement.pdf`)
+        expect(hook.result.current.canSendAgain).toBe(false)
+    })
+
+    it('preserves the live Done target through Send Another lease release and a cancelled chooser', async () => {
+        const hook = renderHook(() => useTransfer())
+        await completed(hook)
+        const release = deferred<void>()
+        mocks.cancelTransfer.mockReturnValueOnce(release.promise)
+        mocks.selectFile.mockResolvedValueOnce('')
+        let choose!: Promise<void>
+        act(() => { choose = hook.result.current.selectFromOutcome('file') })
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+        expect(mocks.selectFile).not.toHaveBeenCalled()
+        release.resolve()
+        await act(async () => { await Promise.resolve() })
+        expect(mocks.selectFile).not.toHaveBeenCalled()
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await choose })
+        expect(hook.result.current.canSendAgain).toBe(true)
+        expect(hook.result.current.state).toMatchObject({phase: 'idle', retainedOutcome: {kind: 'done'}})
+        mocks.stageTransfer.mockResolvedValueOnce(metadata({sessionId: nextSessionId}))
+        await act(async () => { await hook.result.current.sendAgain() })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(2)
+        expect(mocks.stageTransfer).toHaveBeenLastCalledWith(path)
+    })
+
+    it('forgets on user Done, cancellation, replacement, and unmount', async () => {
+        const hook = renderHook(() => useTransfer())
+        await completed(hook)
+        const release = deferred<void>()
+        mocks.cancelTransfer.mockReturnValueOnce(release.promise)
+        let send!: Promise<void>
+        act(() => { send = hook.result.current.sendAgain() })
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+        act(() => { void hook.result.current.cancel() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { release.resolve(); await send })
+        expect(hook.result.current.canSendAgain).toBe(false)
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+
+        mocks.stageTransfer.mockResolvedValueOnce(metadata())
+        await act(async () => { await hook.result.current.stage(path) })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: progress(100)})
+            emit('transfer-reset', {sessionId, seq: 3})
+        })
+        mocks.stageTransfer.mockResolvedValueOnce(metadata({sessionId: nextSessionId}))
+        await act(async () => { await hook.result.current.stage(String.raw`C:\Shared\new.pdf`) })
+        expect(mocks.stageTransfer).toHaveBeenLastCalledWith(String.raw`C:\Shared\new.pdf`)
+        hook.unmount()
+        await act(async () => { await hook.result.current.sendAgain() })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(3)
+    })
+
+    it('cannot stage from a delayed reset after unmount', async () => {
+        const hook = renderHook(() => useTransfer())
+        await completed(hook)
+        const release = deferred<void>()
+        mocks.cancelTransfer.mockReturnValueOnce(release.promise)
+        let send!: Promise<void>
+        act(() => { send = hook.result.current.sendAgain() })
+        await waitFor(() => expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1))
+        const staleReset = subscriptions.find(({name}) => name === 'transfer-reset')!.callback
+        hook.unmount()
+        staleReset({sessionId, seq: 3})
+        release.resolve()
+        await send
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+    })
+
+    it('refuses Send Again while a selection is pending, staged, transferring, or errored', async () => {
+        const hook = renderHook(() => useTransfer())
+        const firstStage = deferred<Record<string, unknown>>()
+        mocks.stageTransfer.mockReturnValueOnce(firstStage.promise)
+        let stage!: Promise<void>
+        act(() => { stage = hook.result.current.stage(path) })
+        await act(async () => { await Promise.resolve() })
+        expect(hook.result.current.state.phase).toBe('pending')
+        await act(async () => { await hook.result.current.sendAgain() })
+        firstStage.resolve(metadata())
+        await act(async () => { await stage })
+        await act(async () => { await hook.result.current.sendAgain() })
+        act(() => emit('transfer-started', {sessionId, seq: 1}))
+        await act(async () => { await hook.result.current.sendAgain() })
+        act(() => emit('transfer-error', {sessionId, seq: 2,
+            error: {code: 'transfer_failed', message: 'x'}}))
+        await act(async () => { await hook.result.current.sendAgain() })
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        await act(async () => { await hook.result.current.sendAgain() })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+    })
+
+    it('does nothing outside Done or without a target and does not replay stale events', async () => {
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.sendAgain() })
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+        await completed(hook)
+        act(() => emit('transfer-started', {sessionId, seq: 4}))
+        expect(hook.result.current.state.phase).toBe('done')
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        act(() => { hook.result.current.dismissRetained() })
+        expect(hook.result.current.canSendAgain).toBe(false)
+        await act(async () => { await hook.result.current.sendAgain() })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
+        act(() => emit('transfer-reset', {sessionId, seq: 4}))
+        await act(async () => { await hook.result.current.sendAgain() })
+        expect(mocks.stageTransfer).toHaveBeenCalledTimes(1)
     })
 })
 

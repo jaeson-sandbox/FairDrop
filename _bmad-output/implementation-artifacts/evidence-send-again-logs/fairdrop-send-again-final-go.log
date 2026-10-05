@@ -1,0 +1,14 @@
+=== RUN   TestNativeCompletedItemCanBeStagedAgainWithFreshCapability
+=== RUN   TestNativeCompletedItemCanBeStagedAgainWithFreshCapability/file
+=== RUN   TestNativeCompletedItemCanBeStagedAgainWithFreshCapability/folder
+--- PASS: TestNativeCompletedItemCanBeStagedAgainWithFreshCapability (0.04s)
+    --- PASS: TestNativeCompletedItemCanBeStagedAgainWithFreshCapability/file (0.02s)
+    --- PASS: TestNativeCompletedItemCanBeStagedAgainWithFreshCapability/folder (0.02s)
+=== RUN   TestNativeSendAgainRevalidatesDeletedSource
+--- PASS: TestNativeSendAgainRevalidatesDeletedSource (0.01s)
+PASS
+ok  	fairdrop	0.347s
+=== RUN   TestStageDrawsTwoIndependentIdentifiers
+--- PASS: TestStageDrawsTwoIndependentIdentifiers (0.00s)
+PASS
+ok  	fairdrop/internal/transfer	0.471s

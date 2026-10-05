@@ -1,0 +1,6 @@
+retention: baseline=pass; named_assertion_failure=True; logs=/tmp/fairdrop-send-again-mutation-retention-{baseline,mutant}.json
+state-guard: baseline=pass; named_assertion_failure=True; logs=/tmp/fairdrop-send-again-mutation-state-guard-{baseline,mutant}.json
+admission: baseline=pass; named_assertion_failure=True; logs=/tmp/fairdrop-send-again-mutation-admission-{baseline,mutant}.json
+abandonment: baseline=pass; named_assertion_failure=True; logs=/tmp/fairdrop-send-again-mutation-abandonment-{baseline,mutant}.json
+release-recovery: baseline=pass; named_assertion_failure=True; logs=/tmp/fairdrop-send-again-mutation-release-recovery-{baseline,mutant}.json
+live-chooser: baseline=pass; named_assertion_failure=True; logs=/tmp/fairdrop-send-again-mutation-live-chooser-{baseline,mutant}.json

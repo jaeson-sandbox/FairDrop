@@ -1,0 +1,12 @@
+
+> fairdrop-frontend@1.3.1 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/jaesonmartin/Projects/FairDrop/frontend
+
+
+ Test Files  21 passed (21)
+      Tests  846 passed (846)
+   Start at  21:00:47
+   Duration  3.84s (transform 2.51s, setup 0ms, import 4.49s, tests 7.71s, environment 16.57s)

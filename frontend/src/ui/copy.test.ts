@@ -171,6 +171,7 @@ describe('approved product copy', () => {
             'discovery.warning',
             'done.dismiss',
             'done.heading',
+            'done.sendAgain',
             'done.sendAnother',
             'external.promise',
             'firewall.macos',

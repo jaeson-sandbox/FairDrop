@@ -29,9 +29,13 @@ published v1.3.1 binary, opening the link starts the one-shot download immediate
    the first device to do so gets the one-shot transfer.
 4. A folder arrives as a ZIP, streamed rather than staged, so nothing extra is written on the
    sending side.
+5. After a completed transfer, choose **Send Again** to offer the same file or folder with a
+   fresh QR code. FairDrop checks the item again; if that check fails, choose it again.
+   **Send Another** opens the file or folder chooser, and **Done** dismisses the result.
 
-Cancel at any point. The window returns to idle and everything it held is released — there is
-no history, because nothing was kept.
+Cancel at any point. The window returns to idle and forgets the selection. Send Again remembers
+only the path to the completed item in memory until it is dismissed or replaced; there is no
+persistent history or staged copy.
 
 ## Trust model
 

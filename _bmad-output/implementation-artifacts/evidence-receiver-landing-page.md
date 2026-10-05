@@ -55,3 +55,11 @@ Duplicate negative-POST and displayed-size findings from blind and verification 
 - The original candidate gate (before these review fixes) passed Wails build, gofmt, vet, staticcheck, full Go, cgo, full race including 4 GiB fixture, rendered browser suite plus live receiver check, line endings, Darwin/Linux builds, and 68/68 canonical native mutations. Its frontend suite had only three stale wording assertions, corrected and passed above. The shared checkout’s build-asset drift check refused the pre-existing untracked `build/.DS_Store`; the orchestrator proved build assets and bindings clean in a separate checkout without touching that file. Native CI on these post-review changes remains the orchestrator’s release proof.
 
 - After integration, Wails build, gofmt, vet, staticcheck and diff whitespace checks passed again on the final local candidate (`/tmp/fairdrop-receiver-final-build.log`).
+
+## Native macOS UI smoke (orchestrator, 2026-10-04)
+
+Launched the built app from build/bin/fairdrop.app through computer-use tooling. Selected an agent-created 48-byte hello.txt through the native chooser. The sender displayed Ready to send, the QR and updated scan-then-Download copy. Opening its real LAN URL in the in-app browser displayed hello.txt and File · 48 bytes while the native sender remained Ready to send. Clicking the receiver Download button produced the native Sent card for hello.txt, 48 bytes. The test browser tab and app were then closed. This is a same-machine native-app/browser smoke, not a nearby phone, screen-reader or physical-keyboard observation. Exact downloaded bytes are separately verified by the live browser harness.
+
+## Native CI milestone
+
+[Verify run 37247403222](https://github.com/jaeson-sandbox/FairDrop/actions/runs/37247403222) completed successfully for exact head `128ec4a4ee6d5a118265ff9a4b70edcf43738b89`. `gh run view --json conclusion,headSha,jobs` confirmed success independently for Windows, macOS and Linux adapter verification. This proves the receiver milestone, not subsequent Send Again edits.

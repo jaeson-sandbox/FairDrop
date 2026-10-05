@@ -2,8 +2,9 @@
 title: 'Send the successfully delivered item again'
 type: feature
 created: '2026-10-04'
-status: draft
+status: done
 review_loop_iteration: 0
+baseline_commit: 128ec4a4ee6d5a118265ff9a4b70edcf43738b89
 context:
   - '{project-root}/AGENTS.md'
   - '{project-root}/_bmad-output/specs/spec-receiver-handoff/SPEC.md'
@@ -54,12 +55,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `useTransfer.ts` — expose guarded sendAgain/canSendAgain, retain success target and correctly forget it on user abandonment; keep normal validation and unique session creation.
-- [ ] `useTransfer.test.tsx` — cover each matrix row, including delayed reset, overlapping calls, stale lifecycle events and unmount; use deterministic controlled promises, not sleeps.
-- [ ] `App.tsx`, harness and controller mocks — wire Send Again through outcome busy handling without changing retry or native drop.
-- [ ] `OutcomePanel.tsx`, `copy.ts` and current UX spine — label and arrange three Done actions accessibly; Send Again primary, Send Another secondary, Done quiet.
-- [ ] Component/App/browser tests — prove actual user activation re-stages once and keyboard/focus/320px/200%/forced-colors behavior remains sound.
-- [ ] Current docs and sibling evidence — record changed memory lifetime, matrix coverage, meaningful mutations and complete verification output.
+- [x] `useTransfer.ts` — expose guarded sendAgain/canSendAgain, retain success target and correctly forget it on user abandonment; keep normal validation and unique session creation.
+- [x] `useTransfer.test.tsx` — cover each matrix row, including delayed reset, overlapping calls, stale lifecycle events and unmount; use deterministic controlled promises, not sleeps.
+- [x] `App.tsx`, harness and controller mocks — wire Send Again through outcome busy handling without changing retry or native drop.
+- [x] `OutcomePanel.tsx`, `copy.ts` and current UX spine — label and arrange three Done actions accessibly; Send Again primary, Send Another secondary, Done quiet.
+- [x] Component/App/browser tests — prove actual user activation re-stages once and keyboard/focus/320px/200%/forced-colors behavior remains sound.
+- [x] Current docs and sibling evidence — record changed memory lifetime, matrix coverage, meaningful mutations and complete verification output.
 
 **Acceptance Criteria:**
 - Given a successful file or folder transfer, when Send Again is activated on live or retained success, then ordinary Stage receives the original path once without opening a chooser and the new returned code is displayed.
@@ -87,4 +88,26 @@ Targeted controller/App/outcome tests and rendered accessibility tests, then can
 
 ## Suggested Review Order
 
-Controller memory/admission → live-reset tests → App wiring → Done card and browser proof → current UX and evidence.
+- Follow state admission, remembered selection and fresh staging.
+  [useTransfer.ts:444](../../frontend/src/transfer/useTransfer.ts#L444)
+
+- Inspect recoverable lease release and user-abandonment handling.
+  [useTransfer.ts:300](../../frontend/src/transfer/useTransfer.ts#L300)
+
+- See how one action owns the busy UI until it settles.
+  [App.tsx:73](../../frontend/src/App.tsx#L73)
+
+- Review the three accessible success actions.
+  [OutcomePanel.tsx:171](../../frontend/src/ui/OutcomePanel.tsx#L171)
+
+- Trace a real controller from click to fresh QR and link.
+  [App.sendAgain.test.tsx:54](../../frontend/src/App.sendAgain.test.tsx#L54)
+
+- Check keyboard and forced-colors behavior with actual layout.
+  [accessibility.test.tsx:1571](../../frontend/browser/accessibility.test.tsx#L1571)
+
+- Review the executable mutation inventory and evidence.
+  [mutation-send-again.py:1](mutation-send-again.py#L1)
+
+- Read matrix coverage, limitations and review disposition.
+  [evidence-send-again.md:1](evidence-send-again.md#L1)

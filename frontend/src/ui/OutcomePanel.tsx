@@ -39,6 +39,8 @@ export interface OutcomeCardProps {
     readonly browse?: OutcomeBrowseAction
     /** "Try Again". Omitted -> not rendered. */
     readonly onRetry?: () => void
+    /** Revalidates the successfully sent item through a new Stage. */
+    readonly onSendAgain?: () => void
     /**
      * True while `stageFromOutcome`/`retry()` is releasing a live lease
      * before staging (Story 9.6). Every action this card owns -- the primary
@@ -110,6 +112,7 @@ export function OutcomePanel({
     onDismiss,
     browse,
     onRetry,
+    onSendAgain,
     busy = false,
 }: OutcomePanelProps) {
     const done = outcome.kind === 'done'
@@ -166,12 +169,24 @@ export function OutcomePanel({
                 </p>
             )}
             <div className="fd-outcome__actions fd-rise" style={rise(actionsStep)}>
+                {done && onSendAgain !== undefined ? (
+                    <button
+                        type="button"
+                        className="fd-button fd-button--primary fd-button--pill fd-target"
+                        aria-disabled={busy || undefined}
+                        onClick={() => { if (!busy) onSendAgain() }}
+                    >
+                        <RefreshGlyph/>
+                        {copy.done.sendAgain}
+                    </button>
+                ) : null}
                 {done ? (
                     <BrowseControl
                         label={copy.done.sendAnother}
                         onSelectFile={browse?.onSelectFile ?? noop}
                         onSelectDirectory={browse?.onSelectDirectory ?? noop}
                         disabled={busy}
+                        appearance={onSendAgain === undefined ? 'primary' : 'secondary'}
                     />
                 ) : browse !== undefined ? (
                     <BrowseControl
