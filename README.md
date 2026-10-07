@@ -6,17 +6,13 @@ Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged cop
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: v1.3.1.** A polish release over 1.3.0, which redesigned every screen on
-the Quartz spine. 1.3.1 replaces the static "Transfer canceled" banner with a notification
-that slides in at the top of the window and leaves on its own, and fixes the direct-link
-field's focus ring and selection highlight. Transfer behavior remains the same complete
-FR1-FR24 scope proven for v1.0.0: one file or folder, one receiver, plain HTTP on a trusted
-LAN, nothing persisted.
+**Current release: [v1.4.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.4.0).**
+A receiver can open a link to see the offered item, then press **Download** to claim the
+one-shot transfer. After a completed transfer, **Send Again**
+revalidates the same item and offers it with a fresh link and QR code. FairDrop still sends
+one file or folder to one receiver over plain HTTP on a trusted LAN and persists nothing.
 
-## Using the development build
-
-The receiver page and explicit Download step below are planned for the next release. In the
-published v1.3.1 binary, opening the link starts the one-shot download immediately.
+## Using FairDrop
 
 1. Launch FairDrop. The first run asks for firewall access — allow it on **Private networks
    only**, and leave Public off. Only one copy runs at a time; launching it again restores the
@@ -26,7 +22,7 @@ published v1.3.1 binary, opening the link starts the one-shot download immediate
    native dialog cannot offer both kinds at once; either item leads to the matching chooser.
 3. Scan the QR code from a browser on the same Wi-Fi, or use **Copy Link** or **Show Link** to
    open the direct link instead. The receiving browser shows the item first. Tap **Download** there;
-   the first device to do so gets the one-shot transfer.
+   the first valid POST claims the one-shot transfer.
 4. A folder arrives as a ZIP, streamed rather than staged, so nothing extra is written on the
    sending side.
 5. After a completed transfer, choose **Send Again** to offer the same file or folder with a
