@@ -2,7 +2,7 @@
 title: 'Release FairDrop 1.4.0'
 type: 'chore'
 created: '2026-10-07'
-status: 'in-review'
+status: 'done'
 baseline_commit: '7fdb98ede732d15a1f1129168e9ae9d805e37900'
 review_loop_iteration: 0
 context:
@@ -56,7 +56,7 @@ context:
 - [x] `README.md` — present the new receiver and Send Again behavior as 1.4.0 capabilities with no development-only caveat.
 - [x] `docs/release-notes-1.4.0.md` — describe both features, direct HTTP client migration from GET to POST, ephemeral path retention, trusted-LAN scope, unsigned Windows and ad-hoc-only macOS, no notarization/auto-update/Linux packaging. State checksums prove integrity, not authenticity. These notes become the published release body.
 - [x] `evidence-release-1-4-0.md` beside this spec — record implementation diff audit and focused verification. Leave remote release proof explicitly pending for the orchestrator.
-- [ ] Verify matrix rows through existing automated identity tests, structured lockfile comparison, documentation review and, for publication, orchestrator-owned artifact checks. Do not add trivial constant-comparison tests.
+- [x] Verify matrix rows through existing automated identity tests, structured lockfile comparison, documentation review and, for publication, orchestrator-owned artifact checks. Do not add trivial constant-comparison tests.
 
 **Acceptance Criteria:**
 - Given the merged feature baseline, when the release changes are inspected, then only product metadata, current release documentation and this story's artifacts change.
