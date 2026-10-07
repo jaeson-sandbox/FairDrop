@@ -67,3 +67,16 @@ Three context-free review layers completed: edge-case and verification-gap revie
 A disposable checkout at `/private/tmp/fairdrop-release-1.4.0-check` applied the exact three metadata file changes to baseline `7fdb98ede732d15a1f1129168e9ae9d805e37900`. Sequential Wails build, generated-binding and build-asset drift, restored .gitkeep, gofmt, vet, pinned staticcheck, full Go suite, CGO_ENABLED=1 and full race suite, frontend suite (846 tests), rendered browser suite (84 tests plus real GET/POST receiver fixture), line-ending check, Darwin arm64/Linux amd64 builds and Darwin staticcheck all passed. Full local logs: `/private/tmp/fairdrop-1.4.0-build.log` and `/private/tmp/fairdrop-1.4.0-gate.log`. The built Info.plist reports 1.4.0 and `codesign --verify --deep --strict` passed. Later edits were release prose and evidence only. Root working tree build/.DS_Store remains untouched.
 
 Publication remains pending exact-head CI and tagged native artifact verification.
+
+## Published release — 2026-10-07
+
+- Release: https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.4.0 — published at 2026-10-07T18:48:18Z, non-draft, non-prerelease, latest stable. Owner explicitly authorized publication.
+- PR #10: https://github.com/jaeson-sandbox/FairDrop/pull/10; verified head `f41edc12a6d9742bbee3c8d6536f7621a2ac6ec7`. Run https://github.com/jaeson-sandbox/FairDrop/actions/runs/37664467222 passed all three jobs.
+- Tag v1.4.0 points at merge `551c46db886b3ecef17bb36c7cce08347f60e2ca`; its tree exactly matches the verified PR head.
+- Tagged release run https://github.com/jaeson-sandbox/FairDrop/actions/runs/37666889342 completed successfully: Windows/macOS native gates, Linux adapter gate, both native builds, and release job. Exact headSha and every job conclusion checked via GitHub JSON, not watch exit status.
+- Downloaded all four draft assets into `/private/tmp/fairdrop-1.4.0-assets`. Both `shasum -a 256 -c` checks passed. macOS ZIP SHA-256: `769cad832893649d389421091cabcf2f6efd6ad3cc68ba215d2d102d1ea0fe61`; Windows exe SHA-256: `94098c566b8151de7f6b9a6b78dcb864a1c75ea7596b8be8c644e52943992fdd`.
+- Extracted macOS bundle is arm64, identifier com.fairdrop.fairdrop, both bundle version fields 1.4.0. Strict/deep signature verification passed; signature is ad-hoc with no TeamIdentifier. Downloaded Windows executable is x86-64 PE; native resource and execution proof comes from Windows CI, not a local Windows run.
+- Downloaded macOS bundle launched to its idle screen through native app automation. This is a launch observation, not phone, firewall, screen-reader or hardware-keyboard certification.
+- Replaced generic draft body with docs/release-notes-1.4.0.md and compared equality before publishing. Four expected assets and release state were checked before publication; afterward GitHub reported v1.4.0 as Latest, not draft or prerelease.
+
+All earlier pending statements above describe their original checkpoints and are superseded by this completed proof. The I/O matrix is covered by existing identity tests, reproduced structured metadata comparison, explicit notes review, exact-head CI, downloaded checksum/native metadata verification, and final release-state checks. No known failures were waived.

@@ -507,3 +507,7 @@ person launching a binary built from `e52457f`.
 
 The draft was published on the owner's instruction "lets do the merge and release but lets
 make it 1.3.1", given 2026-09-26.
+
+## v1.4.0 — PUBLISHED 2026-10-07
+
+Receiver landing page with explicit Download and Send Again shipped in [v1.4.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.4.0). Tag revision: `551c46db886b3ecef17bb36c7cce08347f60e2ca`. All six jobs in [release run 37666889342](https://github.com/jaeson-sandbox/FairDrop/actions/runs/37666889342) passed. Both downloaded release checksums matched, and the packaged macOS app launched with bundle version 1.4.0. Publication was explicitly owner-authorized. See [the complete release evidence](evidence-release-1-4-0.md) for checksums, exact-head verification, review and limitations.
