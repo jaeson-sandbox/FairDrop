@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:08.071879-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-10T00:18:08.282067-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership"}
+{"Time":"2026-10-10T00:18:08.282134-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"=== RUN   TestCollectionCheckedSumAndCallerSliceOwnership\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:08.282223-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"    coordinator_collection_test.go:95: overflow = setup_failed: selection logical size cannot be represented safely\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:08.282338-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"--- FAIL: TestCollectionCheckedSumAndCallerSliceOwnership (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:08.28235-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Elapsed":0}
+{"Time":"2026-10-10T00:18:08.282362-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:08.282789-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.211s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:08.282804-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.211}

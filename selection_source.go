@@ -64,15 +64,23 @@ func newSelectionSource(raw transfer.SourcePort) *selectionSource {
 const selectionResolutionBound = transfer.AdapterCleanupBound
 
 func (s *selectionSource) Inspect(ctx context.Context, path string) (transfer.StagedItem, error) {
+	canonical, err := s.resolveCanonical(ctx, path)
+	if err != nil {
+		return transfer.StagedItem{}, err
+	}
+	return s.inspectResolved(ctx, canonical)
+}
+
+func (s *selectionSource) resolveCanonical(ctx context.Context, path string) (string, error) {
 	if ctx == nil {
-		return transfer.StagedItem{}, transfer.NewError(transfer.ErrSetupFailed, "selection resolution requires a context")
+		return "", transfer.NewError(transfer.ErrSetupFailed, "selection resolution requires a context")
 	}
 	if err := ctx.Err(); err != nil {
-		return transfer.StagedItem{}, selectionResolutionCancelled()
+		return "", selectionResolutionCancelled()
 	}
 	gen := s.nextGen.Add(1)
 	if !s.resolving.CompareAndSwap(0, gen) {
-		return transfer.StagedItem{}, transfer.NewError(transfer.ErrBusy, "a previous selection resolution is still outstanding")
+		return "", transfer.NewError(transfer.ErrBusy, "a previous selection resolution is still outstanding")
 	}
 	// An OS filesystem call cannot be cancelled, so this worker cannot be
 	// stopped, only abandoned -- the same shape as callBounded in
@@ -110,16 +118,48 @@ func (s *selectionSource) Inspect(ctx context.Context, path string) (transfer.St
 		// holds the flag; the bound is the only thing that will take it back
 		// if the worker never finishes. A timer outliving its caller by at
 		// most one bound is the price of that, and it holds nothing else.
-		return transfer.StagedItem{}, selectionResolutionCancelled()
+		return "", selectionResolutionCancelled()
 	case canonical := <-result:
 		stop()
-		return s.inspectResolved(ctx, canonical)
+		return s.acceptResolved(ctx, canonical)
 	case <-timedOut:
 		// The flag is already recovered, by the timer above. The worker's
 		// eventual result, if it ever arrives, lands in a buffered channel
 		// nobody reads again.
-		return transfer.StagedItem{}, selectionResolutionBoundElapsed()
+		return "", selectionResolutionBoundElapsed()
 	}
+}
+
+func (s *selectionSource) acceptResolved(ctx context.Context, canonical string) (string, error) {
+	if ctx.Err() != nil {
+		return "", selectionResolutionCancelled()
+	}
+	return canonical, nil
+}
+
+// InspectWithRetained uses the already canonical path returned by Inspect and
+// keeps the decorator's one-resolution-at-a-time admission guarantee.
+func (s *selectionSource) InspectWithRetained(ctx context.Context, path string, otherPins int) (transfer.StagedItem, error) {
+	canonical, err := s.resolveCanonical(ctx, path)
+	if err != nil {
+		return transfer.StagedItem{}, err
+	}
+	budgeted, ok := s.SourcePort.(transfer.CollectionSourcePort)
+	if !ok {
+		return transfer.StagedItem{}, transfer.NewError(transfer.ErrSetupFailed, "collection source accounting is unavailable")
+	}
+	if _, err := s.acceptResolved(ctx, canonical); err != nil {
+		return transfer.StagedItem{}, err
+	}
+	return budgeted.InspectWithRetained(ctx, canonical, otherPins)
+}
+
+func (s *selectionSource) PrepareDirectoryWithRetained(ctx context.Context, path string, otherPins int) (transfer.PreparedDirectory, error) {
+	budgeted, ok := s.SourcePort.(transfer.CollectionSourcePort)
+	if !ok {
+		return nil, transfer.NewError(transfer.ErrSetupFailed, "collection source accounting is unavailable")
+	}
+	return budgeted.PrepareDirectoryWithRetained(ctx, path, otherPins)
 }
 
 // release clears the busy flag only if it is still held by gen. See the

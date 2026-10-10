@@ -1,0 +1,238 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-remove-order-3o9bndcj/frontend
+
+ ❯ src/ui/CollectionDraftView.test.tsx (4 tests | 1 failed | 3 skipped) 87ms
+     × shows explicit one-based order for identical basenames 87ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > shows explicit one-based order for identical basenames
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Remove 1. same.txt"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Selected items":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"fd-draft-heading"[39m
+    [33mclass[39m=[32m"fd-draft fd-packet"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Selected items":
+  [36m<h1[39m
+    [33mclass[39m=[32m"fd-state-heading"[39m
+    [33mid[39m=[32m"fd-draft-heading"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33maria-live[39m=[32m"polite"[39m
+    [33mclass[39m=[32m"fd-meta"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  [36m<ol[39m
+    [33mclass[39m=[32m"fd-draft__list"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  [36m<li[39m
+    [33mclass[39m=[32m"fd-draft__row"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<li[39m
+    [33mclass[39m=[32m"fd-draft__row"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Remove same.txt":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Remove same.txt"[39m
+    [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Remove same.txt":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Remove same.txt"[39m
+    [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Add Files":
+  [36m<button[39m
+    [33mclass[39m=[32m"fd-button fd-button--secondary fd-target"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Add Folder":
+  [36m<button[39m
+    [33mclass[39m=[32m"fd-button fd-button--secondary fd-target"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Send":
+  [36m<button[39m
+    [33mclass[39m=[32m"fd-button fd-button--primary fd-target"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Cancel":
+  [36m<button[39m
+    [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"fd-region"[39m
+      [33mdata-phase-view[39m=[32m"draft"[39m
+    [36m>[39m
+      [36m<section[39m
+        [33maria-labelledby[39m=[32m"fd-draft-heading"[39m
+        [33mclass[39m=[32m"fd-draft fd-packet"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"fd-state-heading"[39m
+          [33mid[39m=[32m"fd-draft-heading"[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mSelected items[0m
+        [36m</h1>[39m
+        [36m<p[39m
+          [33maria-live[39m=[32m"polite"[39m
+          [33mclass[39m=[32m"fd-meta"[39m
+        [36m>[39m
+          [0m2 of 16 items[0m
+        [36m</p>[39m
+        [36m<ol[39m
+          [33mclass[39m=[32m"fd-draft__list"[39m
+        [36m>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m1[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0msame.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove same.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m2[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0msame.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove same.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+        [36m</ol>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"fd-draft__actions"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"fd-button fd-button--secondary fd-target"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mAdd Files[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"fd-button fd-button--secondary fd-target"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mAdd Folder[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"fd-button fd-button--primary fd-target"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mSend[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mCancel[0m
+          [36m</button>[39m
+        [36m</div>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/CollectionDraftView.test.tsx:22:23
+     20|         expect(rows[0]?.textContent).toContain('1.')
+     21|         expect(rows[1]?.textContent).toContain('2.')
+     22|         expect(screen.getByRole('button', {name: 'Remove 1. same.txt'}…
+       |                       ^
+     23|         expect(screen.getByRole('button', {name: 'Remove 2. same.txt'}…
+     24|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  00:18:17
+   Duration  618ms (transform 35ms, setup 0ms, import 81ms, tests 87ms, environment 359ms)
+

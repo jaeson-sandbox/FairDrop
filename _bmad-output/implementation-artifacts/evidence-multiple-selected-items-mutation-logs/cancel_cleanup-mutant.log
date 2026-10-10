@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:35.7813-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-10T00:18:36.039163-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionCancellationBetweenMembersClosesEarlierDescriptor"}
+{"Time":"2026-10-10T00:18:36.039286-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCancellationBetweenMembersClosesEarlierDescriptor","Output":"=== RUN   TestCollectionCancellationBetweenMembersClosesEarlierDescriptor\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:36.043793-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCancellationBetweenMembersClosesEarlierDescriptor","Output":"    collection_test.go:352: cancelled after 2 source calls and 0 descriptor closes; want 2 and 1\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:36.045516-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCancellationBetweenMembersClosesEarlierDescriptor","Output":"--- FAIL: TestCollectionCancellationBetweenMembersClosesEarlierDescriptor (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:36.045557-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionCancellationBetweenMembersClosesEarlierDescriptor","Elapsed":0.01}
+{"Time":"2026-10-10T00:18:36.045588-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:36.047501-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.266s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:36.047529-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.266}

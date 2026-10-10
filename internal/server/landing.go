@@ -35,12 +35,13 @@ button:hover{background:#7F4428}button:focus-visible{outline:2px solid #9C5636;o
 // Receiver-owned copy registry, tabulated under Receiver page copy in the
 // Quartz EXPERIENCE. The desktop TypeScript registry has no receiver reader.
 const (
-	receiverHeading         = "Ready to download"
-	receiverButton          = "Download"
-	receiverFilePrefix      = "File · "
-	receiverFolderDetail    = "Folder · Downloads as a ZIP."
-	receiverSizeUnavailable = "Size unavailable"
-	receiverTrust           = "Use only on a local network you trust. FairDrop keeps no copy; the receiving device keeps what it downloads. The first device to download gets this item."
+	receiverHeading          = "Ready to download"
+	receiverButton           = "Download"
+	receiverFilePrefix       = "File · "
+	receiverFolderDetail     = "Folder · Downloads as a ZIP."
+	receiverCollectionSuffix = " · Downloads as a ZIP."
+	receiverSizeUnavailable  = "Size unavailable"
+	receiverTrust            = "Use only on a local network you trust. FairDrop keeps no copy; the receiving device keeps what it downloads. The first device to download gets this item."
 )
 
 type landingData struct {
@@ -59,6 +60,9 @@ func (r *run) landing(writer http.ResponseWriter, request *http.Request) {
 	detail := receiverFilePrefix + formatLogicalSize(r.item.LogicalSize)
 	if r.item.Kind == transfer.ItemDirectory {
 		detail = receiverFolderDetail
+	}
+	if r.item.Kind == transfer.ItemCollection {
+		detail = formatLogicalSize(r.item.LogicalSize) + receiverCollectionSuffix
 	}
 	var body bytes.Buffer
 	if err := landingTemplate.Execute(&body, landingData{receiverHeading, r.item.Name, detail, receiverButton, receiverTrust}); err != nil {

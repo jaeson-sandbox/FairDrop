@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:24.298706-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-10T00:18:24.595285-04:00","Action":"run","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce"}
+{"Time":"2026-10-10T00:18:24.595334-04:00","Action":"output","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce","Output":"=== RUN   TestBudgetedSelectionResolvesOnceAndTraversesOnce\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:24.596212-04:00","Action":"output","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce","Output":"    selection_source_test.go:48: budgeted selection traversed plain=1 budgeted=1 times; want 0 and 1\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:24.596559-04:00","Action":"output","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce","Output":"--- FAIL: TestBudgetedSelectionResolvesOnceAndTraversesOnce (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:24.596574-04:00","Action":"fail","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce","Elapsed":0}
+{"Time":"2026-10-10T00:18:24.596597-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:24.597279-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\tfairdrop\t0.298s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:24.597294-04:00","Action":"fail","Package":"fairdrop","Elapsed":0.299}

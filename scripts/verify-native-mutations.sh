@@ -90,6 +90,9 @@ if [[ "$platform" == darwin ]]; then
   baseline TestDarwinLockPreflightRefusesFIFOAndSymlinkWithoutBlocking .
   baseline TestDarwinLockKindIsCheckedBeforeFlock .
 fi
+if [[ "$platform" == windows ]]; then
+  baseline TestWindowsSelectionOverlapUsesCaseFoldAndVolumeComponents ./internal/transfer
+fi
 
 expect_named_failure() {
   local label="$1" test_name="$2" package="$3" evidence="$4" status=0
@@ -175,9 +178,9 @@ perl -0pi -e 's/if !s\.resolving\.CompareAndSwap\(0, gen\)/if false \&\& !s.reso
 expect_named_failure 'admit multiple unresolved calls' TestSelectionResolutionHonoursAdmissionAndCancellation . 'retry admitted additional unresolved filesystem work'
 
 perl -0pi -e 's/if ctx\.Err\(\) != nil/if false \&\& ctx.Err() != nil/ or die "post-result cancellation mutation did not match\n"' selection_source.go
-expect_named_failure 'ignore cancellation at result delivery' TestSelectionResolutionCancellationImmediatelyBeforeResult . 'cancelled result reached raw Inspect or network instead of cancelled refusal'
+expect_named_failure 'ignore cancellation at result delivery' TestSelectionResolutionCancellationImmediatelyBeforeResult . 'cancelled canonical result was accepted'
 
-perl -0pi -e 's/return s\.inspectResolved\(ctx, canonical\)/return s.SourcePort.Inspect(ctx, canonical)/ or die "result wiring mutation did not match\n"' selection_source.go
+perl -0pi -e 's/return s\.acceptResolved\(ctx, canonical\)/return canonical, nil/ or die "result wiring mutation did not match\n"' selection_source.go
 expect_named_failure 'bypass result acceptance gate' TestSelectionResolutionCancellationImmediatelyBeforeResult . 'production result arm bypasses cancellation acceptance gate'
 
 perl -0pi -e 's/if depth == 0/if false \&\& depth == 0/ or die "root-escape mutation did not match\n"' selection_source.go
@@ -193,8 +196,13 @@ expect_named_failure 'replace executable vet with comment' TestVerifyWorkflowExe
 perl -0pi -e 's/maxRetainedDirectoryHandles = 64/maxRetainedDirectoryHandles = 65/ or die "depth cap mutation did not match\n"' internal/source/source.go
 expect_named_failure 'exceed retained handle cap' TestDirectoryHandleBudgetIncludesAncestorsAndPreparedPin ./internal/source 'want "path_unsupported"'
 
-perl -0pi -e 's/withSelectionRetained\(ctx, absolutePath, 1,/withSelectionRetained(ctx, absolutePath, 0,/ or die "pin reservation mutation did not match\n"' internal/source/source.go
+perl -0pi -e 's/withSelectionRetained\(ctx, absolutePath, 1\+otherPins,/withSelectionRetained(ctx, absolutePath, otherPins,/ or die "pin reservation mutation did not match\n"' internal/source/source.go
 expect_named_failure 'omit future pin reservation' TestDirectoryHandleBudgetIncludesAncestorsAndPreparedPin ./internal/source 'want "path_unsupported"'
+
+if [[ "$platform" == windows ]]; then
+  perl -0pi -e 's/if runtime\.GOOS == "windows" \{/if runtime.GOOS == "plan9" {/ or die "Windows case-fold mutation did not match\n"' internal/transfer/coordinator.go
+  expect_named_failure 'omit Windows path case folding' TestWindowsSelectionOverlapUsesCaseFoldAndVolumeComponents ./internal/transfer 'Windows alias overlap missed'
+fi
 
 perl -0pi -e 's/if retained\+len\(stack\) >= maxRetainedDirectoryHandles/if false \&\& retained+len(stack) >= maxRetainedDirectoryHandles/ or die "lexical admission mutation did not match\n"' internal/source/source.go
 expect_named_failure 'acquire beyond lexical budget' TestLexicalHandleBudgetRefusesBeforeSearchOpen ./internal/source 'lexical guard acquired a forbidden search handle'

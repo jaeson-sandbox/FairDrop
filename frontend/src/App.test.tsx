@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     retry: vi.fn(),
     sendAgain: vi.fn(),
     stageFromOutcome: vi.fn(),
+    openDraft: vi.fn(),
     // Story 9.6 review follow-up: the outcome card's own chooser action
     // routes through this controller command now, not through the Go-bound
     // choosers directly -- see useTransfer.test.tsx for the real hook's own
@@ -79,6 +80,7 @@ beforeEach(() => {
     mocks.selectDirectory.mockResolvedValue(undefined)
     mocks.copyToClipboard.mockResolvedValue(undefined)
     mocks.stageFromOutcome.mockResolvedValue(undefined)
+    mocks.openDraft.mockResolvedValue(undefined)
     mocks.retry.mockResolvedValue(undefined)
     mocks.sendAgain.mockResolvedValue(undefined)
     mocks.selectFromOutcome.mockResolvedValue(undefined)
@@ -97,6 +99,14 @@ beforeEach(() => {
         canRetry: false,
         canSendAgain: false,
         reportCopyFailure: mocks.reportCopyFailure,
+        draft: null,
+        openDraft: mocks.openDraft,
+        appendDraft: vi.fn(),
+        selectDraftFiles: vi.fn(),
+        selectDraftFolder: vi.fn(),
+        removeDraftItem: vi.fn(),
+        cancelDraft: vi.fn(),
+        sendDraft: vi.fn(),
     })
 })
 afterEach(cleanup)
@@ -130,9 +140,17 @@ describe('production transfer controller integration', () => {
         expect(mocks.rejectSelection).not.toHaveBeenCalled()
     })
 
+    it('opens a selection list for a multi-path native drop without staging', () => {
+        render(<App/>)
+        const paths = [String.raw`C:\one.txt`, String.raw`C:\two.txt`]
+        drop(paths)
+        expect(mocks.openDraft).toHaveBeenCalledWith(paths)
+        expect(mocks.stageFromOutcome).not.toHaveBeenCalled()
+        expect(mocks.rejectSelection).not.toHaveBeenCalled()
+    })
+
     it.each([
         ['zero paths', []],
-        ['multiple paths', [String.raw`C:\one.txt`, String.raw`C:\two.txt`]],
         ['undefined input', undefined],
         ['null input', null],
         ['an object', {path: String.raw`C:\one.txt`}],
@@ -146,6 +164,17 @@ describe('production transfer controller integration', () => {
 
         expect(mocks.rejectSelection).toHaveBeenCalledTimes(1)
         expect(mocks.stage).not.toHaveBeenCalled()
+        expect(mocks.stageFromOutcome).not.toHaveBeenCalled()
+    })
+
+    it('routes malformed drops on an open draft to its safe refusal path', () => {
+        mocks.useTransfer.mockReturnValue({
+            ...controllerFor({phase: 'idle', retainedOutcome: null, commandError: null}),
+            draft: {names: ['one.txt'], error: null},
+        })
+        render(<App/>)
+        dropOn(document.querySelector('[data-phase-view="draft"]'), [null])
+        expect(mocks.rejectSelection).toHaveBeenCalledTimes(1)
         expect(mocks.stageFromOutcome).not.toHaveBeenCalled()
     })
 })
@@ -235,6 +264,14 @@ const commands: ControllerCommands = {
     selectFromOutcome: mocks.selectFromOutcome,
     canRetry: false,
     canSendAgain: false,
+    draft: null,
+    openDraft: vi.fn(),
+    appendDraft: vi.fn(),
+    selectDraftFiles: vi.fn(),
+    selectDraftFolder: vi.fn(),
+    removeDraftItem: vi.fn(),
+    cancelDraft: vi.fn(),
+    sendDraft: vi.fn(),
 }
 
 function mountWith(state: TransferState) {
@@ -477,7 +514,7 @@ describe('focus-owned transitions', () => {
             {
                 phase: 'idle',
                 retainedOutcome: null,
-                commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+                commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
             },
             'command-error',
         ],
@@ -824,7 +861,7 @@ describe('reset after a terminal outcome', () => {
         mountWith({
             phase: 'idle',
             retainedOutcome: {kind: 'done', receipt: doneReceipt},
-            commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+            commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
         })
 
         const panels = [...document.querySelectorAll('.fd-outcome')]
@@ -870,7 +907,7 @@ describe('a native drop on the outcome card (Story 9.6)', () => {
         mountWith({
             phase: 'idle',
             retainedOutcome: null,
-            commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+            commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
         } as TransferState)
 
         const card = document.querySelector('.fd-outcome')

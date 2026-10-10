@@ -12,15 +12,18 @@ package stream
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"fairdrop/internal/server"
 	"fairdrop/internal/transfer"
@@ -102,6 +105,10 @@ func New(source transfer.SourcePort) *Payloads {
 // response header is written, so every failure returns a coded error and
 // retains no descriptor.
 func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (server.PreparedPayload, error) {
+	return p.prepareWithRetained(ctx, item, 0)
+}
+
+func (p *Payloads) prepareWithRetained(ctx context.Context, item transfer.StagedItem, otherPins int) (server.PreparedPayload, error) {
 	if ctx == nil {
 		return nil, transfer.NewError(
 			transfer.ErrTransferFailed,
@@ -112,6 +119,9 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 		return nil, err
 	}
 	if item.Kind != transfer.ItemFile && item.Kind != transfer.ItemDirectory {
+		if item.Kind == transfer.ItemCollection {
+			return p.prepareCollection(ctx, item)
+		}
 		return nil, transfer.NewError(
 			transfer.ErrPathUnsupported,
 			"payload preparation supports regular files and directories only",
@@ -131,7 +141,17 @@ func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (serve
 	// disappeared, changed kind, or became link-like is refused before anything
 	// is opened. Reusing the port keeps one implementation of the link,
 	// reparse, ancestor, and special-file rules.
-	fresh, err := p.source.Inspect(ctx, item.Path)
+	var fresh transfer.StagedItem
+	var err error
+	if otherPins > 0 {
+		budgeted, ok := p.source.(transfer.CollectionSourcePort)
+		if !ok {
+			return nil, transfer.NewError(transfer.ErrSetupFailed, "collection source accounting is unavailable")
+		}
+		fresh, err = budgeted.InspectWithRetained(ctx, item.Path, otherPins)
+	} else {
+		fresh, err = p.source.Inspect(ctx, item.Path)
+	}
 	if err != nil {
 		return nil, wrapUncodedSourceError(err)
 	}
@@ -238,6 +258,85 @@ func (p *Payloads) prepareArchive(ctx context.Context, item transfer.StagedItem)
 		prepared:   prepared,
 		bufferSize: p.bufferLength(),
 	}, nil
+}
+
+func (p *Payloads) prepareCollection(ctx context.Context, item transfer.StagedItem) (server.PreparedPayload, error) {
+	if p == nil || p.source == nil || item.Collection == nil || len(item.Collection.Members) < 2 || len(item.Collection.Members) > 16 {
+		return nil, transfer.NewError(transfer.ErrSetupFailed, "collection payload is invalid")
+	}
+	members := slices.Clone(item.Collection.Members)
+	dirs := 0
+	for _, member := range members {
+		if member.Kind == transfer.ItemDirectory {
+			dirs++
+		} else if member.Kind != transfer.ItemFile {
+			return nil, transfer.NewError(transfer.ErrSetupFailed, "collection member is invalid")
+		}
+	}
+	var budgeted transfer.CollectionSourcePort
+	if dirs > 0 {
+		var ok bool
+		budgeted, ok = p.source.(transfer.CollectionSourcePort)
+		if !ok {
+			return nil, transfer.NewError(transfer.ErrSetupFailed, "collection source accounting is unavailable")
+		}
+	}
+	collection := &archive{name: "FairDrop.zip", root: "FairDrop", bufferSize: p.bufferLength()}
+	cleanup := func(primary error) (server.PreparedPayload, error) {
+		if closeErr := collection.Close(); closeErr != nil {
+			return nil, transfer.WrapError(transfer.ErrTransferFailed, "collection cleanup failed", errors.Join(primary, closeErr))
+		}
+		return nil, primary
+	}
+	for index, member := range members {
+		if err := prepareContextError(ctx); err != nil {
+			return cleanup(err)
+		}
+		var prepared server.PreparedPayload
+		var err error
+		if member.Kind == transfer.ItemDirectory {
+			var pin transfer.PreparedDirectory
+			pin, err = budgeted.PrepareDirectoryWithRetained(ctx, member.Path, dirs-1)
+			if err == nil && pin == nil {
+				err = transfer.NewError(transfer.ErrSetupFailed, "prepared directory is unavailable")
+			}
+			if err == nil {
+				prepared = &archive{prepared: pin, modTime: member.ModTime, bufferSize: p.bufferLength()}
+			}
+		} else {
+			prepared, err = p.prepareWithRetained(ctx, member, dirs)
+		}
+		if err != nil {
+			return cleanup(wrapUncodedSourceError(err))
+		}
+		name := downloadName(member)
+		var bounded strings.Builder
+		count := 0
+		for _, char := range name {
+			if count >= maxDownloadNameRunes-3 || bounded.Len()+utf8.RuneLen(char) > 255-3 {
+				break
+			}
+			bounded.WriteRune(char)
+			count++
+		}
+		name = bounded.String()
+		name = strings.TrimRight(name, nameTrailingCutset)
+		if name == "" {
+			name = fallbackDownloadName
+		}
+		name = fmt.Sprintf("%02d-%s", index+1, name)
+		if !transfer.SafeArchiveSegment(name) {
+			if closeErr := prepared.Close(); closeErr != nil {
+				return cleanup(transfer.WrapError(transfer.ErrTransferFailed, "collection member cleanup failed", closeErr))
+			}
+			return cleanup(unsafeArchiveEntryName())
+		}
+		collection.members = append(collection.members, collectionMember{name: name, kind: member.Kind, modTime: member.ModTime, payload: prepared})
+	}
+	if err := prepareContextError(ctx); err != nil {
+		return cleanup(err)
+	}
+	return collection, nil
 }
 
 // pinIdentity is the regular-file claim-time re-Lstat. It carries

@@ -1,0 +1,8 @@
+{"Time":"2026-10-10T00:18:33.747629-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-10T00:18:33.952545-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor"}
+{"Time":"2026-10-10T00:18:33.95261-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor","Output":"=== RUN   TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:33.957117-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor","Output":"--- PASS: TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:33.957124-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor","Elapsed":0}
+{"Time":"2026-10-10T00:18:33.957141-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:33.957902-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"ok  \tfairdrop/internal/stream\t0.210s\n"}
+{"Time":"2026-10-10T00:18:33.957944-04:00","Action":"pass","Package":"fairdrop/internal/stream","Elapsed":0.21}

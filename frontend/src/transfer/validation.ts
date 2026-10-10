@@ -31,6 +31,15 @@ export function parseFileMetadata(value: unknown): FileMetadata | null {
         const {sessionId, name, size, isDir, url, qrBase64, warnings} = record
         if (!isSessionId(sessionId) || !isNonEmptyString(name)) return null
         if (!isNonNegativeSafeInteger(size) || typeof isDir !== 'boolean') return null
+        const hasCollection = hasOwn(record, 'isCollection')
+        const hasCount = hasOwn(record, 'itemCount')
+        if (hasCollection !== hasCount) return null
+        const isCollection = hasCollection ? record.isCollection : false
+        const itemCount = hasCount ? record.itemCount : 1
+        if (typeof isCollection !== 'boolean' || !Number.isSafeInteger(itemCount)) return null
+        if (isCollection) {
+            if (isDir || (itemCount as number) < 2 || (itemCount as number) > 16 || name !== `${itemCount} items`) return null
+        } else if (itemCount !== 1) return null
         if (!isCapabilityURL(url) || !isCompletePNGBase64(qrBase64) || !Array.isArray(warnings)) return null
 
         const parsedWarnings: Warning[] = []
@@ -45,6 +54,7 @@ export function parseFileMetadata(value: unknown): FileMetadata | null {
             name,
             size,
             isDir,
+            ...(hasCollection ? {isCollection, itemCount: itemCount as number} : {}),
             url,
             qrBase64,
             warnings: parsedWarnings,

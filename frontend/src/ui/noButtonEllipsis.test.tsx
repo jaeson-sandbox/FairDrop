@@ -139,7 +139,7 @@ describe('no button or menu item ends in an ellipsis (Epic 9, owner rule 2026-09
     it('Idle with a Stage-time command failure', () => {
         const {container} = render(
             <IdleView
-                state={idle({commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}})}
+                state={idle({commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'}})}
                 dropTargetStyle={dropTargetStyle}
                 cancelWon={false}
                 onSelectFile={() => undefined}

@@ -1,5 +1,5 @@
-import {useCallback, useEffect, useReducer, useRef} from 'react'
-import {CancelTransfer, SelectDirectory, SelectFile, StageTransfer} from '../../wailsjs/go/main/App'
+import {useCallback, useEffect, useReducer, useRef, useState} from 'react'
+import {CancelTransfer, SelectDirectory, SelectFile, SelectFiles, StageTransfer, StageTransfers} from '../../wailsjs/go/main/App'
 import {EventsOn} from '../../wailsjs/runtime/runtime'
 import {parseCommandError, publicError} from './errors'
 import {selectErrorAction} from './selectors'
@@ -81,6 +81,14 @@ export interface TransferController {
      * actually offer.
      */
     readonly canRetry: boolean
+    readonly draft: {readonly names: readonly string[]; readonly error: PublicError | null} | null
+    readonly openDraft: (paths?: readonly string[]) => Promise<void>
+    readonly appendDraft: (paths: readonly string[]) => void
+    readonly selectDraftFiles: () => Promise<void>
+    readonly selectDraftFolder: () => Promise<void>
+    readonly removeDraftItem: (index: number) => void
+    readonly cancelDraft: () => void
+    readonly sendDraft: () => Promise<void>
 }
 
 /** Owns the one local command generation and the five session event listeners. */
@@ -103,7 +111,12 @@ export function useTransfer(): TransferController {
     // only `canRetry`/`canSendAgain` booleans. See `stage()`,
     // `dispatchStageFailed`, and `dismissRetained`
     // for where it is replaced or cleared.
-    const rememberedPathRef = useRef<string | null>(null)
+    const rememberedPathsRef = useRef<readonly string[] | null>(null)
+    const draftPathsRef = useRef<readonly string[] | null>(null)
+    const draftRecoveryRef = useRef<readonly string[] | null>(null)
+    const [draft, setDraft] = useState<{readonly names: readonly string[]; readonly error: PublicError | null} | null>(null)
+    const draftChooserRef = useRef<object | null>(null)
+    const draftAdmissionRef = useRef(false)
     const selectionEpochRef = useRef(0)
     const sendAgainPendingRef = useRef(false)
     const idleWaitersRef = useRef<Set<() => void>>(new Set())
@@ -123,7 +136,10 @@ export function useTransfer(): TransferController {
             stageOperationRef.current = null
             activeCancelRef.current = null
             browseOperationRef.current = null
-            rememberedPathRef.current = null
+            rememberedPathsRef.current = null
+            draftPathsRef.current = null
+            draftRecoveryRef.current = null
+            draftChooserRef.current = null
             selectionEpochRef.current += 1
             sendAgainPendingRef.current = false
             for (const resolve of idleWaitersRef.current) resolve()
@@ -173,12 +189,18 @@ export function useTransfer(): TransferController {
         }
     }, [])
 
-    const stage = useCallback(async (
-        absolutePath: string,
+    const stagePaths = useCallback(async (
+        selectedPaths: readonly string[],
         itemKind: PendingItemKind = 'unknown',
     ): Promise<void> => {
         if (!mountedRef.current || stateRef.current.phase !== 'idle') return
         if (stageOperationRef.current !== null || browseOperationRef.current !== null) return
+        if (selectedPaths.length < 1 || selectedPaths.length > 16 ||
+            selectedPaths.some(path => typeof path !== 'string' || path.trim() === '')) {
+            dispatch({type: 'invalid-selection'})
+            return
+        }
+        const paths = [...selectedPaths]
 
         const generation = stageGenerationRef.current + 1
         stageGenerationRef.current = generation
@@ -189,8 +211,10 @@ export function useTransfer(): TransferController {
         // 9.2 AC1). Replaced by the next Stage; cleared elsewhere on Dismiss,
         // user cancellation, and a non-retryable Stage failure.
         selectionEpochRef.current += 1
-        rememberedPathRef.current = absolutePath
-        const promise = Promise.resolve().then(() => StageTransfer(absolutePath) as Promise<unknown>)
+        rememberedPathsRef.current = [...paths]
+        const promise = Promise.resolve().then(() => paths.length === 1
+            ? StageTransfer(paths[0]) as Promise<unknown>
+            : StageTransfers([...paths]) as Promise<unknown>)
         const operation: StageOperation = {generation, promise, cancelRequested: false}
         stageOperationRef.current = operation
         dispatch({type: 'stage-requested', generation, itemKind})
@@ -226,22 +250,33 @@ export function useTransfer(): TransferController {
                     // the next Stage would be refused busy for a session the
                     // user was just told did not exist. That is a different
                     // sentence, and cleanup_unconfirmed is the one that says it.
-                    dispatchStageFailed(generation, publicError(quiesced ? 'setup_failed' : 'cleanup_unconfirmed'))
+                    const error = publicError(quiesced ? 'setup_failed' : 'cleanup_unconfirmed')
+                    const recovery = draftRecoveryRef.current
+                    draftRecoveryRef.current = null
+                    if (recovery !== null) showDraft(recovery, error)
+                    dispatchStageFailed(generation, error)
                 }
                 if (stageOperationRef.current === operation) stageOperationRef.current = null
                 return
             }
 
             dispatch({type: 'stage-succeeded', generation, metadata})
+            draftRecoveryRef.current = null
         } catch (rejection) {
             if (!stageMayCommit(operation)) return
-            dispatchStageFailed(generation, parseCommandError(rejection))
+            const error = parseCommandError(rejection)
+            const recovery = draftRecoveryRef.current
+            draftRecoveryRef.current = null
+            if (recovery !== null) showDraft(recovery, error)
+            dispatchStageFailed(generation, error)
         } finally {
             if (stageOperationRef.current === operation && !operation.cancelRequested) {
                 stageOperationRef.current = null
             }
         }
     }, [])
+    const stage = useCallback((absolutePath: string, itemKind: PendingItemKind = 'unknown') =>
+        stagePaths([absolutePath], itemKind), [stagePaths])
 
     /**
      * Runs one native chooser and hands its result to the same Stage path a
@@ -300,7 +335,8 @@ export function useTransfer(): TransferController {
     const cancelImpl = useCallback(async (releaseForOutcome: boolean): Promise<boolean | void> => {
         const current = stateRef.current
         if (!releaseForOutcome) {
-            rememberedPathRef.current = null
+            rememberedPathsRef.current = null
+            draftRecoveryRef.current = null
             selectionEpochRef.current += 1
             // A live terminal Cancel can reject without a reset event. The
             // reducer then stays on Done, so refresh the derived action
@@ -391,14 +427,18 @@ export function useTransfer(): TransferController {
     }, [])
     const cancel = useCallback(async (): Promise<void> => { await cancelImpl(false) }, [cancelImpl])
 
-    const rejectSelection = useCallback(() => dispatch({type: 'invalid-selection'}), [])
+    const rejectSelection = useCallback(() => {
+        const current = draftPathsRef.current
+        if (current !== null) showDraft(current, publicError('invalid_selection'))
+        else dispatch({type: 'invalid-selection'})
+    }, [])
     const dismissRetained = useCallback(() => {
         // Story 9.2 AC1: Dismiss is one of the three explicit clearing
         // triggers. Dispatched unconditionally -- if the reducer finds
         // nothing to dismiss (already idle with no retained outcome) it
         // simply returns the same state, and clearing an already-null ref a
         // second time is a no-op.
-        rememberedPathRef.current = null
+        rememberedPathsRef.current = null
         selectionEpochRef.current += 1
         dispatch({type: 'dismiss-retained'})
     }, [])
@@ -406,9 +446,8 @@ export function useTransfer(): TransferController {
         dispatch({type: 'clipboard-failed', sessionId})
     }, [])
 
-    const stageFromOutcome = useCallback(async (
-        absolutePath: string,
-        itemKind: PendingItemKind = 'unknown',
+    const stagePathsFromOutcome = useCallback(async (
+        paths: readonly string[], itemKind: PendingItemKind = 'unknown',
     ): Promise<void> => {
         selectionEpochRef.current += 1
         if (stateRef.current.phase === 'done' || stateRef.current.phase === 'error') {
@@ -424,8 +463,10 @@ export function useTransfer(): TransferController {
             await waitForIdle()
         }
         if (!mountedRef.current) return
-        await stage(absolutePath, itemKind)
-    }, [cancelImpl, stage])
+        await stagePaths([...paths], itemKind)
+    }, [cancelImpl, stagePaths])
+    const stageFromOutcome = useCallback((absolutePath: string, itemKind: PendingItemKind = 'unknown') =>
+        stagePathsFromOutcome([absolutePath], itemKind), [stagePathsFromOutcome])
 
     const selectFromOutcome = useCallback(async (itemKind: 'file' | 'directory'): Promise<void> => {
         selectionEpochRef.current += 1
@@ -445,13 +486,13 @@ export function useTransfer(): TransferController {
         const current = stateRef.current
         const isDone = current.phase === 'done' ||
             (current.phase === 'idle' && current.retainedOutcome?.kind === 'done')
-        const path = rememberedPathRef.current
+        const paths = rememberedPathsRef.current
         const itemKind: PendingItemKind = current.phase === 'done'
-            ? (current.outcome.receipt.isDir ? 'directory' : 'file')
+            ? (current.outcome.receipt.isCollection ? 'collection' : current.outcome.receipt.isDir ? 'directory' : 'file')
             : current.phase === 'idle' && current.retainedOutcome?.kind === 'done'
-                ? (current.retainedOutcome.receipt.isDir ? 'directory' : 'file')
+                ? (current.retainedOutcome.receipt.isCollection ? 'collection' : current.retainedOutcome.receipt.isDir ? 'directory' : 'file')
                 : 'unknown'
-        if (!mountedRef.current || !isDone || path === null || sendAgainPendingRef.current) return
+        if (!mountedRef.current || !isDone || paths === null || sendAgainPendingRef.current) return
         sendAgainPendingRef.current = true
         const epoch = selectionEpochRef.current
         try {
@@ -460,27 +501,118 @@ export function useTransfer(): TransferController {
                 await waitForIdle()
             }
             if (!mountedRef.current || selectionEpochRef.current !== epoch ||
-                rememberedPathRef.current !== path || stateRef.current.phase !== 'idle') return
-            await stage(path, itemKind)
+                rememberedPathsRef.current !== paths || stateRef.current.phase !== 'idle') return
+            await stagePaths([...paths], itemKind)
         } finally {
             sendAgainPendingRef.current = false
         }
-    }, [cancelImpl, stage])
+    }, [cancelImpl, stagePaths])
 
     const retry = useCallback(async (): Promise<void> => {
-        const path = rememberedPathRef.current
-        if (path === null) return
+        const paths = rememberedPathsRef.current
+        if (paths === null) return
         const error = currentRetryableError(stateRef.current)
         if (error === null || selectErrorAction(error.code) !== 'retry') return
-        await stageFromOutcome(path)
-    }, [stageFromOutcome])
+        await stagePathsFromOutcome([...paths], paths.length > 1 ? 'collection' : 'unknown')
+    }, [stagePathsFromOutcome])
+
+    function showDraft(paths: readonly string[], error: PublicError | null = null): void {
+        draftPathsRef.current = [...paths]
+        setDraft({names: paths.map(sanitizeDraftBasename), error})
+    }
+
+    const openDraft = async (paths: readonly string[] = []): Promise<void> => {
+        const proposed = [...paths]
+        if (!mountedRef.current || draftAdmissionRef.current || stageOperationRef.current || browseOperationRef.current) return
+        if (draftPathsRef.current !== null) {
+            appendDraft(paths)
+            return
+        }
+        draftAdmissionRef.current = true
+        const epoch = ++selectionEpochRef.current
+        try {
+            const current = stateRef.current
+            if (current.phase === 'done' || current.phase === 'error') {
+                if (await cancelImpl(true) === false) return
+                await waitForIdle()
+            }
+            if (!mountedRef.current || selectionEpochRef.current !== epoch || stateRef.current.phase !== 'idle') return
+            rememberedPathsRef.current = null
+            const invalid = proposed.length > 16 ||
+                proposed.some(path => typeof path !== 'string' || path.trim() === '')
+            showDraft(invalid ? [] : proposed, invalid ? publicError('invalid_selection') : null)
+            dispatch({type: 'dismiss-retained'})
+        } finally {
+            draftAdmissionRef.current = false
+        }
+    }
+
+    const appendDraft = (incoming: readonly string[]): void => {
+        const current = draftPathsRef.current
+        if (current === null || draftAdmissionRef.current || draftChooserRef.current !== null ||
+            stageOperationRef.current !== null || stateRef.current.phase !== 'idle') return
+        const added = [...incoming]
+        if (added.length === 0) return
+        if (current.length + added.length > 16 || added.some(path => typeof path !== 'string' || path.trim() === '')) {
+            showDraft(current, publicError('invalid_selection'))
+            return
+        }
+        showDraft([...current, ...added])
+    }
+
+    const chooseDraft = async (open: () => Promise<readonly string[]>): Promise<void> => {
+        if (draftPathsRef.current === null || draftChooserRef.current !== null || draftAdmissionRef.current) return
+        const operation = {}
+        draftChooserRef.current = operation
+        try {
+            const selected = await open()
+            if (!mountedRef.current || draftChooserRef.current !== operation || draftPathsRef.current === null) return
+            draftChooserRef.current = null
+            if (Array.isArray(selected)) appendDraft([...selected])
+            else showDraft(draftPathsRef.current, publicError('chooser_failed'))
+        } catch {
+            if (mountedRef.current && draftChooserRef.current === operation && draftPathsRef.current !== null) {
+                showDraft(draftPathsRef.current, publicError('chooser_failed'))
+            }
+        } finally {
+            if (draftChooserRef.current === operation) draftChooserRef.current = null
+        }
+    }
+    const selectDraftFiles = () => chooseDraft(SelectFiles)
+    const selectDraftFolder = () => chooseDraft(async () => {
+        const path = await SelectDirectory()
+        return path ? [path] : []
+    })
+    const removeDraftItem = (index: number): void => {
+        const current = draftPathsRef.current
+        if (current === null || !Number.isInteger(index) || index < 0 || index >= current.length) return
+        showDraft(current.filter((_, position) => position !== index))
+    }
+    const cancelDraft = (): void => {
+        draftPathsRef.current = null
+        draftRecoveryRef.current = null
+        rememberedPathsRef.current = null
+        draftChooserRef.current = null
+        selectionEpochRef.current += 1
+        setDraft(null)
+        dispatch({type: 'dismiss-retained'})
+    }
+    const sendDraft = async (): Promise<void> => {
+        const current = draftPathsRef.current
+        if (current === null || current.length === 0 || draftChooserRef.current !== null || draftAdmissionRef.current) return
+        const paths = [...current]
+        cancelDraft()
+        draftRecoveryRef.current = [...paths]
+        await stagePaths(paths, paths.length > 1 ? 'collection' : 'unknown')
+    }
 
     return {
         state, stage, selectFile, selectDirectory, cancel, rejectSelection, reportCopyFailure, dismissRetained,
         stageFromOutcome, selectFromOutcome, retry, sendAgain,
-        canRetry: rememberedPathRef.current !== null,
-        canSendAgain: rememberedPathRef.current !== null &&
+        canRetry: rememberedPathsRef.current !== null,
+        canSendAgain: rememberedPathsRef.current !== null &&
             (state.phase === 'done' || (state.phase === 'idle' && state.retainedOutcome?.kind === 'done')),
+        draft, openDraft, appendDraft, selectDraftFiles, selectDraftFolder, removeDraftItem, cancelDraft, sendDraft,
     }
 
     function waitForIdle(): Promise<void> {
@@ -497,7 +629,7 @@ export function useTransfer(): TransferController {
      * in `browse()`, so the rule holds regardless of which command failed.
      */
     function dispatchStageFailed(generation: number, error: PublicError): void {
-        if (selectErrorAction(error.code) !== 'retry') rememberedPathRef.current = null
+        if (selectErrorAction(error.code) !== 'retry') rememberedPathsRef.current = null
         dispatch({type: 'stage-failed', generation, error})
     }
 
@@ -559,4 +691,12 @@ function currentRetryableError(state: TransferState): PublicError | null {
     if (state.phase !== 'idle') return null
     if (state.retainedOutcome !== null && state.retainedOutcome.kind === 'error') return state.retainedOutcome.error
     return state.commandError
+}
+
+/** Display only. Original paths remain untouched for backend admission. */
+function sanitizeDraftBasename(path: string): string {
+    const basename = path.split(/[\\/]/).filter(Boolean).pop() ?? ''
+    const cleaned = Array.from(basename.replace(/[\p{Cc}\p{Cf}"';:]/gu, ''))
+        .slice(0, 200).join('').replace(/[. \u00a0]+$/u, '')
+    return cleaned || 'download'
 }

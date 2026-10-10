@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-append-limit-2y89s4r4/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 78 skipped (79)
+   Start at  00:18:04
+   Duration  615ms (transform 113ms, setup 0ms, import 203ms, tests 10ms, environment 318ms)
+

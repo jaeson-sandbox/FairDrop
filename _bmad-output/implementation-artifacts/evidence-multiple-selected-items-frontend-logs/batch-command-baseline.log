@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-batch-command-ublcv2we/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 78 skipped (79)
+   Start at  00:18:06
+   Duration  582ms (transform 107ms, setup 0ms, import 160ms, tests 11ms, environment 326ms)
+

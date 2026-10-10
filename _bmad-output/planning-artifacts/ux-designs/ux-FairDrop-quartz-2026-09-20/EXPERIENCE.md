@@ -26,7 +26,7 @@ sources:
 
 ## Foundation
 
-V1 is a compact Wails v2 sender for Windows amd64 and macOS that serves one selected regular file or directory to one supported same-LAN browser receiver. React 19, TypeScript, and Tailwind CSS v4 implement the UI; Tailwind supplies no component behavior. Standard OS chrome is mandatory, and `DESIGN.md` owns visual identity.
+V1 is a compact Wails v2 sender for Windows amd64 and macOS that serves one selected file or folder, or a bounded collection of 2–16 roots, to one supported same-LAN browser receiver. React 19, TypeScript, and Tailwind CSS v4 implement the UI; Tailwind supplies no component behavior. Standard OS chrome is mandatory, and `DESIGN.md` owns visual identity.
 
 Windows and macOS are native senders. Windows, macOS, and iPhone are browser receivers only when their combinations pass **Compatibility and Evidence Gates**; iPhone sending is roadmap-only. Thus “Mac → Windows” and “Windows → Mac” mean a native FairDrop sender transferring to the other platform’s browser.
 
@@ -38,6 +38,7 @@ One process owns one live session and receiver. V1 has no receiver app, account,
 |---|---|---|
 | **FairDrop desktop window — Idle** | App open; accepted `transfer-reset` | Native drop target, one browse control (`copy.label.chooseFileOrFolder`) opening a menu for file or folder, firewall preflight, optional retained Done/Error, and staged troubleshooting. |
 | **Native file/directory dialogs** | Selection Controls | OS-owned selection; empty result is a quiet cancel. Dialog does not stage itself. |
+| **Multiple-selection list** | Send multiple items or native drop of 2–16 paths | Editable memory-only list with Add Files, Add Folder, Remove, Send and Cancel. Listener setup starts only on Send. |
 | **Local staging-pending presentation** | One valid drop or non-empty dialog result | Shows local preparation and **Cancel preparation** while `StageTransfer` is pending; never claims backend STAGED. |
 | **FairDrop desktop window — Staged** | Successful `FileMetadata` | Item, QR-primary handoff, readonly URL, exact trust/link guidance, warnings, troubleshooting, and Cancel. |
 | **FairDrop desktop window — Transferring** | Accepted `transfer-started` | Honest wire progress/bytes, throughput, and Cancel. |
@@ -58,7 +59,7 @@ Backend lifecycle and protocol remain unchanged.
 
 | Input | Public presentation rule |
 |---|---|
-| `StageTransfer` pending | Local Stage Pending only; internal STAGING is not public. |
+| `StageTransfer` or `StageTransfers` pending | Local Stage Pending only; internal STAGING is not public. |
 | Successful `FileMetadata` | Initialize `(sessionId, lastSeq=0)` and show Staged. |
 | `transfer-started` | Show Transferring only for matching session/increasing `seq`; internal CLAIMING is not public. |
 | `transfer-progress` | Accept matching increasing sequence only; ignore duplicates, stale sessions, and post-terminal progress. |
@@ -85,6 +86,15 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.stage.pending.file` | File Stage pending | “Preparing your file…” |
 | `copy.stage.pending.folder` | Folder Stage pending | “Preparing your folder…” |
 | `copy.stage.pending.item` | Native-drop Stage pending before kind is known | “Preparing your item…” |
+| `copy.stage.pending.collection` | Collection Stage pending | “Preparing your items…” |
+| `copy.selection.open` | Secondary Idle action | “Send multiple items” |
+| `copy.selection.heading` | Collection list heading | “Selected items” |
+| `copy.selection.add_files` | Files-only native multi-picker action | “Add Files” |
+| `copy.selection.add_folder` | Single-folder native picker action | “Add Folder” |
+| `copy.selection.send` | Stage list action | “Send” |
+| `copy.selection.cancel` | Discard list action | “Cancel” |
+| `copy.selection.remove` | Per-row action, followed by sanitized basename in accessible name | “Remove” |
+| `copy.collection.note` | Collection kind/ZIP disclosure | “Downloads as ZIP” |
 | `copy.stage.heading` | Staged heading | “Ready to send” |
 | `copy.qr.instruction` | QR instruction | “Scan the code, then tap Download on the receiving device.” |
 | `copy.qr.alt` | QR accessible-name template | “Download QR code for [item name]” |
@@ -130,6 +140,7 @@ The receiver page uses a separate Go-owned copy registry in `internal/server/lan
 | `receiver.button` | Native form submit | “Download” |
 | `receiver.filePrefix` | File detail before formatted size | “File · ” |
 | `receiver.folderDetail` | Folder detail | “Folder · Downloads as a ZIP.” |
+| `receiver.collectionDetail` | Collection detail after count/name | Formatted aggregate size followed by “ · Downloads as a ZIP.” |
 | `receiver.sizeUnavailable` | Unknown logical size | “Size unavailable” |
 | `receiver.trust` | Local-network and single-download guidance | “Use only on a local network you trust. FairDrop keeps no copy; the receiving device keeps what it downloads. The first device to download gets this item.” |
 
@@ -141,7 +152,7 @@ The codes come from the binding contract. `PublicErrorOf` and the malformed/unkn
 
 | Code | Visible heading | Exact `PublicError.message` | Sole announcement owner | Recovery |
 |---|---|---|---|---|
-| `invalid_selection` | Choose one item | “Choose exactly one file or folder.” | Focused inline Error Panel | Use the drop target or one browse action and choose one item. |
+| `invalid_selection` | Choose 1 to 16 items | “Choose 1 to 16 separate files or folders.” | Focused inline Error Panel | Remove duplicates or overlapping roots and keep the list within 16 items. |
 | `busy` | FairDrop is still busy | “FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.” | Focused current-state heading with the message as description | Wait for it to finish, or restart FairDrop. The clause “or cancel it” was removed on 2026-09-13: cancelling cannot stop an uninterruptible filesystem call, and the outstanding work is not always a transfer (D-111). |
 | `cancelled` | Transfer canceled | “Transfer canceled.” | Polite status during pending; focused Idle heading, described by the cancellation notification, when reset wins (Story 10.2) | Return to Idle; never render as Error. |
 | `path_not_found` | Item not found | “That file or folder is no longer available. Choose it again.” | Focused Error Panel | Choose the item again. |
@@ -168,11 +179,12 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 | Component | Use | Behavioral rules |
 |---|---|---|
 | **App Shell** | Every desktop state | Renders one authoritative lifecycle presentation plus an optional retained terminal outcome in Idle; subscribes once to `transfer-*`; a second launch preserves the session and retained status. **Story 9.6 amendment:** a retained outcome, or an Idle Stage-time command failure, replaces Idle's own composition (the drop zone, the browse pill, the grouped disclosures) rather than rendering alongside it -- the outcome card itself carries the inherited `--wails-drop-target: drop`, so a native drop on it stages that item through the same release-then-stage path "Send Another"/"Choose Another" use. |
-| **DropZone** | Idle | Uses `OnFileDrop(callback, true)` and inherited `--wails-drop-target: drop`; no DOM drop handler. Rejects zero/multiple paths and stages exactly one. |
+| **DropZone** | Idle and collection list | Uses `OnFileDrop(callback, true)` and inherited `--wails-drop-target: drop`; no DOM drop handler. One path stages immediately in Idle; 2–16 open the list, and drops onto an open list append. Zero or more than 16 are refused without selecting a subset. |
 | **Selection Controls** | Idle | One control labelled `copy.label.chooseFileOrFolder`, opening a `role="menu"` offering both kinds (spec-4-1) because Windows' `IFileOpenDialog` cannot; the item chosen runs the matching semantic `SelectFile()` / `SelectDirectory()`. Keyboard-operable, Escape closes the menu, and focus returns to the control on Escape or on a kind chosen; focus leaving the menu on its own (e.g. Tab) closes it without recapturing focus, since no focus trap is permitted outside an OS dialog. Non-empty result stages immediately; empty result stays quiet. Starting Stage dismisses a retained outcome. |
+| **Collection List** | Idle before Stage | `copy.selection.open` opens an editable list of up to 16 basenames. Add Files uses the files-only multi-dialog, Add Folder uses the single-folder chooser, Remove moves focus to an adjacent row or Add Files, and Cancel clears memory and returns focus to the entry action. Empty list disables Send; one remaining item uses the one-item command. Chooser dismissal changes nothing. The list is never a second session or a listener. |
 | **Stage Pending Card** | Local command pending | Identifies item kind and preparation; includes semantic `copy.cancel.preparation`. No QR/session controls or authoritative-state badge. Obsolete promises cannot commit state. |
 | **StagedView** | Staged | **Story 9.4 rebuild:** a centred heading and instruction above one card -- the QR tile is the whole point of the screen, and the URL is one activation away rather than always present. Built only from successful metadata. Exposes exact link/trust guidance, warning, and Cancel without implying receiver identity or claim; recovery help lives behind "Trouble connecting?" (a `Disclosure`, not an always-open block). |
-| **Item Summary** | Staged, Transferring | Shows a kind glyph beside the sanitized bidi-isolated full name and logical size; folders distinguish logical size from unknown ZIP wire total. **Story 9.4:** the name always wraps (`overflow-wrap: anywhere`) rather than clamping behind a persistent "Show full name" toggle, which is removed along with `copy.name.show_full`. |
+| **Item Summary** | Staged, Transferring | Shows a kind glyph beside the sanitized bidi-isolated full name and logical size; collections show “N items” and “Downloads as ZIP,” with unknown wire total just like folders. **Story 9.4:** the name always wraps (`overflow-wrap: anywhere`) rather than clamping behind a persistent "Show full name" toggle. |
 | **QR Panel** | Staged | Prepends `data:image/png;base64,` only at render. The noninteractive image uses `copy.qr.alt`; it never exposes or spells the token. |
 | **Direct URL Row** | Staged | **Story 9.4:** not rendered, focusable, or exposed to assistive technology until requested -- SPEC.md's "expose the QR code and URL" is met by the URL being one activation away, not always present. `copy.direct_link.action` (Copy Link, primary) copies without revealing it, through the same bound `CopyToClipboard` as before; `copy.direct_link.show`/`copy.direct_link.hide` (secondary, `aria-expanded`/`aria-controls`) reveals or hides the readonly selectable field with a smooth expansion, never a sender-side activation link. `copy.direct_link.helper` is retired along with the always-visible field it used to sit beside. Every Story 7.9 guarantee (readonly `textarea`, CSS-grid mirror sizing, select-on-focus, Escape blurs) applies to the revealed field unchanged. |
 | **Copy Feedback** | Staged | Label becomes `copy.copy.confirmation` with a check glyph and success tint, as a non-reflowing crossfade (Story 9.4) rather than a jump cut; one polite update, no toast, focus move, lifecycle change, or clipboard clearing. Reverts to `copy.direct_link.action` the moment focus leaves the control (D-114) -- an event the sender's own action triggers, not a timer, so the one control that reaches the capability URL still names what it does whenever the sender returns to it. This row's "no toast" still holds -- copy feedback keeps its in-button label, never a toast of its own. Story 10.2's cancellation notification is the one sanctioned transient notification in the product; it is not this row's concern, and this row is not an exception to it. |

@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:10.960722-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-10T00:18:11.18737-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWork"}
+{"Time":"2026-10-10T00:18:11.187436-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWork","Output":"=== RUN   TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWork\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:11.188739-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWork","Output":"    collection_test.go:415: caller mutation replaced admitted member \"/private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWor3263734810/001/b/report.txt\": path_not_found: selection does not exist\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:11.189356-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWork","Output":"--- FAIL: TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWork (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:11.189378-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWork","Elapsed":0}
+{"Time":"2026-10-10T00:18:11.189393-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:11.190098-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.229s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:11.190107-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.229}

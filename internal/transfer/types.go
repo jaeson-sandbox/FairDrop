@@ -21,8 +21,9 @@ type CapabilityToken string
 type ItemKind string
 
 const (
-	ItemFile      ItemKind = "file"
-	ItemDirectory ItemKind = "directory"
+	ItemFile       ItemKind = "file"
+	ItemDirectory  ItemKind = "directory"
+	ItemCollection ItemKind = "collection"
 )
 
 // StagedItem is an immutable metadata snapshot of a validated source item.
@@ -43,7 +44,14 @@ type StagedItem struct {
 	// here refuses, because a name Windows dislikes is still an ordinary name
 	// on the sender and on the phone that is this product's usual receiver.
 	UnportableNames int
+	// Members is owned by this snapshot and is populated only for a collection.
+	// No member path crosses the public metadata boundary.
+	Collection *StagedCollection
 }
+
+// StagedCollection is a private, copied set of selected roots. A pointer keeps
+// StagedItem comparable for existing single-item contracts and tests.
+type StagedCollection struct{ Members []StagedItem }
 
 // ProgressSnapshot is one wire-accurate view of a transfer in flight.
 //
@@ -128,11 +136,13 @@ type Warning struct {
 // offered -- and Warnings is always a non-nil slice so it serializes as an
 // empty JSON array rather than null.
 type FileMetadata struct {
-	SessionID SessionID `json:"sessionId"`
-	Name      string    `json:"name"`
-	Size      int64     `json:"size"`
-	IsDir     bool      `json:"isDir"`
-	URL       string    `json:"url"`
-	QR        string    `json:"qrBase64"`
-	Warnings  []Warning `json:"warnings"`
+	SessionID    SessionID `json:"sessionId"`
+	Name         string    `json:"name"`
+	Size         int64     `json:"size"`
+	IsDir        bool      `json:"isDir"`
+	IsCollection bool      `json:"isCollection"`
+	ItemCount    int       `json:"itemCount"`
+	URL          string    `json:"url"`
+	QR           string    `json:"qrBase64"`
+	Warnings     []Warning `json:"warnings"`
 }

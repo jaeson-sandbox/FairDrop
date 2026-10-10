@@ -1,0 +1,15 @@
+2026/10/07 15:32:22 fairdrop: shutdown begin
+2026/10/07 15:32:22 fairdrop: another FairDrop already holds this user's instance lock; this window starts no transfer
+--- FAIL: TestSelectionResolutionCancellationImmediatelyBeforeResult (0.00s)
+    selection_source_test.go:384: production result arm bypasses cancellation acceptance gate
+FAIL
+FAIL	fairdrop	1.333s
+ok  	fairdrop/internal/network	0.785s
+ok  	fairdrop/internal/qr	1.616s
+ok  	fairdrop/internal/server	4.753s
+ok  	fairdrop/internal/source	0.468s
+ok  	fairdrop/internal/stream	4.018s
+ok  	fairdrop/internal/transfer	1.740s
+ok  	fairdrop/scripts	1.282s
+ok  	fairdrop/scripts/mutationverdict	0.939s
+FAIL

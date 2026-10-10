@@ -119,7 +119,7 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	payload, err := r.payloads.Prepare(r.ctx, r.item)
+	payload, err := r.payloads.Prepare(r.ctx, cloneServerItem(r.item))
 	if err == nil && payload == nil {
 		// Prepare runs before writeDownloadHeaders, so nothing has been sent
 		// when this fires -- the same reasoning that moved every other

@@ -41,10 +41,17 @@ func New() *Inspector { return &Inspector{} }
 // Inspect describes the selection. A directory is traversed once to sum its
 // logical size; nothing it contains is opened for reading.
 func (i *Inspector) Inspect(ctx context.Context, absolutePath string) (transfer.StagedItem, error) {
+	return i.InspectWithRetained(ctx, absolutePath, 0)
+}
+
+func (i *Inspector) InspectWithRetained(ctx context.Context, absolutePath string, otherPins int) (transfer.StagedItem, error) {
+	if otherPins < 0 || otherPins >= maxRetainedDirectoryHandles {
+		return transfer.StagedItem{}, directoryDepthError()
+	}
 	var item transfer.StagedItem
 	// Reserve the later prepared-root pin so an unchanged accepted directory
 	// does not exceed the same cap only after response headers are sent.
-	err := i.withSelectionRetained(ctx, absolutePath, 1, func(selected selection) error {
+	err := i.withSelectionRetained(ctx, absolutePath, 1+otherPins, func(selected selection) error {
 		if selected.isFile {
 			if selected.info.Size() < 0 {
 				return sourceFault(nil, "selection logical size is invalid")

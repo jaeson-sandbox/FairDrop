@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:19.160635-04:00","Action":"start","Package":"fairdrop/internal/source"}
+{"Time":"2026-10-10T00:18:19.363969-04:00","Action":"run","Package":"fairdrop/internal/source","Test":"TestCollectionPinsShareRetainedDirectoryBudget"}
+{"Time":"2026-10-10T00:18:19.364017-04:00","Action":"output","Package":"fairdrop/internal/source","Test":"TestCollectionPinsShareRetainedDirectoryBudget","Output":"=== RUN   TestCollectionPinsShareRetainedDirectoryBudget\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:19.386013-04:00","Action":"output","Package":"fairdrop/internal/source","Test":"TestCollectionPinsShareRetainedDirectoryBudget","Output":"    collection_budget_test.go:49: single root refused before shared budget boundary: path_unsupported: selection exceeds the directory handle limit\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:19.390958-04:00","Action":"output","Package":"fairdrop/internal/source","Test":"TestCollectionPinsShareRetainedDirectoryBudget","Output":"--- FAIL: TestCollectionPinsShareRetainedDirectoryBudget (0.03s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:19.390982-04:00","Action":"fail","Package":"fairdrop/internal/source","Test":"TestCollectionPinsShareRetainedDirectoryBudget","Elapsed":0.03}
+{"Time":"2026-10-10T00:18:19.391002-04:00","Action":"output","Package":"fairdrop/internal/source","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:19.391521-04:00","Action":"output","Package":"fairdrop/internal/source","Output":"FAIL\tfairdrop/internal/source\t0.231s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:19.391529-04:00","Action":"fail","Package":"fairdrop/internal/source","Elapsed":0.231}

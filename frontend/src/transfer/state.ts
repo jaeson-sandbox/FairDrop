@@ -74,6 +74,8 @@ export interface ErrorTransferState {
          * already has `metadata` in scope.
          */
         readonly itemName?: string
+        readonly isCollection?: boolean
+        readonly itemCount?: number
     }
 }
 
@@ -264,7 +266,7 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                     return {
                         phase: 'error',
                         session,
-                        outcome: {kind: 'error', error: publicError('transfer_failed'), itemName: state.metadata.name},
+                        outcome: {kind: 'error', error: publicError('transfer_failed'), itemName: state.metadata.name, ...(state.metadata.isCollection ? {isCollection: true, itemCount: state.metadata.itemCount} : {})},
                     }
                 }
                 return {
@@ -275,6 +277,7 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                         receipt: {
                             name: state.metadata.name,
                             isDir: state.metadata.isDir,
+                            ...(state.metadata.isCollection ? {isCollection: true, itemCount: state.metadata.itemCount} : {}),
                             bytesSent: event.progress.bytesSent,
                         },
                     },
@@ -287,7 +290,7 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                 return {
                     phase: 'error',
                     session,
-                    outcome: {kind: 'error', error: fixedCopy(event.error), itemName: state.metadata.name},
+                    outcome: {kind: 'error', error: fixedCopy(event.error), itemName: state.metadata.name, ...(state.metadata.isCollection ? {isCollection: true, itemCount: state.metadata.itemCount} : {})},
                 }
             }
             if (event.kind === 'transfer-reset') return createInitialTransferState()
@@ -312,6 +315,7 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
                     kind: 'error',
                     error: fixedCopy(state.outcome.error),
                     itemName: state.outcome.itemName,
+                    ...(state.outcome.isCollection ? {isCollection: true, itemCount: state.outcome.itemCount} : {}),
                 },
                 commandError: null,
             }
@@ -330,7 +334,7 @@ function progressCanFollow(previous: ProgressSnapshot | null, next: ProgressSnap
 }
 
 function progressMatchesMetadata(metadata: FileMetadata, progress: ProgressSnapshot): boolean {
-    return metadata.isDir
+    return metadata.isDir || metadata.isCollection
         ? !progress.totalKnown
         : progress.totalKnown && progress.totalBytes === metadata.size
 }

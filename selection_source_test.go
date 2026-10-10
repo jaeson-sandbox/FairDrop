@@ -10,8 +10,44 @@ import (
 	"testing"
 	"time"
 
+	"fairdrop/internal/source"
 	"fairdrop/internal/transfer"
 )
+
+type countedCollectionSource struct {
+	transfer.SourcePort
+	plain, budgeted int
+}
+
+func (s *countedCollectionSource) Inspect(ctx context.Context, path string) (transfer.StagedItem, error) {
+	s.plain++
+	return s.SourcePort.Inspect(ctx, path)
+}
+
+func (s *countedCollectionSource) InspectWithRetained(ctx context.Context, path string, pins int) (transfer.StagedItem, error) {
+	s.budgeted++
+	return s.SourcePort.(transfer.CollectionSourcePort).InspectWithRetained(ctx, path, pins)
+}
+
+func (s *countedCollectionSource) PrepareDirectoryWithRetained(ctx context.Context, path string, pins int) (transfer.PreparedDirectory, error) {
+	return s.SourcePort.(transfer.CollectionSourcePort).PrepareDirectoryWithRetained(ctx, path, pins)
+}
+
+func TestBudgetedSelectionResolvesOnceAndTraversesOnce(t *testing.T) {
+	root := t.TempDir()
+	file := filepath.Join(root, "report.txt")
+	if err := os.WriteFile(file, []byte("one"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	raw := &countedCollectionSource{SourcePort: source.New()}
+	selection := newSelectionSource(raw)
+	if _, err := selection.InspectWithRetained(context.Background(), file, 1); err != nil {
+		t.Fatal(err)
+	}
+	if raw.plain != 0 || raw.budgeted != 1 {
+		t.Fatalf("budgeted selection traversed plain=%d budgeted=%d times; want 0 and 1", raw.plain, raw.budgeted)
+	}
+}
 
 func TestSelectionResolutionHonoursAdmissionAndCancellation(t *testing.T) {
 	for _, ending := range []string{"caller", "cancel", "shutdown"} {
@@ -340,11 +376,14 @@ func TestSelectionResolutionCancellationImmediatelyBeforeResult(t *testing.T) {
 	if transfer.ErrorCodeOf(err) != transfer.ErrCancelled || inspector.calls.Load() != 0 || inspector.networkCalls.Load() != 0 {
 		t.Fatal("cancelled result reached raw Inspect or network instead of cancelled refusal")
 	}
+	if _, err := inspector.selection.acceptResolved(ctx, "private selection"); transfer.ErrorCodeOf(err) != transfer.ErrCancelled {
+		t.Fatal("cancelled canonical result was accepted")
+	}
 	data, err := os.ReadFile("selection_source.go")
 	if err != nil {
 		t.Fatal("selection result wiring source unavailable")
 	}
-	if !strings.Contains(strings.ReplaceAll(string(data), "\r\n", "\n"), "case canonical := <-result:\n\t\tstop()\n\t\treturn s.inspectResolved(ctx, canonical)") {
+	if !strings.Contains(strings.ReplaceAll(string(data), "\r\n", "\n"), "case canonical := <-result:\n\t\tstop()\n\t\treturn s.acceptResolved(ctx, canonical)") {
 		t.Fatal("production result arm bypasses cancellation acceptance gate")
 	}
 }

@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-error-focus-m1g332v8/frontend
+
+ ❯ src/ui/CollectionDraftView.test.tsx (4 tests | 1 failed | 3 skipped) 79ms
+     × describes a newly focused draft heading with its restored refusal 78ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > describes a newly focused draft heading with its restored refusal
+AssertionError: expected null to be 'fd-draft-error' // Object.is equality
+
+- Expected:
+"fd-draft-error"
+
++ Received:
+null
+
+ ❯ src/ui/CollectionDraftView.test.tsx:33:58
+     31|         const error = screen.getByText('Choose 1 to 16 separate files …
+     32|         expect(document.activeElement).toBe(heading)
+     33|         expect(heading.getAttribute('aria-describedby')).toBe(error.id)
+       |                                                          ^
+     34|     })
+     35|     it('moves from a removed row to the adjacent remaining Remove cont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  00:18:19
+   Duration  556ms (transform 43ms, setup 0ms, import 94ms, tests 79ms, environment 292ms)
+

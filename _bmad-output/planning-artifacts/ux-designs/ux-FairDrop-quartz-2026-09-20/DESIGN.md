@@ -425,6 +425,15 @@ overlap, and no clipped actions. The single browse control stays out of the
 pair-collapse query. Containers grow under 200% text and WCAG text-spacing
 overrides; no fixed height may clip content.
 
+The bounded multiple-selection list uses the same Quartz surface, control-border,
+focus and text tokens as Idle controls. Basenames wrap and remain bidi-isolated;
+the visible order and count out of 16 remain readable at 320 CSS pixels and 200%
+text. Add Files, Add Folder, Send, Cancel and each Remove target stay at least
+44px. Programmatic focus after removal uses `:focus` appearance, with a system
+outline in forced colors, so macOS WebKit's `:focus-visible` behavior does not
+hide the focus destination. The list inherits Wails' native drop target and
+does not introduce a DOM drop handler.
+
 ### Vertical composition (Story 7.7)
 
 Width was the only axis this section constrained until Idle's content shrank

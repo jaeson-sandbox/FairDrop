@@ -12,6 +12,15 @@ one-shot transfer. After a completed transfer, **Send Again**
 revalidates the same item and offers it with a fresh link and QR code. FairDrop still sends
 one file or folder to one receiver over plain HTTP on a trusted LAN and persists nothing.
 
+## In development
+
+The next version adds **Send multiple items**. A native drop of 2–16 paths or the
+accessible selection list can combine files and folders into one handoff. The
+receiver sees the count and aggregate logical size, then downloads one streamed
+`FairDrop.zip` with numbered top-level members. One item still uses the existing
+file or folder flow. This feature is under development and is not part of the
+published v1.4.0 release described above.
+
 ## Using FairDrop
 
 1. Launch FairDrop. The first run asks for firewall access — allow it on **Private networks

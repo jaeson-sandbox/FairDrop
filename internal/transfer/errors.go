@@ -144,7 +144,7 @@ func nilInterface(value any) bool {
 }
 
 var publicMessages = map[ErrorCode]string{
-	ErrInvalidSelection:   "Choose exactly one file or folder.",
+	ErrInvalidSelection:   "Choose 1 to 16 separate files or folders.",
 	ErrBusy:               "FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.",
 	ErrCancelled:          "Transfer canceled.",
 	ErrPathNotFound:       "That file or folder is no longer available. Choose it again.",

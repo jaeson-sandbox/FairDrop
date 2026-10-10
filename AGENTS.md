@@ -5,8 +5,8 @@
 
 ## FairDrop
 
-FairDrop is an ephemeral LAN peer-to-peer file-transfer desktop app: drop one file
-or folder, let one receiver pull it over HTTP, and persist nothing. It uses Go,
+FairDrop is an ephemeral LAN peer-to-peer file-transfer desktop app: select a file,
+folder, or bounded collection, let one receiver pull it over HTTP, and persist nothing. It uses Go,
 Wails v2, React 19, TypeScript, and Tailwind v4. The canonical product contract is
 `_bmad-output/specs/spec-fairdrop/SPEC.md` with `docs/fairdrop-architecture.md` and
 `docs/fairdrop-contracts.md`; the UX `DESIGN.md` and `EXPERIENCE.md` control visual
@@ -439,3 +439,20 @@ ordered by how much they cost.
 - **When a story deletes a contract, grep the whole repo.** Documentation drift is
   invisible to an `internal/`-only check, and `docs/fairdrop-spec.md` kept publishing
   deleted interfaces twice because of it.
+
+## Collection handoff (2026-10-07)
+
+- The collection extension is `_bmad-output/specs/spec-multiple-selected-items/SPEC.md`
+  and its `selection-contract.md`. It supersedes older single-root restrictions only
+  for at most 16 selected roots; singleton file/folder transfers stay unchanged.
+- Collection source accounting covers all prepared directory pins plus active lexical
+  ancestors and traversal within the existing 64 retained + 3 transient limit. Independent
+  one-pin budgets do not prove that bound. Top-level verified file descriptors are separately
+  bounded by the selection limit. No second index of every descendant is permitted.
+- Preserve the distinction between source kinds: a prepared file streams its verified
+  descriptor after pathname replacement; a prepared directory rejects root replacement
+  when Walk compares its retained identity pin. Neither promises a content snapshot.
+- `selection_source.go` uses generation-scoped busy admission and an existing timeout
+  that releases admission even if a native resolver remains blocked. Older descriptions
+  of indefinite busy until worker return are stale; do not remove bounded recovery or
+  claim that timeout interrupted the operating-system call.

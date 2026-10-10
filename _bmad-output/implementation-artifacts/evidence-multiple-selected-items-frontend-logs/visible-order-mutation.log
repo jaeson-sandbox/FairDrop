@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-visible-order-3ijb71h6/frontend
+
+ ❯ src/ui/CollectionDraftView.test.tsx (4 tests | 1 failed | 3 skipped) 22ms
+     × shows explicit one-based order for identical basenames 21ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > shows explicit one-based order for identical basenames
+AssertionError: expected 'same.txtRemove' to contain '1.'
+
+Expected: "1."
+Received: "same.txtRemove"
+
+ ❯ src/ui/CollectionDraftView.test.tsx:20:38
+     18|         render(<Harness initial={['same.txt', 'same.txt']}/> )
+     19|         const rows = document.querySelectorAll('.fd-draft__row')
+     20|         expect(rows[0]?.textContent).toContain('1.')
+       |                                      ^
+     21|         expect(rows[1]?.textContent).toContain('2.')
+     22|         expect(screen.getByRole('button', {name: 'Remove 1. same.txt'}…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  00:18:15
+   Duration  530ms (transform 39ms, setup 0ms, import 130ms, tests 22ms, environment 293ms)
+

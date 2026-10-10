@@ -52,12 +52,13 @@ func (nativeMatrixNetwork) StopBeacon() error                                   
 
 type inspectedNativeSource struct {
 	transfer.SourcePort
-	mu           sync.Mutex
-	first        string
-	calls        atomic.Int32
-	networkCalls atomic.Int32
-	selection    *selectionSource
-	events       chan transfer.Event
+	mu                    sync.Mutex
+	first                 string
+	calls                 atomic.Int32
+	networkCalls          atomic.Int32
+	selection             *selectionSource
+	events                chan transfer.Event
+	afterPrepareDirectory func(string)
 }
 
 func (s *inspectedNativeSource) Inspect(ctx context.Context, path string) (transfer.StagedItem, error) {
@@ -68,6 +69,18 @@ func (s *inspectedNativeSource) Inspect(ctx context.Context, path string) (trans
 	}
 	s.mu.Unlock()
 	return s.SourcePort.Inspect(ctx, path)
+}
+
+func (s *inspectedNativeSource) InspectWithRetained(ctx context.Context, path string, otherPins int) (transfer.StagedItem, error) {
+	return s.SourcePort.(transfer.CollectionSourcePort).InspectWithRetained(ctx, path, otherPins)
+}
+
+func (s *inspectedNativeSource) PrepareDirectoryWithRetained(ctx context.Context, path string, otherPins int) (transfer.PreparedDirectory, error) {
+	pin, err := s.SourcePort.(transfer.CollectionSourcePort).PrepareDirectoryWithRetained(ctx, path, otherPins)
+	if err == nil && s.afterPrepareDirectory != nil {
+		s.afterPrepareDirectory(path)
+	}
+	return pin, err
 }
 
 // Drive the bound command, real coordinator, source, server and payload over

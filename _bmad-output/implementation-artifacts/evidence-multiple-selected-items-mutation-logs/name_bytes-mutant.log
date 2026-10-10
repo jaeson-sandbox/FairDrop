@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:17.856812-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-10T00:18:18.127244-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit"}
+{"Time":"2026-10-10T00:18:18.127298-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Output":"=== RUN   TestCollectionNumberedRootFitsMultibyteFilesystemLimit\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:18.128863-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Output":"    collection_test.go:480: numbered multibyte root exceeded bound: \"01-界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界\" (258 bytes)\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:18.12948-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Output":"--- FAIL: TestCollectionNumberedRootFitsMultibyteFilesystemLimit (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:18.129487-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Elapsed":0}
+{"Time":"2026-10-10T00:18:18.1295-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:18.130115-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.273s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:18.13013-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.273}

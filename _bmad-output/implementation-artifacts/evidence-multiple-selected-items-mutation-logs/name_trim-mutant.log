@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:16.570532-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-10T00:18:16.792038-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit"}
+{"Time":"2026-10-10T00:18:16.792102-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Output":"=== RUN   TestCollectionRootNameFallbackAndPostPrefixLimit\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:16.793626-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Output":"    collection_test.go:457: numbered root exceeded safe limit or ended in dot: \"02-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.\"\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:16.794267-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Output":"--- FAIL: TestCollectionRootNameFallbackAndPostPrefixLimit (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:16.794284-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Elapsed":0}
+{"Time":"2026-10-10T00:18:16.794294-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:16.794832-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.224s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:16.794839-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.224}

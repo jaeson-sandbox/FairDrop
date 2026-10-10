@@ -1,0 +1,8 @@
+{"Time":"2026-10-10T00:18:21.828846-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-10T00:18:22.132945-04:00","Action":"run","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce"}
+{"Time":"2026-10-10T00:18:22.133041-04:00","Action":"output","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce","Output":"=== RUN   TestBudgetedSelectionResolvesOnceAndTraversesOnce\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:22.134847-04:00","Action":"output","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce","Output":"--- PASS: TestBudgetedSelectionResolvesOnceAndTraversesOnce (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:22.134872-04:00","Action":"pass","Package":"fairdrop","Test":"TestBudgetedSelectionResolvesOnceAndTraversesOnce","Elapsed":0}
+{"Time":"2026-10-10T00:18:22.134899-04:00","Action":"output","Package":"fairdrop","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:22.135996-04:00","Action":"output","Package":"fairdrop","Output":"ok  \tfairdrop\t0.307s\n"}
+{"Time":"2026-10-10T00:18:22.136012-04:00","Action":"pass","Package":"fairdrop","Elapsed":0.307}

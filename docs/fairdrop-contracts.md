@@ -30,6 +30,7 @@ type ItemKind string
 const (
     ItemFile      ItemKind = "file"
     ItemDirectory ItemKind = "directory"
+    ItemCollection ItemKind = "collection"
 )
 
 type StagedItem struct {
@@ -38,7 +39,10 @@ type StagedItem struct {
     Kind        ItemKind
     LogicalSize int64
     ModTime     time.Time
+    Collection *StagedCollection // members stay sender-private; nil for one item
 }
+
+type StagedCollection struct { Members []StagedItem }
 
 type ErrorCode string
 
@@ -74,6 +78,8 @@ type FileMetadata struct {
     Name      string    `json:"name"`
     Size      int64     `json:"size"`
     IsDir     bool      `json:"isDir"`
+    IsCollection bool   `json:"isCollection"`
+    ItemCount int       `json:"itemCount"`
     URL       string    `json:"url"`
     QR        string    `json:"qrBase64"`
     Warnings  []Warning `json:"warnings"`
@@ -115,7 +121,7 @@ Stable domain error codes are:
 
 | Code | Meaning |
 | --- | --- |
-| `invalid_selection` | zero/multiple paths or empty path at an input boundary |
+| `invalid_selection` | zero or more than 16 paths, empty path, duplicate canonical path, or parent/descendant overlap |
 | `busy` | Stage requested outside IDLE, or while an uninterruptible filesystem call from a previous selection is still outstanding |
 | `cancelled` | Stage/claim/transfer lost to Cancel or Shutdown |
 | `path_not_found` | selected root or nested entry disappears during inspection or preparation |
@@ -275,11 +281,13 @@ type PayloadPort interface {
 }
 ```
 
-`Prepare` runs before response headers. For a file, it opens and stats the same descriptor, validates the staged root, and returns a known length. For a directory it returns an unknown wire length and begins streaming only from `WriteTo`. `Close` is idempotent.
+`Prepare` runs before response headers. For a file, it opens and stats the same descriptor, validates the staged root, and returns a known length. For a directory it returns an unknown wire length and begins streaming only from `WriteTo`. For a collection it prepares every member before headers, retaining verified file descriptors and directory identity pins. A failure closes every earlier acquisition. `Close` is idempotent.
 
 `Prepare` pins filesystem identity. For a file it `Lstat`s the selected root immediately before opening it and compares that against the opened descriptor with `os.SameFile`; kind, size, and modification time are forgeable together, so they are not sufficient on their own, and a mismatch is `source_changed` before headers. For a directory it obtains `SourcePort.PrepareDirectory`: one source-owned search-only root pin, with no enumeration or content read. This pins identity from Prepare, not original Stage. `PreparedDirectory.Walk` revalidates the complete path no-follow, compares the freshly validated root against the retained pin, and traverses that same validated handle. Replacement is `source_changed`; links remain `path_unsupported`, disappearance `path_not_found`. A post-header failure aborts the response rather than choosing a new HTTP status. Contents remain unsnapshotted; the ZIP root's timestamp is staged metadata, not a fresh snapshot.
 
 `PreparedDirectory.Close` owns release of the search pin even if Walk never ran. It is idempotent (only the first close reports its error), joins an active Walk under the capability's private ownership lock, and subsequent Walk fails with `transfer_failed` wrapping `fs.ErrClosed`. Every traversal handle remains walk-owned and closes before Walk returns. Production payload ownership still forbids concurrent Close/WriteTo; the capability additionally protects concurrent Close/Walk. A blocked native read is not made interruptible by this synchronization. Preparation failure returns no live capability and attempts all acquired closes. `internal/transfer` owns this consumer contract; `internal/source` implements it, and `internal/stream` owns the returned capability's Close.
+
+Collections use `CollectionSourcePort.InspectWithRetained` and `PrepareDirectoryWithRetained` to count every collection directory pin with lexical ancestors and active traversal against the same 64 retained-handle limit, plus three transient handles. File reinspection also reserves all directory pins. At most 16 top-level file descriptors are held. `FairDrop.zip` contains `FairDrop/NN-<safe-basename>` members in input order, with each folder's descendants directly below its numbered root. An unknown ZIP wire length never becomes a percentage denominator. File entries stop at their prepared descriptor length and fail if fewer bytes arrive. Failure halts ZIP central-directory output.
 
 `Size` is a bound, not a hint, whenever it is known. A directory reports `(0, false)` and writes an archive whose length is unknowable until the last entry is compressed, so no length bounds it and the server performs no delivered-length recheck; the payload alone is responsible for reporting truncation, and it does so by returning a non-nil error from `WriteTo`, which is the only signal available once headers are on the wire. For a known length `WriteTo` never writes more than the advertised length, and fails `transfer_failed` if the source delivers fewer bytes, because a short body reported as success would match no `Content-Length` already on the wire and would pass silently through any abort-on-error defense. `WriteTo` is once-only; a second call fails `transfer_failed` rather than reporting a no-op as success. A context deadline that expires is `transfer_failed`, not `cancelled` -- only a real cancellation is `cancelled`.
 
@@ -291,13 +299,15 @@ After successful `Prepare`, the server owns exactly one `Close`. It never calls 
 
 ```go
 func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
+func (a *App) StageTransfers(paths []string) (*transfer.FileMetadata, error)
 func (a *App) CancelTransfer() error
 func (a *App) SelectFile() (string, error)
+func (a *App) SelectFiles() ([]string, error)
 func (a *App) SelectDirectory() (string, error)
 func (a *App) CopyToClipboard(text string) error
 ```
 
-`SelectFile` and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. A cancelled native dialog returns an empty selection without emitting a transfer error. A dialog that fails to open (the platform chooser itself refuses) returns `chooser_failed` rather than a coded selection failure, since no item was ever chosen. The frontend validates that native drop arrays contain exactly one path before calling `StageTransfer`.
+`SelectFile`, `SelectFiles`, and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. `SelectFiles` selects files only. A cancelled native dialog returns an empty selection without emitting a transfer error. A dialog that fails to open returns `chooser_failed`. One dropped path stages immediately; two through 16 enter an editable in-memory list and stage only on Send. Zero or more than 16 never silently discard members.
 
 `CopyToClipboard` writes through the Wails Go runtime. The frontend never relies on `navigator.clipboard`, because the macOS Wails webview is not a secure context.
 
@@ -393,7 +403,7 @@ The Wails adapter emits the event-specific payload without the internal `Kind` f
 ## Source mutation and link policy
 
 - Inspect and stream with filesystem APIs, never shell commands.
-- `App.StageTransfer` delegates unchanged. After lifecycle admission a coordinator-facing SourcePort decorator resolves selection ancestors before the raw inspector. It checks cancellation before/after resolution and while waiting, permits at most one unresolved filesystem call per decorator, and refuses retries busy until that call returns. No mutex spans filesystem I/O and cancellation does not claim the OS call itself stopped. The stream adapter keeps the raw inspector and receives the canonical staged path. The final selected component is never resolved; a trailing separator or explicit final dot traversal retains its original meaning. Resolution failures and Windows device/extended namespace spellings remain with the source's existing grammar and coded refusals. The source's no-follow traversal is unchanged; it receives and preserves the boundary-resolved path.
+- `App.StageTransfer` remains the one-path command; `StageTransfers` admits one through 16 paths. After lifecycle admission a coordinator-facing SourcePort decorator resolves each selection's ancestors sequentially before raw inspection. It checks cancellation before/after resolution and while waiting, permits at most one unresolved filesystem call per decorator, and recovers after the existing bound even if a native call remains wedged. No mutex spans filesystem I/O and cancellation does not claim the OS call itself stopped. The stream adapter keeps the raw inspector and receives canonical staged paths. Selected leaves remain unresolved and retain source grammar/refusals.
 - Reject a selected symlink, Windows junction/reparse point, nested link/reparse traversal, and non-regular special file.
 - Re-`Lstat` a selected file at claim. It must retain regular-file kind, size, and modification time; otherwise fail `source_changed` before headers. A directory instead obtains the no-follow prepared capability described above.
 - Open a regular file before calculating `Content-Length`, and derive the header from that descriptor.
@@ -402,8 +412,8 @@ The Wails adapter emits the event-specific payload without the internal `Kind` f
 
 ### Directory hardening (Story 3.8, checkpoint 1)
 
-- The directory-handle budget is 64 retained handles, counting lexical ancestors, enumeration frames and the prepared root pin together, plus at most three transient handles. Refuse before acquiring another retained handle with `path_unsupported`. Inspect reserves the future prepared pin so unchanged accepted depth does not fail solely because streaming owns that pin. This bounds FairDrop's consumption, not ambient OS exhaustion.
-- Source inspection and walking, sanitized ZIP root validation, and each ZIP entry segment share `transfer.SafeArchiveSegment`. Reject empty/dot/traversal segments, separators, invalid UTF-8, control/format characters, `<>:"/\\|?*`, trailing dot/space, and case-insensitive Windows device stems (including extensions, spaces before extensions, and COM/LPT superscript digits). Nested names are rejected, never renamed. Ordinary Unicode/spaces, apostrophes and semicolons are preserved. This does not promise case/normalization collision detection or compatibility with every receiver extractor.
+- The directory-handle budget is 64 retained handles, counting lexical ancestors, enumeration frames and all collection prepared root pins together, plus at most three transient handles. Refuse before acquiring another retained handle with `path_unsupported`. Inspect reserves all future collection pins so unchanged accepted depth does not fail solely because streaming owns them. This bounds FairDrop's consumption, not ambient OS exhaustion.
+- Source inspection and walking, sanitized ZIP root validation, and each ZIP entry segment share `transfer.SafeArchiveSegment`. Reject empty/dot/traversal segments, separators, invalid UTF-8, control/format characters, and drive-qualified names. Other Windows-unportable names, including reserved punctuation/device stems and trailing dot/space, raise `name_warning` and travel unchanged. Nested names are never renamed. Ordinary Unicode/spaces, apostrophes and semicolons are preserved. This does not promise case/normalization collision detection or compatibility with every receiver extractor.
 - ZIP directories explicitly use 0755 and regular files 0644. These are portable output defaults, not source-permission preservation.
 - Borrowed Read and revocation share one mutex spanning actual native reads. Revocation joins an admitted read before the source closes the descriptor; subsequent reads return `fs.ErrClosed`. Cancellation and close-error precedence remain unchanged.
 - Checked-size and oversized-enumeration-batch faults use `setup_failed` during Inspect and `transfer_failed` during Walk. Other path/source/cancellation codes are preserved.

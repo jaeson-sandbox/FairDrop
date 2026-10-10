@@ -18,6 +18,9 @@ export interface FileMetadata {
     readonly name: string
     readonly size: number
     readonly isDir: boolean
+    /** Legacy singleton fixtures may omit both fields; parsed metadata always supplies them. */
+    readonly isCollection?: boolean
+    readonly itemCount?: number
     readonly url: string
     readonly qrBase64: string
     readonly warnings: readonly Warning[]
@@ -78,7 +81,7 @@ export type LifecycleEvent =
     | TransferErrorEvent
     | TransferResetEvent
 
-export type PendingItemKind = 'file' | 'directory' | 'unknown'
+export type PendingItemKind = 'file' | 'directory' | 'collection' | 'unknown'
 
 /**
  * What the completion receipt needs, and nothing else `FileMetadata` carries.
@@ -95,6 +98,8 @@ export type PendingItemKind = 'file' | 'directory' | 'unknown'
 export interface CompletionReceipt {
     readonly name: string
     readonly isDir: boolean
+    readonly isCollection?: boolean
+    readonly itemCount?: number
     readonly bytesSent: number
 }
 
@@ -115,6 +120,8 @@ export interface RetainedErrorOutcome {
      * never reached a session and carries none.
      */
     readonly itemName?: string
+    readonly isCollection?: boolean
+    readonly itemCount?: number
 }
 
 /** A terminal result after every session/capability field has been scrubbed. */

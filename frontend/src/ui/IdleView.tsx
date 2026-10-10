@@ -50,6 +50,7 @@ interface IdleViewProps {
     readonly cancelWon: boolean
     readonly onSelectFile: () => void
     readonly onSelectDirectory: () => void
+    readonly onOpenMultiple?: () => void
     /**
      * Story 9.6: the Stage-time command-failure card's own action wiring
      * (dropTargetStyle, onDismiss, browse/onRetry, busy) -- built by App using
@@ -102,6 +103,7 @@ export function IdleView({
     cancelWon,
     onSelectFile,
     onSelectDirectory,
+    onOpenMultiple,
     commandErrorPanelProps,
 }: IdleViewProps) {
     const commandError = selectCommandError(state)
@@ -200,6 +202,7 @@ export function IdleView({
                                 onSelectDirectory={onSelectDirectory}
                             />
                         </div>
+                        {onOpenMultiple ? <button type="button" data-draft-entry className="fd-button fd-button--secondary fd-target" onClick={onOpenMultiple}>{copy.selection.open}</button> : null}
                     </div>
                 </div>
 

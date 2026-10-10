@@ -41,6 +41,7 @@ var emittableKinds = map[transfer.EventKind]bool{
 
 // dialogFunc is the shape both native open dialogs share.
 type dialogFunc func(ctx context.Context, dialogOptions wailsruntime.OpenDialogOptions) (string, error)
+type multipleDialogFunc func(ctx context.Context, dialogOptions wailsruntime.OpenDialogOptions) ([]string, error)
 
 // emitFunc is the shape of the Wails runtime event emission.
 type emitFunc func(ctx context.Context, eventName string, optionalData ...interface{})
@@ -102,12 +103,13 @@ type App struct {
 	// EventsEmit, both dialogs, the clipboard write, and both window-restoration
 	// calls answer a context that did not come from a running window with
 	// log.Fatalf -- not panic -- which would take the test binary down with it.
-	emit          emitFunc
-	openFile      dialogFunc
-	openDirectory dialogFunc
-	setClipboard  clipboardFunc
-	unminimise    windowActionFunc
-	show          windowActionFunc
+	emit              emitFunc
+	openFile          dialogFunc
+	openDirectory     dialogFunc
+	openMultipleFiles multipleDialogFunc
+	setClipboard      clipboardFunc
+	unminimise        windowActionFunc
+	show              windowActionFunc
 
 	// logf is the diagnostic seam. A transfer otherwise leaves no record at
 	// all -- FairDrop persists nothing, by contract -- so this is the one place
@@ -160,14 +162,15 @@ func (o appObserver) Publish(event transfer.Event) {
 // NewApp creates a new App wired to the real Wails runtime.
 func NewApp() *App {
 	return &App{
-		emit:          wailsruntime.EventsEmit,
-		openFile:      wailsruntime.OpenFileDialog,
-		openDirectory: wailsruntime.OpenDirectoryDialog,
-		setClipboard:  wailsruntime.ClipboardSetText,
-		unminimise:    wailsruntime.WindowUnminimise,
-		show:          wailsruntime.WindowShow,
-		homeDir:       os.UserHomeDir,
-		logf:          log.Printf,
+		emit:              wailsruntime.EventsEmit,
+		openFile:          wailsruntime.OpenFileDialog,
+		openDirectory:     wailsruntime.OpenDirectoryDialog,
+		openMultipleFiles: wailsruntime.OpenMultipleFilesDialog,
+		setClipboard:      wailsruntime.ClipboardSetText,
+		unminimise:        wailsruntime.WindowUnminimise,
+		show:              wailsruntime.WindowShow,
+		homeDir:           os.UserHomeDir,
+		logf:              log.Printf,
 	}
 }
 
@@ -199,6 +202,25 @@ func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
 	if err != nil {
 		// No metadata on failure, and the coordinator's code is preserved for
 		// the error formatter to serialize.
+		return nil, err
+	}
+	return &metadata, nil
+}
+
+// StageTransfers stages a bounded collection as one atomic session.
+func (a *App) StageTransfers(paths []string) (*transfer.FileMetadata, error) {
+	ctx, coordinator := a.delegate()
+	if ctx == nil || coordinator == nil {
+		return nil, errNotComposed()
+	}
+	stage, ok := coordinator.(interface {
+		StageTransfers(context.Context, []string) (transfer.FileMetadata, error)
+	})
+	if !ok {
+		return nil, transfer.NewError(transfer.ErrSetupFailed, "collection staging is unavailable")
+	}
+	metadata, err := stage.StageTransfers(ctx, paths)
+	if err != nil {
 		return nil, err
 	}
 	return &metadata, nil
@@ -237,6 +259,19 @@ func (a *App) SelectFile() (string, error) {
 // Like SelectFile it stages nothing.
 func (a *App) SelectDirectory() (string, error) {
 	return a.chooseWith(a.openDirectory, "Choose a folder to send")
+}
+
+// SelectFiles opens the native files-only multi-selection dialog.
+func (a *App) SelectFiles() ([]string, error) {
+	ctx := a.runtimeContext()
+	if ctx == nil {
+		return nil, transfer.NewError(transfer.ErrNotReady, "FairDrop is not ready to open a chooser")
+	}
+	paths, err := a.openMultipleFiles(ctx, wailsruntime.OpenDialogOptions{Title: "Choose files to send", DefaultDirectory: a.startingDirectory()})
+	if err != nil {
+		return nil, transfer.WrapError(transfer.ErrChooserFailed, "the chooser could not be opened", err)
+	}
+	return append([]string{}, paths...), nil
 }
 
 // maxClipboardText bounds what the window may put on the user's clipboard.

@@ -144,7 +144,7 @@ describe('the Done card', () => {
 
 describe('the Error card', () => {
     it.each([
-        ['invalid_selection', 'Choose one item', 'Choose exactly one file or folder.'],
+        ['invalid_selection', 'Choose 1 to 16 items', 'Choose 1 to 16 separate files or folders.'],
         [
             'busy',
             'FairDrop is still busy',

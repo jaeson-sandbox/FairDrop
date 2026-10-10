@@ -18,6 +18,14 @@ export function SelectFile() {
   return window['go']['main']['App']['SelectFile']();
 }
 
+export function SelectFiles() {
+  return window['go']['main']['App']['SelectFiles']();
+}
+
 export function StageTransfer(arg1) {
   return window['go']['main']['App']['StageTransfer'](arg1);
+}
+
+export function StageTransfers(arg1) {
+  return window['go']['main']['App']['StageTransfers'](arg1);
 }

@@ -134,6 +134,59 @@ func TestFolderLandingExplainsZIPWithoutPromisingArchiveSize(t *testing.T) {
 	}
 }
 
+func TestCollectionLandingShowsCountAndLogicalSizeWithoutPaths(t *testing.T) {
+	payloads := &stubPayloads{}
+	server := newTestServer(t, payloads)
+	request := startRequest()
+	request.Item = transfer.StagedItem{
+		Kind: transfer.ItemCollection, Name: "2 items", LogicalSize: 42,
+		Collection: &transfer.StagedCollection{Members: []transfer.StagedItem{
+			{Path: "/private/first", Kind: transfer.ItemFile},
+			{Path: "/private/second", Kind: transfer.ItemFile},
+		}},
+	}
+	handle, err := server.Start(context.Background(), request, &stubAuthorizer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Item.Collection.Members[0].Path = "/mutated/after/start"
+	if got := server.active.item.Collection.Members[0].Path; got != "/private/first" {
+		t.Fatalf("caller mutated server-owned collection: %q", got)
+	}
+	t.Cleanup(func() { _ = server.Stop() })
+	response := do(t, http.MethodGet, downloadURL(handle.Port, string(testToken)))
+	body := string(readBody(t, response))
+	if response.StatusCode != http.StatusOK || !strings.Contains(body, "2 items") || !strings.Contains(body, "42 bytes") || !strings.Contains(body, "Downloads as a ZIP") || strings.Contains(body, "/private/") {
+		t.Fatalf("collection page status %d, body %q", response.StatusCode, body)
+	}
+	if payloads.calls.Load() != 0 {
+		t.Fatal("GET prepared collection payload")
+	}
+}
+
+func TestCollectionPayloadAdapterCannotMutateServerMetadata(t *testing.T) {
+	payloads := &stubPayloads{prepare: func(_ context.Context, item transfer.StagedItem) (PreparedPayload, error) {
+		item.Collection.Members[0].Path = "/mutated/by/payload"
+		return &stubPayload{name: "FairDrop.zip", known: false}, nil
+	}}
+	server := newTestServer(t, payloads)
+	request := startRequest()
+	request.Item = transfer.StagedItem{Kind: transfer.ItemCollection, Name: "2 items", Collection: &transfer.StagedCollection{Members: []transfer.StagedItem{
+		{Path: "/private/first", Kind: transfer.ItemFile}, {Path: "/private/second", Kind: transfer.ItemFile},
+	}}}
+	handle, err := server.Start(context.Background(), request, &stubAuthorizer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = server.Stop() })
+	owned := server.active
+	response := do(t, http.MethodPost, downloadURL(handle.Port, string(testToken)))
+	readBody(t, response)
+	if got := owned.item.Collection.Members[0].Path; got != "/private/first" {
+		t.Fatalf("payload adapter mutated server metadata: %q", got)
+	}
+}
+
 func TestFileLandingRendersStagedSize(t *testing.T) {
 	for _, test := range []struct {
 		name string

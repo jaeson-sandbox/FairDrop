@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,13 @@ import (
 
 	"fairdrop/internal/transfer"
 )
+
+func cloneServerItem(item transfer.StagedItem) transfer.StagedItem {
+	if item.Collection != nil {
+		item.Collection = &transfer.StagedCollection{Members: slices.Clone(item.Collection.Members)}
+	}
+	return item
+}
 
 const (
 	// listenAddress binds every interface on an OS-assigned port. The address
@@ -262,7 +270,7 @@ func (s *Server) Start(
 	if request.Token == "" {
 		return transfer.ServerHandle{}, startError("transfer server start requires a capability token", nil)
 	}
-	if request.Item.Path == "" {
+	if request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > 16) {
 		return transfer.ServerHandle{}, startError("transfer server start requires a staged item", nil)
 	}
 	if authorizer == nil {
@@ -306,7 +314,7 @@ func (s *Server) Start(
 	active := &run{
 		sessionID:    request.SessionID,
 		token:        request.Token,
-		item:         request.Item,
+		item:         cloneServerItem(request.Item),
 		payloads:     s.payloads,
 		authorizer:   authorizer,
 		now:          s.clock(),

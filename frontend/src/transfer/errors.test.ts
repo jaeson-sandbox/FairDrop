@@ -43,7 +43,7 @@ const backendCodes = [
 // the assertion site. The object-shaped cases also put the changed code in a
 // failing test's name instead of hiding it inside one loop.
 const expectedFixedCopies = [
-    {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+    {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
     {code: 'busy', message: 'FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.'},
     {code: 'cancelled', message: 'Transfer canceled.'},
     {code: 'path_not_found', message: 'That file or folder is no longer available. Choose it again.'},

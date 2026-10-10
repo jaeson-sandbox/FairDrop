@@ -6,7 +6,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"path/filepath"
+	"runtime"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -214,6 +218,21 @@ func NewCoordinator(deps Dependencies) *Coordinator {
 // cancellation unwinds in reverse acquisition order, returns to IDLE, emits no
 // lifecycle event, and reports the coded cause instead of metadata.
 func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetadata, error) {
+	return c.StageTransfers(ctx, []string{absolutePath})
+}
+
+// StageTransfers atomically admits one through sixteen selected roots. The
+// caller's slice is copied before any asynchronous or external work begins.
+func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileMetadata, error) {
+	if len(paths) == 0 || len(paths) > 16 {
+		return FileMetadata{}, NewError(ErrInvalidSelection, "choose between one and sixteen items")
+	}
+	paths = slices.Clone(paths)
+	for _, path := range paths {
+		if path == "" {
+			return FileMetadata{}, NewError(ErrInvalidSelection, "choose a file or folder")
+		}
+	}
 	if ctx == nil {
 		// Before ready(), before any resource, before anything: whatever this
 		// is, no transfer began. Found by review after the first pass fixed
@@ -282,12 +301,73 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 
 	// 1. Inspect the selection. Nothing on the network is touched until the
 	//    source has proven itself.
-	item, err := c.source.Inspect(setupCtx, absolutePath)
-	if err != nil {
-		return c.failStage(live, err)
-	}
-	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
-		return c.failStage(live, err)
+	var item StagedItem
+	if len(paths) == 1 {
+		item, err = c.source.Inspect(setupCtx, paths[0])
+		if err != nil {
+			return c.failStage(live, err)
+		}
+		if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
+			return c.failStage(live, err)
+		}
+	} else {
+		members := make([]StagedItem, 0, len(paths))
+		var total int64
+		var unportable int
+		var directories int
+		for _, path := range paths {
+			member, inspectErr := c.source.Inspect(setupCtx, path)
+			if inspectErr != nil {
+				return c.failStage(live, inspectErr)
+			}
+			if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
+				return c.failStage(live, err)
+			}
+			for _, previous := range members {
+				if selectionsOverlap(previous.Path, member.Path) {
+					return c.failStage(live, NewError(ErrInvalidSelection, "selected items overlap"))
+				}
+			}
+			if member.Kind != ItemFile && member.Kind != ItemDirectory {
+				return c.failStage(live, NewError(ErrSetupFailed, "selection kind is unsupported"))
+			}
+			if member.LogicalSize < 0 || member.LogicalSize > 9007199254740991-total {
+				return c.failStage(live, NewError(ErrPathUnsupported, "selection logical size is too large"))
+			}
+			total += member.LogicalSize
+			if member.UnportableNames > 0 {
+				unportable = 1
+			}
+			if member.Kind == ItemDirectory {
+				directories++
+			}
+			members = append(members, member)
+		}
+		// The first pass discovers the true directory count. Reinspect with
+		// every future pin reserved against the shared source handle budget.
+		if directories > 0 {
+			budgeted, ok := c.source.(CollectionSourcePort)
+			if !ok {
+				return c.failStage(live, NewError(ErrSetupFailed, "collection source accounting is unavailable"))
+			}
+			for _, member := range members {
+				reserved := directories
+				if member.Kind == ItemDirectory {
+					reserved--
+				}
+				checked, inspectErr := budgeted.InspectWithRetained(setupCtx, member.Path, reserved)
+				if inspectErr != nil {
+					return c.failStage(live, inspectErr)
+				}
+				if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
+					return c.failStage(live, err)
+				}
+				if checked.Kind != member.Kind || checked.LogicalSize != member.LogicalSize || !checked.ModTime.Equal(member.ModTime) {
+					return c.failStage(live, NewError(ErrSourceChanged, "selection changed during admission"))
+				}
+			}
+		}
+		item = StagedItem{Name: strconv.Itoa(len(members)) + " items", Kind: ItemCollection, LogicalSize: total, UnportableNames: unportable, Collection: &StagedCollection{Members: members}}
 	}
 	// JavaScript numbers can represent integers exactly only through 2^53-1.
 	// Refuse invalid metadata before any network, server, QR, or beacon resource
@@ -296,7 +376,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	if item.LogicalSize < 0 || item.LogicalSize > maxSafeInteger {
 		return c.failStage(live, NewError(ErrSetupFailed, "selection logical size cannot be represented safely"))
 	}
-	if item.Kind != ItemFile && item.Kind != ItemDirectory {
+	if item.Kind != ItemFile && item.Kind != ItemDirectory && item.Kind != ItemCollection {
 		return c.failStage(live, NewError(ErrSetupFailed, "selection kind is unsupported"))
 	}
 	live.item = item
@@ -329,7 +409,7 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	// 3. Start the server and its drainer together. A started server whose
 	//    event lane nobody reads could block its own teardown, so the reader
 	//    exists from the moment the listener does.
-	handle, err := c.server.Start(sessionCtx, ServerStartRequest{SessionID: id, Token: token, Item: item}, c)
+	handle, err := c.server.Start(sessionCtx, ServerStartRequest{SessionID: id, Token: token, Item: cloneStagedItem(item)}, c)
 	if err != nil {
 		return c.failStage(live, err)
 	}
@@ -404,13 +484,15 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	warnings := make([]Warning, len(live.warnings))
 	copy(warnings, live.warnings)
 	metadata := FileMetadata{
-		SessionID: id,
-		Name:      item.Name,
-		Size:      item.LogicalSize,
-		IsDir:     item.Kind == ItemDirectory,
-		URL:       live.url,
-		QR:        live.qrBase64,
-		Warnings:  warnings,
+		SessionID:    id,
+		Name:         item.Name,
+		Size:         item.LogicalSize,
+		IsDir:        item.Kind == ItemDirectory,
+		IsCollection: item.Kind == ItemCollection,
+		ItemCount:    len(paths),
+		URL:          live.url,
+		QR:           live.qrBase64,
+		Warnings:     warnings,
 	}
 	// The lease is handed back inside the same critical section that commits
 	// STAGED, so a claim that observes STAGED can never find this Stage still
@@ -419,6 +501,31 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	c.mu.Unlock()
 
 	return metadata, nil
+}
+
+func cloneStagedItem(item StagedItem) StagedItem {
+	if item.Collection != nil {
+		item.Collection = &StagedCollection{Members: slices.Clone(item.Collection.Members)}
+	}
+	return item
+}
+
+func selectionsOverlap(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		a, b = strings.ToLower(a), strings.ToLower(b)
+	}
+	if a == b {
+		return true
+	}
+	separator := string(filepath.Separator)
+	ancestor := func(parent, child string) bool {
+		if !strings.HasSuffix(parent, separator) {
+			parent += separator
+		}
+		return strings.HasPrefix(child, parent)
+	}
+	return ancestor(a, b) || ancestor(b, a)
 }
 
 // AuthorizeClaim is the synchronous handshake between a reserved HTTP claim

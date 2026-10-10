@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-display-name-97rabzih/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (79 tests | 1 failed | 78 skipped) 14ms
+     × sanitizes draft display names but sends the untouched original paths 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > sanitizes draft display names but sends the untouched original paths
+AssertionError: expected [ …(2) ] to deeply equal [ 'report.txt', 'photos' ]
+
+- Expected
++ Received
+
+  [
+-   "report.txt",
+-   "photos",
++   "/private/‮report.txt",
++   "/private/⁦photos⁩",
+  ]
+
+ ❯ src/transfer/useTransfer.test.tsx:204:50
+    202|         const hook = renderHook(() => useTransfer())
+    203|         await act(async () => { await hook.result.current.openDraft([f…
+    204|         expect(hook.result.current.draft?.names).toEqual(['report.txt'…
+       |                                                  ^
+    205|         await act(async () => { await hook.result.current.sendDraft() …
+    206|         expect(mocks.stageTransfers).toHaveBeenCalledWith([first, seco…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 78 skipped (79)
+   Start at  00:18:12
+   Duration  558ms (transform 110ms, setup 0ms, import 162ms, tests 14ms, environment 293ms)
+

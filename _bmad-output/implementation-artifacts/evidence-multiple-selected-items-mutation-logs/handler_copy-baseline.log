@@ -1,0 +1,8 @@
+{"Time":"2026-10-10T00:18:11.789101-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-10T00:18:12.058236-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata"}
+{"Time":"2026-10-10T00:18:12.058295-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Output":"=== RUN   TestCollectionPayloadAdapterCannotMutateServerMetadata\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:12.059788-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Output":"--- PASS: TestCollectionPayloadAdapterCannotMutateServerMetadata (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:12.059799-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Elapsed":0}
+{"Time":"2026-10-10T00:18:12.059808-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:12.060446-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.271s\n"}
+{"Time":"2026-10-10T00:18:12.060461-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.271}

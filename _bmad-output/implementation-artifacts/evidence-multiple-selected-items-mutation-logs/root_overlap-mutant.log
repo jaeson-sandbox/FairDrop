@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:06.803359-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-10T00:18:07.085151-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries"}
+{"Time":"2026-10-10T00:18:07.085222-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"=== RUN   TestSelectionOverlapRespectsRootAndComponentBoundaries\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:07.085278-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"    coordinator_collection_test.go:48: filesystem root did not contain child\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:07.085317-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"--- FAIL: TestSelectionOverlapRespectsRootAndComponentBoundaries (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:07.085329-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Elapsed":0}
+{"Time":"2026-10-10T00:18:07.085338-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:07.0858-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.282s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:07.085814-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.282}

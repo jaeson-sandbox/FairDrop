@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:34.454422-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-10T00:18:34.692302-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor"}
+{"Time":"2026-10-10T00:18:34.692378-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor","Output":"=== RUN   TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:34.693764-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor","Output":"    collection_test.go:328: earlier descriptor close count = 0, want 1\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:34.694483-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor","Output":"--- FAIL: TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:34.694488-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor","Elapsed":0}
+{"Time":"2026-10-10T00:18:34.69451-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:34.69499-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.240s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:34.694998-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.241}
