@@ -76,6 +76,14 @@ const commands: ControllerCommands = {
     selectFromOutcome: mocks.noop,
     canRetry: false,
     canSendAgain: false,
+    draft: null,
+    openDraft: mocks.noop,
+    appendDraft: mocks.noop,
+    selectDraftFiles: mocks.noop,
+    selectDraftFolder: mocks.noop,
+    removeDraftItem: mocks.noop,
+    cancelDraft: mocks.noop,
+    sendDraft: mocks.noop,
 }
 
 function mountWith(state: TransferState) {

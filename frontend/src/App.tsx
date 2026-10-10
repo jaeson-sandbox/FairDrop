@@ -14,6 +14,7 @@ import {OutcomePanel, type OutcomeBrowseAction, type OutcomeCardProps} from './u
 import {StagePendingCard} from './ui/StagePendingCard'
 import {StagedView} from './ui/StagedView'
 import {TransferringView} from './ui/TransferringView'
+import {CollectionDraftView} from './ui/CollectionDraftView'
 
 // Wails gates native file drops on a CSS custom property rather than a class.
 // The property inherits, so every descendant of the zone is a valid drop point.
@@ -119,6 +120,15 @@ function App() {
         await runOutcomeAction(() => transfer.stageFromOutcome(path, 'unknown'))
     }
 
+    async function openMultiple(paths: readonly string[] = []): Promise<void> {
+        await runOutcomeAction(() => transfer.openDraft(paths))
+    }
+
+    function cancelMultiple(): void {
+        transfer.cancelDraft()
+        queueMicrotask(() => rootRef.current?.querySelector<HTMLElement>('[data-draft-entry]')?.focus())
+    }
+
     function outcomeBrowseAction(label: string): OutcomeBrowseAction {
         return {
             label,
@@ -158,15 +168,23 @@ function App() {
     useEffect(() => {
         // useDropTarget=true: only fire when the drop lands inside the zone.
         OnFileDrop((_x, _y, dropped) => {
-            if (!Array.isArray(dropped) || dropped.length !== 1 ||
-                typeof dropped[0] !== 'string' || dropped[0].trim() === '') {
+            if (!Array.isArray(dropped) || dropped.length === 0 ||
+                dropped.some(path => typeof path !== 'string' || path.trim() === '')) {
                 transfer.rejectSelection()
+                return
+            }
+            if (transfer.draft !== null) {
+                transfer.appendDraft([...dropped])
+                return
+            }
+            if (dropped.length > 1) {
+                void openMultiple([...dropped])
                 return
             }
             void stageDroppedPath(dropped[0])
         }, true)
         return () => OnFileDropOff()
-    }, [transfer.rejectSelection, transfer.stageFromOutcome])
+    }, [transfer.rejectSelection, transfer.stageFromOutcome, transfer.draft, transfer.appendDraft, transfer.openDraft])
 
     /*
       One transition in, one owner out.
@@ -329,7 +347,18 @@ function App() {
                     onDismiss={() => setCancelNotification(null)}
                 />
             )}
-            {outcome === null ? null : (
+            {transfer.draft !== null ? (
+                <CollectionDraftView
+                    names={transfer.draft.names}
+                    error={transfer.draft.error}
+                    dropTargetStyle={dropTargetStyle}
+                    onAddFiles={() => void transfer.selectDraftFiles()}
+                    onAddFolder={() => void transfer.selectDraftFolder()}
+                    onRemove={transfer.removeDraftItem}
+                    onSend={() => void transfer.sendDraft()}
+                    onCancel={cancelMultiple}
+                />
+            ) : outcome === null ? null : (
                 <OutcomePanel
                     outcome={outcome}
                     level={1}
@@ -343,7 +372,12 @@ function App() {
                         ))}
                 />
             )}
-            {phaseBody(transfer, cancelWon, announceFromStaged, errorCardProps)}
+            {transfer.draft === null ? phaseBody(transfer, cancelWon, announceFromStaged, errorCardProps,
+                () => void openMultiple()) : null}
+            {transfer.draft === null && outcome !== null && (transfer.state.phase === 'idle' || terminal) ? (
+                <button type="button" data-draft-entry className="fd-button fd-button--secondary fd-target fd-multiple-outcome"
+                    onClick={() => void openMultiple()}>{copy.selection.open}</button>
+            ) : null}
             <div className="fd-status-announcer" role="status" aria-live="polite" aria-atomic="true">
                 <span key={announcement.nonce}>{announcement.text}</span>
             </div>
@@ -366,6 +400,7 @@ function phaseBody(
     cancelWon: boolean,
     announce: (sessionId: string, text: string) => void,
     errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps,
+    onOpenMultiple: () => void,
 ): ReactElement | null {
     const {state} = transfer
 
@@ -375,7 +410,7 @@ function phaseBody(
             // rather than stacking above it -- App's top-level OutcomePanel
             // slot already renders it; IdleView (the drop zone, the pill, the
             // grouped disclosures) is not rendered at all while it shows.
-            return state.retainedOutcome === null ? idleView(transfer, state, cancelWon, errorCardProps) : null
+            return state.retainedOutcome === null ? idleView(transfer, state, cancelWon, errorCardProps, onOpenMultiple) : null
 
         case 'pending':
             return <StagePendingCard state={state} onCancel={() => void transfer.cancel()}/>
@@ -403,7 +438,7 @@ function phaseBody(
             // sends that transition to the Idle cancellation summary, so Idle is
             // rendered here with the summary showing.
             return selectOutcome(state) === null
-                ? idleView(transfer, createInitialTransferState(), cancelWon, errorCardProps)
+                ? idleView(transfer, createInitialTransferState(), cancelWon, errorCardProps, onOpenMultiple)
                 : null
     }
 }
@@ -413,6 +448,7 @@ function idleView(
     state: IdleTransferState,
     cancelWon: boolean,
     errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps,
+    onOpenMultiple: () => void,
 ): ReactElement {
     const commandError = selectCommandError(state)
     return (
@@ -422,6 +458,7 @@ function idleView(
             cancelWon={cancelWon}
             onSelectFile={() => void transfer.selectFile()}
             onSelectDirectory={() => void transfer.selectDirectory()}
+            onOpenMultiple={onOpenMultiple}
             commandErrorPanelProps={
                 commandError === null
                     ? EMPTY_OUTCOME_CARD_PROPS

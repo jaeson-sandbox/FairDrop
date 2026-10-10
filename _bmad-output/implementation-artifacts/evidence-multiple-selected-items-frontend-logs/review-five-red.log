@@ -1,0 +1,119 @@
+
+> fairdrop-frontend@1.4.0 test
+> vitest run --run src/transfer/useTransfer.test.tsx src/ui/CollectionDraftView.test.tsx
+
+
+ RUN  v4.1.11 /Users/jaesonmartin/Projects/FairDrop/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (79 tests | 3 failed) 140ms
+     × forgets retryable remembered paths when a restored draft is cancelled 4ms
+     × sanitizes draft display names but sends the untouched original paths 1ms
+     × keeps draft rows and shows a safe error after malformed native selection 1ms
+ ❯ src/ui/CollectionDraftView.test.tsx (4 tests | 2 failed) 199ms
+     × shows explicit one-based order for identical basenames 20ms
+     × describes a newly focused draft heading with its restored refusal 48ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > forgets retryable remembered paths when a restored draft is cancelled
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/transfer/useTransfer.test.tsx:194:46
+    192|         act(() => hook.result.current.cancelDraft())
+    193|         expect(hook.result.current.draft).toBeNull()
+    194|         expect(hook.result.current.canRetry).toBe(false)
+       |                                              ^
+    195|         expect(hook.result.current.canSendAgain).toBe(false)
+    196|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > sanitizes draft display names but sends the untouched original paths
+AssertionError: expected [ '\u202ereport.txt\u0007', …(1) ] to deeply equal [ 'report.txt', 'photos' ]
+
+- Expected
++ Received
+
+  [
+-   "report.txt",
+-   "photos",
++   "‮report.txt",
++   "⁦photos⁩",
+  ]
+
+ ❯ src/transfer/useTransfer.test.tsx:204:50
+    202|         const hook = renderHook(() => useTransfer())
+    203|         await act(async () => { await hook.result.current.openDraft([f…
+    204|         expect(hook.result.current.draft?.names).toEqual(['report.txt'…
+       |                                                  ^
+    205|         await act(async () => { await hook.result.current.sendDraft() …
+    206|         expect(mocks.stageTransfers).toHaveBeenCalledWith([first, seco…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > keeps draft rows and shows a safe error after malformed native selection
+AssertionError: expected undefined to be 'invalid_selection' // Object.is equality
+
+- Expected:
+"invalid_selection"
+
++ Received:
+undefined
+
+ ❯ src/transfer/useTransfer.test.tsx:214:56
+    212|         act(() => hook.result.current.rejectSelection())
+    213|         expect(hook.result.current.draft?.names).toEqual(['one'])
+    214|         expect(hook.result.current.draft?.error?.code).toBe('invalid_s…
+       |                                                        ^
+    215|     })
+    216|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > shows explicit one-based order for identical basenames
+AssertionError: expected 'same.txtRemove' to contain '1.'
+
+Expected: "1."
+Received: "same.txtRemove"
+
+ ❯ src/ui/CollectionDraftView.test.tsx:20:38
+     18|         render(<Harness initial={['same.txt', 'same.txt']}/> )
+     19|         const rows = document.querySelectorAll('.fd-draft__row')
+     20|         expect(rows[0]?.textContent).toContain('1.')
+       |                                      ^
+     21|         expect(rows[1]?.textContent).toContain('2.')
+     22|         expect(screen.getByRole('button', {name: 'Remove 1. same.txt'}…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > describes a newly focused draft heading with its restored refusal
+AssertionError: expected null to be '' // Object.is equality
+
+- Expected:
+""
+
++ Received:
+null
+
+ ❯ src/ui/CollectionDraftView.test.tsx:33:58
+     31|         const error = screen.getByText('Choose 1 to 16 separate files …
+     32|         expect(document.activeElement).toBe(heading)
+     33|         expect(heading.getAttribute('aria-describedby')).toBe(error.id)
+       |                                                          ^
+     34|     })
+     35|     it('moves from a removed row to the adjacent remaining Remove cont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 78 passed (83)
+   Start at  15:27:14
+   Duration  952ms (transform 214ms, setup 0ms, import 375ms, tests 339ms, environment 960ms)
+

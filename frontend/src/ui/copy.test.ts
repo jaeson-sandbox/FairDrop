@@ -164,6 +164,7 @@ describe('approved product copy', () => {
             'cancel.preparationPending',
             'cancel.wonBody',
             'cancel.wonTitle',
+            'collection.note',
             'copy.confirmation',
             'directLink.action',
             'directLink.hide',
@@ -192,6 +193,7 @@ describe('approved product copy', () => {
             'label.file',
             'label.firewallHeading',
             'label.folder',
+            'label.items',
             'label.logicalSize',
             'label.macos',
             'label.macosRecovery',
@@ -215,7 +217,15 @@ describe('approved product copy', () => {
             'progress.unknown',
             'qr.alt',
             'qr.instruction',
+            'selection.addFiles',
+            'selection.addFolder',
+            'selection.cancel',
+            'selection.heading',
+            'selection.open',
+            'selection.remove',
+            'selection.send',
             'stage.heading',
+            'stage.pending.collection',
             'stage.pending.file',
             'stage.pending.folder',
             'stage.pending.item',
@@ -265,7 +275,7 @@ describe('functional labels the spine names in prose', () => {
 describe('fixed error surface', () => {
     it('pairs every stable code with its exact visible heading', () => {
         expect(errorHeadings).toEqual({
-            invalid_selection: 'Choose one item',
+            invalid_selection: 'Choose 1 to 16 items',
             busy: 'FairDrop is still busy',
             cancelled: 'Transfer canceled',
             path_not_found: 'Item not found',
@@ -289,7 +299,7 @@ describe('fixed error surface', () => {
 
     it('re-exports the validated message table rather than restating it', () => {
         expect(errorMessages).toBe(fixedErrorMessages)
-        expect(errorMessages.invalid_selection).toBe('Choose exactly one file or folder.')
+        expect(errorMessages.invalid_selection).toBe('Choose 1 to 16 separate files or folders.')
         expect(errorMessages.transfer_failed).toBe(
             'The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.',
         )

@@ -39,7 +39,7 @@ export type {PublicError}
 
 /** The only public copy allowed to enter frontend state for each stable code. */
 export const fixedErrorMessages: Readonly<Record<TransferErrorCode, string>> = {
-    invalid_selection: 'Choose exactly one file or folder.',
+    invalid_selection: 'Choose 1 to 16 separate files or folders.',
     busy: 'FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.',
     cancelled: 'Transfer canceled.',
     path_not_found: 'That file or folder is no longer available. Choose it again.',

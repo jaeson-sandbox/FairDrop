@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-refusal-f2kdns07/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 78 skipped (79)
+   Start at  00:18:13
+   Duration  615ms (transform 153ms, setup 0ms, import 218ms, tests 10ms, environment 307ms)
+

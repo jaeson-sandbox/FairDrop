@@ -4,6 +4,7 @@ import type {TransferringTransferState} from '../transfer/state'
 import {OutcomePanel} from './OutcomePanel'
 import {copy} from './copy'
 import {formatBytes, formatRate} from './format'
+import {CollectionKindGlyph} from './CollectionKindGlyph'
 
 interface TransferringViewProps {
     readonly state: TransferringTransferState
@@ -56,7 +57,7 @@ export function TransferringView({state, onCancel}: TransferringViewProps) {
     const progress = selectProgress(state)
     const commandError = selectCommandError(state)
 
-    const size = metadata.isDir
+    const size = metadata.isDir || metadata.isCollection
         ? `${formatBytes(metadata.size)} ${copy.label.logicalSize}`
         : formatBytes(metadata.size)
 
@@ -90,17 +91,17 @@ export function TransferringView({state, onCancel}: TransferringViewProps) {
                         */}
                         <div className="fd-item">
                             <span className="fd-item__icon" aria-hidden="true">
-                                {metadata.isDir ? <FolderKindGlyph/> : <FileKindGlyph/>}
+                                {metadata.isCollection ? <CollectionKindGlyph/> : metadata.isDir ? <FolderKindGlyph/> : <FileKindGlyph/>}
                             </span>
                             <div className="fd-item__text">
                                 <h2 className="fd-headline" id="fd-item-name">
                                     <bdi dir="auto">{metadata.name}</bdi>
                                 </h2>
                                 <p className="fd-meta">
-                                    {(metadata.isDir ? copy.label.folder : copy.label.file) +
+                                    {(metadata.isCollection ? copy.label.items : metadata.isDir ? copy.label.folder : copy.label.file) +
                                         copy.label.metaSeparator + size}
                                 </p>
-                                {metadata.isDir ? <p className="fd-subheading">{copy.folder.note}</p> : null}
+                                {metadata.isDir || metadata.isCollection ? <p className="fd-subheading">{metadata.isCollection ? copy.collection.note : copy.folder.note}</p> : null}
                             </div>
                         </div>
 

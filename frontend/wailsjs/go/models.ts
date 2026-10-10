@@ -19,6 +19,8 @@ export namespace transfer {
 	    name: string;
 	    size: number;
 	    isDir: boolean;
+	    isCollection: boolean;
+	    itemCount: number;
 	    url: string;
 	    qrBase64: string;
 	    warnings: Warning[];
@@ -33,6 +35,8 @@ export namespace transfer {
 	        this.name = source["name"];
 	        this.size = source["size"];
 	        this.isDir = source["isDir"];
+	        this.isCollection = source["isCollection"];
+	        this.itemCount = source["itemCount"];
 	        this.url = source["url"];
 	        this.qrBase64 = source["qrBase64"];
 	        this.warnings = this.convertValues(source["warnings"], Warning);

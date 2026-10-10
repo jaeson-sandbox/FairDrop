@@ -70,6 +70,13 @@ type SourcePort interface {
 	Walk(ctx context.Context, absolutePath string, visit SourceVisitor) error
 }
 
+// CollectionSourcePort makes other prepared directory pins explicit in the
+// source's 64-handle admission and traversal accounting.
+type CollectionSourcePort interface {
+	InspectWithRetained(ctx context.Context, absolutePath string, otherPins int) (StagedItem, error)
+	PrepareDirectoryWithRetained(ctx context.Context, absolutePath string, otherPins int) (PreparedDirectory, error)
+}
+
 // BeaconRequest contains the non-sensitive values needed to publish a staged
 // transfer. SessionID is correlation-only and is never advertised.
 type BeaconRequest struct {

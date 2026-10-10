@@ -1,0 +1,29 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-batch-command-ublcv2we/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (79 tests | 1 failed | 78 skipped) 17ms
+     × restores the editable batch after backend duplicate refusal 16ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > restores the editable batch after backend duplicate refusal
+AssertionError: expected "vi.fn()" to be called with arguments: [ '/p/a' ]
+
+Number of calls: 0
+
+ ❯ src/transfer/useTransfer.test.tsx:182:37
+    180|         mocks.stageTransfer.mockResolvedValue(metadata({name: 'a'}))
+    181|         await act(async () => { await hook.result.current.sendDraft() …
+    182|         expect(mocks.stageTransfer).toHaveBeenCalledWith('/p/a')
+       |                                     ^
+    183|     })
+    184|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 78 skipped (79)
+   Start at  00:18:07
+   Duration  577ms (transform 122ms, setup 0ms, import 180ms, tests 17ms, environment 282ms)
+

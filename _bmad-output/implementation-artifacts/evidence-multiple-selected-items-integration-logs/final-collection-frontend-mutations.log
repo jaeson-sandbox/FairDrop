@@ -1,0 +1,12 @@
+KILLED metadata-count: accepts a coherent collection
+KILLED append-limit: rejects a seventeenth append
+KILLED batch-command: restores the editable batch
+KILLED draft-recovery: restores the editable batch
+KILLED cancel-forgets: forgets retryable remembered paths
+KILLED display-name: sanitizes draft display names
+KILLED draft-refusal: keeps draft rows and shows a safe error
+KILLED visible-order: shows explicit one-based order
+KILLED remove-order: shows explicit one-based order
+KILLED error-focus: describes a newly focused draft heading
+10/10 collection frontend mutations killed
+fe-mut exit 0

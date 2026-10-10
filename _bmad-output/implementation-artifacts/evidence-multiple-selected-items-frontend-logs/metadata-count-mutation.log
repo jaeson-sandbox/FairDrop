@@ -1,0 +1,43 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-metadata-count-twjupprp/frontend
+
+ ❯ src/transfer/validation.test.ts (68 tests | 1 failed | 67 skipped) 6ms
+     × accepts a coherent collection and refuses partial or inconsistent metadata 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/validation.test.ts > Stage metadata validation > accepts a coherent collection and refuses partial or inconsistent metadata
+AssertionError: expected { …(9) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "isCollection": true,
+  "isDir": false,
+  "itemCount": 17,
+  "name": "17 items",
+  "qrBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "sessionId": "0123456789abcdef0123456789abcdef",
+  "size": 4,
+  "url": "http://192.0.2.1:34123/download/fedcba9876543210fedcba9876543210",
+  "warnings": [],
+}
+
+ ❯ src/transfer/validation.test.ts:55:56
+     53|             {isCollection: true, itemCount: 2, name: 'report.pdf'},
+     54|             {isCollection: false, itemCount: 2},
+     55|         ]) expect(parseFileMetadata(metadata(fields))).toBeNull()
+       |                                                        ^
+     56|     })
+     57|     it('copies only allow-listed fields into fresh metadata and warnin…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 skipped (68)
+   Start at  00:18:03
+   Duration  494ms (transform 40ms, setup 0ms, import 50ms, tests 6ms, environment 354ms)
+

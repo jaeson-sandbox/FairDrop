@@ -65,7 +65,7 @@ flowchart LR
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> STAGING: Stage(exactly one path)
+    IDLE --> STAGING: Stage(one path or 2–16 roots)
     STAGING --> STAGED: resources ready
     STAGING --> IDLE: setup fails, Cancel, or Shutdown
     STAGED --> STAGED: valid GET inspects metadata
@@ -80,11 +80,11 @@ stateDiagram-v2
     ERROR --> IDLE: 3 seconds
 ```
 
-### AD-3 — One process, one session, one selected root
+### AD-3 — One process, one session, bounded selected roots
 
 - **Binds:** FR1, FR12, FR18, application startup
 - **Prevents:** silent path truncation, ambiguous multi-root archives, and parallel processes bypassing the lifecycle
-- **Rule:** v1 stages exactly one regular file or one directory. The Wails drop adapter receives `[]string`, rejects zero or multiple paths with a typed safe error, and forwards one string; it never silently selects the first. Only `IDLE` accepts Stage. Setup failure or Cancel/Shutdown during `STAGING` unwinds to IDLE, returns a command error, and emits no lifecycle event. Wails single-instance locking must be added and pinned in `main_test.go`; `OnSecondInstanceLaunch` uses `WindowUnminimise`/`WindowShow` to restore the existing window.
+- **Rule:** one file or folder stages through the original command. Two through 16 selected files/folders enter a memory-only list and stage atomically through `StageTransfers` on Send. Zero or more than 16, duplicate canonical paths, and ancestor/descendant overlaps are refused before networking; nothing silently selects a subset. A collection ZIP has numbered top-level members beneath `FairDrop/`. Only `IDLE` accepts Stage. Setup failure or Cancel/Shutdown during `STAGING` unwinds to IDLE, returns a command error, and emits no lifecycle event. Wails single-instance locking and second-instance window restoration remain pinned.
 
 ### AD-4 — Session-scoped transactional resource ownership
 
@@ -102,11 +102,13 @@ stateDiagram-v2
 
 - **Binds:** FR6-FR7, NFR1-NFR2, NFR5, NFR8-NFR9, NFR11
 - **Prevents:** payload-sized memory, temporary archives, zip traversal, symlink escape, corrupt central directories, and cancellation leaks
-- **Rule:** regular files use context-aware bounded-buffer copying. Directories use `io.Pipe`; close `zip.Writer` before the pipe writer. Reject symlinks and non-regular entries, normalize relative ZIP names beneath one root, and revalidate during streaming. Treat spaces, Unicode, Windows long paths, and UNC paths as supported wherever native Go filesystem APIs permit—never shell-interpolate or destructively normalize them—and return typed path errors otherwise. A post-header failure reports ERROR then aborts via `http.ErrAbortHandler`.
+- **Rule:** regular files use context-aware bounded-buffer copying. Directories and collections use one `io.Pipe` ZIP worker; close `zip.Writer` before the pipe writer and halt central-directory output on failure. Collection preparation pins all roots before headers, accounts for all directory pins against the shared 64-retained-handle budget, and retains at most 16 top-level file descriptors. Numbered top-level member names avoid collisions without a descendant index or staged archive. Reject symlinks and non-regular entries, validate relative ZIP names beneath each root, and revalidate during streaming. Treat spaces, Unicode, Windows long paths, and UNC paths as supported wherever native Go filesystem APIs permit—never shell-interpolate or destructively normalize them—and return typed path errors otherwise. A post-header failure reports ERROR then aborts via `http.ErrAbortHandler`.
 
 Story 3.7 selection admission uses a coordinator-facing SourcePort decorator: resolve lexical ancestors only after admission, preserve the selected leaf and grammar refusals, and pass the canonical staged path to the stream's raw inspector. Cancellation releases the waiting caller without claiming the OS call stopped; only one unresolved call per decorator can remain and retries refuse busy. Darwin no-follow metadata snapshots compare device/inode, generation and birth time with later opened descriptors. Identical/zero generation and birth fields retain residual fingerprint collision risk; snapshots never claim to pin an inode.
 
 Story 3.8 checkpoint 1 adds a source-owned PreparedDirectory capability: one search-only pin from Prepare through Close, freshly compared before walking the validated root. It is not a Stage snapshot. Lexical ancestors, enumeration frames and the pin share 64 retained handles plus at most three transient handles; Inspect reserves the future pin. Borrowed reads and revocation share a lock across native I/O; Close joins Walk. Portable unsafe segments are rejected in both source and ZIP boundaries, never silently renamed; modes are 0755/0644. No case/normalization collision index or source-permission backup is promised. Inspection arithmetic/batch faults use setup_failed; streaming faults use transfer_failed. Empty read 101 fails with wrapped io.ErrNoProgress in file, ZIP-entry and archive-drain lanes; progress resets the count. Blocking OS I/O is not made interruptible.
+
+The multiple-selection extension passes explicit other-pin counts through source inspection and preparation. Every unchanged admitted collection fits the same budget at streaming; no independent one-pin capability substitutes for collection accounting. Top-level file descriptors retain the verified original bytes across pathname replacement, bounded by prepared length; directory Walk refuses replacement against its prepared identity pin. The ZIP remains unsnapshotted below each root.
 
 ### AD-7 — Honest, wire-level progress
 

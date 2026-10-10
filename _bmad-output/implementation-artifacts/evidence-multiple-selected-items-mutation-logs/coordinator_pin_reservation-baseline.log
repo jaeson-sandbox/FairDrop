@@ -1,0 +1,8 @@
+{"Time":"2026-10-10T00:18:25.230103-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-10T00:18:25.518832-04:00","Action":"run","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP"}
+{"Time":"2026-10-10T00:18:25.518911-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP","Output":"=== RUN   TestNativeCollectionSharedDirectoryBoundaryAndHTTP\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:25.567558-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP","Output":"--- PASS: TestNativeCollectionSharedDirectoryBoundaryAndHTTP (0.05s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:25.567584-04:00","Action":"pass","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP","Elapsed":0.05}
+{"Time":"2026-10-10T00:18:25.567605-04:00","Action":"output","Package":"fairdrop","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:25.568446-04:00","Action":"output","Package":"fairdrop","Output":"ok  \tfairdrop\t0.338s\n"}
+{"Time":"2026-10-10T00:18:25.568461-04:00","Action":"pass","Package":"fairdrop","Elapsed":0.338}

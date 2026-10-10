@@ -324,6 +324,7 @@ func TestNewAppWiresTheRealWailsRuntime(t *testing.T) {
 		{"emit", app.emit, wailsruntime.EventsEmit},
 		{"openFile", app.openFile, wailsruntime.OpenFileDialog},
 		{"openDirectory", app.openDirectory, wailsruntime.OpenDirectoryDialog},
+		{"openMultipleFiles", app.openMultipleFiles, wailsruntime.OpenMultipleFilesDialog},
 		{"setClipboard", app.setClipboard, wailsruntime.ClipboardSetText},
 		{"unminimise", app.unminimise, wailsruntime.WindowUnminimise},
 		{"show", app.show, wailsruntime.WindowShow},
@@ -419,8 +420,10 @@ func TestComposeClosesTheAppCoordinatorCycle(t *testing.T) {
 func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 	want := map[string]bool{
 		"StageTransfer":   true,
+		"StageTransfers":  true,
 		"CancelTransfer":  true,
 		"SelectFile":      true,
+		"SelectFiles":     true,
 		"SelectDirectory": true,
 		"CopyToClipboard": true,
 	}
@@ -438,7 +441,7 @@ func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 	}
 	for name := range got {
 		if !want[name] {
-			t.Errorf("the App exports %s, which Wails will bind as a fifth command", name)
+			t.Errorf("the App exports unexpected command %s", name)
 		}
 	}
 }
@@ -777,6 +780,33 @@ func TestSelectDialogsReturnTheChosenPathAndStageNothing(t *testing.T) {
 				t.Error("the dialog was not handed the application-lifetime context")
 			}
 		})
+	}
+}
+
+func TestSelectFilesReturnsEveryChosenPathAndStagesNothing(t *testing.T) {
+	h := newHarness(t)
+	want := []string{"/first", "/second"}
+	h.app.openMultipleFiles = func(ctx context.Context, options wailsruntime.OpenDialogOptions) ([]string, error) {
+		if ctx != h.ctx || options.Title != "Choose files to send" {
+			t.Fatalf("chooser inputs = %v, %+v", ctx, options)
+		}
+		return want, nil
+	}
+	got, err := h.app.SelectFiles()
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("SelectFiles = %v, %v", got, err)
+	}
+	if calls := h.coordinator.log(); len(calls) != 0 {
+		t.Fatalf("chooser staged prematurely: %v", calls)
+	}
+	h.app.openMultipleFiles = func(context.Context, wailsruntime.OpenDialogOptions) ([]string, error) { return nil, nil }
+	got, err = h.app.SelectFiles()
+	if err != nil || len(got) != 0 {
+		t.Fatalf("chooser dismissal = %v, %v", got, err)
+	}
+	serialized, err := json.Marshal(got)
+	if err != nil || string(serialized) != "[]" {
+		t.Fatalf("chooser dismissal JSON = %s, %v, want []", serialized, err)
 	}
 }
 

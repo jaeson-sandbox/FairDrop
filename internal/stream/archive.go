@@ -34,10 +34,18 @@ type archive struct {
 	modTime    time.Time
 	prepared   transfer.PreparedDirectory
 	bufferSize int
+	members    []collectionMember
 
 	streamed  atomic.Bool
 	closed    atomic.Bool
 	closeOnce sync.Once
+}
+
+type collectionMember struct {
+	name    string
+	kind    transfer.ItemKind
+	modTime time.Time
+	payload server.PreparedPayload
 }
 
 var _ server.PreparedPayload = (*archive)(nil)
@@ -227,6 +235,9 @@ func (a *archive) drain(ctx context.Context, dst io.Writer, src io.Reader) (dest
 // writeEntries emits the archive: one top-level directory, then every entry the
 // source walk reaches, each below that directory.
 func (a *archive) writeEntries(ctx context.Context, out *zip.Writer) error {
+	if len(a.members) > 0 {
+		return a.writeCollectionEntries(ctx, out)
+	}
 	if !transfer.SafeArchiveSegment(a.root) {
 		return unsafeArchiveEntryName()
 	}
@@ -260,13 +271,80 @@ func (a *archive) writeEntries(ctx context.Context, out *zip.Writer) error {
 	})
 }
 
+func (a *archive) writeCollectionEntries(ctx context.Context, out *zip.Writer) error {
+	if err := writeArchiveDirectory(out, "FairDrop/", time.Time{}); err != nil {
+		return err
+	}
+	buffer := make([]byte, a.bufferSize)
+	for _, member := range a.members {
+		if err := contextError(ctx); err != nil {
+			return err
+		}
+		if !transfer.SafeArchiveSegment(member.name) {
+			return unsafeArchiveEntryName()
+		}
+		name := "FairDrop/" + member.name
+		switch member.kind {
+		case transfer.ItemFile:
+			file, ok := member.payload.(*payload)
+			if !ok {
+				return transfer.NewError(transfer.ErrTransferFailed, "prepared collection file is unavailable")
+			}
+			bounded := &io.LimitedReader{R: file.file, N: file.size}
+			if err := writeArchiveFile(ctx, out, name, member.modTime, bounded, buffer); err != nil {
+				return err
+			}
+			if bounded.N != 0 {
+				return transfer.WrapError(transfer.ErrTransferFailed, "payload source delivered fewer bytes than its advertised length", io.ErrUnexpectedEOF)
+			}
+		case transfer.ItemDirectory:
+			directory, ok := member.payload.(*archive)
+			if !ok {
+				return transfer.NewError(transfer.ErrTransferFailed, "prepared collection directory is unavailable")
+			}
+			if err := writeArchiveDirectory(out, name+"/", member.modTime); err != nil {
+				return err
+			}
+			err := directory.prepared.Walk(ctx, func(entry transfer.SourceEntry, content io.Reader) error {
+				child, err := archiveEntryName(member.name, entry.RelativePath)
+				if err != nil {
+					return err
+				}
+				child = "FairDrop/" + child
+				switch entry.Kind {
+				case transfer.ItemDirectory:
+					return writeArchiveDirectory(out, child+"/", entry.ModTime)
+				case transfer.ItemFile:
+					return writeArchiveFile(ctx, out, child, entry.ModTime, content, buffer)
+				default:
+					return transfer.NewError(transfer.ErrPathUnsupported, "payload archive received an unsupported entry kind")
+				}
+			})
+			if err != nil {
+				return err
+			}
+		default:
+			return transfer.NewError(transfer.ErrSetupFailed, "collection member is invalid")
+		}
+	}
+	return nil
+}
+
 // Close releases the prepared search pin, including when WriteTo never ran.
 // The source capability joins an active walk before releasing that handle.
 func (a *archive) Close() error {
 	var err error
 	a.closeOnce.Do(func() {
 		a.closed.Store(true)
-		err = a.prepared.Close()
+		if len(a.members) > 0 {
+			for index := len(a.members) - 1; index >= 0; index-- {
+				if closeErr := a.members[index].payload.Close(); closeErr != nil {
+					err = errors.Join(err, closeErr)
+				}
+			}
+		} else if a.prepared != nil {
+			err = a.prepared.Close()
+		}
 	})
 	return err
 }

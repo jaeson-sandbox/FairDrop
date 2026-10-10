@@ -55,7 +55,8 @@ export const copy = {
         pending: {
             file: 'Preparing your file…',
             folder: 'Preparing your folder…',
-            item: 'Preparing your item…',
+        item: 'Preparing your item…',
+            collection: 'Preparing your items…',
         },
         heading: 'Ready to send',
     },
@@ -65,6 +66,19 @@ export const copy = {
     },
     folder: {
         note: 'This folder downloads as a ZIP.',
+    },
+    collection: {
+        note: 'Downloads as ZIP',
+    },
+    selection: {
+        open: 'Send multiple items',
+        heading: 'Selected items',
+        addFiles: 'Add Files',
+        addFolder: 'Add Folder',
+        send: 'Send',
+        cancel: 'Cancel',
+        remove: 'Remove',
+        count: (count: number) => `${count} of 16 items`,
     },
     directLink: {
         action: 'Copy Link',
@@ -178,6 +192,7 @@ export const copy = {
         /** The approved item vocabulary: file, folder. */
         file: 'File',
         folder: 'Folder',
+        items: 'Items',
         /** Item Summary: "sanitized bidi-isolated full name and logical size". */
         logicalSize: 'logical size',
         /** Direct URL Row heading, from the staged production reference. */
@@ -222,7 +237,7 @@ export const copy = {
 
 /** The visible heading for each stable failure code. */
 export const errorHeadings: Readonly<Record<TransferErrorCode, string>> = {
-    invalid_selection: 'Choose one item',
+    invalid_selection: 'Choose 1 to 16 items',
     busy: 'FairDrop is still busy',
     cancelled: 'Transfer canceled',
     path_not_found: 'Item not found',

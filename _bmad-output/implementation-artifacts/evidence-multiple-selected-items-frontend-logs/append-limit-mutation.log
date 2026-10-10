@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-append-limit-2y89s4r4/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (79 tests | 1 failed | 78 skipped) 14ms
+     × rejects a seventeenth append without losing the sixteen editable rows 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > rejects a seventeenth append without losing the sixteen editable rows
+AssertionError: expected [ '0', '1', '2', '3', '4', '5', …(11) ] to have a length of 16 but got 17
+
+- Expected
++ Received
+
+- 16
++ 17
+
+ ❯ src/transfer/useTransfer.test.tsx:134:50
+    132|         await act(async () => { await hook.result.current.openDraft(Ar…
+    133|         act(() => hook.result.current.appendDraft(['/p/16']))
+    134|         expect(hook.result.current.draft?.names).toHaveLength(16)
+       |                                                  ^
+    135|         expect(hook.result.current.draft?.error?.code).toBe('invalid_s…
+    136|         expect(mocks.stageTransfers).not.toHaveBeenCalled()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 78 skipped (79)
+   Start at  00:18:05
+   Duration  599ms (transform 125ms, setup 0ms, import 190ms, tests 14ms, environment 296ms)
+

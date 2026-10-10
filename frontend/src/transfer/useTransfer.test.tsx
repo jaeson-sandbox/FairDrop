@@ -5,17 +5,21 @@ import {useTransfer} from './useTransfer'
 
 const mocks = vi.hoisted(() => ({
     stageTransfer: vi.fn(),
+    stageTransfers: vi.fn(),
     cancelTransfer: vi.fn(),
     selectFile: vi.fn(),
     selectDirectory: vi.fn(),
+    selectFiles: vi.fn(),
     eventsOn: vi.fn(),
 }))
 
 vi.mock('../../wailsjs/go/main/App', () => ({
     StageTransfer: mocks.stageTransfer,
+    StageTransfers: mocks.stageTransfers,
     CancelTransfer: mocks.cancelTransfer,
     SelectFile: mocks.selectFile,
     SelectDirectory: mocks.selectDirectory,
+    SelectFiles: mocks.selectFiles,
 }))
 
 vi.mock('../../wailsjs/runtime/runtime', () => ({
@@ -76,9 +80,11 @@ function emit(name: string, ...args: unknown[]): void {
 beforeEach(() => {
     subscriptions = []
     mocks.stageTransfer.mockReset()
+    mocks.stageTransfers.mockReset()
     mocks.cancelTransfer.mockReset()
     mocks.selectFile.mockReset()
     mocks.selectDirectory.mockReset()
+    mocks.selectFiles.mockReset()
     mocks.eventsOn.mockReset()
     mocks.cancelTransfer.mockResolvedValue(undefined)
     mocks.eventsOn.mockImplementation((name: string, callback: (...args: unknown[]) => void) => {
@@ -90,6 +96,147 @@ beforeEach(() => {
         }
         subscriptions.push(subscription)
         return subscription.dispose
+    })
+})
+
+describe('collection draft and immutable batch admission', () => {
+    it('starts empty without Stage and refuses an initial 17-path drop without truncation', async () => {
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft() })
+        expect(hook.result.current.draft).toEqual({names: [], error: null})
+        expect(mocks.stageTransfers).not.toHaveBeenCalled()
+        act(() => hook.result.current.cancelDraft())
+        await act(async () => { await hook.result.current.openDraft(Array.from({length: 17}, (_, i) => `/p/${i}`)) })
+        expect(hook.result.current.draft?.names).toEqual([])
+        expect(hook.result.current.draft?.error?.code).toBe('invalid_selection')
+        expect(mocks.stageTransfers).not.toHaveBeenCalled()
+    })
+
+    it('keeps paths private, copies mutable input, and stages one batch only on Send', async () => {
+        const paths = ['/private/one.txt', '/private/two.txt']
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(paths) })
+        paths[0] = '/private/changed.txt'
+        expect(hook.result.current.draft?.names).toEqual(['one.txt', 'two.txt'])
+        expect(JSON.stringify(hook.result.current.draft)).not.toContain('/private/')
+        expect(mocks.stageTransfers).not.toHaveBeenCalled()
+        mocks.stageTransfers.mockResolvedValue(metadata({name: '2 items', isCollection: true, itemCount: 2}))
+        await act(async () => { await hook.result.current.sendDraft() })
+        expect(mocks.stageTransfers).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfers).toHaveBeenCalledWith(['/private/one.txt', '/private/two.txt'])
+        expect(hook.result.current.state.phase).toBe('staged')
+    })
+
+    it('rejects a seventeenth append without losing the sixteen editable rows', async () => {
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(Array.from({length: 16}, (_, i) => `/p/${i}`)) })
+        act(() => hook.result.current.appendDraft(['/p/16']))
+        expect(hook.result.current.draft?.names).toHaveLength(16)
+        expect(hook.result.current.draft?.error?.code).toBe('invalid_selection')
+        expect(mocks.stageTransfers).not.toHaveBeenCalled()
+    })
+
+    it('ignores a chooser completion after Cancel', async () => {
+        const pending = deferred<string[]>()
+        mocks.selectFiles.mockReturnValue(pending.promise)
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft() })
+        let choosing!: Promise<void>
+        act(() => { choosing = hook.result.current.selectDraftFiles() })
+        act(() => hook.result.current.cancelDraft())
+        await act(async () => { pending.resolve(['/secret/late.txt']); await choosing })
+        expect(hook.result.current.draft).toBeNull()
+    })
+
+    it('leaves a draft unchanged when the files chooser is dismissed', async () => {
+        mocks.selectFiles.mockResolvedValue([])
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(['/p/first.txt']) })
+        await act(async () => { await hook.result.current.selectDraftFiles() })
+        expect(hook.result.current.draft).toEqual({names: ['first.txt'], error: null})
+        expect(mocks.stageTransfer).not.toHaveBeenCalled()
+    })
+
+    it('drops a stale chooser completion after unmount', async () => {
+        const pending = deferred<string[]>()
+        mocks.selectFiles.mockReturnValue(pending.promise)
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft() })
+        let choosing!: Promise<void>
+        act(() => { choosing = hook.result.current.selectDraftFiles() })
+        hook.unmount()
+        await act(async () => { pending.resolve(['/secret/late.txt']); await choosing })
+        expect(mocks.stageTransfers).not.toHaveBeenCalled()
+    })
+
+    it('restores the editable batch after backend duplicate refusal', async () => {
+        mocks.stageTransfers.mockRejectedValue(JSON.stringify({code: 'invalid_selection', message: 'unsafe'}))
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(['/p/a', '/p/a']) })
+        await act(async () => { await hook.result.current.sendDraft() })
+        expect(hook.result.current.draft?.names).toEqual(['a', 'a'])
+        expect(hook.result.current.draft?.error?.message).toBe('Choose 1 to 16 separate files or folders.')
+        act(() => hook.result.current.removeDraftItem(1))
+        mocks.stageTransfer.mockResolvedValue(metadata({name: 'a'}))
+        await act(async () => { await hook.result.current.sendDraft() })
+        expect(mocks.stageTransfer).toHaveBeenCalledWith('/p/a')
+    })
+
+    it('forgets retryable remembered paths when a restored draft is cancelled', async () => {
+        mocks.stageTransfers.mockRejectedValue(JSON.stringify({code: 'network_unavailable', message: 'raw'}))
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(['/p/one', '/p/two']) })
+        await act(async () => { await hook.result.current.sendDraft() })
+        expect(hook.result.current.draft?.names).toEqual(['one', 'two'])
+        expect(hook.result.current.canRetry).toBe(true)
+        act(() => hook.result.current.cancelDraft())
+        expect(hook.result.current.draft).toBeNull()
+        expect(hook.result.current.canRetry).toBe(false)
+        expect(hook.result.current.canSendAgain).toBe(false)
+    })
+
+    it('sanitizes draft display names but sends the untouched original paths', async () => {
+        const first = '/private/\u202Ereport.txt\u0007'
+        const second = '/private/\u2066photos\u2069'
+        mocks.stageTransfers.mockResolvedValue(metadata({name: '2 items', isCollection: true, itemCount: 2}))
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft([first, second]) })
+        expect(hook.result.current.draft?.names).toEqual(['report.txt', 'photos'])
+        await act(async () => { await hook.result.current.sendDraft() })
+        expect(mocks.stageTransfers).toHaveBeenCalledWith([first, second])
+    })
+
+    it('keeps draft rows and shows a safe error after malformed native selection', async () => {
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(['/p/one']) })
+        act(() => hook.result.current.rejectSelection())
+        expect(hook.result.current.draft?.names).toEqual(['one'])
+        expect(hook.result.current.draft?.error?.code).toBe('invalid_selection')
+    })
+
+    it('repeats the exact remembered collection once with a fresh Stage command', async () => {
+        const paths = ['/p/one', '/p/two']
+        mocks.stageTransfers.mockResolvedValueOnce(metadata({name: '2 items', isCollection: true, itemCount: 2}))
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(paths); await hook.result.current.sendDraft() })
+        act(() => {
+            emit('transfer-started', {sessionId, seq: 1})
+            emit('transfer-complete', {sessionId, seq: 2, progress: {
+                bytesSent: 120, totalBytes: 0, totalKnown: false, percent: 0, speedBytesPerSec: 0,
+            }})
+        })
+        expect(hook.result.current.state.phase).toBe('done')
+        act(() => emit('transfer-reset', {sessionId, seq: 3}))
+        paths[0] = '/p/changed'
+        const pending = deferred<Record<string, unknown>>()
+        mocks.stageTransfers.mockReturnValueOnce(pending.promise)
+        let first!: Promise<void>
+        let second!: Promise<void>
+        act(() => { first = hook.result.current.sendAgain(); second = hook.result.current.sendAgain() })
+        await waitFor(() => expect(mocks.stageTransfers).toHaveBeenCalledTimes(2))
+        expect(mocks.stageTransfers).toHaveBeenLastCalledWith(['/p/one', '/p/two'])
+        await act(async () => { pending.resolve(metadata({name: '2 items', isCollection: true, itemCount: 2})); await Promise.all([first, second]) })
+        expect(mocks.stageTransfers).toHaveBeenCalledTimes(2)
     })
 })
 describe('Wails lifecycle subscriptions', () => {
@@ -346,7 +493,8 @@ describe('Stage generations and malformed acknowledgements', () => {
     */
     it('reports an unconfirmed cleanup when quiescing a malformed acknowledgement fails', async () => {
         mocks.stageTransfer.mockResolvedValue(metadata({sessionId: ''}))
-        mocks.cancelTransfer.mockRejectedValue(new Error(String.raw`C:\privateeport.pdf?token=secret`))
+        mocks.cancelTransfer.mockRejectedValue(new Error(String.raw`C:\private
+eport.pdf?token=secret`))
         const hook = renderHook(() => useTransfer())
 
         await act(async () => { await hook.result.current.stage('C:\report.pdf') })

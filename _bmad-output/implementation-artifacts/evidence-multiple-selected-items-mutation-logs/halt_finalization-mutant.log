@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:33.149218-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-10T00:18:33.396524-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterDirectoryReplacementAbortsWithoutCentralDirectory"}
+{"Time":"2026-10-10T00:18:33.396776-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterDirectoryReplacementAbortsWithoutCentralDirectory","Output":"=== RUN   TestCollectionLaterDirectoryReplacementAbortsWithoutCentralDirectory\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:33.400302-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterDirectoryReplacementAbortsWithoutCentralDirectory","Output":"    collection_test.go:288: failed collection has a valid ZIP central directory\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:33.401739-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterDirectoryReplacementAbortsWithoutCentralDirectory","Output":"--- FAIL: TestCollectionLaterDirectoryReplacementAbortsWithoutCentralDirectory (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:33.401783-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionLaterDirectoryReplacementAbortsWithoutCentralDirectory","Elapsed":0.01}
+{"Time":"2026-10-10T00:18:33.401835-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:33.402902-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.253s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:33.402917-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.254}

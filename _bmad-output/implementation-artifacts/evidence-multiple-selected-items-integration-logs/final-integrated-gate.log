@@ -1,0 +1,71 @@
+
+### dist-gitkeep
+
+### build-asset-drift
+
+### gofmt
+
+### vet
+
+### staticcheck
+
+### go-test
+ok  	fairdrop	2.071s
+ok  	fairdrop/internal/network	0.234s
+ok  	fairdrop/internal/qr	0.573s
+ok  	fairdrop/internal/server	5.139s
+ok  	fairdrop/internal/source	0.452s
+ok  	fairdrop/internal/stream	4.328s
+ok  	fairdrop/internal/transfer	1.473s
+ok  	fairdrop/scripts	1.352s
+ok  	fairdrop/scripts/mutationverdict	1.708s
+
+### cgo
+
+### race
+ok  	fairdrop	9.359s
+ok  	fairdrop/internal/network	1.499s
+ok  	fairdrop/internal/qr	2.384s
+ok  	fairdrop/internal/server	5.488s
+ok  	fairdrop/internal/source	2.853s
+ok  	fairdrop/internal/stream	100.561s
+ok  	fairdrop/internal/transfer	2.839s
+ok  	fairdrop/scripts	2.857s
+ok  	fairdrop/scripts/mutationverdict	2.312s
+
+### npm-test
+
+> fairdrop-frontend@1.4.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/jaesonmartin/Projects/FairDrop/frontend
+
+
+ Test Files  22 passed (22)
+      Tests  863 passed (863)
+   Start at  00:14:13
+   Duration  3.28s (transform 2.11s, setup 0ms, import 4.15s, tests 6.29s, environment 14.18s)
+
+
+### browser
+
+> fairdrop-frontend@1.4.0 test:browser
+> vitest run --config vitest.browser.config.ts && node browser/receiver-live.mjs
+
+
+ RUN  v4.1.11 /Users/jaesonmartin/Projects/FairDrop/frontend
+
+
+ Test Files  3 passed (3)
+      Tests  86 passed (86)
+   Start at  00:14:17
+   Duration  70.56s (transform 0ms, setup 0ms, import 624ms, tests 71.91s, environment 0ms)
+
+receiver live browser: real GET page, headers, 320px layout, keyboard POST and exact attachment bytes passed
+
+### eol
+
+### cross
+
+### GATE-PASSED

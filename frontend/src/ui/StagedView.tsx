@@ -8,6 +8,7 @@ import {OutcomePanel} from './OutcomePanel'
 import {StagedHelpContent} from './RecoveryHelp'
 import {copy, errorHeadings, qrAltFor} from './copy'
 import {formatBytes} from './format'
+import {CollectionKindGlyph} from './CollectionKindGlyph'
 
 /**
  * Story 9.1's per-child stagger, duplicated from `IdleView.tsx` rather than
@@ -73,7 +74,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
     const [revealed, setRevealed] = useState(false)
     const revealId = useId()
 
-    const size = metadata.isDir
+    const size = metadata.isDir || metadata.isCollection
         ? `${formatBytes(metadata.size)} ${copy.label.logicalSize}`
         : formatBytes(metadata.size)
 
@@ -255,14 +256,14 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                     <div className="fd-hero__details">
                         <div className="fd-item fd-rise" style={rise(0)}>
                             <span className="fd-item__icon" aria-hidden="true">
-                                {metadata.isDir ? <FolderKindGlyph/> : <FileKindGlyph/>}
+                                {metadata.isCollection ? <CollectionKindGlyph/> : metadata.isDir ? <FolderKindGlyph/> : <FileKindGlyph/>}
                             </span>
                             <div className="fd-item__text">
                                 <h2 className="fd-headline" id="fd-item-name">
                                     <bdi dir="auto">{metadata.name}</bdi>
                                 </h2>
                                 <p className="fd-meta">
-                                    {(metadata.isDir ? copy.label.folder : copy.label.file) +
+                                    {(metadata.isCollection ? copy.label.items : metadata.isDir ? copy.label.folder : copy.label.file) +
                                         copy.label.metaSeparator + size}
                                 </p>
                             </div>
@@ -401,7 +402,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                                 <LockGlyph/>
                                 {copy.network.disclosure}
                             </li>
-                            {metadata.isDir ? <li className="fd-caveats__plain">{copy.folder.note}</li> : null}
+                            {metadata.isDir || metadata.isCollection ? <li className="fd-caveats__plain">{metadata.isCollection ? copy.collection.note : copy.folder.note}</li> : null}
                         </ul>
                     </div>
                 </div>

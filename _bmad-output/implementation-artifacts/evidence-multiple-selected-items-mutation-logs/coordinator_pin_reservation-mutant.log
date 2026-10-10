@@ -1,0 +1,9 @@
+{"Time":"2026-10-10T00:18:27.747542-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-10T00:18:28.055145-04:00","Action":"run","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP"}
+{"Time":"2026-10-10T00:18:28.055232-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP","Output":"=== RUN   TestNativeCollectionSharedDirectoryBoundaryAndHTTP\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:28.095558-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP","Output":"    collection_native_test.go:67: unreservable third directory depth admitted: \u003cnil\u003e\n","OutputType":"error"}
+{"Time":"2026-10-10T00:18:28.10136-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP","Output":"--- FAIL: TestNativeCollectionSharedDirectoryBoundaryAndHTTP (0.05s)\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:28.101368-04:00","Action":"fail","Package":"fairdrop","Test":"TestNativeCollectionSharedDirectoryBoundaryAndHTTP","Elapsed":0.05}
+{"Time":"2026-10-10T00:18:28.101383-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:28.102282-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\tfairdrop\t0.354s\n","OutputType":"frame"}
+{"Time":"2026-10-10T00:18:28.102295-04:00","Action":"fail","Package":"fairdrop","Elapsed":0.355}

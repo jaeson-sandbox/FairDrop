@@ -1,0 +1,36 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-recovery-iwt0i4bk/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (79 tests | 1 failed | 78 skipped) 14ms
+     × restores the editable batch after backend duplicate refusal 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > restores the editable batch after backend duplicate refusal
+AssertionError: expected undefined to deeply equal [ 'a', 'a' ]
+
+- Expected:
+[
+  "a",
+  "a",
+]
+
++ Received:
+undefined
+
+ ❯ src/transfer/useTransfer.test.tsx:177:50
+    175|         await act(async () => { await hook.result.current.openDraft(['…
+    176|         await act(async () => { await hook.result.current.sendDraft() …
+    177|         expect(hook.result.current.draft?.names).toEqual(['a', 'a'])
+       |                                                  ^
+    178|         expect(hook.result.current.draft?.error?.message).toBe('Choose…
+    179|         act(() => hook.result.current.removeDraftItem(1))
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 78 skipped (79)
+   Start at  00:18:08
+   Duration  574ms (transform 108ms, setup 0ms, import 161ms, tests 14ms, environment 312ms)
+

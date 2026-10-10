@@ -27,9 +27,8 @@ scope. Historical observations are retained rather than rewritten as successes.
 
 If selecting an unavailable network folder remains stuck, cancel the selection.
 Cancellation stops FairDrop waiting, but cannot interrupt the operating system's
-filesystem call. Until that call returns, FairDrop refuses another selection with
-`busy` to prevent accumulating background work. Wait for the network lookup to
-finish, or close and restart FairDrop, then choose a reachable item. Repeatedly
-pressing Cancel will not terminate the underlying OS call. Public wording for this
-case is tracked as D-111 in Story 3.11; this guidance is not a claim it is fixed in
-the UI already.
+filesystem call. FairDrop refuses another selection with `busy` until that call
+returns or the existing recovery timeout releases selection admission. A timed-out
+filesystem call may still be running; recovery does not prove it stopped. Choose a
+reachable item after recovery, or close and restart FairDrop. Repeatedly pressing
+Cancel will not terminate the underlying OS call.

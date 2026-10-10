@@ -508,7 +508,7 @@ describe('terminal receipt retention (Story 7.4)', () => {
         const dual: TransferState = {
             phase: 'idle',
             retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
-            commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'},
+            commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
         }
 
         expect(transferReducer(dual, {type: 'dismiss-retained'})).toEqual(createInitialTransferState())
@@ -553,7 +553,7 @@ describe('terminal receipt retention (Story 7.4)', () => {
             retainedOutcome: {kind: 'done', receipt: {name: 'report.pdf', isDir: false, bytesSent: 100}},
             commandError: {
                 code: 'invalid_selection',
-                message: 'Choose exactly one file or folder.',
+                message: 'Choose 1 to 16 separate files or folders.',
             },
         })
     })

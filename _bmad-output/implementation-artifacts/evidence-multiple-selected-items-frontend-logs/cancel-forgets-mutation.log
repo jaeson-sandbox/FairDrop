@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-cancel-forgets-h5hmy1r2/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (79 tests | 1 failed | 78 skipped) 14ms
+     × forgets retryable remembered paths when a restored draft is cancelled 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > forgets retryable remembered paths when a restored draft is cancelled
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/transfer/useTransfer.test.tsx:194:46
+    192|         act(() => hook.result.current.cancelDraft())
+    193|         expect(hook.result.current.draft).toBeNull()
+    194|         expect(hook.result.current.canRetry).toBe(false)
+       |                                              ^
+    195|         expect(hook.result.current.canSendAgain).toBe(false)
+    196|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 78 skipped (79)
+   Start at  00:18:10
+   Duration  613ms (transform 105ms, setup 0ms, import 158ms, tests 14ms, environment 340ms)
+

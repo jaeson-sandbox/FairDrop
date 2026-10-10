@@ -308,7 +308,7 @@ function DoneReceipt({receipt, rise}: {readonly receipt: CompletionReceiptData; 
         // definite width instead of an intermediate box sized to match it.
         <p className="fd-outcome__receipt fd-rise" style={rise}>
             <span className="fd-outcome__receipt-icon" aria-hidden="true">
-                {receipt.isDir ? <FolderGlyph/> : <FileGlyph/>}
+                {receipt.isCollection ? <CollectionGlyph/> : receipt.isDir ? <FolderGlyph/> : <FileGlyph/>}
             </span>
             <bdi className="fd-outcome__receipt-name" dir="auto">{receipt.name}</bdi>
             <span className="fd-outcome__receipt-meta">
@@ -367,6 +367,16 @@ function FolderGlyph() {
             focusable="false"
         >
             <path d="M2.5 5a1.2 1.2 0 0 1 1.2-1.2h4.2l1.8 1.8h7.1a1.2 1.2 0 0 1 1.2 1.2v8.2a1.2 1.2 0 0 1-1.2 1.2h-13a1.2 1.2 0 0 1-1.2-1.2z"/>
+        </svg>
+    )
+}
+
+function CollectionGlyph() {
+    return (
+        <svg className="fd-outcome__receipt-glyph" viewBox="0 0 20 20" fill="none"
+            stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M4 3h9l3 3v10H4z"/>
+            <path d="M13 3v3h3M2 6v12h11"/>
         </svg>
     )
 }

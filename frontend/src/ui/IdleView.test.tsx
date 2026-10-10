@@ -425,11 +425,11 @@ describe('recovery guidance is a second collapsed disclosure', () => {
 
 describe('Idle with a command failure (Story 9.6: the card replaces the whole composition)', () => {
     it('renders the fixed invalid-selection panel and stages nothing', () => {
-        const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
+        const error: PublicError = {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'}
         show(idle({commandError: error}))
 
-        expect(screen.getByRole('heading', {name: 'Choose one item'})).toBeTruthy()
-        expect(screen.getByText('Choose exactly one file or folder.')).toBeTruthy()
+        expect(screen.getByRole('heading', {name: 'Choose 1 to 16 items'})).toBeTruthy()
+        expect(screen.getByText('Choose 1 to 16 separate files or folders.')).toBeTruthy()
     })
 
     it('never dresses a cancellation up as an Error', () => {
@@ -447,7 +447,7 @@ describe('Idle with a command failure (Story 9.6: the card replaces the whole co
       grouped disclosures are not rendered while it shows."
     */
     it('replaces the drop zone, the browse pill and the grouped disclosures -- none of them render', () => {
-        show(idle({commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}}))
+        show(idle({commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'}}))
 
         expect(document.querySelector('.fd-drop-zone')).toBeNull()
         expect(screen.queryByRole('button', {name: 'Choose File or Folder'})).toBeNull()
@@ -459,7 +459,7 @@ describe('Idle with a command failure (Story 9.6: the card replaces the whole co
     })
 
     it('keeps the command-error focus target unchanged', () => {
-        const error: PublicError = {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}
+        const error: PublicError = {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'}
         show(idle({commandError: error}))
 
         const target = document.querySelector('[data-focus-target="command-error"]')
@@ -538,7 +538,7 @@ describe('Idle after a cancellation won its race', () => {
     // the Idle instruction's own target is not on the screen at all while it
     // shows -- there is exactly one target, the card's own.
     it('gives a command failure its own focus target, with no idle-instruction target underneath it', () => {
-        show(idle({commandError: {code: 'invalid_selection', message: 'Choose exactly one file or folder.'}}))
+        show(idle({commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'}}))
 
         const targets = [...document.querySelectorAll('[data-focus-target]')]
             .map((element) => element.getAttribute('data-focus-target'))
