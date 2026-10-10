@@ -208,13 +208,17 @@ supported no-follow queries; preserve content-read separation and identity check
 
 ## Subagent model budget
 
-- **Owner instruction (2026-10-04, current): create the spec first, then
-  delegate story implementation to Sol (`gpt-6-sol`) subagents.** Keep the
-  main session as orchestrator for specification, review, verification,
-  integration and release coordination. Do not repeatedly request approval
-  for work already authorized; raise only material scope changes or blockers.
+- **Owner instruction (2026-10-10, current): the implementation model follows
+  the orchestrator.** When a **Claude** agent orchestrates, delegate story
+  implementation to **Sonnet** subagents where delegation applies. When a
+  **Codex** agent orchestrates, delegate to **Sol (`gpt-6-sol`)** subagents.
+  Either way, create the spec first and keep the main session as orchestrator
+  for specification, review, verification, integration and release
+  coordination. Do not repeatedly request approval for work already
+  authorized; raise only material scope changes or blockers.
 
-- This supersedes the 2026-09-20 Sonnet preference and earlier model budgets.
+- This clarifies the 2026-10-04 Sol instruction, which was written for
+  Codex-orchestrated sessions, and supersedes earlier model budgets.
 
 - The general rule this incident illustrates: repo instruction files are
   authoritative but supersedable. A more recent instruction from the owner
