@@ -301,22 +301,30 @@ func TestNativeCollectionReplacedLaterRootAbortsAuthorizedHTTP(t *testing.T) {
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	response, err := client.Post(metadata.URL, "", nil)
+	// What the receiver saw is kept for the failure message: a claim that never
+	// reached the later member is otherwise indistinguishable from a hook that
+	// did not fire.
+	outcome := fmt.Sprintf("POST error %v", err)
 	if err == nil {
 		body, readErr := io.ReadAll(response.Body)
 		_ = response.Body.Close()
+		outcome = fmt.Sprintf("status %d, %d body bytes, read error %v", response.StatusCode, len(body), readErr)
 		if readErr == nil {
 			if _, zipErr := zip.NewReader(bytes.NewReader(body), int64(len(body))); zipErr == nil {
 				t.Fatal("replaced later root finalized a readable ZIP")
 			}
 		}
 	}
+	// The later member is prepared inside the streaming worker, so its hook has
+	// always run before the stream aborts; the bounded wait only absorbs
+	// scheduling, never a skipped preparation.
 	select {
 	case err := <-mutated:
 		if err != nil {
 			t.Fatal(err)
 		}
-	default:
-		t.Fatal("claim did not prepare and replace later directory")
+	case <-time.After(5 * time.Second):
+		t.Fatalf("claim did not prepare and replace later directory (receiver saw: %s)", outcome)
 	}
 	deadline := time.After(5 * time.Second)
 	for {
