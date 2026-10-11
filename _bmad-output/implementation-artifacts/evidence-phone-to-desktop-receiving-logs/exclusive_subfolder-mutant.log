@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T00:24:36.604054-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T00:24:36.82848-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAnExistingSubfolderNameGetsANumberAndNothingInItChanges"}
+{"Time":"2026-10-11T00:24:36.828584-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAnExistingSubfolderNameGetsANumberAndNothingInItChanges","Output":"=== RUN   TestAnExistingSubfolderNameGetsANumberAndNothingInItChanges\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:36.837262-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAnExistingSubfolderNameGetsANumberAndNothingInItChanges","Output":"    destination_test.go:205: destination holds [FairDrop 2026-10-10 14.05 FairDrop 2026-10-10 14.05 (1)], want [FairDrop 2026-10-10 14.05 FairDrop 2026-10-10 14.05 (1) FairDrop 2026-10-10 14.05 (2)]\n","OutputType":"error"}
+{"Time":"2026-10-11T00:24:36.845739-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAnExistingSubfolderNameGetsANumberAndNothingInItChanges","Output":"--- FAIL: TestAnExistingSubfolderNameGetsANumberAndNothingInItChanges (0.02s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:36.845763-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestAnExistingSubfolderNameGetsANumberAndNothingInItChanges","Elapsed":0.02}
+{"Time":"2026-10-11T00:24:36.845809-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:36.847133-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.243s\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:36.847158-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.243}

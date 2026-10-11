@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T00:24:25.669896-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T00:24:25.913199-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt"}
+{"Time":"2026-10-11T00:24:25.913311-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt","Output":"=== RUN   TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:25.913757-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt","Output":"    coordinator_receive_test.go:489: events = transfer-started,transfer-reset, want started then one error and no reset\n","OutputType":"error"}
+{"Time":"2026-10-11T00:24:25.913787-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt","Output":"--- FAIL: TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:25.913803-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt","Elapsed":0}
+{"Time":"2026-10-11T00:24:25.913824-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:25.914708-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.245s\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:25.914726-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.245}

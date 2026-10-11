@@ -74,14 +74,23 @@ func (r *run) landing(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	header := writer.Header()
+	setReceiverPageHeaders(header)
+	header.Set("Content-Length", strconv.Itoa(body.Len()))
+	writer.WriteHeader(http.StatusOK)
+	_, _ = writer.Write(body.Bytes())
+}
+
+// setReceiverPageHeaders sets the response headers every HTML page this server
+// sends a receiver carries: the landing page, the upload page and every result
+// page. No cache, no referrer, no sniffing, and a CSP that allows no script,
+// framing or external resource -- only the page's own inline style and a form
+// that posts back to this origin.
+func setReceiverPageHeaders(header http.Header) {
 	header.Set("Content-Type", "text/html; charset=utf-8")
 	header.Set("Cache-Control", "no-store")
 	header.Set("Referrer-Policy", "no-referrer")
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
-	header.Set("Content-Length", strconv.Itoa(body.Len()))
-	writer.WriteHeader(http.StatusOK)
-	_, _ = writer.Write(body.Bytes())
 }
 
 func formatLogicalSize(size int64) string {

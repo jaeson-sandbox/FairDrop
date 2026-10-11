@@ -1,0 +1,12 @@
+{"Time":"2026-10-11T00:23:42.732925-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T00:23:42.95623-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
+{"Time":"2026-10-11T00:23:42.956352-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== RUN   TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.956421-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== PAUSE TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.956426-04:00","Action":"pause","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
+{"Time":"2026-10-11T00:23:42.95643-04:00","Action":"cont","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
+{"Time":"2026-10-11T00:23:42.956433-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== CONT  TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.956453-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"--- PASS: TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.956479-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Elapsed":0}
+{"Time":"2026-10-11T00:23:42.956507-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.957173-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.224s\n"}
+{"Time":"2026-10-11T00:23:42.957191-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.224}

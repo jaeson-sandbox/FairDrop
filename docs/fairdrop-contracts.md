@@ -1,7 +1,7 @@
 # FairDrop Binding Integration Contracts
 
 Status: Final  
-Updated: 2026-09-12
+Updated: 2026-10-11 (receive session contracts added)
 Architecture: `docs/fairdrop-architecture.md`  
 Spine: `_bmad-output/planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md`
 
@@ -11,7 +11,7 @@ This document fixes the cross-package shapes and ordering rules that separate ph
 
 | Contract | Owner | Implementer |
 | --- | --- | --- |
-| Coordinator public API, `NetworkPort`, `ServerPort`, `SourcePort`, `PreparedDirectory`, `QRPort`, `Observer`, domain values/errors/events | `internal/transfer` | coordinator plus adapters |
+| Coordinator public API, `NetworkPort`, `ServerPort`, `SourcePort`, `PreparedDirectory`, `QRPort`, `SinkPort`, `ReceiveDestination`, `Observer`, domain values/errors/events | `internal/transfer` | coordinator plus adapters (`internal/sink` for `SinkPort`) |
 | `PayloadPort` and `PreparedPayload` | `internal/server` | `internal/stream` |
 | Wails command DTOs | `app.go` adapter, derived from transfer values | `App` |
 | React event types | generated/hand-mirrored from Wails DTOs | `frontend/src/transfer` |
@@ -295,6 +295,107 @@ Collections use `CollectionSourcePort.InspectWithRetained` and `PrepareDirectory
 
 After successful `Prepare`, the server owns exactly one `Close`. It never calls `Close` concurrently with `WriteTo`. Cancellation order is: cancel the data-plane context, force-close the HTTP connection/destination so writes unblock, wait for `WriteTo` and its workers to return, then call `Close`. The same ownership covers normal completion, receiver disconnect, header failure, Cancel, and Stop-before-Write.
 
+## Receive session contracts (phone to desktop)
+
+Canonical product behaviour: `_bmad-output/specs/spec-phone-to-desktop-receiving/SPEC.md` and `receive-contract.md`. This section fixes the Go-level shapes and orderings Story A implements and Story B consumes. Sending is unchanged.
+
+### Port and DTO shapes
+
+```go
+// internal/transfer -- consumer-owned; internal/sink implements it.
+type SinkPort interface {
+    OpenDestination(ctx context.Context, absolutePath string) (ReceiveDestination, error)
+}
+
+type ReceiveDestination interface {
+    Name() string                                  // basename only
+    CheckSpace(declared int64) error               // ErrInsufficientSpace, nil, or "unknown" (a refusal)
+    SaveFile(ctx context.Context, name string, content io.Reader) (int64, error)
+    Snapshot() ReceiveResult                       // never touches the filesystem
+    Folder() (string, bool)                        // absolute subfolder path, Show in Folder only
+    Close() (ReceiveResult, error)                 // final, idempotent; removes the subfolder only if nothing was saved
+}
+
+type ReceiveResult struct{ FilesSaved int; SubfolderExists, MarkingFailed bool }
+
+type ServerStartRequest struct {                   // Destination is non-nil exactly for a receive run
+    SessionID SessionID; Token CapabilityToken; Item StagedItem; Destination ReceiveDestination
+}
+
+func (c *Coordinator) StartReceive(ctx context.Context, absolutePath string) (ReceiveMetadata, error)
+func (c *Coordinator) ReceivedFolder() (string, error)
+```
+
+`Dependencies.Sink` is optional at construction (a coordinator without one still sends and answers `StartReceive` with `not_ready`); `main.go` always supplies `sink.New()`.
+
+Wire shapes, pinned as literals in `app_receive_test.go`:
+
+```text
+ReceiveMetadata  {"sessionId","destination","url","qrBase64","warnings":[]}      destination = folder basename only
+Event.receive    {"filesSaved","result"?,"subfolderExists","markingWarning"}      result: "complete" | "incomplete" | "cancelled"
+Event.notice     "receive_too_large"
+```
+
+On a receive session `progress.bytesSent` counts bytes read from the phone's request and `progress.totalBytes` is its declared `Content-Length` (`totalKnown` is always true). `receive.filesSaved` is the number of files whose no-replace rename succeeded. `result`, `subfolderExists` and `markingWarning` are meaningful only on `transfer-complete` and `transfer-error`; on progress events `result` is absent and the two flags are false. No receive event, diagnostic, HTTP response, mDNS record or log line carries the destination path, the subfolder path or a file name.
+
+The new event kind `transfer-notice` (a sixth lifecycle event) carries `notice` only. It is published for a receive session in STAGED when a phone's upload was refused for space, consumes a sequence number only when published, and changes no state. It is droppable like progress: a claim or teardown holding the lease makes it moot.
+
+### Commands
+
+```go
+func (a *App) SelectReceiveFolder() (string, error)               // native directory chooser at Downloads; dismissal = ""
+func (a *App) StartReceive(folder string) (*transfer.ReceiveMetadata, error)
+func (a *App) ShowReceivedFolder() error                          // OS file manager, argument vector, no shell
+```
+
+Cancel is the existing `CancelTransfer`. `ShowReceivedFolder` refuses (`path_not_found`) when the live session has no subfolder, including after the session has been left. The launcher builds `open <dir>` (macOS), `explorer.exe <dir>` (Windows) or `xdg-open <dir>`; the path is one element of the vector and a relative, empty or NUL-bearing path is refused before any process starts. No new `ErrorCode` was added: a refused or missing folder uses `path_not_found` / `path_unsupported`, a chooser failure uses `chooser_failed`, and a launcher failure uses `path_not_found`. Dedicated receive copy and codes are a Story B / owner decision; adding one means updating the cross-language registry pins listed in `TestTheCodeRegistryIsExactlyThisSet`.
+
+### State and event rules for receive
+
+| Input | Allowed state(s) | Result |
+| --- | --- | --- |
+| StartReceive | IDLE | Same admission gate and lease as Stage. Open and pin the destination (refuse `path_not_found` / `path_unsupported` before any network resource), then address, server, URL (`/upload/{token}`), QR, beacon, commit STAGED. Nothing is written. |
+| StartReceive | Any other state | `busy`; no destination is opened and no state changes. |
+| Cancel | STAGED or CLAIMING (receive) | As a send session: reset only; destination closed; nothing was written. |
+| Cancel | TRANSFERRING (receive) | Cancel the connection, stop the server, close the destination (final count), publish one `transfer-error` with `error.code = cancelled` and `receive.result = "cancelled"`, **hold** in ERROR (no reset timer), release the lease. A second Cancel resets. |
+| Complete / failed | TRANSFERRING (receive) | Stop the server, close the destination, publish the final progress then `transfer-complete` (`result = "complete"`) or `transfer-error` (`result = "incomplete"`), **hold** in DONE / ERROR. |
+| Shutdown | Any | As for send; the destination is closed and no event is published. |
+
+A receive outcome is held until the user leaves it (Cancel, which resets) rather than reset after three seconds, because Show in Folder is offered from it. Valid receive grammars: `started, progress*, final progress, complete`; `started, progress*, final progress when bytes arrived, error(incomplete)`; `started, progress*, error(cancelled)`; and, from STAGED, `notice*` interleaved before `started`. Each ends with a `reset` only when the user leaves a held outcome or cancels while waiting. A Complete or Failed report from the server carries no count: the coordinator closes the destination after the server stops and reads the count from it, so the desktop and the phone's result page cannot disagree.
+
+### HTTP
+
+| Request/state | Response | Side effect |
+| --- | --- | --- |
+| Exact valid GET, unclaimed | 200 script-free upload page | None |
+| POST, declared length, `multipart/form-data`, passes the space check, first file part seen | stream, then a result page (200 complete, 500 incomplete) | Claims the session and writes files |
+| POST without a declared length | 411 fixed page with the form | None; session stays waiting |
+| POST that is not multipart, has no `files` file part, or has an oversized part header | 400 fixed page with the form | None; session stays waiting |
+| POST whose declared size fails the free-space check (or whose free space cannot be determined) | 413 fixed page with the form | None; `transfer-notice` to the desktop; session stays waiting |
+| Anything after the claim while the listener lives | 423 | None |
+| Wrong token, wrong route (including `/download/{token}` on a receive run), wrong method, malformed path | generic 404 | None |
+
+The route is the methodless `/upload/{token}`, with the download route's canonical-path and constant-time token checks. A receive run registers only this route and a send run only the download route. The claim happens when the first file part of the `files` field is seen, not at the first byte: a mistaken tap that carries no file does not spend the one-time link.
+
+Bodies are read with `request.MultipartReader()`; `ParseMultipartForm`, `ReadForm`, `FormFile` and `FormValue` are forbidden (pinned by `TestTheServerNeverBuffersAMultipartBody`). Parts outside the `files` field, and file parts with an empty filename, are read and discarded within the declared size. The request body is wrapped: it counts every byte, hands on nothing past the declared length (`errBodyOverrun`), bounds the headers a part may consume to 32 KiB, and -- once claimed -- re-arms the read deadline with `http.ResponseController.SetReadDeadline` after every read that delivers a byte. `readTimeout` (20 s) therefore bounds only the pre-claim phase; a claimed upload is bounded by `uploadIdleTimeout` (30 s of no progress), never by its total length. Download requests never reach this code and `TestATransferLongerThanEveryTimeoutStillCompletes` is unchanged. A receive upload is complete when its files are saved and the multipart stream ended at exactly the declared length: a failed write of the result page does not demote it.
+
+Result and refusal pages render before any header is sent, carry the receiver page headers (`no-store`, `no-referrer`, `nosniff`, CSP with no script, framing or external resource and `form-action 'self'`), and contain only fixed copy and the saved count -- never a path, a file name or a token.
+
+### Write safety (`internal/sink`)
+
+1. The destination must be an existing directory with no symbolic link or reparse point in any component. On POSIX each component is opened with `O_NOFOLLOW|O_DIRECTORY` relative to the previous one and the final descriptor pins the directory; on Windows each prefix is `lstat`ed and reparse points are refused. Windows addresses by path (no portable `openat`), so its writes are path-based on names this package generates.
+2. The session subfolder `FairDrop YYYY-MM-DD HH.MM` (the clock's wall time, minutes) is created only at the first file part, exclusively (`mkdirat` / `os.Mkdir`, which fail on any existing name including a link); on collision ` (n)` is appended. Directories are 0755 and files 0644 before umask, never executable.
+3. Per file: exclusive create of a random `.fairdrop-<hex>.part` inside the subfolder (`O_CREAT|O_EXCL|O_NOFOLLOW`), copy through one 64 KiB buffer, `fsync`, best-effort OS marking, close, then a **no-replace rename** (`renameatx_np RENAME_EXCL` on macOS, `renameat2 RENAME_NOREPLACE` on Linux, `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING` on Windows). If the final name was taken in the meantime the next ` (n)` is tried. A file counts as saved only after that rename succeeds. Only on a filesystem that reports the exclusive rename unsupported does the hard-link form (`link` then `unlink`) run, and if that cannot work either the rename **fails closed** -- there is no stat-then-rename fallback.
+4. Names: the part after the last `/` or `\`; control, format, bidirectional, line/paragraph-separator and invalid-UTF-8 characters removed; `< > : " | ? *` become `_`; Windows device names are prefixed `_`; trailing dots and spaces trimmed; cut on a rune boundary to 255 UTF-8 bytes keeping the extension; `file` when nothing remains. Names that collide case-insensitively within one upload become `name (1).ext`, `name (2).ext`. A name is never refused.
+5. Free space: `declared + 3 GiB` must fit in the space available to an unprivileged writer (`statfs` `Bavail`, `GetDiskFreeSpaceEx` bytes-available-to-caller). Exactly 3 GiB remaining passes. An unanswerable query refuses.
+6. Failure: the in-progress `.part` file is removed and nothing else; every saved file is kept. `Close` marks the destination closed before it does any filesystem work, waits only for a rename already underway, and thereafter no file can appear under a final name, so the count it returns is the count on disk. It removes the subfolder only when nothing was saved. A writer still running when `Close` returns finishes its own cleanup and the release of the handles.
+7. Marking: macOS `com.apple.quarantine` (`0083;<hex time>;FairDrop;`) set on the open temp file; Windows `<file>:Zone.Identifier` stream `[ZoneTransfer]\r\nZoneId=3` written to the temp name and carried by the rename. A failure keeps the file and sets `markingWarning`. Linux has no marking requirement and never warns.
+8. Memory and temp storage: one 64 KiB buffer per file part; nothing is held in memory and nothing is written outside the session subfolder (no OS temp storage).
+
+### Bounds
+
+`OpenDestination` and `Close` are called through `callBounded` with `AdapterCleanupBound`. An open that does not return is a coded `setup_failed`, and whatever it later returns is closed. A close that does not return is a coded `transfer_failed` naming the destination, recorded as a diagnostic, and the outcome uses the destination's non-blocking snapshot -- which is final because `Close` marks the destination closed first. The coordinator still reaches IDLE with the lease freed. Teardown order is the reverse of acquisition: beacon, server, destination.
+
 ## Public Wails API
 
 ```go
@@ -305,7 +406,12 @@ func (a *App) SelectFile() (string, error)
 func (a *App) SelectFiles() ([]string, error)
 func (a *App) SelectDirectory() (string, error)
 func (a *App) CopyToClipboard(text string) error
+func (a *App) SelectReceiveFolder() (string, error)
+func (a *App) StartReceive(folder string) (*transfer.ReceiveMetadata, error)
+func (a *App) ShowReceivedFolder() error
 ```
+
+The last three are the receive commands described under "Receive session contracts" above.
 
 `SelectFile`, `SelectFiles`, and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. `SelectFiles` selects files only. A cancelled native dialog returns an empty selection without emitting a transfer error. A dialog that fails to open returns `chooser_failed`. One dropped path stages immediately; two through 16 enter an editable in-memory list and stage only on Send. Zero or more than 16 never silently discard members.
 
@@ -344,7 +450,7 @@ Setup failure or cancellation before a successful Stage acknowledgement unwinds 
 ## Claim and HTTP ordering
 
 1. Reject malformed/oversized paths, wrong methods, wrong routes, and token mismatches as `404` without reserving or claiming.
-2. Exact-token GET renders escaped staged metadata and an explicit same-origin POST form without reserving or opening the payload. The first exact-token POST atomically reserves the server. Further valid GET/POST requests receive `423` while that reserved listener remains live.
+2. (Send sessions; the receive route is specified under "Receive session contracts".) Exact-token GET renders escaped staged metadata and an explicit same-origin POST form without reserving or opening the payload. The first exact-token POST atomically reserves the server. Further valid GET/POST requests receive `423` while that reserved listener remains live.
 3. The reserved handler calls `AuthorizeClaim` synchronously. It opens no payload and writes no header first.
 4. Authorization generation-checks the session, enters CLAIMING, stops the beacon, commits TRANSFERRING, and synchronously publishes `transfer-started`. `StopBeacon` diagnostics are safe because the port guarantees the advertisement is gone before return.
 5. Only after authorization succeeds may the handler prepare the payload and write headers/body. If Cancel/Shutdown wins, authorization returns `cancelled`; the handler returns `404` if it can still respond, otherwise closes.
@@ -399,6 +505,9 @@ The Wails adapter emits the event-specific payload without the internal `Kind` f
 | Absolute/relative source path | Sender process only |
 | mDNS TXT | Protocol version and non-sensitive instance identity only |
 | Logs and unrelated HTTP errors | No token, filename, or source path |
+| Receive destination and session subfolder paths | Desktop process only, and only to the OS file manager for Show in Folder. Never an event, HTTP response, mDNS record, diagnostic or log line; the metadata and UI carry the folder's basename only |
+| Phone-supplied file names | Sanitized names exist on the destination disk only; they are never echoed into a response, event, diagnostic or log line |
+| Receive counts | The saved-file count and byte counts appear in events and the result page; nothing else about the upload does |
 
 ## Source mutation and link policy
 

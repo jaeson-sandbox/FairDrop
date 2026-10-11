@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T00:23:49.284693-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T00:23:49.585722-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes"}
+{"Time":"2026-10-11T00:23:49.585847-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Output":"=== RUN   TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:50.403019-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Output":"    upload_test.go:724: terminal = failed (transfer_failed: the upload did not complete) after 812.635292ms, want complete: bytes kept arriving, so the inactivity bound must never have fired\n","OutputType":"error"}
+{"Time":"2026-10-11T00:23:50.405204-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Output":"--- FAIL: TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes (0.82s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:50.405233-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Elapsed":0.82}
+{"Time":"2026-10-11T00:23:50.405278-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:50.408892-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t1.124s\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:50.408917-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":1.124}

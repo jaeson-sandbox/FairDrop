@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T00:24:29.274866-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T00:24:29.487764-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder"}
+{"Time":"2026-10-11T00:24:29.48783-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder","Output":"=== RUN   TestReceivedFolderRefusesWhenThereIsNoSubfolder\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:29.488097-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder","Output":"    coordinator_receive_test.go:408: ReceivedFolder before any file was saved = \u003cnil\u003e, want path_not_found\n","OutputType":"error"}
+{"Time":"2026-10-11T00:24:29.488299-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder","Output":"--- FAIL: TestReceivedFolderRefusesWhenThereIsNoSubfolder (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:29.488322-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder","Elapsed":0}
+{"Time":"2026-10-11T00:24:29.488334-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:29.489033-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.214s\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:29.489048-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.214}

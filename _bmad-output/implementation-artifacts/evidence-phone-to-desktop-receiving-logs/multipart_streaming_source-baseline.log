@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T00:24:04.464611-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T00:24:04.724062-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody"}
+{"Time":"2026-10-11T00:24:04.724131-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Output":"=== RUN   TestTheServerNeverBuffersAMultipartBody\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:04.724554-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Output":"--- PASS: TestTheServerNeverBuffersAMultipartBody (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:04.724566-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Elapsed":0}
+{"Time":"2026-10-11T00:24:04.724579-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:04.725155-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.260s\n"}
+{"Time":"2026-10-11T00:24:04.725167-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.261}

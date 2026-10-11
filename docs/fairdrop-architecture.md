@@ -1,14 +1,14 @@
 # FairDrop Architecture and Design
 
 Status: Final  
-Updated: 2026-09-12
+Updated: 2026-10-11 (receive session added)
 Binding companions: `_bmad-output/planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md` and `docs/fairdrop-contracts.md`
 
 This is the durable technical handoff for humans and implementation agents. The architecture spine is the terse source of binding invariants; this document explains how those invariants fit together and why. Product behavior comes from `_bmad-output/specs/spec-fairdrop/SPEC.md` and its binding companions. The corrected `docs/fairdrop-spec.md` is historical narrative only where it does not conflict.
 
 ## Goals
 
-- Transfer one local file or directory, or a bounded collection of 2–16 roots, to one receiver over the LAN.
+- Transfer one local file or directory, or a bounded collection of 2–16 roots, to one receiver over the LAN, or receive files from one phone browser into a folder the user chose.
 - Keep payload memory constant in payload size and never stage a ZIP on disk.
 - Own every listener, beacon, file handle, pipe, goroutine, callback, and timer for deterministic cancellation and shutdown.
 - Keep Wails and React at the edge so transfer behavior is testable without a desktop window.
@@ -28,10 +28,11 @@ FairDrop uses ports and adapters around a single `internal/transfer.Coordinator`
 | `internal/network` | Select a LAN IPv4 address and own `_fairdrop._tcp` registration | Transfer state or UI events |
 | `internal/server` | Own listener, one-shot HTTP claim, headers, progress, and queued terminal events | Wails events or mDNS |
 | `internal/stream` | Stream files and directory ZIPs with cancellation | Listener lifecycle or frontend state |
+| `internal/sink` | Validate a receive destination and write received files: exclusive creation, no-replace rename, sanitized and de-duplicated names, free-space check, OS marking, cleanup | Listener lifecycle, events, or any decision about when a session ends |
 | `internal/qr` | Encode the capability URL to an in-memory PNG | Filesystem output |
 | React transfer reducer | Render backend-authoritative snapshots/events | Server or transfer lifecycle decisions |
 
-Interfaces belong to the package that consumes them. `SourcePort`, `NetworkPort`, `QRPort`, and `ServerPort` live in `internal/transfer`; `PayloadPort` and `PreparedPayload` live in `internal/server` and are implemented by `internal/stream`. The retired provider-owned interfaces must not be recreated as duplicate or conversion-only shadow types. Concrete constructors remain in their adapter packages. Context-aware Start/Stream behavior remains mandatory; Stop is idempotent and quiescent on every return — or, since Story 3.4, reports a bounded failure naming what did not return in time rather than blocking forever; the server reports progress and terminal outcomes through the binding event stream.
+Interfaces belong to the package that consumes them. `SourcePort`, `NetworkPort`, `QRPort`, `SinkPort` (with `ReceiveDestination`), and `ServerPort` live in `internal/transfer`; `PayloadPort` and `PreparedPayload` live in `internal/server` and are implemented by `internal/stream`. The retired provider-owned interfaces must not be recreated as duplicate or conversion-only shadow types. Concrete constructors remain in their adapter packages. Context-aware Start/Stream behavior remains mandatory; Stop is idempotent and quiescent on every return — or, since Story 3.4, reports a bounded failure naming what did not return in time rather than blocking forever; the server reports progress and terminal outcomes through the binding event stream.
 
 ## Transfer lifecycle
 
@@ -126,7 +127,7 @@ Response rules:
 - `Access-Control-Allow-Origin: *` on rejections as well as the authorized response (D-018, decided 2026-09-12). The capability is the token, not the origin, so a receiver page fetched from anywhere may read the status it was already allowed to provoke. Without it every rejection reads as one opaque network error and the page cannot tell a wrong token from a consumed one from a busy sender. Rejection bodies stay empty and byte-identical, so the status the contract already defines remains the only distinction.
 - `Access-Control-Expose-Headers: Content-Disposition` on the authorized response, because a cross-origin reader sees only the CORS-safelisted response headers unless the server names the rest.
 - `Accept-Ranges: none` on the authorized response, stating the rule below on the wire so a download manager does not range-retry a capability the first request consumed.
-- Bounded request-header and idle timeouts, bounded maximum headers, no request body, and no whole-transfer write deadline.
+- Bounded request-header and idle timeouts, bounded maximum headers, no request body on the download route, and no whole-transfer write deadline. The upload route is the one exception to "no request body"; see the receive decision below.
 - No range/resume behavior in v1.
 
 FairDrop v1 is plain HTTP because an ad-hoc sender cannot present a certificate trusted by arbitrary phone browsers. The capability URL reduces blind discovery but does not protect against a LAN observer. UI copy and release documentation must call this a trusted-LAN transfer, not end-to-end secure sharing.
@@ -158,6 +159,22 @@ After claim authorization, a payload-preparation failure returns a generic `410 
 After `Prepare` succeeds, the server owns exactly one payload `Close`. It cancels the data-plane context and closes the HTTP destination, waits for `WriteTo` and workers, then calls `Close`; `Close` never races `WriteTo`.
 
 Buffer size and per-entry ZIP compression are Phase 3 benchmark choices. They may change without architecture review if payload memory remains O(buffer) in payload bytes (plus the ZIP format's own per-entry central-directory record, and nothing more per entry), cancellation remains prompt, and archive compatibility tests remain green.
+
+## Receiving from a phone
+
+**Decision (phone-to-desktop receiving): a receive session is a session, not a second lifecycle.** `StartReceive` is admitted by the same gate as `Stage` (extracted as `admit`: closing, IDLE only, no cleanup outstanding, one operation lease) and shares everything from the address to the STAGED commit (`activate`). What differs is the subject -- an opened destination instead of a staged item -- and the teardown ledger gains one resource, acquired before the server so the reverse unwind closes it last, after the server has stopped. The state machine, lease rules, generation checks, bounded waits and the event lane are unchanged. A receive session never serves the download route and a send session never serves the upload route; the URL's prefix is the session kind.
+
+**Decision: the destination owns the truth about what was saved; the server reports only how the upload ended.** A `ServerComplete` or `ServerFailed` for a receive run carries no count. The coordinator stops the server, closes the destination (which refuses any further rename and returns the final count), and builds the outcome from that. The desktop's "N files saved" and the phone's result page are both read from the same destination, and a late write from a handler a bounded teardown could not stop cannot change a number after it was reported.
+
+**Decision: a receive outcome is held, and a cancelled upload gets an outcome.** A send outcome is held for a three-second lease because there is nothing to do with it. A receive outcome offers Show in Folder, so it is held until the user leaves it (Cancel resets), and `Shutdown` still closes everything silently. Cancel during TRANSFERRING of a receive session, unlike a send session, publishes one `transfer-error` (`cancelled`, with the saved count) instead of a bare reset: the user is owed "cancelled, N files saved", and the files exist. Cancel before the claim wrote nothing and resets as before.
+
+**Decision: the claim is the first file part; space is checked before any byte is read.** The declared `Content-Length` must exist (411), the content type must be `multipart/form-data` (400), and `declared + 3 GiB` must fit (413) before the body is read; none of those spend the link, and the 413 raises a `transfer-notice` so the desktop can say an upload was refused. The first part of the `files` field is then read before the claim, so a body with no file in it (400) also leaves the session waiting. The claim itself reuses `AuthorizeClaim` and the `claimed` compare-and-swap unchanged.
+
+**Decision: stream with `MultipartReader`, bound by inactivity, never by total time.** `ParseMultipartForm`/`ReadForm` hold an upload in memory or in OS temp storage and are forbidden. The whole-request `ReadTimeout` that protects the metadata GET would cut off a large phone upload, so once an upload is claimed the handler replaces it with a deadline re-armed after every read that delivers a byte (`http.ResponseController.SetReadDeadline`, 30 s). The pre-claim phase keeps the 20 s bound, `ReadHeaderTimeout` and `MaxHeaderBytes` are untouched, and the download route is not on this path at all. net/http never delivers bytes past `Content-Length`, so the server's own overrun guard is a defence against an alternate transport, exercised by a handler-level test; over the wire a longer body arrives as a multipart stream that ends mid-part, which is an incomplete upload.
+
+**Decision: write safety is structural, and a missing capability fails closed.** The destination is pinned by descriptor on POSIX (no path is resolved again after the open), every create is exclusive and refuses links, and the only way a file reaches its final name is a rename that fails instead of replacing. Where the filesystem reports the exclusive rename unsupported, the hard-link form runs; where that cannot work either, the save fails and the upload is reported incomplete. There is deliberately no check-then-rename fallback, and FAT/exFAT behaviour of `renameatx_np` on macOS has not been verified here -- if it is unsupported there, a save to such a volume fails closed rather than weakening the guarantee. Windows has no portable `openat`; its writes are path-based on single-segment names this package generates inside a directory it validated or created, and exclusivity comes from `CREATE_NEW` and `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING`. That is a weaker pin than POSIX against a hostile local process racing the folder, and is stated as such.
+
+**Persistence wording.** FairDrop still keeps no settings, history, logs or staged copies. A receive session saves the received files into the chosen folder and nothing else is written; the folder choice and the outcome are held in memory for the session only. Copy says files were "saved to this computer" only after the rename, and claims nothing beyond the filesystem's own durability.
 
 ## Network selection
 

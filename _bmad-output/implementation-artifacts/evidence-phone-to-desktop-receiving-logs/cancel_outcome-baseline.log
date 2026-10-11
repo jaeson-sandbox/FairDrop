@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T00:24:24.975711-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T00:24:25.179676-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt"}
+{"Time":"2026-10-11T00:24:25.179772-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt","Output":"=== RUN   TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:25.180186-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt","Output":"--- PASS: TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:25.180211-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt","Elapsed":0}
+{"Time":"2026-10-11T00:24:25.180254-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:25.181011-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.205s\n"}
+{"Time":"2026-10-11T00:24:25.181026-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.205}

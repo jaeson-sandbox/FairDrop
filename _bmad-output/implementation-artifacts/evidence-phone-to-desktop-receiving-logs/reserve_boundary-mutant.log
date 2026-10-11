@@ -1,0 +1,10 @@
+{"Time":"2026-10-11T00:23:36.958529-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T00:23:37.199026-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary"}
+{"Time":"2026-10-11T00:23:37.199172-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary","Output":"=== RUN   TestTheSpaceReserveBoundary\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:37.199231-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary","Output":"    destination_test.go:556: exactly the reserve remains: fitsWithReserve(3221226472, 1000) = false, want true\n","OutputType":"error"}
+{"Time":"2026-10-11T00:23:37.199254-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary","Output":"    destination_test.go:556: a zero byte upload needs only the reserve: fitsWithReserve(3221225472, 0) = false, want true\n","OutputType":"error"}
+{"Time":"2026-10-11T00:23:37.1993-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary","Output":"--- FAIL: TestTheSpaceReserveBoundary (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:37.199307-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary","Elapsed":0}
+{"Time":"2026-10-11T00:23:37.199327-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:37.200213-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.241s\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:37.200269-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.242}

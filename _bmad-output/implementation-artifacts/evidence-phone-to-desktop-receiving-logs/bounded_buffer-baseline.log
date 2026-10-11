@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T00:23:40.657218-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T00:23:40.853634-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage"}
+{"Time":"2026-10-11T00:23:40.853706-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Output":"=== RUN   TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:40.890918-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Output":"--- PASS: TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage (0.04s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:40.890937-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Elapsed":0.04}
+{"Time":"2026-10-11T00:23:40.890967-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:40.891444-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.234s\n"}
+{"Time":"2026-10-11T00:23:40.891462-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.234}
