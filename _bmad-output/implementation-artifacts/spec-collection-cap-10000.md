@@ -2,7 +2,7 @@
 title: 'Raise the collection cap to 10,000 with lazy member preparation'
 type: 'feature'
 created: '2026-10-11'
-status: 'in-progress'
+status: 'done'
 baseline_commit: 'e28cc304c979be64428688997e9815e7e57a8eef'
 review_loop_iteration: 0
 context:
@@ -73,10 +73,10 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Backend: lazy member preparation, the 10,000 cap and ordinal width, with tests for every matrix row (failing first where behaviour changes).
-- [ ] Frontend: limit, scrolling draft list, copy and validation.
-- [ ] Update every test and mutation inventory that encoded 16 or pin accumulation, so each guarantee is still named by a mutation; replace obsolete accumulation guarantees with one-at-a-time guarantees.
-- [ ] Docs updated; evidence file `evidence-collection-cap-10000.md` with matrix coverage and mutation totals.
+- [x] Backend: lazy member preparation, the 10,000 cap and ordinal width, with tests for every matrix row (failing first where behaviour changes).
+- [x] Frontend: limit, scrolling draft list, copy and validation.
+- [x] Update every test and mutation inventory that encoded 16 or pin accumulation, so each guarantee is still named by a mutation; replace obsolete accumulation guarantees with one-at-a-time guarantees.
+- [x] Docs updated; evidence file `evidence-collection-cap-10000.md` with matrix coverage and mutation totals.
 
 **Acceptance Criteria:**
 - Given 100 loose files and 100 folders, when downloaded, then an independently read ZIP contains every byte under `001-…` to `200-…` ordinals, and an instrumented source shows at most one member's resources held at once.

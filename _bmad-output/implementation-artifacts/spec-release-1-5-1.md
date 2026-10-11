@@ -2,7 +2,7 @@
 title: 'Release FairDrop 1.5.1'
 type: 'chore'
 created: '2026-10-11'
-status: 'in-progress'
+status: 'done'
 baseline_commit: 'e28cc304c979be64428688997e9815e7e57a8eef'
 context:
   - '{project-root}/AGENTS.md'

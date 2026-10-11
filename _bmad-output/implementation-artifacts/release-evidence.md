@@ -511,3 +511,7 @@ make it 1.3.1", given 2026-09-26.
 ## v1.4.0 — PUBLISHED 2026-10-07
 
 Receiver landing page with explicit Download and Send Again shipped in [v1.4.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.4.0). Tag revision: `551c46db886b3ecef17bb36c7cce08347f60e2ca`. All six jobs in [release run 37666889342](https://github.com/jaeson-sandbox/FairDrop/actions/runs/37666889342) passed. Both downloaded release checksums matched, and the packaged macOS app launched with bundle version 1.4.0. Publication was explicitly owner-authorized. See [the complete release evidence](evidence-release-1-4-0.md) for checksums, exact-head verification, review and limitations.
+
+## v1.5.1 — PUBLISHED 2026-10-11
+
+The 10,000-item collection cap, with lazy member preparation, shipped in [v1.5.1](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.5.1). It was built from v1.5.0 and excludes receiving. Tag revision: `a282903b74eb1db0cdf183c4e40e20f246efb0fc`. All six jobs in [release run 38165726133](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38165726133) passed, both downloaded checksums matched, and the macOS bundle reports version 1.5.1. See [the complete release evidence](evidence-release-1-5-1.md).
