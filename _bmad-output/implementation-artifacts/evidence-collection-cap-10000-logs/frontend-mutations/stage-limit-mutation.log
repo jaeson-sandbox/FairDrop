@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-stage-limit-okafbj3z/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 17ms
+     × stages a draft of exactly 10,000 paths as one batch 16ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > stages a draft of exactly 10,000 paths as one batch
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ src/transfer/useTransfer.test.tsx:160:38
+    158|         mocks.stageTransfers.mockResolvedValue(metadata({name: '10000 …
+    159|         await act(async () => { await hook.result.current.sendDraft() …
+    160|         expect(mocks.stageTransfers).toHaveBeenCalledTimes(1)
+       |                                      ^
+    161|         expect(mocks.stageTransfers.mock.calls[0][0]).toHaveLength(100…
+    162|         expect(hook.result.current.state.phase).toBe('staged')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 82 skipped (83)
+   Start at  14:17:36
+   Duration  562ms (transform 112ms, setup 0ms, import 168ms, tests 17ms, environment 298ms)
+

@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T14:23:38.760193-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T14:23:39.004432-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown"}
+{"Time":"2026-10-11T14:23:39.004531-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Output":"=== RUN   TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:39.007582-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Output":"--- PASS: TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:39.007641-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Elapsed":0}
+{"Time":"2026-10-11T14:23:39.007664-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:39.008901-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"ok  \tfairdrop/internal/stream\t0.249s\n"}
+{"Time":"2026-10-11T14:23:39.008926-04:00","Action":"pass","Package":"fairdrop/internal/stream","Elapsed":0.249}

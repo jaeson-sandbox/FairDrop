@@ -22,15 +22,8 @@ func sourceFault(visit transfer.SourceVisitor, message string) error {
 
 // PrepareDirectory acquires only search rights; enumeration remains lazy.
 func (i *Inspector) PrepareDirectory(ctx context.Context, path string) (transfer.PreparedDirectory, error) {
-	return i.PrepareDirectoryWithRetained(ctx, path, 0)
-}
-
-func (i *Inspector) PrepareDirectoryWithRetained(ctx context.Context, path string, otherPins int) (transfer.PreparedDirectory, error) {
-	if otherPins < 0 || otherPins >= maxRetainedDirectoryHandles {
-		return nil, directoryDepthError()
-	}
 	var pin metadataHandle
-	err := i.withSelectionRetained(ctx, path, otherPins, func(selected selection) error {
+	err := i.withSelection(ctx, path, func(selected selection) error {
 		if selected.isFile {
 			return transfer.NewError(transfer.ErrSourceChanged, "selection is no longer a directory")
 		}
@@ -53,7 +46,7 @@ func (i *Inspector) PrepareDirectoryWithRetained(ctx context.Context, path strin
 	if err != nil {
 		return nil, closeMetadataHandles(ctx, []metadataHandle{pin}, err)
 	}
-	return &preparedDirectory{inspector: i, path: path, pin: pin, otherPins: otherPins}, nil
+	return &preparedDirectory{inspector: i, path: path, pin: pin}, nil
 }
 
 type preparedDirectory struct {
@@ -61,7 +54,6 @@ type preparedDirectory struct {
 	inspector *Inspector
 	path      string
 	pin       metadataHandle
-	otherPins int
 }
 
 func (p *preparedDirectory) Walk(ctx context.Context, visit transfer.SourceVisitor) error {
@@ -73,7 +65,7 @@ func (p *preparedDirectory) Walk(ctx context.Context, visit transfer.SourceVisit
 	if visit == nil {
 		return transfer.NewError(transfer.ErrTransferFailed, "selection walk requires a visitor")
 	}
-	return p.inspector.withSelectionRetained(ctx, p.path, 1+p.otherPins, func(selected selection) error {
+	return p.inspector.withSelectionRetained(ctx, p.path, 1, func(selected selection) error {
 		if selected.isFile {
 			return transfer.NewError(transfer.ErrSourceChanged, "prepared directory was replaced")
 		}

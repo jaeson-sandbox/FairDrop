@@ -29,7 +29,7 @@ People need a quick way to move a local file or directory from a Windows or macO
 ## Capabilities
 
 - **CAP-1**
-  - **intent:** A sender can select one through 16 local regular files or directories through native drag-and-drop or accessible browse and collection controls.
+  - **intent:** A sender can select one through 10,000 local regular files or directories through native drag-and-drop or accessible browse and collection controls.
   - **success:** One valid selection stages atomically. Zero/over-limit selections, canonical duplicates or ancestor overlaps, missing, link-like, reparse or special-file selections fail safely without silently choosing or omitting an item or disclosing its path.
 
 - **CAP-2**
@@ -66,9 +66,9 @@ People need a quick way to move a local file or directory from a Windows or macO
 
 ## Constraints
 
-- FairDrop permits one process, one live send or receive session, one through 16 selected roots, and one counterpart browser; only IDLE accepts Stage. Collection admission validates all members, canonical overlap and checked aggregate logical size before networking; the selection-contract companion defines the extension.
+- FairDrop permits one process, one live send or receive session, one through 10,000 selected roots, and one counterpart browser; only IDLE accepts Stage. Collection admission validates all members, canonical overlap and checked aggregate logical size before networking; the selection-contract companion defines the extension.
 - Runtime product state is ephemeral: no database, settings, telemetry, persistent logs, cloud service, or payload archive is written. The only exception is a receive session, which writes the files it receives. They go into a newly created subfolder of a destination the user chose for that session, are created exclusively, and never replace an existing file; the receive-contract companion defines this.
-- Payload memory remains O(buffer) in payload bytes regardless of payload size; files and ZIPs stream with prompt context cancellation and no whole-payload reads. A streamed ZIP additionally retains the one central-directory record per entry that the format requires (measured at ~250 bytes each) and never a second per-entry index of its own. Collections additionally retain at most 16 selected-root records.
+- Payload memory remains O(buffer) in payload bytes regardless of payload size; files and ZIPs stream with prompt context cancellation and no whole-payload reads. A streamed ZIP additionally retains the one central-directory record per entry that the format requires (measured at ~250 bytes each) and never a second per-entry index of its own. Collections additionally retain at most 10,000 selected-root records.
 - V1 is trusted-LAN plain HTTP with a separate cryptographically random capability token of at least 128 bits. The receiver uses a modern browser on the same LAN, and the sender permits the operating-system firewall access required for inbound HTTP.
 - Capability tokens, source paths and receive destination paths never enter mDNS, diagnostics, unrelated HTTP errors, or persistent storage; receiver-visible names are sanitized as specified by the binding contracts.
 - The coordinator is the sole lifecycle owner. External calls occur outside its mutex, state commits are generation-checked, and every Stop is idempotent and force-closing. Teardown waits are bounded: successful teardown proves quiescence; an elapsed bound reports a coded failure and never claims the underlying resource has stopped. One outstanding cleanup call is retained per adapter, and new Stage admission remains busy until it returns; an inner unquiescent server result is propagated through the longer outer bound (Stories 3.4/3.8).
@@ -78,16 +78,16 @@ People need a quick way to move a local file or directory from a Windows or macO
 - Backend events and typed errors are authoritative and session-scoped. Ordering, sequence, progress, public DTO, HTTP, and disclosure semantics are exactly those in the binding contracts companion.
 - Preserve the proven Wails v2 native drop boundary, standard OS chrome, application-lifetime Wails context, single-instance restoration, and accessibility rules defined by the architecture companions.
 - Preserve ordinary spaces/Unicode, long Windows paths, and UNC paths wherever native Go APIs permit, subject to the portable archive-segment refusals in the contracts. Never shell-interpolate paths; reject symlinks, reparse traversal, and non-regular files with typed errors.
-- Directory preparation pins one search-only root identity until Close, revalidated before walking; this protects Prepare-to-WriteTo replacement, not original Stage or unsnapshotted contents. Traversal retains at most 64 directory handles including ancestors and every selected-directory pin, plus three transient handles, across the whole collection; Stage reserves the future pins. Collection preparation may additionally retain at most 16 verified top-level file descriptors and acquires all source capabilities before headers with transactional cleanup. Borrowed reader revocation joins admitted native reads before owned close. Unsafe archive segments are refused at source and ZIP boundaries, with explicit 0755 directory/0644 file modes; numbered collection roots prevent cross-root collisions, but no within-folder collision or permission-preserving backup promise is made. Consecutive empty reads fail at 101 and reset on progress; native blocking I/O remains non-interruptible.
+- Directory preparation pins one search-only root identity until Close, revalidated before walking; this protects Prepare-to-WriteTo replacement, not original Stage or unsnapshotted contents. Traversal retains at most 64 directory handles including ancestors and the current pin, plus three transient handles; Stage reserves the future pin. A collection prepares its members one at a time in archive order, the first before headers and each later one when the stream reaches it, so at most one top-level file descriptor and one directory pin are held at any moment, and a later member that fails aborts the ZIP without finalization. Borrowed reader revocation joins admitted native reads before owned close. Unsafe archive segments are refused at source and ZIP boundaries, with explicit 0755 directory/0644 file modes; numbered collection roots prevent cross-root collisions, but no within-folder collision or permission-preserving backup promise is made. Consecutive empty reads fail at 101 and reset on progress; native blocking I/O remains non-interruptible.
 - Implementation follows the final architecture spine and contracts. Evidence-driven divergence updates this spec, the architecture decision log and documents, the relevant phase artifact, tests, and managed agent context together.
 
 ## Non-goals
 
-- More than 16 selected roots, collisions within a selected folder, and multiple receivers.
+- More than 10,000 selected roots, collisions within a selected folder, and multiple receivers.
 - TLS, authenticated discovery, hostile-network security, cloud relay, or a native receiver application.
 - IPv6, an interface-selection UI, transfer resume or ranges, transfer history, or persistent preferences.
 - Linux packaging, installers, signing, notarization, auto-update, or default UPX compression.
 
 ## Success signal
 
-On native Windows and macOS, a sender can choose one file or directory, or combine up to 16 items, and a nearby browser downloads exact file bytes or a valid ZIP with distinct collection members. Progress and cancellation remain honest, every session returns to a leak-free IDLE state, and FairDrop retains no product data.
+On native Windows and macOS, a sender can choose one file or directory, or combine up to 10,000 items, and a nearby browser downloads exact file bytes or a valid ZIP with distinct collection members. Progress and cancellation remain honest, every session returns to a leak-free IDLE state, and FairDrop retains no product data.

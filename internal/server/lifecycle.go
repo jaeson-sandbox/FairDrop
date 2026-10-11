@@ -290,7 +290,7 @@ func (s *Server) Start(
 	if receiving && request.Item.Path != "" {
 		return transfer.ServerHandle{}, startError("a receive session has no staged item", nil)
 	}
-	if !receiving && request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > 16) {
+	if !receiving && request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > transfer.MaxCollectionItems) {
 		return transfer.ServerHandle{}, startError("transfer server start requires a staged item", nil)
 	}
 	if authorizer == nil {

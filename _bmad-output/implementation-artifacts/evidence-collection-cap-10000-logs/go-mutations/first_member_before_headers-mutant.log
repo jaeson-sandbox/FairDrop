@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T14:23:40.970629-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T14:23:41.232202-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparesFirstMemberBeforeHeadersAndLaterMembersOnlyWhenReached"}
+{"Time":"2026-10-11T14:23:41.232341-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparesFirstMemberBeforeHeadersAndLaterMembersOnlyWhenReached","Output":"=== RUN   TestCollectionPreparesFirstMemberBeforeHeadersAndLaterMembersOnlyWhenReached\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:41.244926-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparesFirstMemberBeforeHeadersAndLaterMembersOnlyWhenReached","Output":"    collection_lazy_test.go:384: Prepare touched [] and acquired 0; want only the first member\n","OutputType":"error"}
+{"Time":"2026-10-11T14:23:41.245504-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparesFirstMemberBeforeHeadersAndLaterMembersOnlyWhenReached","Output":"--- FAIL: TestCollectionPreparesFirstMemberBeforeHeadersAndLaterMembersOnlyWhenReached (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:41.245528-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparesFirstMemberBeforeHeadersAndLaterMembersOnlyWhenReached","Elapsed":0.01}
+{"Time":"2026-10-11T14:23:41.245546-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:41.246357-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.275s\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:41.246374-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.276}

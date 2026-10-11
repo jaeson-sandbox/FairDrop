@@ -196,7 +196,7 @@ expect_named_failure 'replace executable vet with comment' TestVerifyWorkflowExe
 perl -0pi -e 's/maxRetainedDirectoryHandles = 64/maxRetainedDirectoryHandles = 65/ or die "depth cap mutation did not match\n"' internal/source/source.go
 expect_named_failure 'exceed retained handle cap' TestDirectoryHandleBudgetIncludesAncestorsAndPreparedPin ./internal/source 'want "path_unsupported"'
 
-perl -0pi -e 's/withSelectionRetained\(ctx, absolutePath, 1\+otherPins,/withSelectionRetained(ctx, absolutePath, otherPins,/ or die "pin reservation mutation did not match\n"' internal/source/source.go
+perl -0pi -e 's/withSelectionRetained\(ctx, absolutePath, 1,/withSelectionRetained(ctx, absolutePath, 0,/ or die "pin reservation mutation did not match\n"' internal/source/source.go
 expect_named_failure 'omit future pin reservation' TestDirectoryHandleBudgetIncludesAncestorsAndPreparedPin ./internal/source 'want "path_unsupported"'
 
 if [[ "$platform" == windows ]]; then

@@ -1,0 +1,35 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-focus-room-vawflser/frontend
+
+ ❯ src/ui/draftListStyles.test.ts (4 tests | 1 failed | 3 skipped) 5ms
+     × leaves room inside the scrollport for the 2px outline and its 3px offset 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/draftListStyles.test.ts > collection draft list at large counts > leaves room inside the scrollport for the 2px outline and its 3px offset
+AssertionError: expected ' list-style: decimal; padding-inline-…' to contain 'padding-inline-end: .75rem'
+
+- Expected
++ Received
+
+- padding-inline-end: .75rem
++  list-style: decimal; padding-inline-start: 1.5rem; margin-block: 1rem;
++   max-height: min(24rem, 50vh); overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: .5rem;
++   border: 1px solid var(--color-separator); border-radius: var(--radius-md); 
+
+ ❯ src/ui/draftListStyles.test.ts:26:22
+     24|
+     25|     it('leaves room inside the scrollport for the 2px outline and its …
+     26|         expect(rule).toContain('padding-inline-end: .75rem')
+       |                      ^
+     27|         expect(rule).toContain('padding-block: .25rem')
+     28|         expect(stylesheet).toContain('.fd-draft .fd-button:focus, .fd-…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  14:17:44
+   Duration  416ms (transform 19ms, setup 0ms, import 26ms, tests 5ms, environment 304ms)
+

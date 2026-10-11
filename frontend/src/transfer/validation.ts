@@ -1,6 +1,7 @@
 import {fixedErrorMessages, parsePublicError, publicError, unknownPublicError} from './errors'
 import {
     lifecycleEventNames,
+    MAX_COLLECTION_ITEMS,
     type FileMetadata,
     type LifecycleEvent,
     type LifecycleEventName,
@@ -41,7 +42,7 @@ export function parseFileMetadata(value: unknown): FileMetadata | null {
         const itemCount = hasCount ? record.itemCount : 1
         if (typeof isCollection !== 'boolean' || !Number.isSafeInteger(itemCount)) return null
         if (isCollection) {
-            if (isDir || (itemCount as number) < 2 || (itemCount as number) > 16 || name !== `${itemCount} items`) return null
+            if (isDir || (itemCount as number) < 2 || (itemCount as number) > MAX_COLLECTION_ITEMS || name !== `${itemCount} items`) return null
         } else if (itemCount !== 1) return null
         if (!isCapabilityURL(url) || !isCompletePNGBase64(qrBase64) || !Array.isArray(warnings)) return null
 

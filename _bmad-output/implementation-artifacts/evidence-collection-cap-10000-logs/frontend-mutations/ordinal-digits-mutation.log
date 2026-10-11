@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-digits-xrvept7c/frontend
+
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 33ms
+     × sizes the ordinal column to the digit width of the count, never below two 32ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > sizes the ordinal column to the digit width of the count, never below two
+AssertionError: expected '3' to be '2' // Object.is equality
+
+Expected: "2"
+Received: "3"
+
+ ❯ src/ui/CollectionDraftView.test.tsx:96:119
+     94|     it('sizes the ordinal column to the digit width of the count, neve…
+     95|         const {unmount} = render(<Harness initial={['one.txt', 'two.tx…
+     96|         expect(document.querySelector<HTMLElement>('.fd-draft__list')?…
+       |                                                                                                                       ^
+     97|         unmount()
+     98|         const hundred = render(<Harness initial={Array.from({length: 1…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  14:18:09
+   Duration  518ms (transform 43ms, setup 0ms, import 93ms, tests 33ms, environment 306ms)
+

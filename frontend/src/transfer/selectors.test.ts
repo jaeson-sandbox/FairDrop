@@ -177,7 +177,7 @@ describe('state-aware selectors', () => {
 
         expect(selectOutcome(idle)).toEqual({kind: 'error', retained: true, error: retainedError})
         expect(selectCommandError(idle)).toEqual({
-            code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.',
+            code: 'invalid_selection', message: 'Choose 1 to 10,000 separate files or folders.',
         })
     })
 
@@ -298,7 +298,7 @@ describe('command errors', () => {
             phase: 'idle',
             retainedOutcome: null,
             commandError: publicError('invalid_selection'),
-        })).toEqual({code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'})
+        })).toEqual({code: 'invalid_selection', message: 'Choose 1 to 10,000 separate files or folders.'})
 
         expect(selectCommandError({
             phase: 'staged',

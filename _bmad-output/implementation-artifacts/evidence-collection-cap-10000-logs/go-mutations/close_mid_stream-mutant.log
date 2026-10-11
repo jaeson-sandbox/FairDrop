@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T14:23:52.346848-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T14:23:52.594393-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionCloseMidStreamReleasesTheCurrentMemberOnly"}
+{"Time":"2026-10-11T14:23:52.594451-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCloseMidStreamReleasesTheCurrentMemberOnly","Output":"=== RUN   TestCollectionCloseMidStreamReleasesTheCurrentMemberOnly\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:52.705288-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCloseMidStreamReleasesTheCurrentMemberOnly","Output":"    collection_lazy_test.go:670: Close mid-stream: held=1 acquired=1 closes=0; want 0, 1, 1\n","OutputType":"error"}
+{"Time":"2026-10-11T14:23:52.70563-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCloseMidStreamReleasesTheCurrentMemberOnly","Output":"--- FAIL: TestCollectionCloseMidStreamReleasesTheCurrentMemberOnly (0.11s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:52.705643-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionCloseMidStreamReleasesTheCurrentMemberOnly","Elapsed":0.11}
+{"Time":"2026-10-11T14:23:52.705676-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:52.706419-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.359s\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:52.706429-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.36}

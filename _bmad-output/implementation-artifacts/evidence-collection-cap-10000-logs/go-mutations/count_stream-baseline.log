@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T14:23:04.844567-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T14:23:05.105894-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource"}
+{"Time":"2026-10-11T14:23:05.105996-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource","Output":"=== RUN   TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:05.111634-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource","Output":"--- PASS: TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:05.111654-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource","Elapsed":0.01}
+{"Time":"2026-10-11T14:23:05.111676-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:05.113081-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"ok  \tfairdrop/internal/stream\t0.268s\n"}
+{"Time":"2026-10-11T14:23:05.113134-04:00","Action":"pass","Package":"fairdrop/internal/stream","Elapsed":0.269}

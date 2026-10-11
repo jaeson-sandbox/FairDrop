@@ -1,0 +1,146 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-count-copy-5ccphtp_/frontend
+
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 35ms
+     × shows the count out of 10,000, grouped for large lists 34ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > shows the count out of 10,000, grouped for large lists
+TestingLibraryElementError: Unable to find an element with the text: 2 of 10,000 items. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"fd-region"[39m
+      [33mdata-phase-view[39m=[32m"draft"[39m
+    [36m>[39m
+      [36m<section[39m
+        [33maria-labelledby[39m=[32m"fd-draft-heading"[39m
+        [33mclass[39m=[32m"fd-draft fd-packet"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"fd-state-heading"[39m
+          [33mid[39m=[32m"fd-draft-heading"[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mSelected items[0m
+        [36m</h1>[39m
+        [36m<p[39m
+          [33maria-live[39m=[32m"polite"[39m
+          [33mclass[39m=[32m"fd-meta"[39m
+        [36m>[39m
+          [0m2 of 16 items[0m
+        [36m</p>[39m
+        [36m<ol[39m
+          [33mclass[39m=[32m"fd-draft__list"[39m
+          [33mstyle[39m=[32m"--fd-ordinal-digits: 2;"[39m
+        [36m>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m1[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0mone.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove 1. one.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m2[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0mtwo.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove 2. two.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+        [36m</ol>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"fd-draft__actions"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"fd-button fd-button--secondary fd-target"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mAdd Files[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"fd-button fd-button--secondary fd-target"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mAdd Folder[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"fd-button fd-button--primary fd-target"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mSend[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mCancel[0m
+          [36m</button>[39m
+        [36m</div>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/CollectionDraftView.test.tsx:28:23
+     26|     it('shows the count out of 10,000, grouped for large lists', () =>…
+     27|         const {unmount} = render(<Harness initial={['one.txt', 'two.tx…
+     28|         expect(screen.getByText('2 of 10,000 items')).toBeTruthy()
+       |                       ^
+     29|         unmount()
+     30|         render(<Harness initial={Array.from({length: 1234}, (_, i) => …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  14:17:38
+   Duration  505ms (transform 40ms, setup 0ms, import 87ms, tests 35ms, environment 303ms)
+

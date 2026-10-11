@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-focus-room-vawflser/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 3 skipped (4)
+   Start at  14:17:43
+   Duration  396ms (transform 15ms, setup 0ms, import 20ms, tests 1ms, environment 300ms)
+

@@ -515,3 +515,7 @@ Receiver landing page with explicit Download and Send Again shipped in [v1.4.0](
 ## v1.5.0 — PUBLISHED 2026-10-11
 
 Sending multiple selected items as one streamed ZIP shipped in [v1.5.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.5.0). Tag revision: `e28cc304c979be64428688997e9815e7e57a8eef`. All six jobs in [release run 38111051180](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38111051180) passed, both downloaded release checksums matched, and the macOS bundle reports version 1.5.0 with a valid ad-hoc signature. Publication was explicitly authorized by the owner. See [the complete release evidence](evidence-release-1-5-0.md).
+
+## v1.5.1 — PUBLISHED 2026-10-11
+
+The 10,000-item collection cap, with lazy member preparation, shipped in [v1.5.1](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.5.1). It was built from v1.5.0 and excludes receiving. Tag revision: `a282903b74eb1db0cdf183c4e40e20f246efb0fc`. All six jobs in [release run 38165726133](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38165726133) passed, both downloaded checksums matched, and the macOS bundle reports version 1.5.1. See [the complete release evidence](evidence-release-1-5-1.md).

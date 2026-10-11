@@ -273,6 +273,7 @@ const commands: ControllerCommands = {
     canRetry: false,
     canSendAgain: false,
     draft: null,
+    draftIds: [],
     openDraft: vi.fn(),
     appendDraft: vi.fn(),
     selectDraftFiles: vi.fn(),
@@ -522,7 +523,7 @@ describe('focus-owned transitions', () => {
             {
                 phase: 'idle',
                 retainedOutcome: null,
-                commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
+                commandError: {code: 'invalid_selection', message: 'Choose 1 to 10,000 separate files or folders.'},
             },
             'command-error',
         ],
@@ -869,7 +870,7 @@ describe('reset after a terminal outcome', () => {
         mountWith({
             phase: 'idle',
             retainedOutcome: {kind: 'done', receipt: doneReceipt},
-            commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
+            commandError: {code: 'invalid_selection', message: 'Choose 1 to 10,000 separate files or folders.'},
         })
 
         const panels = [...document.querySelectorAll('.fd-outcome')]
@@ -915,7 +916,7 @@ describe('a native drop on the outcome card (Story 9.6)', () => {
         mountWith({
             phase: 'idle',
             retainedOutcome: null,
-            commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
+            commandError: {code: 'invalid_selection', message: 'Choose 1 to 10,000 separate files or folders.'},
         } as TransferState)
 
         const card = document.querySelector('.fd-outcome')

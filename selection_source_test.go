@@ -16,36 +16,38 @@ import (
 
 type countedCollectionSource struct {
 	transfer.SourcePort
-	plain, budgeted int
+	inspects int
 }
 
 func (s *countedCollectionSource) Inspect(ctx context.Context, path string) (transfer.StagedItem, error) {
-	s.plain++
+	s.inspects++
 	return s.SourcePort.Inspect(ctx, path)
 }
 
-func (s *countedCollectionSource) InspectWithRetained(ctx context.Context, path string, pins int) (transfer.StagedItem, error) {
-	s.budgeted++
-	return s.SourcePort.(transfer.CollectionSourcePort).InspectWithRetained(ctx, path, pins)
-}
-
-func (s *countedCollectionSource) PrepareDirectoryWithRetained(ctx context.Context, path string, pins int) (transfer.PreparedDirectory, error) {
-	return s.SourcePort.(transfer.CollectionSourcePort).PrepareDirectoryWithRetained(ctx, path, pins)
-}
-
-func TestBudgetedSelectionResolvesOnceAndTraversesOnce(t *testing.T) {
-	root := t.TempDir()
-	file := filepath.Join(root, "report.txt")
-	if err := os.WriteFile(file, []byte("one"), 0o600); err != nil {
+func TestSelectionResolvesAndTraversesEachCollectionRootOnce(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
 		t.Fatal(err)
+	}
+	var paths []string
+	for _, name := range []string{"one.txt", "two.txt", "three.txt"} {
+		file := filepath.Join(root, name)
+		if err := os.WriteFile(file, []byte("one"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, file)
 	}
 	raw := &countedCollectionSource{SourcePort: source.New()}
 	selection := newSelectionSource(raw)
-	if _, err := selection.InspectWithRetained(context.Background(), file, 1); err != nil {
-		t.Fatal(err)
+	resolutions := 0
+	selection.resolve = func(path string) string { resolutions++; return path }
+	for _, path := range paths {
+		if _, err := selection.Inspect(context.Background(), path); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if raw.plain != 0 || raw.budgeted != 1 {
-		t.Fatalf("budgeted selection traversed plain=%d budgeted=%d times; want 0 and 1", raw.plain, raw.budgeted)
+	if raw.inspects != 3 || resolutions != 3 {
+		t.Fatalf("three roots resolved %d times and traversed %d times; want once each", resolutions, raw.inspects)
 	}
 }
 

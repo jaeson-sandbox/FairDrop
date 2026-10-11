@@ -1,0 +1,19 @@
+KILLED metadata-count: accepts a coherent collection
+KILLED metadata-count-lower: accepts a coherent collection
+KILLED append-limit: rejects a 10,001st append
+KILLED append-limit-lower: accepts appends up to exactly 10,000 rows
+KILLED open-limit: refuses an initial 10,001-path drop
+KILLED stage-limit: stages a draft of exactly 10,000 paths as one batch
+KILLED count-copy: shows the count out of 10,000
+KILLED count-grouping: shows the count out of 10,000
+KILLED list-scroll: scrolls within the window instead of stretching the page
+KILLED focus-room: leaves room inside the scrollport
+KILLED batch-command: restores the editable batch
+KILLED draft-recovery: restores the editable batch
+KILLED cancel-forgets: forgets retryable remembered paths
+KILLED display-name: sanitizes draft display names
+KILLED draft-refusal: keeps draft rows and shows a safe error
+KILLED visible-order: shows explicit one-based order
+KILLED remove-order: shows explicit one-based order
+KILLED error-focus: describes a newly focused draft heading
+18/18 collection frontend mutations killed

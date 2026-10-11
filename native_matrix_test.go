@@ -71,12 +71,8 @@ func (s *inspectedNativeSource) Inspect(ctx context.Context, path string) (trans
 	return s.SourcePort.Inspect(ctx, path)
 }
 
-func (s *inspectedNativeSource) InspectWithRetained(ctx context.Context, path string, otherPins int) (transfer.StagedItem, error) {
-	return s.SourcePort.(transfer.CollectionSourcePort).InspectWithRetained(ctx, path, otherPins)
-}
-
-func (s *inspectedNativeSource) PrepareDirectoryWithRetained(ctx context.Context, path string, otherPins int) (transfer.PreparedDirectory, error) {
-	pin, err := s.SourcePort.(transfer.CollectionSourcePort).PrepareDirectoryWithRetained(ctx, path, otherPins)
+func (s *inspectedNativeSource) PrepareDirectory(ctx context.Context, path string) (transfer.PreparedDirectory, error) {
+	pin, err := s.SourcePort.PrepareDirectory(ctx, path)
 	if err == nil && s.afterPrepareDirectory != nil {
 		s.afterPrepareDirectory(path)
 	}
