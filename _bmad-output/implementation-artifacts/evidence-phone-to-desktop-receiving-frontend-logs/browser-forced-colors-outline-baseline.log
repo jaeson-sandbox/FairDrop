@@ -1,10 +1,10 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-forced-colors-outline-usx7164o/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-forced-colors-outline-gp28dr4h/frontend
 
-1:16:34 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+5:01:17 AM [vite] (client) Re-optimizing dependencies because vite config has changed
 
  Test Files  1 passed (1)
       Tests  2 passed | 35 skipped (37)
-   Start at  01:16:34
-   Duration  2.63s (transform 0ms, setup 0ms, import 197ms, tests 1.57s, environment 0ms)
+   Start at  05:01:17
+   Duration  2.63s (transform 0ms, setup 0ms, import 180ms, tests 1.60s, environment 0ms)
 

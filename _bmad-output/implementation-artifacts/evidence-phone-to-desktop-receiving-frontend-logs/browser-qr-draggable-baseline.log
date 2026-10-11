@@ -1,10 +1,10 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-qr-draggable-cok0lr32/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-qr-draggable-wjgui750/frontend
 
-1:17:06 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+5:01:49 AM [vite] (client) Re-optimizing dependencies because vite config has changed
 
  Test Files  1 passed (1)
       Tests  1 passed | 36 skipped (37)
-   Start at  01:17:06
-   Duration  1.44s (transform 0ms, setup 0ms, import 173ms, tests 684ms, environment 0ms)
+   Start at  05:01:49
+   Duration  1.40s (transform 0ms, setup 0ms, import 167ms, tests 669ms, environment 0ms)
 

@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-not-over-cancel-ddhmfxkz/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-not-over-cancel-k5cc8vlp/frontend
 
- ❯ src/ui/announce.receive.test.ts (19 tests | 1 failed | 18 skipped) 4ms
-     × is not spoken over a pending cancellation 4ms
+ ❯ src/ui/announce.receive.test.ts (20 tests | 1 failed | 19 skipped) 4ms
+     × is not spoken over a pending cancellation 3ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -31,7 +31,7 @@ null
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 18 skipped (19)
-   Start at  01:16:12
-   Duration  416ms (transform 36ms, setup 0ms, import 44ms, tests 4ms, environment 288ms)
+      Tests  1 failed | 19 skipped (20)
+   Start at  05:00:47
+   Duration  396ms (transform 34ms, setup 0ms, import 42ms, tests 4ms, environment 274ms)
 

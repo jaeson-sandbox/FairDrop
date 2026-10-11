@@ -174,6 +174,12 @@ func (c *Coordinator) closeDestinationBounded(live *session) error {
 	})
 	if !completed {
 		snapshot := recv.dest.Snapshot()
+		// A snapshot is taken mid-Close. A destination that saved nothing is
+		// about to remove its subfolder yet still reports it as existing, and
+		// the close that would settle that did not return in time, so the folder
+		// is claimed only when files were saved. Close itself reports the same
+		// rule when it does return.
+		snapshot.SubfolderExists = snapshot.SubfolderExists && snapshot.FilesSaved > 0
 		c.mu.Lock()
 		if !recv.finalized {
 			recv.final, recv.finalized = snapshot, true

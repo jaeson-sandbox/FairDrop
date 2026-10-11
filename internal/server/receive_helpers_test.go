@@ -45,6 +45,9 @@ type testPart struct {
 	// rawHeaders replaces the whole Content-Disposition value when set, for
 	// names the standard encoders would escape.
 	rawDisposition string
+	// transferEncoding, when set, adds a Content-Transfer-Encoding header to the
+	// part so a test can send a body that is not meant to be decoded.
+	transferEncoding string
 }
 
 func uploadFile(name, content string) testPart {
@@ -72,6 +75,9 @@ func multipartBody(parts ...testPart) []byte {
 		}
 		if part.filename != nil || part.rawDisposition != "" {
 			body.WriteString("Content-Type: application/octet-stream\r\n")
+		}
+		if part.transferEncoding != "" {
+			fmt.Fprintf(&body, "Content-Transfer-Encoding: %s\r\n", part.transferEncoding)
 		}
 		body.WriteString("\r\n")
 		body.WriteString(part.content)

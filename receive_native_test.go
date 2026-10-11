@@ -298,6 +298,30 @@ func TestNativeReceiveCancelMidFileKeepsCompletedFilesAndReportsCancelled(t *tes
 	}
 }
 
+// An unwritable folder is refused when it is chosen -- path_unsupported, no
+// listener, no event -- so the one-time link is never shown for a folder that
+// cannot take a file and then burned by the first upload.
+func TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource(t *testing.T) {
+	app, events, _ := nativeReceiveApp(t)
+	base := filepath.Dir(nativeFixture(t))
+	unwritable := nativeUnwritableDir(t, base)
+
+	if _, err := app.StartReceive(unwritable); transfer.ErrorCodeOf(err) != transfer.ErrPathUnsupported {
+		t.Fatalf("StartReceive of an unwritable folder code=%s, want path_unsupported", transfer.ErrorCodeOf(err))
+	}
+	select {
+	case event := <-events:
+		t.Fatalf("a refusal published %q", event.Kind)
+	default:
+	}
+	if entries, err := os.ReadDir(unwritable); err != nil || len(entries) != 0 {
+		t.Fatalf("the refused folder holds %v (%v), want it untouched", entries, err)
+	}
+	if _, err := app.StartReceive(base); err != nil {
+		t.Fatalf("a refusal left the coordinator unusable: code=%s", transfer.ErrorCodeOf(err))
+	}
+}
+
 func TestNativeReceiveRefusesUnusableFoldersBeforeAnyNetworkResource(t *testing.T) {
 	app, events, _ := nativeReceiveApp(t)
 	base := filepath.Dir(nativeFixture(t))

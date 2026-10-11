@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-reducer-bvwk__zr/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-reducer-dnvsu8vt/frontend
 
- ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 7ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
      × shows an incomplete upload as incomplete with the exact count 6ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -26,19 +26,19 @@ AssertionError: expected { phase: 'receive-outcome', …(4) } to deeply equal { 
     "phase": "receive-outcome",
     "session": {
 
- ❯ src/transfer/state.receive.test.ts:303:23
-    301|         }))
-    302|
-    303|         expect(state).toEqual({
+ ❯ src/transfer/state.receive.test.ts:344:23
+    342|         }))
+    343|
+    344|         expect(state).toEqual({
        |                       ^
-    304|             phase: 'receive-outcome',
-    305|             session: {sessionId, lastSeq: 2},
+    345|             phase: 'receive-outcome',
+    346|             session: {sessionId, lastSeq: 2},
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 37 skipped (38)
-   Start at  01:15:54
-   Duration  433ms (transform 47ms, setup 0ms, import 58ms, tests 7ms, environment 287ms)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:30
+   Duration  418ms (transform 45ms, setup 0ms, import 55ms, tests 7ms, environment 276ms)
 

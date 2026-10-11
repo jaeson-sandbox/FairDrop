@@ -1,4 +1,4 @@
-platform=darwin cases=27
+platform=darwin cases=48
 reserve_boundary: baseline=pass mutant=named assertion
 reserve_constant: baseline=pass mutant=named assertion
 partial_removal: baseline=pass mutant=named assertion
@@ -22,6 +22,27 @@ destination_close: baseline=pass mutant=named assertion
 outcome_held: baseline=pass mutant=named assertion
 show_refuses_without_subfolder: baseline=pass mutant=named assertion
 show_in_folder_no_shell: baseline=pass mutant=named assertion
+long_path_prefix_drive: baseline=pass mutant=named assertion
+long_path_prefix_unc: baseline=pass mutant=named assertion
+deadline_refresh_after_save: baseline=pass mutant=named assertion
+raw_part: baseline=pass mutant=named assertion
+race_exactly_one_terminal: baseline=pass mutant=named assertion
+close_bound_subfolder: baseline=pass mutant=named assertion
+commit_exist_retry: baseline=pass mutant=named assertion
+sanitize_device_prefix: baseline=pass mutant=named assertion
+sanitize_control_removal: baseline=pass mutant=named assertion
+sanitize_bidi_removal: baseline=pass mutant=named assertion
+dedupe_hint_never_skips: baseline=pass mutant=named assertion
+sanitize_fallback: baseline=pass mutant=named assertion
+short_body_incomplete: baseline=pass mutant=named assertion
+upload_wrong_token_404: baseline=pass mutant=named assertion
+upload_field_filter: baseline=pass mutant=named assertion
+writable_destination_at_open: baseline=pass mutant=named assertion
+writable_destination_native: baseline=pass mutant=named assertion
+never_executable_file: baseline=pass mutant=named assertion
+never_loose_directory: baseline=pass mutant=named assertion
+destination_link_refusal: baseline=pass mutant=named assertion
+link_classification: baseline=pass mutant=named assertion
 no_replace_rename: baseline=pass mutant=named assertion
 exclusive_subfolder: baseline=pass mutant=named assertion
 exclusive_file: baseline=pass mutant=named assertion

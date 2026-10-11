@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-accepted-nuh1q0q9/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 39 skipped (40)
+   Start at  05:01:02
+   Duration  419ms (transform 49ms, setup 0ms, import 61ms, tests 2ms, environment 279ms)
+

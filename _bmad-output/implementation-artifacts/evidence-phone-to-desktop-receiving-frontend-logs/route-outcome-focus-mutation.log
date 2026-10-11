@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-route-outcome-focus-qaevl7tk/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-route-outcome-focus-11tq5jpi/frontend
 
- ❯ src/ui/announce.receive.test.ts (19 tests | 1 failed | 18 skipped) 5ms
+ ❯ src/ui/announce.receive.test.ts (20 tests | 1 failed | 19 skipped) 4ms
      × focuses the outcome when a receive ends, whichever way it ended 4ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -31,7 +31,7 @@ null
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 18 skipped (19)
-   Start at  01:16:30
-   Duration  419ms (transform 37ms, setup 0ms, import 46ms, tests 5ms, environment 287ms)
+      Tests  1 failed | 19 skipped (20)
+   Start at  05:01:13
+   Duration  400ms (transform 34ms, setup 0ms, import 41ms, tests 4ms, environment 276ms)
 

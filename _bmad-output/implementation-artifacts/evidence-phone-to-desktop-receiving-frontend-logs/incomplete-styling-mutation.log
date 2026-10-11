@@ -1,11 +1,11 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-styling-pyz5okya/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-styling-u3se2lgv/frontend
 
- ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 4 failed | 29 skipped) 79ms
-     × heads it "Upload incomplete" with the exact count and no success wording 67ms
-     × says "1 file saved" for one 5ms
-     × explains that finished files were kept and the one in progress was removed 3ms
-     × says no files saved, and that nothing was added, when none finished 4ms
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 4 failed | 29 skipped) 71ms
+     × heads it "Upload incomplete" with the exact count and no success wording 61ms
+     × says "1 file saved" for one 4ms
+     × explains that finished files were kept and the one in progress was removed 2ms
+     × says no files saved, and that nothing was added, when none finished 3ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -76,6 +76,6 @@ Received: "No files saved"
 
  Test Files  1 failed (1)
       Tests  4 failed | 29 skipped (33)
-   Start at  01:15:59
-   Duration  559ms (transform 59ms, setup 0ms, import 111ms, tests 79ms, environment 287ms)
+   Start at  05:00:34
+   Duration  538ms (transform 54ms, setup 0ms, import 104ms, tests 71ms, environment 277ms)
 

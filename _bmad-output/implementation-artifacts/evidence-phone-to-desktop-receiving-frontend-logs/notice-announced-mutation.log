@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-announced-xebqn3bn/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-announced-35o69vw8/frontend
 
- ❯ src/ui/announce.receive.test.ts (19 tests | 2 failed | 15 skipped) 6ms
+ ❯ src/ui/announce.receive.test.ts (20 tests | 2 failed | 16 skipped) 5ms
      × is spoken by the announcer, not focused 4ms
      × is spoken again for each further refusal 1ms
 
@@ -54,7 +54,7 @@ null
 
 
  Test Files  1 failed (1)
-      Tests  2 failed | 2 passed | 15 skipped (19)
-   Start at  01:16:11
-   Duration  422ms (transform 35ms, setup 0ms, import 43ms, tests 6ms, environment 290ms)
+      Tests  2 failed | 2 passed | 16 skipped (20)
+   Start at  05:00:46
+   Duration  407ms (transform 34ms, setup 0ms, import 42ms, tests 5ms, environment 277ms)
 

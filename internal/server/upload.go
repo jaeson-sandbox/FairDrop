@@ -296,6 +296,13 @@ func (r *run) savePartsAndDrain(ctx context.Context, body *uploadBody, multi *mu
 		if _, err := r.destination.SaveFile(ctx, part.name, part.part); err != nil {
 			return err
 		}
+		// The inactivity bound times the phone's silence, not the desktop's own
+		// disk: SaveFile ends with an fsync, marking and a rename that can
+		// outlast the bound on a slow volume (F_FULLFSYNC on macOS), during which
+		// no read of the body happens. Without a fresh deadline here the very
+		// next read would hit one that expired while the phone was waiting on us,
+		// and a healthy upload would be reported incomplete.
+		body.refreshDeadline()
 		// Each saved file is an event the desktop wants immediately, not at the
 		// next 4 Hz tick.
 		r.lane.publishProgress(receiveProgressEvent(r.sessionID, progress.snapshot(), r.destination.Snapshot().FilesSaved))
@@ -434,7 +441,10 @@ func (b *uploadBody) Close() error { return b.body.Close() }
 func (b *uploadBody) nextFilePart(multi *multipart.Reader) (filePart, error) {
 	for {
 		b.inHeader, b.headerBytes = true, 0
-		part, err := multi.NextPart()
+		// NextRawPart, not NextPart: NextPart transparently decodes a
+		// quoted-printable part and hides its header, so the saved bytes would
+		// differ from the bytes the phone sent.
+		part, err := multi.NextRawPart()
 		b.inHeader = false
 		if b.err != nil {
 			return filePart{}, b.err

@@ -123,22 +123,32 @@ func splitExtension(name string) (stem, extension string) {
 // guards it.
 type nameSet struct {
 	taken map[string]struct{}
+	// next remembers, per requested name, the first " (n)" that has not yet been
+	// found taken. Names are only ever added, so every number below the hint is
+	// known to be taken and need not be probed again: claiming thousands of files
+	// with the same name costs one probe each rather than a rescan from (1).
+	next map[string]int
 }
 
 func newNameSet() *nameSet {
-	return &nameSet{taken: make(map[string]struct{})}
+	return &nameSet{taken: make(map[string]struct{}), next: make(map[string]int)}
 }
 
 // claim returns the first of name, "stem (1).ext", "stem (2).ext" ... that is
 // not yet taken, and marks it taken.
 func (s *nameSet) claim(name string) string {
-	candidate := name
-	for attempt := 1; ; attempt++ {
+	if _, taken := s.taken[strings.ToLower(name)]; !taken {
+		s.taken[strings.ToLower(name)] = struct{}{}
+		return name
+	}
+	hint := strings.ToLower(name)
+	for attempt := max(s.next[hint], 1); ; attempt++ {
+		candidate := fitName(name, " ("+strconv.Itoa(attempt)+")")
 		key := strings.ToLower(candidate)
 		if _, taken := s.taken[key]; !taken {
 			s.taken[key] = struct{}{}
+			s.next[hint] = attempt + 1
 			return candidate
 		}
-		candidate = fitName(name, " ("+strconv.Itoa(attempt)+")")
 	}
 }

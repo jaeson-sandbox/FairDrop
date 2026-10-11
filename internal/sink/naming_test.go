@@ -1,6 +1,7 @@
 package sink
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -128,9 +129,45 @@ func TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively(t *testing
 		{"Y", "Y (1)"},
 		{".dotfile", ".dotfile"},
 		{".dotfile", ".dotfile (1)"},
+		// A number already taken under another case is skipped, not reused: the
+		// candidate's own key is folded, not only the requested name's.
+		{"x (3).jpg", "x (3).jpg"},
+		{"X.JPG", "X (4).JPG"},
 	} {
 		if got := set.claim(step.in); got != step.want {
 			t.Fatalf("claim(%q) = %q, want %q", step.in, got, step.want)
+		}
+	}
+}
+
+// The per-name hint that keeps thousands of identical names linear must never
+// skip a free number: a name claimed directly in between is stepped over, and
+// numbers are still handed out in order with none missed.
+func TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver(t *testing.T) {
+	t.Parallel()
+
+	set := newNameSet()
+	for _, step := range []struct{ in, want string }{
+		{"a.txt", "a.txt"},
+		{"a.txt", "a (1).txt"},
+		{"a (3).txt", "a (3).txt"},
+		{"a.txt", "a (2).txt"},
+		{"a.txt", "a (4).txt"},
+		{"A.TXT", "A (5).TXT"},
+	} {
+		if got := set.claim(step.in); got != step.want {
+			t.Fatalf("claim(%q) = %q, want %q", step.in, got, step.want)
+		}
+	}
+
+	bulk := newNameSet()
+	for index := 0; index <= 3000; index++ {
+		want := "photo.jpg"
+		if index > 0 {
+			want = "photo (" + strconv.Itoa(index) + ").jpg"
+		}
+		if got := bulk.claim("photo.jpg"); got != want {
+			t.Fatalf("claim #%d of the same name = %q, want %q", index, got, want)
 		}
 	}
 }

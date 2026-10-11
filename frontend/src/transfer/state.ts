@@ -496,11 +496,24 @@ function reduceReceiveWaiting(
             // The upload that was refused wrote nothing and the session is
             // still open, so this changes nothing but a count.
             return {...state, session, refusals: state.refusals + 1}
+        case 'transfer-error': {
+            // The one terminal event that CAN precede `started`: the backend ends
+            // a receive nobody claimed when its server lane closes first (Go
+            // TestALaneThatClosesBeforeAnyClaimFailsAWaitingReceive). Dropping it
+            // left a QR for a listener that no longer exists. Only a payload that
+            // is coherent with a session no phone claimed is applied -- an
+            // incomplete result with nothing saved and no folder; anything else
+            // is refused rather than guessed at.
+            const receive = event.receive
+            if (receive === undefined || receive.result !== 'incomplete' ||
+                receive.filesSaved !== 0 || receive.subfolderExists) return state
+            return receiveOutcomeState(state, session, receive, 'incomplete')
+        }
         case 'transfer-reset':
             return createInitialTransferState()
         default:
-            // A progress, complete or error event cannot precede `started` in a
-            // valid grammar. Applying one would show a receive that never began.
+            // A progress or complete event cannot precede `started` in a valid
+            // grammar. Applying one would show a receive that never began.
             return state
     }
 }
@@ -543,7 +556,7 @@ function reduceReceiveReceiving(
 }
 
 function receiveOutcomeState(
-    state: ReceiveReceivingTransferState,
+    state: ReceiveWaitingTransferState | ReceiveReceivingTransferState,
     session: SessionCursor,
     status: ReceiveStatus,
     kind: ReceiveResult,

@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-monotonic-tl3kusb1/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-monotonic-ro92tsim/frontend
 
- ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 7ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
      × refuses progress that goes backwards, changes the declared total, or lowers the saved count 6ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -41,19 +41,19 @@ AssertionError: expected { phase: 'receive-receiving', …(6) } to be { phase: '
     },
   }
 
- ❯ src/transfer/state.receive.test.ts:246:115
-    244|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
-    245|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
-    246|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
+ ❯ src/transfer/state.receive.test.ts:287:115
+    285|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
+    286|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
+    287|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
        |                                                                                                                   ^
-    247|     })
-    248|
+    288|     })
+    289|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 37 skipped (38)
-   Start at  01:15:53
-   Duration  427ms (transform 44ms, setup 0ms, import 55ms, tests 7ms, environment 282ms)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:28
+   Duration  415ms (transform 44ms, setup 0ms, import 55ms, tests 7ms, environment 276ms)
 

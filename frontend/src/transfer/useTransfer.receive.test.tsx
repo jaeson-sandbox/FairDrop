@@ -466,6 +466,25 @@ describe('the session lifecycle', () => {
         })
     })
 
+    it('ends a waiting session with an incomplete outcome when the backend closes it before any phone claimed it', async () => {
+        const hook = await waitingController()
+
+        // The wire shape Go publishes when the server lane closes first
+        // (TestALaneThatClosesBeforeAnyClaimFailsAWaitingReceive), through the real parser.
+        act(() => emit('transfer-error', {
+            seq: 1, error: {code: 'transfer_failed', message: 'x'},
+            receive: {filesSaved: 0, result: 'incomplete', subfolderExists: false, markingWarning: false},
+        }))
+
+        expect(hook.result.current.state).toMatchObject({
+            phase: 'receive-outcome',
+            destination: 'Phone Photos',
+            outcome: {kind: 'incomplete', filesSaved: 0, subfolderExists: false},
+        })
+        await act(async () => { await hook.result.current.showReceivedFolder() })
+        expect(mocks.showReceivedFolder).not.toHaveBeenCalled()
+    })
+
     it('holds the outcome: nothing resets it until the user leaves', async () => {
         const hook = await outcomeController('complete', {filesSaved: 3, subfolderExists: true})
         const held = hook.result.current.state

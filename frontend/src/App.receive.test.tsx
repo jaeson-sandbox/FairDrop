@@ -292,6 +292,24 @@ describe('receive transitions: one owner each', () => {
         expect(announcer()).toBe('')
     })
 
+    it('replaces a waiting QR with an incomplete outcome when the session ends before any phone claimed it', () => {
+        const view = mountWith(waiting({refusals: 1}))
+        expect(document.querySelector('img')).not.toBeNull()
+
+        transitionTo(view, outcome('incomplete', {filesSaved: 0, subfolderExists: false}))
+
+        expect(phaseViews()).toEqual(['receive-outcome'])
+        expect(screen.getByRole('main').getAttribute('data-transfer-phase')).toBe('receive-outcome')
+        expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Upload incomplete — no files saved')
+        // The QR for a listener that no longer exists is gone, nothing is offered
+        // to show, and the one way out is Done.
+        expect(document.querySelector('img')).toBeNull()
+        expect(screen.queryByRole('button', {name: 'Show in Folder'})).toBeNull()
+        expect(screen.getByRole('button', {name: 'Done'})).toBeTruthy()
+        expect(focusTarget()).toBe('receive-outcome')
+        expect(announcer()).toBe('')
+    })
+
     it('moves focus to the Idle instruction when the outcome is left, as its only owner', () => {
         const view = mountWith(outcome('complete'))
         transitionTo(view, idle)

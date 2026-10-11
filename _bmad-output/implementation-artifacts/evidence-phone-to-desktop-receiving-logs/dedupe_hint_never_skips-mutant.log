@@ -1,0 +1,13 @@
+{"Time":"2026-10-11T04:59:21.149822-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T04:59:21.371859-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver"}
+{"Time":"2026-10-11T04:59:21.37194-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver","Output":"=== RUN   TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:21.371989-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver","Output":"=== PAUSE TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:21.371992-04:00","Action":"pause","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver"}
+{"Time":"2026-10-11T04:59:21.371993-04:00","Action":"cont","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver"}
+{"Time":"2026-10-11T04:59:21.371996-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver","Output":"=== CONT  TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:21.371998-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver","Output":"    naming_test.go:159: claim(\"a.txt\") = \"a (4).txt\", want \"a (2).txt\"\n","OutputType":"error"}
+{"Time":"2026-10-11T04:59:21.372005-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver","Output":"--- FAIL: TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:21.372006-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver","Elapsed":0}
+{"Time":"2026-10-11T04:59:21.372015-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:21.372509-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.222s\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:21.372536-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.223}

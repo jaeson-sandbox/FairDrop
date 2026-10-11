@@ -528,6 +528,61 @@ func TestCancellingAnUploadInFlightPublishesACancelledOutcomeAndHoldsIt(t *testi
 	}
 }
 
+// When the destination's close bound elapses the coordinator reports from the
+// destination's snapshot, but a snapshot is not the final answer: a destination
+// that saved nothing is about to remove its subfolder, and the real one reports
+// a live-looking subfolder until it has. Claiming a folder that may be gone would
+// offer Show in Folder for nothing, so the outcome says the subfolder exists only
+// when files were saved.
+func TestACloseBoundThatElapsesNeverClaimsAnEmptySubfolderExists(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		snapshot ReceiveResult
+		want     ReceiveStatus
+	}{
+		{"nothing saved", ReceiveResult{FilesSaved: 0, SubfolderExists: true}, ReceiveStatus{FilesSaved: 0, Result: "cancelled", SubfolderExists: false}},
+		{"files saved", ReceiveResult{FilesSaved: 2, SubfolderExists: true}, ReceiveStatus{FilesSaved: 2, Result: "cancelled", SubfolderExists: true}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newReceiveHarness(t)
+			h.receiveTransferring()
+			dest := h.sink.destination(0)
+			dest.mu.Lock()
+			dest.current = testCase.snapshot
+			dest.closeBlocked = make(chan struct{})
+			blocked := dest.closeBlocked
+			dest.mu.Unlock()
+			t.Cleanup(func() { close(blocked) })
+
+			baseline := h.bounds.armed()
+			done := make(chan error, 1)
+			go func() { done <- h.coordinator.Cancel(context.Background()) }()
+			h.awaitCalls("destination.Close")
+			h.awaitBoundPending(baseline)
+			h.bounds.fire()
+			select {
+			case err := <-done:
+				if err == nil || !strings.Contains(err.Error(), "destination folder did not confirm") {
+					t.Fatalf("Cancel = %v, want the elapsed bound reported", err)
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("Cancel never returned")
+			}
+
+			events := h.observer.published()
+			var outcome *ReceiveStatus
+			for _, event := range events {
+				if event.Kind == TransferError {
+					outcome = event.Receive
+				}
+			}
+			if outcome == nil || *outcome != testCase.want {
+				t.Fatalf("outcome Receive = %+v, want %+v", outcome, testCase.want)
+			}
+		})
+	}
+}
+
 // Cancel racing a terminal report: whichever linearizes first wins, and the
 // session publishes exactly one terminal outcome either way. The distribution is
 // logged; each branch is forced deterministically elsewhere.
@@ -563,8 +618,8 @@ func TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome(t *testing.T
 				}
 			}
 		}
-		if terminals > 1 {
-			t.Fatalf("round %d published %d terminal outcomes, want at most 1", round, terminals)
+		if terminals != 1 {
+			t.Fatalf("round %d published %d terminal outcomes, want exactly 1", round, terminals)
 		}
 		if got := h.sink.destination(0).closeCalls(); got != 1 {
 			t.Fatalf("round %d closed the destination %d times, want 1", round, got)

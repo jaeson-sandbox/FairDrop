@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-controller-guard-eta6v6nn/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-controller-guard-578dog6j/frontend
 
 
  Test Files  1 passed (1)
-      Tests  1 passed | 47 skipped (48)
-   Start at  01:15:42
-   Duration  505ms (transform 74ms, setup 0ms, import 127ms, tests 11ms, environment 289ms)
+      Tests  1 passed | 48 skipped (49)
+   Start at  05:00:18
+   Duration  494ms (transform 74ms, setup 0ms, import 127ms, tests 11ms, environment 280ms)
 

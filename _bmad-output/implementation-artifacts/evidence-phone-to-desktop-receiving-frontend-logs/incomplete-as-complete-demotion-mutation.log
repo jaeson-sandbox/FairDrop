@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-demotion-feihensj/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-demotion-jlykusra/frontend
 
- ❯ src/transfer/state.receive.test.ts (38 tests | 2 failed | 36 skipped) 7ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 2 failed | 38 skipped) 7ms
      × demotes a success whose snapshot does not follow the accepted progress to incomplete, never the reverse 6ms
      × demotes a success with an unknown total to incomplete 1ms
 
@@ -23,13 +23,13 @@ AssertionError: expected { phase: 'receive-outcome', …(4) } to match object { 
     "phase": "receive-outcome",
   }
 
- ❯ src/transfer/state.receive.test.ts:284:23
-    282|             }))
-    283|
-    284|         expect(state).toMatchObject({phase: 'receive-outcome', outcome…
+ ❯ src/transfer/state.receive.test.ts:325:23
+    323|             }))
+    324|
+    325|         expect(state).toMatchObject({phase: 'receive-outcome', outcome…
        |                       ^
-    285|     })
-    286|
+    326|     })
+    327|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -49,19 +49,19 @@ AssertionError: expected { phase: 'receive-outcome', …(4) } to match object { 
     "phase": "receive-outcome",
   }
 
- ❯ src/transfer/state.receive.test.ts:293:23
-    291|             receive: {filesSaved: 3, result: 'complete', subfolderExis…
-    292|         }))
-    293|         expect(state).toMatchObject({phase: 'receive-outcome', outcome…
+ ❯ src/transfer/state.receive.test.ts:334:23
+    332|             receive: {filesSaved: 3, result: 'complete', subfolderExis…
+    333|         }))
+    334|         expect(state).toMatchObject({phase: 'receive-outcome', outcome…
        |                       ^
-    294|     })
-    295|
+    335|     })
+    336|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 
 
  Test Files  1 failed (1)
-      Tests  2 failed | 36 skipped (38)
-   Start at  01:15:56
-   Duration  442ms (transform 45ms, setup 0ms, import 55ms, tests 7ms, environment 295ms)
+      Tests  2 failed | 38 skipped (40)
+   Start at  05:00:31
+   Duration  422ms (transform 46ms, setup 0ms, import 55ms, tests 7ms, environment 276ms)
 

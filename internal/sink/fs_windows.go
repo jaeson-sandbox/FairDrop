@@ -3,6 +3,8 @@
 package sink
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"io/fs"
 	"os"
@@ -66,7 +68,44 @@ func openDirectory(absolute string) (dirHandle, error) {
 			return nil, errNotDirectory
 		}
 	}
+	// A folder the user cannot write into is refused here, before a QR code
+	// exists, as the POSIX handle does with faccessat. Windows has no
+	// descriptor-relative access query that honours ACLs, so the only honest
+	// answer is to try.
+	if err := probeWritable(clean); err != nil {
+		return nil, errUnusable
+	}
 	return &windowsDir{path: clean}, nil
+}
+
+// writableProbeAttempts bounds the (astronomically unlikely) name collision.
+const writableProbeAttempts = 4
+
+// probeWritable proves directory is one a child directory can be created in --
+// the first thing a receive does -- by creating a uniquely named, empty probe
+// directory and removing it again. Creation is os.Mkdir, which is CREATE_NEW: it
+// fails for any existing name, a link included, and never follows one, so the
+// probe cannot land anywhere but directly inside directory. The probe is
+// removed on every path that created it; if it cannot be removed the folder is
+// reported unusable rather than left holding a stray entry.
+func probeWritable(directory string) error {
+	var lastErr error
+	for attempt := 0; attempt < writableProbeAttempts; attempt++ {
+		var random [8]byte
+		if _, err := rand.Read(random[:]); err != nil {
+			return err
+		}
+		probe := filepath.Join(directory, tempPrefix+"probe-"+hex.EncodeToString(random[:]))
+		err := os.Mkdir(probe, 0o755)
+		if err == nil {
+			return os.Remove(probe)
+		}
+		lastErr = err
+		if !errors.Is(err, fs.ErrExist) {
+			return err
+		}
+	}
+	return lastErr
 }
 
 // linkLike reports a symbolic link or any reparse point.
@@ -111,12 +150,17 @@ func (d *windowsDir) unlink(name string) error {
 // with ERROR_ALREADY_EXISTS rather than replacing. A failure is passed through
 // untranslated except that "exists" is reported as fs.ErrExist, which
 // syscall.Errno does for ERROR_ALREADY_EXISTS and ERROR_FILE_EXISTS.
+//
+// Both paths are spelled in extended-length form. Go's os.* calls lift MAX_PATH
+// for a long path by themselves, but this raw call does not, so a long final
+// name under a deep destination would otherwise fail here and discard a file
+// that had been received and flushed in full.
 func (d *windowsDir) renameNoReplace(from, to string) error {
-	source, err := windows.UTF16PtrFromString(d.child(from))
+	source, err := windows.UTF16PtrFromString(extendedLengthPath(d.child(from)))
 	if err != nil {
 		return err
 	}
-	target, err := windows.UTF16PtrFromString(d.child(to))
+	target, err := windows.UTF16PtrFromString(extendedLengthPath(d.child(to)))
 	if err != nil {
 		return err
 	}
@@ -141,7 +185,14 @@ func (d *windowsDir) mark(_ *os.File, name string, _ time.Time) error {
 }
 
 func (d *windowsDir) availableBytes() (uint64, error) {
-	path, err := windows.UTF16PtrFromString(d.path)
+	// Extended-length only once the path is long enough to need it (Go's own
+	// threshold), so the common case keeps the plain spelling GetDiskFreeSpaceEx
+	// is documented against.
+	query := d.path
+	if len(query) >= 248 {
+		query = extendedLengthPath(query)
+	}
+	path, err := windows.UTF16PtrFromString(query)
 	if err != nil {
 		return 0, err
 	}

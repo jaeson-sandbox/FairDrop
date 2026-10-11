@@ -134,6 +134,15 @@ describe('the outcome and leaving it', () => {
         }
     })
 
+    it('focuses the outcome when a receive nobody claimed ends while still waiting', () => {
+        // The server lane closing before any phone claimed the session ends it
+        // straight from waiting; the outcome has the same one owner as any other.
+        const unclaimed = outcome({outcome: {kind: 'incomplete', filesSaved: 0, subfolderExists: false, markingWarning: false}})
+        for (const before of [waiting(), waiting({cancelPending: true}), waiting({refusals: 2})]) {
+            expect(routeTransition(before, unclaimed)).toEqual({row: 'receive-outcome', owner: 'focus', target: 'receive-outcome'})
+        }
+    })
+
     it('focuses a failed Show in Folder as a command failure, and nothing else about the outcome', () => {
         const failed = outcome({commandError: {code: 'path_not_found', message: 'x'}})
         expect(routeTransition(outcome(), failed)).toEqual({row: 'command-failure', owner: 'focus', target: 'command-error'})

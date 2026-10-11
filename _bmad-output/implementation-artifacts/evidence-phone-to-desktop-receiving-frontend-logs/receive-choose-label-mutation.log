@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-choose-label-i1qjxnw9/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-choose-label-7yr9c1xc/frontend
 
- ❯ src/App.receive.test.tsx (38 tests | 1 failed | 33 skipped) 99ms
-     × shows receive wording and a folder-chooser action, never the send ones 76ms
+ ❯ src/App.receive.test.tsx (39 tests | 1 failed | 34 skipped) 93ms
+     × shows receive wording and a folder-chooser action, never the send ones 72ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -169,23 +169,23 @@ Ignored nodes: comments, script, style
     [36m</main>[39m
   [36m</div>[39m
 [36m</body>[39m
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
- ❯ src/App.receive.test.tsx:428:23
-    426|
-    427|         expect(screen.getByRole('heading', {name: 'Can’t save there'})…
-    428|         expect(screen.getByRole('button', {name: 'Choose Another Folde…
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/App.receive.test.tsx:446:23
+    444|
+    445|         expect(screen.getByRole('heading', {name: 'Can’t save there'})…
+    446|         expect(screen.getByRole('button', {name: 'Choose Another Folde…
        |                       ^
-    429|         expect(screen.queryByRole('button', {name: 'Choose Another'}))…
-    430|         expect(screen.queryByRole('menu')).toBeNull()
+    447|         expect(screen.queryByRole('button', {name: 'Choose Another'}))…
+    448|         expect(screen.queryByRole('menu')).toBeNull()
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 4 passed | 33 skipped (38)
-   Start at  01:16:27
-   Duration  677ms (transform 141ms, setup 0ms, import 210ms, tests 99ms, environment 286ms)
+      Tests  1 failed | 4 passed | 34 skipped (39)
+   Start at  05:01:02
+   Duration  648ms (transform 131ms, setup 0ms, import 195ms, tests 93ms, environment 282ms)
 

@@ -106,7 +106,7 @@ All commands sequential, from the worktree root, `PATH` prepended with `/opt/hom
 1. **A receive outcome is held, not reset after three seconds.** The spec calls for Show in Folder and "a way back to Idle" from the outcome; a three second lease is not long enough to reach a button. The coordinator arms no reset for a receive session; Cancel (or Shutdown) leaves it. `docs/fairdrop-contracts.md` and the architecture decision log say so.
 2. **Cancel mid-upload publishes a `transfer-error` with `error.code = cancelled` and `receive.result = "cancelled"`**, and holds ERROR, instead of a bare reset, because the spec requires "cancelled, N files saved".
 3. **The count comes from the destination, not the server.** The server's terminal event carries no count; the coordinator closes the destination after the server stops and reads the final result. The desktop and the phone's result page read the same number.
-4. **A sixth lifecycle event, `transfer-notice`**, carries the "refused for space" note to the desktop. It is new wire surface Story B must subscribe to (the current frontend ignores it).
+4. **A sixth lifecycle event, `transfer-notice`**, carries the "refused for space" note to the desktop. It was new wire surface; Story B subscribes to it (`useTransfer` holds six lifecycle subscriptions, the reducer counts each refusal in `receive-waiting`, and the announcer speaks it).
 5. **`ReceiveMetadata` has a `warnings` array** (the beacon warning applies to a receive session too), beyond the four fields the task listed.
 6. **No new `ErrorCode`.** Refusals reuse `path_not_found` / `path_unsupported` / `chooser_failed` / `cancelled`; their public copy is send-flavoured. Receive-specific copy needs an owner decision and the cross-language registry updates named in `TestTheCodeRegistryIsExactlyThisSet`.
 7. **`frontend/package.json` `test:browser` now also runs `browser/upload-live.mjs`**, a real-Chromium check of the upload form. Test-only; no production frontend file changed.
@@ -262,3 +262,60 @@ No existing assertion was weakened or removed. Extensions only: `App.test.tsx` a
 - **A real phone upload end to end through the UI.** The frontend was driven by fabricated events matching the Go-pinned JSON; the Go side was proven separately by Story A.
 - **Windows.** Frontend suites are platform-neutral and ran on macOS only.
 - Event ordering race: a lifecycle event that reaches the frontend before the `StartReceive` command resolves is dropped (as it is for a send); not changed here.
+
+# Review patches (independent review of `39eda3d`)
+
+Baseline: detached `39eda3d`, nothing committed. Produced on macOS (darwin/arm64, Go 1.27.0, Node 24, Chromium via Playwright). Each fix has a test written to fail for the stated reason, the fix, and a mutation case in the canonical inventory that reverts it. Review finding numbers other than 1.6, 1.7 and 1.8 were not part of the patching brief, so rows are keyed by the brief's patch number and a description.
+
+One honesty note on test-first order: where the guarantee already held on the host (P1 on POSIX, which has always refused through `faccessat`; the pure `extendedLengthPath` spelling), the test could not be seen failing before the fix, and the mutation case is what shows it fails when the guard is removed. Every other test was run red first for its stated reason (P2: the waiting error was dropped; P3: the incomplete page after a slow save; P5: decoded bytes; P7: `SubfolderExists:true` for 0 saved).
+
+## Review triage
+
+| Finding | Route | Test(s) | Mutation case(s) |
+| --- | --- | --- | --- |
+| P1 (medium) Windows accepted an unwritable folder at open; the QR was shown and the one-time link burned when `mkdir` failed | **Patched.** `openDirectory` now probes by creating and removing a uniquely named empty directory (`os.Mkdir`, CREATE_NEW semantics, no follow), removed on every path; failure is `errUnusable`, so `path_unsupported`. POSIX already refused via `faccessat` | sink `TestOpenDestinationRefusesAFolderTheUserCannotWriteInto`, `TestOpeningAWritableFolderLeavesItUntouched`; root `TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource` (POSIX: mode 0555, skipped as root; Windows: an `icacls` deny ACE) | `writable_destination_at_open`, `writable_destination_native` (darwin/linux and windows anchors), `writable_probe_removed` (windows) |
+| P2 (medium) A terminal `transfer-error` in `receive-waiting` was dropped, leaving a dead QR | **Patched.** `reduceReceiveWaiting` applies it as an incomplete outcome, 0 saved, no folder, only when the payload is coherent (`incomplete`, 0 saved, no subfolder); anything else is still refused. Progress and complete before `started` are still dropped | `state.receive.test.ts` `accepts a terminal incomplete outcome with nothing saved while still waiting`, `still drops a waiting error whose receive payload is missing, unresolved or claims saved files`; `useTransfer.receive.test.tsx` `ends a waiting session with an incomplete outcome when the backend closes it before any phone claimed it`; `announce.receive.test.ts` `focuses the outcome when a receive nobody claimed ends while still waiting`; `App.receive.test.tsx` `replaces a waiting QR with an incomplete outcome when the session ends before any phone claimed it` | `waiting-error-accepted`, `waiting-error-accepted-controller`, `waiting-error-coherence`, `waiting-error-result-kind`, `route-unclaimed-outcome-focus`, `app-unclaimed-outcome` |
+| P3 (medium) The inactivity deadline was refreshed only inside `uploadBody.Read`, so a slow `SaveFile` (fsync, marking, rename) made the next part read hit an expired deadline | **Patched.** `body.refreshDeadline()` after each `SaveFile` returns | server `TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound` (300 ms bound, 900 ms slow save, 256 KiB second file so it cannot sit in a read buffer) | `deadline_refresh_after_save` |
+| P4 (low-medium) Raw `MoveFileEx` had no long-path handling | **Patched.** Both paths go through `extendedLengthPath` (`\\?\`, `\\?\UNC\`); `GetDiskFreeSpaceEx` uses it past 247 characters. Windows CI is the proof of the rename | sink `TestExtendedLengthPathSpellsDrivesAndUNCSharesAndLeavesTheRestAlone` (every host, literals); Windows-only `TestRenameNoReplaceWorksOnAFinalPathLongerThanMaxPath`, `TestAFileWhoseFinalPathExceedsMaxPathIsSavedNotDiscarded` | `long_path_prefix_drive`, `long_path_prefix_unc` (run); `long_path_rename_source`, `long_path_rename_target` (windows, not run here) |
+| P5 (low) `NextPart` decoded quoted-printable parts | **Patched.** `NextRawPart` | server `TestAQuotedPrintablePartIsSavedAsSentNotDecoded` | `raw_part` |
+| P6 (low) The cancel-versus-complete race test accepted zero terminal outcomes | **Patched (test tightened).** `terminals != 1` per round; the distribution is still only logged. Stable under `-race -count=50` | transfer `TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome` | `race_exactly_one_terminal` |
+| P7 (low) A close bound that elapsed reported `SubfolderExists=true` for a folder about to be removed | **Patched.** The bound-elapsed snapshot claims the subfolder only when files were saved | transfer `TestACloseBoundThatElapsesNeverClaimsAnEmptySubfolderExists` (deterministic `boundTimer` seam) | `close_bound_subfolder` |
+| P8 Mutation inventory gaps | **Patched.** Commit-time `ErrExist` retry, never-executable file mode (0644) and directory mode (0755), sanitizer device-name prefix, control removal, bidi/format removal and the `file` fallback, destination link refusal (`O_NOFOLLOW` and the `ENOTDIR` link classification), short body, wrong token on the upload route, the `files` field filter. New tests: `TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete`, `TestARefusedDestinationIsDescribedByWhyItWasRefused`; `TestFilesAndFoldersAreNeverExecutable` now clears the umask so a loosened mode constant is not masked back into range. Existing tests kill the rest (`TestAFinalNameTakenBeforeTheRenameIsNeverReplaced`, `TestSanitizeNameTable`, `TestEveryRouteOrMethodThatIsNotTheExactUploadIsTheGenericNotFound`, `TestPartsOutsideTheFilesFieldAreDiscardedNeverWritten`, `TestOpenDestinationRefusesWhatItMustAndCreatesNothing`) | named per case in the inventory | `commit_exist_retry`, `never_executable_file`, `never_loose_directory`, `sanitize_device_prefix`, `sanitize_control_removal`, `sanitize_bidi_removal`, `sanitize_fallback`, `destination_link_refusal`, `link_classification`, `short_body_incomplete`, `upload_wrong_token_404`, `upload_field_filter` |
+| P9 Stale evidence line (the frontend "ignores" `transfer-notice`) | **Patched** in decision 4 above | n/a | n/a |
+| O(n squared) name claim for thousands of same-named files | **Patched** (cheap): a per-name hint remembers the first unprobed number | sink `TestManyDuplicatesAreNumberedInOrderAndAnInterveningClaimIsSteppedOver`; `TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively` gained two steps | `dedupe_hint_never_skips`; `dedupe_case` re-anchored to `want "X (4).JPG"` (the hint had hidden the original anchor, so the case survived until the new steps were added) |
+| 1.6 The name is claimed in the set after a failed save | **Accepted.** An upload ends on the first failure, so a claimed name that was never written cannot be observed by a later file | n/a | n/a |
+| 1.7 413/411 answered without reading the body | **Accepted** as speculative. A real-browser check is left to the optional manual smoke | n/a | n/a |
+| 1.8 `Folder()` returns a path string | **Accepted.** Show in Folder re-checks at use: a moved or removed folder is `path_not_found` | root `TestNativeReceiveSavesFilesReportsTheExactCountAndShowsTheFolder`, transfer `TestReceivedFolderRefusesWhenThereIsNoSubfolder` | `show_refuses_without_subfolder` |
+| `Content-Length` lying long | **Accepted.** An honest `incomplete`: the declared total is what progress and the space check use, and a short body is never reported complete | `TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete` | `short_body_incomplete` |
+| Per-file `fsync` cost (`F_FULLFSYNC` on macOS) | **Accepted.** Durability before the rename is the contract; the cost is now charged to the desktop, not the phone's inactivity bound (P3) | n/a | `deadline_refresh_after_save` |
+| Windows antivirus sharing violation on rename | **Accepted.** No retry loop: a failed rename is an honest `incomplete` with completed files kept and the partial removed | n/a | n/a |
+
+## Mutation totals
+
+| Inventory | Command | Result |
+| --- | --- | --- |
+| Go, darwin | `python3 _bmad-output/implementation-artifacts/mutate-phone-to-desktop-receiving.py` (from the top, after the last source edit) | exit 0, **48 of 48** (27 earlier + 21 new): every baseline passed and every mutant failed its named assertion. A first complete run reported 47 of 48: `dedupe_case` survived because the new hint hid its anchor; the test and anchor were fixed and the whole script re-run from the top |
+| Frontend | `python3 scripts/verify-receive-frontend-mutations.py` | exit 0, **66 of 66** (60 earlier + 6 new). One draft of `waiting-error-result-kind` survived because the parser, not the reducer, refused a `cancelled` result on a non-cancelled code; the test now sends the matching code |
+
+Not run here: the Windows anchors (`no_replace_rename`, `exclusive_subfolder`, `exclusive_file`, `mark_of_the_web`, `writable_destination_at_open`, `writable_destination_native`, `writable_probe_removed`, `long_path_rename_source`, `long_path_rename_target`) and the Linux anchors (the shared POSIX ones were proven on darwin only). The Windows ones are unproven until the Windows CI job runs the script. The inventory script also accepts case ids to narrow an iteration run; only a run with no ids rewrites `summary.txt` or counts as the inventory.
+
+## Verification run (review patches)
+
+All sequential, `PATH` prepended with `/opt/homebrew/bin` and `~/go/bin`. `wails build` was not run: the exported `App` command surface did not change.
+
+| Step | Result |
+| --- | --- |
+| `gofmt -l .`, `go vet ./...`, `go tool staticcheck ./...` | empty / pass / pass |
+| `go test -count=1 ./...` | all 10 packages `ok` |
+| `CGO_ENABLED=1 go test -count=1 -race ./...` | all 10 packages `ok` (`go env CGO_ENABLED` = 1); the race and bound tests also `-race -count=50` |
+| `GOOS=windows GOARCH=amd64 go build ./... && go vet ./...`, `GOOS=linux GOARCH=amd64 go build ./...`, `GOOS=darwin GOARCH=arm64 go build ./...` | pass |
+| bare `staticcheck` under `GOOS=windows`, `GOOS=darwin GOARCH=arm64`, `GOOS=linux GOARCH=amd64` | pass |
+| `npm test` | 34 files, 1258 tests passed (was 1253) |
+| `npm run test:browser` | 4 files, 123 tests passed; `receiver-live` and `upload-live` passed; `git checkout -- frontend/browser/captures/` run |
+
+## Unproven here (review patches)
+
+- **Windows CI is the only proof** of: the writability probe against a real ACL-denied folder (`icacls` deny on `S-1-1-0:(WD,AD)`, removed on cleanup), the extended-length `MoveFileEx` on a final path past `MAX_PATH`, `GetDiskFreeSpaceEx` on a long root, and every Windows mutation anchor. They are compile- and vet-checked with `GOOS=windows` only. If `icacls` is unavailable the Windows writability test fails rather than skips, on purpose.
+- The Windows probe needs create and delete rights on the chosen folder. A folder where the user may create but not delete (an unusual ACL) is refused, which is the safe direction.
+- Linux execution of the new POSIX tests and of the Linux mutation anchors.
+- Phone browsers: a quoted-printable part was sent only by a hand-built body.

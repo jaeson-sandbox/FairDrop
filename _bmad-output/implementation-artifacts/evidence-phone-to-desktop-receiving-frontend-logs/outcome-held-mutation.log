@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-outcome-held-dge9rkpp/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-outcome-held-w1s2fjv8/frontend
 
- ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 6ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
      × is held: nothing but a reset moves it 6ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -30,19 +30,19 @@ AssertionError: expected { phase: 'idle', …(2) } to be { phase: 'receive-outco
 +   "retainedOutcome": null,
   }
 
- ❯ src/transfer/state.receive.test.ts:367:115
-    365|     it('is held: nothing but a reset moves it', () => {
-    366|         const held = outcomeState()
-    367|         expect(run(held, event('transfer-progress', {seq: 3, progress:…
+ ❯ src/transfer/state.receive.test.ts:408:115
+    406|     it('is held: nothing but a reset moves it', () => {
+    407|         const held = outcomeState()
+    408|         expect(run(held, event('transfer-progress', {seq: 3, progress:…
        |                                                                                                                   ^
-    368|         expect(run(held, event('transfer-started', {seq: 3}))).toBe(he…
-    369|         expect(run(held, event('transfer-notice', {seq: 3, notice: 're…
+    409|         expect(run(held, event('transfer-started', {seq: 3}))).toBe(he…
+    410|         expect(run(held, event('transfer-notice', {seq: 3, notice: 're…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 37 skipped (38)
-   Start at  01:16:06
-   Duration  433ms (transform 45ms, setup 0ms, import 55ms, tests 6ms, environment 288ms)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:42
+   Duration  414ms (transform 44ms, setup 0ms, import 54ms, tests 6ms, environment 276ms)
 

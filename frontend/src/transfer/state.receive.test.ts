@@ -190,15 +190,56 @@ describe('waiting for a phone', () => {
         })
     })
 
-    it('does not apply progress, complete or error before started', () => {
+    it('does not apply progress or complete before started', () => {
         const state = waitingState()
         expect(run(state, event('transfer-progress', {seq: 1, progress: progress(10), receive: savedStatus(0)}))).toBe(state)
         expect(run(state, event('transfer-complete', {
             seq: 1, progress: progress(400), receive: {filesSaved: 1, result: 'complete', subfolderExists: true, markingWarning: false},
         }))).toBe(state)
+    })
+
+    // The backend publishes a terminal incomplete outcome when the server lane
+    // closes before any phone claimed the session (Go
+    // TestALaneThatClosesBeforeAnyClaimFailsAWaitingReceive). Dropping it left a
+    // QR for a listener that no longer existed, with nothing to tell the user.
+    it('accepts a terminal incomplete outcome with nothing saved while still waiting', () => {
+        const cancelling = run(waitingState(), {type: 'cancel-requested'})
+        for (const state of [waitingState(), cancelling]) {
+            expect(run(state, event('transfer-error', {
+                seq: 1, error: {code: 'transfer_failed', message: 'x'},
+                receive: {filesSaved: 0, result: 'incomplete', subfolderExists: false, markingWarning: false},
+            }))).toEqual({
+                phase: 'receive-outcome',
+                session: {sessionId, lastSeq: 1},
+                destination: 'Phone Photos',
+                outcome: {kind: 'incomplete', filesSaved: 0, subfolderExists: false, markingWarning: false},
+                commandError: null,
+            })
+        }
+    })
+
+    it('still drops a waiting error whose receive payload is missing, unresolved or claims saved files', () => {
+        const state = waitingState()
+        const error = {code: 'transfer_failed', message: 'x'}
+        // No receive payload at all: not a receive terminal event.
+        expect(run(state, event('transfer-error', {seq: 1, error}))).toBe(state)
+        // No result: not terminal.
         expect(run(state, event('transfer-error', {
-            seq: 1, error: {code: 'transfer_failed', message: 'x'},
-            receive: {filesSaved: 1, result: 'incomplete', subfolderExists: true, markingWarning: false},
+            seq: 1, error, receive: {filesSaved: 0, result: null, subfolderExists: false, markingWarning: false},
+        }))).toBe(state)
+        // Files saved, or a folder that exists, cannot be true of a session no phone has claimed.
+        expect(run(state, event('transfer-error', {
+            seq: 1, error, receive: {filesSaved: 1, result: 'incomplete', subfolderExists: true, markingWarning: false},
+        }))).toBe(state)
+        expect(run(state, event('transfer-error', {
+            seq: 1, error, receive: {filesSaved: 0, result: 'incomplete', subfolderExists: true, markingWarning: false},
+        }))).toBe(state)
+        // Only an incomplete result can end a session nobody claimed.
+        // (A cancelled result must arrive with the cancelled code, or the parser refuses it
+        // before the reducer sees it; the matching code isolates the reducer's own rule.)
+        expect(run(state, event('transfer-error', {
+            seq: 1, error: {code: 'cancelled', message: 'x'},
+            receive: {filesSaved: 0, result: 'cancelled', subfolderExists: false, markingWarning: false},
         }))).toBe(state)
     })
 

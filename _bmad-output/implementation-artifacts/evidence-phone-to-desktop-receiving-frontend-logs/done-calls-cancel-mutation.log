@@ -1,26 +1,26 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-done-calls-cancel-_z3jyl4s/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-done-calls-cancel-tkjx2k9b/frontend
 
- ❯ src/App.receive.test.tsx (38 tests | 1 failed | 37 skipped) 68ms
-     × Done leaves through the existing Cancel command, never a new one 67ms
+ ❯ src/App.receive.test.tsx (39 tests | 1 failed | 38 skipped) 65ms
+     × Done leaves through the existing Cancel command, never a new one 64ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  src/App.receive.test.tsx > the held outcome at the App boundary > Done leaves through the existing Cancel command, never a new one
 AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
- ❯ src/App.receive.test.tsx:366:30
-    364|         fireEvent.click(screen.getByRole('button', {name: 'Done'}))
-    365|
-    366|         expect(mocks.cancel).toHaveBeenCalledTimes(1)
+ ❯ src/App.receive.test.tsx:384:30
+    382|         fireEvent.click(screen.getByRole('button', {name: 'Done'}))
+    383|
+    384|         expect(mocks.cancel).toHaveBeenCalledTimes(1)
        |                              ^
-    367|         expect(mocks.dismissRetained).not.toHaveBeenCalled()
-    368|     })
+    385|         expect(mocks.dismissRetained).not.toHaveBeenCalled()
+    386|     })
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 37 skipped (38)
-   Start at  01:16:02
-   Duration  632ms (transform 134ms, setup 0ms, import 197ms, tests 68ms, environment 288ms)
+      Tests  1 failed | 38 skipped (39)
+   Start at  05:00:37
+   Duration  611ms (transform 128ms, setup 0ms, import 187ms, tests 65ms, environment 279ms)
 

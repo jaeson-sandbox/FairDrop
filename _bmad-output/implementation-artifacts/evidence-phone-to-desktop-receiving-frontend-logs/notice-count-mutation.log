@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-count-ao6fettx/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-count-6p4evs_y/frontend
 
- ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 6ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
      × counts each refused upload as a new state and keeps waiting 6ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -35,7 +35,7 @@ AssertionError: expected { phase: 'receive-waiting', …(5) } to match object { 
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 37 skipped (38)
-   Start at  01:16:09
-   Duration  434ms (transform 45ms, setup 0ms, import 57ms, tests 6ms, environment 290ms)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:44
+   Duration  418ms (transform 49ms, setup 0ms, import 58ms, tests 6ms, environment 272ms)
 

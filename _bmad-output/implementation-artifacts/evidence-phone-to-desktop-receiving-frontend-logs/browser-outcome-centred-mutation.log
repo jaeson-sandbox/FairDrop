@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-outcome-centred-v_4vhz1l/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-outcome-centred-xyt8u62m/frontend
 
- ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 36 skipped) 626ms
-     × centres the outcome card in the window rather than pinning it to the top 625ms
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 36 skipped) 621ms
+     × centres the outcome card in the window rather than pinning it to the top 620ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -21,6 +21,6 @@ AssertionError: the card sits 24px from the top and 447px from the bottom: expec
 
  Test Files  1 failed (1)
       Tests  1 failed | 36 skipped (37)
-   Start at  01:17:11
-   Duration  1.33s (transform 0ms, setup 0ms, import 176ms, tests 626ms, environment 0ms)
+   Start at  05:01:54
+   Duration  1.33s (transform 0ms, setup 0ms, import 178ms, tests 621ms, environment 0ms)
 

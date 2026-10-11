@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancelled-heading-fyt5xiuk/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancelled-heading-w6amio7t/frontend
 
- ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 30 skipped) 71ms
-     × heads it "Upload cancelled" with the exact count 63ms
-     × says that nothing was added when nothing was saved 5ms
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 30 skipped) 70ms
+     × heads it "Upload cancelled" with the exact count 62ms
+     × says that nothing was added when nothing was saved 4ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -42,6 +42,6 @@ Received: "Upload incomplete — no files saved"
 
  Test Files  1 failed (1)
       Tests  2 failed | 1 passed | 30 skipped (33)
-   Start at  01:16:00
-   Duration  550ms (transform 57ms, setup 0ms, import 108ms, tests 71ms, environment 286ms)
+   Start at  05:00:36
+   Duration  530ms (transform 56ms, setup 0ms, import 105ms, tests 70ms, environment 276ms)
 

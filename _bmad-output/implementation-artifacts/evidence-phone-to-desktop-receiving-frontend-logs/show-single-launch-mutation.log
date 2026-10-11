@@ -1,26 +1,26 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-single-launch-_zekgodh/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-single-launch-dqkg624_/frontend
 
- ❯ src/transfer/useTransfer.receive.test.tsx (48 tests | 1 failed | 47 skipped) 13ms
-     × launches once for a double activation 12ms
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 12ms
+     × launches once for a double activation 11ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  src/transfer/useTransfer.receive.test.tsx > Show in Folder > launches once for a double activation
 AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
- ❯ src/transfer/useTransfer.receive.test.tsx:575:42
-    573|         await act(async () => { launching.resolve(); await Promise.all…
-    574|
-    575|         expect(mocks.showReceivedFolder).toHaveBeenCalledTimes(1)
+ ❯ src/transfer/useTransfer.receive.test.tsx:594:42
+    592|         await act(async () => { launching.resolve(); await Promise.all…
+    593|
+    594|         expect(mocks.showReceivedFolder).toHaveBeenCalledTimes(1)
        |                                          ^
-    576|     })
-    577|
+    595|     })
+    596|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 47 skipped (48)
-   Start at  01:15:44
-   Duration  514ms (transform 77ms, setup 0ms, import 132ms, tests 13ms, environment 286ms)
+      Tests  1 failed | 48 skipped (49)
+   Start at  05:00:20
+   Duration  492ms (transform 73ms, setup 0ms, import 126ms, tests 12ms, environment 278ms)
 

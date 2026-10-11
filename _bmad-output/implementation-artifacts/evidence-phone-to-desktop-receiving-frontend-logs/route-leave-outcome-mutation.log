@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-route-leave-outcome-fw69ob85/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-route-leave-outcome-l5tu4dn8/frontend
 
- ❯ src/ui/announce.receive.test.ts (19 tests | 1 failed | 18 skipped) 4ms
+ ❯ src/ui/announce.receive.test.ts (20 tests | 1 failed | 19 skipped) 4ms
      × focuses the Idle instruction when the outcome is left, because nothing stays mounted to hold focus 4ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -19,19 +19,19 @@ AssertionError: expected null to deeply equal { row: 'receive-leave', …(2) }
 + Received:
 null
 
- ❯ src/ui/announce.receive.test.ts:144:50
-    142|
-    143|     it('focuses the Idle instruction when the outcome is left, because…
-    144|         expect(routeTransition(outcome(), idle)).toEqual({row: 'receiv…
+ ❯ src/ui/announce.receive.test.ts:153:50
+    151|
+    152|     it('focuses the Idle instruction when the outcome is left, because…
+    153|         expect(routeTransition(outcome(), idle)).toEqual({row: 'receiv…
        |                                                  ^
-    145|     })
-    146|
+    154|     })
+    155|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 18 skipped (19)
-   Start at  01:16:29
-   Duration  421ms (transform 38ms, setup 0ms, import 46ms, tests 4ms, environment 291ms)
+      Tests  1 failed | 19 skipped (20)
+   Start at  05:01:12
+   Duration  405ms (transform 36ms, setup 0ms, import 44ms, tests 4ms, environment 278ms)
 

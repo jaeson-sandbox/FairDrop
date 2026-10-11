@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-extra-field-wzgxnuv7/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-extra-field-h24xxkkd/frontend
 
- ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 77 skipped) 6ms
+ ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 77 skipped) 5ms
      × refuses an extra field 4ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -34,6 +34,6 @@ null
 
  Test Files  1 failed (1)
       Tests  1 failed | 2 passed | 77 skipped (80)
-   Start at  01:15:28
-   Duration  416ms (transform 34ms, setup 0ms, import 43ms, tests 6ms, environment 284ms)
+   Start at  05:00:04
+   Duration  407ms (transform 35ms, setup 0ms, import 44ms, tests 5ms, environment 276ms)
 

@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T04:59:17.208355-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T04:59:17.435527-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAFinalNameTakenBeforeTheRenameIsNeverReplaced"}
+{"Time":"2026-10-11T04:59:17.435584-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFinalNameTakenBeforeTheRenameIsNeverReplaced","Output":"=== RUN   TestAFinalNameTakenBeforeTheRenameIsNeverReplaced\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:17.441824-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFinalNameTakenBeforeTheRenameIsNeverReplaced","Output":"    destination_test.go:332: SaveFile(\"doc.txt\") = transfer_failed: a received file could not be put in place, want it saved\n","OutputType":"error"}
+{"Time":"2026-10-11T04:59:17.44218-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFinalNameTakenBeforeTheRenameIsNeverReplaced","Output":"--- FAIL: TestAFinalNameTakenBeforeTheRenameIsNeverReplaced (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:17.442184-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestAFinalNameTakenBeforeTheRenameIsNeverReplaced","Elapsed":0.01}
+{"Time":"2026-10-11T04:59:17.442201-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:17.442597-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.234s\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:17.442608-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.234}

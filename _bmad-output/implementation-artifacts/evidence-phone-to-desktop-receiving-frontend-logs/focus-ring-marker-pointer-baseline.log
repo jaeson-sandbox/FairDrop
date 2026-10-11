@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-focus-ring-marker-pointer-mhggvpqr/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-focus-ring-marker-pointer-53bmrcrg/frontend
 
 
  Test Files  1 passed (1)
       Tests  7 passed | 13 skipped (20)
-   Start at  01:15:13
-   Duration  612ms (transform 74ms, setup 0ms, import 128ms, tests 125ms, environment 283ms)
+   Start at  04:59:50
+   Duration  593ms (transform 69ms, setup 0ms, import 119ms, tests 120ms, environment 279ms)
 

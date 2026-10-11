@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T04:59:35.046527-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T04:59:35.262733-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused"}
+{"Time":"2026-10-11T04:59:35.262827-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Output":"=== RUN   TestARefusedDestinationIsDescribedByWhyItWasRefused\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:35.265126-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Output":"    destination_test.go:98: a symbolic link: OpenDestination error = path_unsupported: the destination folder cannot be written to, want \"path_unsupported: the destination is not a plain folder\"\n","OutputType":"error"}
+{"Time":"2026-10-11T04:59:35.266844-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Output":"--- FAIL: TestARefusedDestinationIsDescribedByWhyItWasRefused (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:35.266869-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Elapsed":0}
+{"Time":"2026-10-11T04:59:35.266919-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:35.267773-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.221s\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:35.267795-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.221}

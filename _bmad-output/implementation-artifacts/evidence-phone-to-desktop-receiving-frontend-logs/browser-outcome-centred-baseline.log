@@ -1,10 +1,10 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-outcome-centred-v_4vhz1l/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-outcome-centred-xyt8u62m/frontend
 
-1:17:09 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+5:01:52 AM [vite] (client) Re-optimizing dependencies because vite config has changed
 
  Test Files  1 passed (1)
       Tests  1 passed | 36 skipped (37)
-   Start at  01:17:09
-   Duration  1.38s (transform 0ms, setup 0ms, import 170ms, tests 642ms, environment 0ms)
+   Start at  05:01:52
+   Duration  1.37s (transform 0ms, setup 0ms, import 166ms, tests 641ms, environment 0ms)
 

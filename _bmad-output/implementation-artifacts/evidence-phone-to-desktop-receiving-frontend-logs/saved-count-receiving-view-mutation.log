@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-receiving-view-bubub9yu/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-receiving-view-tnp0siax/frontend
 
- ❯ src/ui/ReceivingView.test.tsx (14 tests | 3 failed | 9 skipped) 36ms
+ ❯ src/ui/ReceivingView.test.tsx (14 tests | 3 failed | 9 skipped) 35ms
      × says 1 saved as "1 file saved" 5ms
      × says 2 saved as "2 files saved" 3ms
      × says 37 saved as "37 files saved" 2ms
@@ -27,10 +27,10 @@ Ignored nodes: comments, script, style
     [0mSaved[0m
   [36m</span>[39m
 [36m</div>[39m
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
  ❯ src/ui/ReceivingView.test.tsx:74:40
      72|         render(<ReceivingView state={receiving({filesSaved})} onCancel…
      73|
@@ -60,10 +60,10 @@ Ignored nodes: comments, script, style
     [0mSaved[0m
   [36m</span>[39m
 [36m</div>[39m
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
  ❯ src/ui/ReceivingView.test.tsx:74:40
      72|         render(<ReceivingView state={receiving({filesSaved})} onCancel…
      73|
@@ -93,10 +93,10 @@ Ignored nodes: comments, script, style
     [0mSaved[0m
   [36m</span>[39m
 [36m</div>[39m
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
  ❯ src/ui/ReceivingView.test.tsx:74:40
      72|         render(<ReceivingView state={receiving({filesSaved})} onCancel…
      73|
@@ -110,6 +110,6 @@ Ignored nodes: comments, script, style
 
  Test Files  1 failed (1)
       Tests  3 failed | 2 passed | 9 skipped (14)
-   Start at  01:15:50
-   Duration  535ms (transform 78ms, setup 0ms, import 130ms, tests 36ms, environment 286ms)
+   Start at  05:00:25
+   Duration  521ms (transform 78ms, setup 0ms, import 132ms, tests 35ms, environment 274ms)
 

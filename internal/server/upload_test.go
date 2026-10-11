@@ -271,6 +271,28 @@ func TestPartsOutsideTheFilesFieldAreDiscardedNeverWritten(t *testing.T) {
 	}
 }
 
+// A part may name a Content-Transfer-Encoding. The standard reader's NextPart
+// would transparently decode quoted-printable and hide the header, so the saved
+// bytes would differ from the bytes the phone sent. A receiver saves what was
+// sent: NextRawPart keeps the part body exactly as it arrived.
+func TestAQuotedPrintablePartIsSavedAsSentNotDecoded(t *testing.T) {
+	rig := startReceiveRig(t)
+	sent := "=41=42=43 soft=\r\nbreak =3D"
+	part := uploadFile("encoded.txt", sent)
+	part.transferEncoding = "quoted-printable"
+
+	response, page := rig.post(multipartBody(part, uploadFile("plain.txt", "PLAIN")))
+	if response.StatusCode != http.StatusOK || !strings.Contains(string(page), "2 files saved to this computer.") {
+		t.Fatalf("status %d, page %q, want 2 files saved", response.StatusCode, page)
+	}
+	if got := readText(t, filepath.Join(rig.subfolder(), "encoded.txt")); got != "=41=42=43 soft=\r\nbreak =3D" {
+		t.Fatalf("saved bytes = %q, want exactly the quoted-printable text that was sent", got)
+	}
+	if got := readText(t, filepath.Join(rig.subfolder(), "plain.txt")); got != "PLAIN" {
+		t.Fatalf("plain.txt = %q, want PLAIN", got)
+	}
+}
+
 // --- Requests that must leave the session waiting ---------------------------
 
 func TestRejectedRequestsWriteNothingAndLeaveTheSessionWaiting(t *testing.T) {
@@ -623,6 +645,43 @@ func TestTheServerItselfAbortsWhenTheBodyExceedsItsDeclaredLength(t *testing.T) 
 	}
 }
 
+// net/http itself turns a body that ends short of its Content-Length into
+// io.ErrUnexpectedEOF, so over a real connection this branch is a backstop for a
+// transport that reports a clean end instead. The handler is driven directly with
+// exactly that: a well-formed multipart body, terminator included, that stops
+// before the declared length. Every file in it is saved, and the upload must
+// still not read as finished -- the progress total is the declared length, and
+// "complete" with fewer bytes than that would be a claim nobody checked.
+func TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete(t *testing.T) {
+	rig := startReceiveRig(t)
+	rig.server.mu.Lock()
+	active := rig.server.active
+	rig.server.mu.Unlock()
+
+	full := multipartBody(uploadFile("one.txt", "1"), uploadFile("two.txt", "22"))
+	request := httptest.NewRequest(http.MethodPost, "/upload/"+string(testToken), bytes.NewReader(full))
+	request.SetPathValue("token", string(testToken))
+	request.Header.Set("Content-Type", multipartType)
+	request.ContentLength = int64(len(full)) + 500
+	recorder := httptest.NewRecorder()
+
+	active.upload(recorder, request)
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want the incomplete-upload page for a body 500 bytes short", recorder.Code)
+	}
+	page := recorder.Body.String()
+	if !strings.Contains(page, "Upload incomplete") || !strings.Contains(page, "2 files saved to this computer.") {
+		t.Errorf("page = %s, want incomplete with the 2 files that did arrive", page)
+	}
+	if strings.Contains(page, "Upload complete") {
+		t.Error("a body shorter than its declared length was reported as complete")
+	}
+	if _, terminal := awaitTerminal(t, rig.handle.Events); terminal.Kind != transfer.ServerFailed {
+		t.Fatalf("terminal = %s, want failed", terminal.Kind)
+	}
+}
+
 func TestAWriteErrorMidUploadIsIncompleteWithTheExactCount(t *testing.T) {
 	var spy *spyDestination
 	rig := startReceiveRig(t, withDestination(func(real transfer.ReceiveDestination) transfer.ReceiveDestination {
@@ -736,6 +795,50 @@ func TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes(t *testing.T) {
 	}
 	if got := readText(t, filepath.Join(rig.subfolder(), "steady.bin")); got != strings.Repeat(content, chunks) {
 		t.Fatal("the saved bytes differ from the uploaded bytes")
+	}
+}
+
+// The inactivity bound measures silence from the phone, not time the desktop
+// spends on its own disk. Finishing a file (fsync -- F_FULLFSYNC on macOS --
+// marking and the rename) can outlast the bound on a slow volume, and when it
+// does the very next read of the body must still get a full bound, or a healthy
+// multi-file upload is reported incomplete. The destination here is real but
+// slow after the first file is fully read; the second file is large enough that
+// it cannot already sit in the server's read buffers, so it needs the socket.
+func TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound(t *testing.T) {
+	const bound = 300 * time.Millisecond
+	var spy *spyDestination
+	rig := startReceiveRig(t,
+		withTimeouts(serverTimeouts{
+			readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout, teardown: TeardownBound,
+			uploadIdle: bound,
+		}),
+		withDestination(func(real transfer.ReceiveDestination) transfer.ReceiveDestination {
+			spy = &spyDestination{ReceiveDestination: real}
+			spy.saveFile = func(ctx context.Context, name string, content io.Reader) (int64, error) {
+				written, err := real.SaveFile(ctx, name, content)
+				if spy.saves.Load() == 1 {
+					// The part is fully read; now the volume is slow to finish it.
+					time.Sleep(3 * bound)
+				}
+				return written, err
+			}
+			return spy
+		}))
+
+	second := strings.Repeat("0123456789abcdef", 16384) // 256 KiB
+	response, page := rig.post(multipartBody(uploadFile("first.txt", "1"), uploadFile("second.bin", second)))
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d (%s), want 200: a slow save is not a stalled phone", response.StatusCode, page)
+	}
+	if text := string(page); !strings.Contains(text, "Upload complete") || !strings.Contains(text, "2 files saved to this computer.") {
+		t.Errorf("page = %s, want complete with 2 files saved", text)
+	}
+	if _, terminal := awaitTerminal(t, rig.handle.Events); terminal.Kind != transfer.ServerComplete {
+		t.Fatalf("terminal = %s (%v), want complete", terminal.Kind, terminal.Err)
+	}
+	if got := readText(t, filepath.Join(rig.subfolder(), "second.bin")); got != second {
+		t.Fatal("the second file's saved bytes differ from the uploaded bytes")
 	}
 }
 

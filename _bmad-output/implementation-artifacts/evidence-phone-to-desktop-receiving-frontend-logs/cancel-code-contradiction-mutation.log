@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancel-code-contradiction-pt0f47j4/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancel-code-contradiction-1jdd65oi/frontend
 
- ❯ src/transfer/validation.receive.test.ts (80 tests | 3 failed | 77 skipped) 5ms
+ ❯ src/transfer/validation.receive.test.ts (80 tests | 3 failed | 77 skipped) 6ms
      × refuses an incomplete result beside the cancelled code: a contradiction is never guessed at 4ms
      × refuses a cancelled result beside transfer_failed: a contradiction is never guessed at 0ms
      × refuses a cancelled result beside an unknown code: a contradiction is never guessed at 0ms
@@ -80,6 +80,6 @@ null
 
  Test Files  1 failed (1)
       Tests  3 failed | 77 skipped (80)
-   Start at  01:15:35
-   Duration  421ms (transform 34ms, setup 0ms, import 43ms, tests 5ms, environment 289ms)
+   Start at  05:00:11
+   Duration  414ms (transform 36ms, setup 0ms, import 45ms, tests 6ms, environment 279ms)
 

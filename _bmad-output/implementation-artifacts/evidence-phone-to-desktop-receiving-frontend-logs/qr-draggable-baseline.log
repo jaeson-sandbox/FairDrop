@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-qr-draggable-w7h59siy/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-qr-draggable-v_ze00xs/frontend
 
 
  Test Files  1 passed (1)
       Tests  1 passed | 21 skipped (22)
-   Start at  01:16:31
-   Duration  583ms (transform 85ms, setup 0ms, import 140ms, tests 67ms, environment 298ms)
+   Start at  05:01:14
+   Duration  550ms (transform 81ms, setup 0ms, import 131ms, tests 63ms, environment 279ms)
 

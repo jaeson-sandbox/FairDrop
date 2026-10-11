@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-failure-note-493l4rph/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-failure-note-1rr5grcu/frontend
 
- ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 7ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
      × records a failed Show in Folder beside the outcome and clears it on the next request 6ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -25,19 +25,19 @@ AssertionError: expected { phase: 'receive-outcome', …(4) } to match object { 
     },
     "phase": "receive-outcome",
 
- ❯ src/transfer/state.receive.test.ts:381:24
-    379|     it('records a failed Show in Folder beside the outcome and clears …
-    380|         const failed = run(outcomeState(), {type: 'receive-show-failed…
-    381|         expect(failed).toMatchObject({
+ ❯ src/transfer/state.receive.test.ts:422:24
+    420|     it('records a failed Show in Folder beside the outcome and clears …
+    421|         const failed = run(outcomeState(), {type: 'receive-show-failed…
+    422|         expect(failed).toMatchObject({
        |                        ^
-    382|             phase: 'receive-outcome',
-    383|             commandError: {code: 'path_not_found'},
+    423|             phase: 'receive-outcome',
+    424|             commandError: {code: 'path_not_found'},
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 37 skipped (38)
-   Start at  01:15:45
-   Duration  440ms (transform 48ms, setup 0ms, import 59ms, tests 7ms, environment 291ms)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:21
+   Duration  486ms (transform 48ms, setup 0ms, import 58ms, tests 7ms, environment 339ms)
 

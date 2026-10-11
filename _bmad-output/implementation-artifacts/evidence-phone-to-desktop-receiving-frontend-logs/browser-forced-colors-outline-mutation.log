@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-forced-colors-outline-usx7164o/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-forced-colors-outline-gp28dr4h/frontend
 
- ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 35 skipped) 1521ms
-     × draws a real outline, not a box-shadow, on the Receive control after a scripted focus return 850ms
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 35 skipped) 1538ms
+     × draws a real outline, not a box-shadow, on the Receive control after a scripted focus return 851ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -25,6 +25,6 @@ Received: [31m"none"[39m
 
  Test Files  1 failed (1)
       Tests  1 failed | 1 passed | 35 skipped (37)
-   Start at  01:16:37
-   Duration  2.24s (transform 0ms, setup 0ms, import 177ms, tests 1.52s, environment 0ms)
+   Start at  05:01:20
+   Duration  2.24s (transform 0ms, setup 0ms, import 177ms, tests 1.54s, environment 0ms)
 

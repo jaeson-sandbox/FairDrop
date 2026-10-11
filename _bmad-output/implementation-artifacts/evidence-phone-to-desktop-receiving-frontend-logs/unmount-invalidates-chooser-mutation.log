@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-unmount-invalidates-chooser-7_z_144e/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-unmount-invalidates-chooser-wt5m9fib/frontend
 
- ❯ src/transfer/useTransfer.receive.test.tsx (48 tests | 1 failed | 44 skipped) 15ms
-     × ignores a folder chosen after unmount 11ms
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 45 skipped) 14ms
+     × ignores a folder chosen after unmount 10ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -32,7 +32,7 @@ Number of calls: 1
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 3 passed | 44 skipped (48)
-   Start at  01:15:25
-   Duration  508ms (transform 74ms, setup 0ms, import 129ms, tests 15ms, environment 284ms)
+      Tests  1 failed | 3 passed | 45 skipped (49)
+   Start at  05:00:02
+   Duration  499ms (transform 72ms, setup 0ms, import 125ms, tests 14ms, environment 282ms)
 

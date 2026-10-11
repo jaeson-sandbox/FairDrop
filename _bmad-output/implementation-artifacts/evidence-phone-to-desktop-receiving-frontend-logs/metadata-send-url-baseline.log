@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-send-url-9p7gz3l6/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-send-url-z7fozvkp/frontend
 
 
  Test Files  1 passed (1)
       Tests  1 passed | 79 skipped (80)
-   Start at  01:15:26
-   Duration  418ms (transform 37ms, setup 0ms, import 46ms, tests 2ms, environment 287ms)
+   Start at  05:00:02
+   Duration  398ms (transform 34ms, setup 0ms, import 44ms, tests 2ms, environment 277ms)
 

@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-session-id-um2whua6/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-session-id-d32gfhd7/frontend
 
  ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 79 skipped) 5ms
      × refuses a non-hex session id 4ms
@@ -34,6 +34,6 @@ null
 
  Test Files  1 failed (1)
       Tests  1 failed | 79 skipped (80)
-   Start at  01:15:31
-   Duration  419ms (transform 36ms, setup 0ms, import 47ms, tests 5ms, environment 283ms)
+   Start at  05:00:07
+   Duration  403ms (transform 36ms, setup 0ms, import 45ms, tests 5ms, environment 276ms)
 

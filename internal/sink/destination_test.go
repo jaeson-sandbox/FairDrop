@@ -72,6 +72,38 @@ func TestOpenDestinationRefusesWhatItMustAndCreatesNothing(t *testing.T) {
 	}
 }
 
+// A link, a file and an unwritable folder all end in path_unsupported, but they
+// are told apart in words: the first two are "not a plain folder", the last is a
+// folder that "cannot be written to". The words are what the user reads, so a
+// link that fell through to the generic branch would send them to fix
+// permissions on a folder that has none to fix.
+func TestARefusedDestinationIsDescribedByWhyItWasRefused(t *testing.T) {
+	root := fixtureDir(t)
+	file := filepath.Join(root, "plain.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	real := filepath.Join(root, "real")
+	if err := os.Mkdir(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip("this runner cannot create the symbolic link fixture")
+	}
+
+	for name, path := range map[string]string{"a symbolic link": link, "a file": file} {
+		_, err := New().OpenDestination(context.Background(), path)
+		if err == nil || err.Error() != "path_unsupported: the destination is not a plain folder" {
+			t.Errorf("%s: OpenDestination error = %v, want %q", name, err, "path_unsupported: the destination is not a plain folder")
+		}
+	}
+	_, err := New().OpenDestination(context.Background(), filepath.Join(root, "missing"))
+	if err == nil || err.Error() != "path_not_found: the destination folder does not exist" {
+		t.Errorf("a missing folder: OpenDestination error = %v, want %q", err, "path_not_found: the destination folder does not exist")
+	}
+}
+
 func TestOpenDestinationHonoursACancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -318,6 +350,9 @@ func TestFilesAndFoldersAreNeverExecutable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows has no POSIX permission bits to inspect")
 	}
+	// With the usual umask a loosened constant is masked back into range, so the
+	// modes are read with the umask cleared: what is observed is what was asked.
+	clearUmask(t)
 	dir := fixtureDir(t)
 	dest := openTest(t, newTestSink(), dir)
 	save(t, dest, "run.sh", "#!/bin/sh\necho hi\n")
@@ -639,5 +674,44 @@ func TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage(t *te
 	}
 	if got := listing(t, osTemp); len(got) != 0 {
 		t.Fatalf("the upload wrote %v to OS temp storage", got)
+	}
+}
+
+// A folder the user cannot write into must be refused when it is chosen, before
+// a QR code exists, not discovered as an upload that saved nothing and burned the
+// one-time link. POSIX checks access on the open descriptor; Windows has no such
+// query and must try to create something and take it away again.
+func TestOpenDestinationRefusesAFolderTheUserCannotWriteInto(t *testing.T) {
+	root := fixtureDir(t)
+	unwritable := unwritableDir(t, root)
+
+	dest, err := New().OpenDestination(context.Background(), unwritable)
+	if dest != nil {
+		_, _ = dest.Close()
+		t.Fatalf("OpenDestination(%q) returned a destination for an unwritable folder", unwritable)
+	}
+	if got := transfer.ErrorCodeOf(err); got != transfer.ErrPathUnsupported {
+		t.Fatalf("OpenDestination of an unwritable folder code = %q (%v), want %q", got, err, transfer.ErrPathUnsupported)
+	}
+	if names := listing(t, unwritable); len(names) != 0 {
+		t.Fatalf("a refused open left %v inside the folder, want it untouched", names)
+	}
+}
+
+// The probe that proves a folder writable on Windows creates something to find
+// out, so a folder that IS writable must come back exactly as it was.
+func TestOpeningAWritableFolderLeavesItUntouched(t *testing.T) {
+	dir := fixtureDir(t)
+	if err := os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before := listing(t, dir)
+	dest, err := New().OpenDestination(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("OpenDestination of a writable folder = %v", err)
+	}
+	defer func() { _, _ = dest.Close() }()
+	if after := listing(t, dir); !equalStrings(before, after) {
+		t.Fatalf("opening a writable folder changed it: %v -> %v", before, after)
 	}
 }

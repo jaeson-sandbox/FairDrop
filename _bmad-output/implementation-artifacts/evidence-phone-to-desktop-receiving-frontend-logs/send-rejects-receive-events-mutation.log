@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-send-rejects-receive-events-5ifllspb/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-send-rejects-receive-events-u6gp4euq/frontend
 
- ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 6ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
      × ignores receive progress, complete and error on a transferring send session 6ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -33,19 +33,19 @@ AssertionError: expected { phase: 'transferring', …(5) } to be { phase: 'trans
     },
   }
 
- ❯ src/transfer/state.receive.test.ts:417:118
-    415|     it('ignores receive progress, complete and error on a transferring…
-    416|         const sending = transferringSend()
-    417|         expect(run(sending, event('transfer-progress', {seq: 2, progre…
+ ❯ src/transfer/state.receive.test.ts:458:118
+    456|     it('ignores receive progress, complete and error on a transferring…
+    457|         const sending = transferringSend()
+    458|         expect(run(sending, event('transfer-progress', {seq: 2, progre…
        |                                                                                                                      ^
-    418|         expect(run(sending, event('transfer-complete', {
-    419|             seq: 2, progress: progress(400),
+    459|         expect(run(sending, event('transfer-complete', {
+    460|             seq: 2, progress: progress(400),
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 37 skipped (38)
-   Start at  01:16:18
-   Duration  436ms (transform 45ms, setup 0ms, import 56ms, tests 6ms, environment 286ms)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:53
+   Duration  425ms (transform 49ms, setup 0ms, import 58ms, tests 7ms, environment 279ms)
 
