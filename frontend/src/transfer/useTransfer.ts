@@ -443,7 +443,7 @@ export function useTransfer(): TransferController {
         // The collection draft replaces Idle's composition, so no control can
         // reach this while one is open; the guard is for a caller that is not a
         // control, and keeps "one thing at a time" true at the command level.
-        if (draftPathsRef.current !== null || draftChooserRef.current !== null || draftAdmissionRef.current) return 'ignored'
+        if (draftEntriesRef.current !== null || draftChooserRef.current !== null || draftAdmissionRef.current) return 'ignored'
         return browse(SelectReceiveFolder, 'receive', startReceiveAt, true)
     }, [browse, startReceiveAt])
 
