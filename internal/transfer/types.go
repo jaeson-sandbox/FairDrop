@@ -146,3 +146,60 @@ type FileMetadata struct {
 	QR           string    `json:"qrBase64"`
 	Warnings     []Warning `json:"warnings"`
 }
+
+// ReceiveMetadata is the acknowledgement of a receive session: what the
+// desktop needs to show the waiting view, and nothing more.
+//
+// Destination is the chosen folder's basename only. The absolute destination
+// path is held by the sink and the coordinator and never crosses this boundary,
+// any HTTP response, mDNS record or diagnostic. As with FileMetadata, URL and
+// QR are the only two places the capability token may appear, and Warnings is
+// always a non-nil slice so it serializes as an empty JSON array.
+type ReceiveMetadata struct {
+	SessionID   SessionID `json:"sessionId"`
+	Destination string    `json:"destination"`
+	URL         string    `json:"url"`
+	QR          string    `json:"qrBase64"`
+	Warnings    []Warning `json:"warnings"`
+}
+
+// ReceiveResultKind is how a receive session ended.
+type ReceiveResultKind string
+
+const (
+	// ReceiveComplete means the whole upload was read and every file part was
+	// renamed into place.
+	ReceiveComplete ReceiveResultKind = "complete"
+	// ReceiveIncomplete means the upload ended early for any reason other than
+	// a desktop Cancel: a dropped connection, oversize body, inactivity, or a
+	// write error. Completed files stay; the file being written does not.
+	ReceiveIncomplete ReceiveResultKind = "incomplete"
+	// ReceiveCancelled means the desktop user cancelled an upload in flight.
+	ReceiveCancelled ReceiveResultKind = "cancelled"
+)
+
+// ReceiveStatus is the receive-specific payload an Event may carry.
+//
+// FilesSaved is the number of files whose rename succeeded -- a file counts
+// only after that -- and is present on every receive progress and terminal
+// event. The remaining fields are meaningful only on a terminal event
+// (transfer-complete, or transfer-error): Result names how the session ended,
+// SubfolderExists says whether Show in Folder has anything to open, and
+// MarkingWarning says some saved file could not receive the OS download marking
+// (the file was kept). On progress events Result is empty and the two flags are
+// false. Nothing here ever carries a path or a file name.
+type ReceiveStatus struct {
+	FilesSaved      int               `json:"filesSaved"`
+	Result          ReceiveResultKind `json:"result,omitempty"`
+	SubfolderExists bool              `json:"subfolderExists"`
+	MarkingWarning  bool              `json:"markingWarning"`
+}
+
+// NoticeCode is a stable code for something that happened to a waiting session
+// without changing its state.
+type NoticeCode string
+
+// NoticeReceiveTooLarge is raised when a phone's upload is refused before any
+// byte is written because its declared size would leave less than the free
+// space reserve. The session keeps waiting.
+const NoticeReceiveTooLarge NoticeCode = "receive_too_large"

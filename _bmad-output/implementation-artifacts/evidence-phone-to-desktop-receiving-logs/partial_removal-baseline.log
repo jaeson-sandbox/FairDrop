@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T00:23:38.63868-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T00:23:38.850367-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile"}
+{"Time":"2026-10-11T00:23:38.850482-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Output":"=== RUN   TestAReadErrorMidFileRemovesOnlyThePartialFile\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:38.867166-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Output":"--- PASS: TestAReadErrorMidFileRemovesOnlyThePartialFile (0.02s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:38.867189-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Elapsed":0.02}
+{"Time":"2026-10-11T00:23:38.867241-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:38.868285-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.229s\n"}
+{"Time":"2026-10-11T00:23:38.868317-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.23}

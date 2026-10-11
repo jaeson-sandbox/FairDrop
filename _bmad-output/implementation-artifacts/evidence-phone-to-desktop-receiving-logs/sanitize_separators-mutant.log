@@ -1,0 +1,16 @@
+{"Time":"2026-10-11T00:23:42.271126-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T00:23:42.492203-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost"}
+{"Time":"2026-10-11T00:23:42.492271-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"=== RUN   TestSanitizeNameStripsBothSeparatorsOnEveryHost\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.492332-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"=== PAUSE TestSanitizeNameStripsBothSeparatorsOnEveryHost\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.492336-04:00","Action":"pause","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost"}
+{"Time":"2026-10-11T00:23:42.49234-04:00","Action":"cont","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost"}
+{"Time":"2026-10-11T00:23:42.492343-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"=== CONT  TestSanitizeNameStripsBothSeparatorsOnEveryHost\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.492347-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"    naming_test.go:78: SanitizeName(\"C:\\\\a.txt\") = \"C_\\\\a.txt\", want \"a.txt\"\n","OutputType":"error"}
+{"Time":"2026-10-11T00:23:42.492378-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"    naming_test.go:78: SanitizeName(\"\\\\\\\\server\\\\share\\\\b.txt\") = \"\\\\\\\\server\\\\share\\\\b.txt\", want \"b.txt\"\n","OutputType":"error"}
+{"Time":"2026-10-11T00:23:42.492388-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"    naming_test.go:78: SanitizeName(\"x/y\\\\z/w\\\\v.txt\") = \"w\\\\v.txt\", want \"v.txt\"\n","OutputType":"error"}
+{"Time":"2026-10-11T00:23:42.492401-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"    naming_test.go:78: SanitizeName(\"..\\\\..\\\\Windows\\\\System32\\\\evil.dll\") = \"..\\\\..\\\\Windows\\\\System32\\\\evil.dll\", want \"evil.dll\"\n","OutputType":"error"}
+{"Time":"2026-10-11T00:23:42.492413-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"--- FAIL: TestSanitizeNameStripsBothSeparatorsOnEveryHost (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.492417-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Elapsed":0}
+{"Time":"2026-10-11T00:23:42.492431-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.49308-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.222s\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:42.493096-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.222}

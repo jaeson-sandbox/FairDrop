@@ -1,0 +1,12 @@
+{"Time":"2026-10-11T00:23:41.719341-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T00:23:41.937345-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost"}
+{"Time":"2026-10-11T00:23:41.937459-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"=== RUN   TestSanitizeNameStripsBothSeparatorsOnEveryHost\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:41.937514-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"=== PAUSE TestSanitizeNameStripsBothSeparatorsOnEveryHost\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:41.937519-04:00","Action":"pause","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost"}
+{"Time":"2026-10-11T00:23:41.937522-04:00","Action":"cont","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost"}
+{"Time":"2026-10-11T00:23:41.937526-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"=== CONT  TestSanitizeNameStripsBothSeparatorsOnEveryHost\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:41.937532-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Output":"--- PASS: TestSanitizeNameStripsBothSeparatorsOnEveryHost (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:41.937543-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestSanitizeNameStripsBothSeparatorsOnEveryHost","Elapsed":0}
+{"Time":"2026-10-11T00:23:41.937559-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:23:41.938616-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.219s\n"}
+{"Time":"2026-10-11T00:23:41.938647-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.219}

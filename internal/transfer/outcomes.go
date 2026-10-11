@@ -29,6 +29,8 @@ func (c *Coordinator) drain(live *session, events <-chan ServerEvent) {
 		switch event.Kind {
 		case ServerProgress:
 			c.forwardProgress(live, event)
+		case ServerNotice:
+			c.forwardNotice(live, event)
 		case ServerComplete, ServerFailed:
 			// A real report from the server only ever describes a claimed,
 			// in-flight transfer, so this arm stays gated to TRANSFERRING --
@@ -36,7 +38,7 @@ func (c *Coordinator) drain(live *session, events <-chan ServerEvent) {
 			// session the server left behind before a claim ever happened.
 			c.acceptTerminal(live, event, stateTransferring)
 		default:
-			// The port defines three kinds and this coordinator does not own
+			// The port defines four kinds and this coordinator does not own
 			// the adapter that produces them. Discarding an unrecognized one
 			// is the only safe action, but discarding it silently would hide
 			// the adapter defect that produced it -- the same reasoning that
@@ -103,6 +105,11 @@ func (c *Coordinator) forwardProgress(live *session, event ServerEvent) {
 	live.seq++
 	snapshot := sanitizeProgress(*event.Progress)
 	published := Event{SessionID: live.id, Seq: live.seq, Kind: TransferProgress, Progress: &snapshot}
+	if live.receive != nil && event.Receive != nil {
+		// Only the saved count crosses, and never below zero: the destination
+		// owns the number and this boundary owns its range.
+		published.Receive = &ReceiveStatus{FilesSaved: max(event.Receive.FilesSaved, 0)}
+	}
 	c.mu.Unlock()
 
 	c.publish(published)
@@ -166,7 +173,7 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent, allowed .
 		// renders progress and outcome separately still sees the last byte
 		// count before it sees the outcome.
 		snapshot := final
-		c.publishNext(live, Event{Kind: TransferProgress, Progress: &snapshot})
+		c.publishNext(live, Event{Kind: TransferProgress, Progress: &snapshot, Receive: c.receiveProgress(live)})
 	}
 
 	var settled sessionState
@@ -185,7 +192,7 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent, allowed .
 		// transfer failure -- the bytes did arrive -- so it reports the
 		// unknown-total zero snapshot rather than downgrading a success.
 		snapshot := final
-		c.publishNext(live, Event{Kind: TransferComplete, Progress: &snapshot})
+		c.publishNext(live, Event{Kind: TransferComplete, Progress: &snapshot, Receive: c.receiveStatus(live, ReceiveComplete)})
 		settled = stateDone
 	default:
 		// The original cause is recorded, by code only, before it is
@@ -203,7 +210,7 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent, allowed .
 			snapshot := final
 			payload = &snapshot
 		}
-		c.publishNext(live, Event{Kind: TransferError, Progress: payload, Error: &failure})
+		c.publishNext(live, Event{Kind: TransferError, Progress: payload, Error: &failure, Receive: c.receiveStatus(live, ReceiveIncomplete)})
 		settled = stateError
 	}
 
@@ -212,7 +219,12 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent, allowed .
 	c.mu.Unlock()
 
 	c.releaseLease()
-	c.armReset(live)
+	if live.receive == nil {
+		// A receive outcome is held until the user leaves it (Cancel, or
+		// Shutdown): Show in Folder is offered from it, and the three-second
+		// lease a send outcome gets is not long enough to reach a button.
+		c.armReset(live)
+	}
 }
 
 // drainerMayActLocked reports whether this drainer's session is still the one

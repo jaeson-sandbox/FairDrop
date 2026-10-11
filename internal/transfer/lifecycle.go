@@ -140,6 +140,13 @@ func (c *Coordinator) retire(live *session, announce bool) error {
 	}
 	stopReset := live.stopReset
 	live.stopReset = nil
+	// A receive upload the desktop cancelled while it was in flight owes the
+	// user an outcome ("cancelled, N saved") rather than a bare reset, so the
+	// session is held in its terminal state instead of returning to IDLE. Only
+	// the announcing path does this (Shutdown has no UI to tell), and only from
+	// TRANSFERRING: a session cancelled while still waiting or claiming wrote
+	// nothing and resets as before.
+	holdOutcome := announce && live.receive != nil && c.state == stateTransferring && !live.terminal
 	c.mu.Unlock()
 
 	// Stopping the armed reset before publishing our own is what makes the
@@ -154,6 +161,10 @@ func (c *Coordinator) retire(live *session, announce bool) error {
 	// and only joins the drainer the terminal path could not join itself.
 	unwindErr := c.unwind(live)
 	live.stop()
+
+	if holdOutcome {
+		return c.settleCancelledReceive(live, unwindErr)
+	}
 
 	var reset *Event
 	c.mu.Lock()

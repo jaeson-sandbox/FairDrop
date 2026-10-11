@@ -426,6 +426,11 @@ func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 		"SelectFiles":     true,
 		"SelectDirectory": true,
 		"CopyToClipboard": true,
+		// Phone-to-desktop receiving: one chooser, one start, one Show in Folder.
+		// Cancel is the existing CancelTransfer.
+		"SelectReceiveFolder": true,
+		"StartReceive":        true,
+		"ShowReceivedFolder":  true,
 	}
 
 	appType := reflect.TypeOf(NewApp())

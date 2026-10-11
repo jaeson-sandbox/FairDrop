@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T00:24:35.086249-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T00:24:35.303204-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile"}
+{"Time":"2026-10-11T00:24:35.303362-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile","Output":"=== RUN   TestRenameNoReplaceNeverReplacesAnExistingFile\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:35.306499-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile","Output":"--- PASS: TestRenameNoReplaceNeverReplacesAnExistingFile (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:35.306515-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile","Elapsed":0}
+{"Time":"2026-10-11T00:24:35.306543-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:35.307578-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.221s\n"}
+{"Time":"2026-10-11T00:24:35.30761-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.221}

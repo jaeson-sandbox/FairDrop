@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T00:24:28.585968-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T00:24:28.785664-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder"}
+{"Time":"2026-10-11T00:24:28.785717-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder","Output":"=== RUN   TestReceivedFolderRefusesWhenThereIsNoSubfolder\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:28.78603-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder","Output":"--- PASS: TestReceivedFolderRefusesWhenThereIsNoSubfolder (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:28.786041-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestReceivedFolderRefusesWhenThereIsNoSubfolder","Elapsed":0}
+{"Time":"2026-10-11T00:24:28.786053-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T00:24:28.786471-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.200s\n"}
+{"Time":"2026-10-11T00:24:28.786486-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.201}

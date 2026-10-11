@@ -8,6 +8,7 @@ import (
 	"fairdrop/internal/network"
 	"fairdrop/internal/qr"
 	"fairdrop/internal/server"
+	"fairdrop/internal/sink"
 	"fairdrop/internal/source"
 	"fairdrop/internal/stream"
 	"fairdrop/internal/transfer"
@@ -51,6 +52,7 @@ func compose(app *App) *transfer.Coordinator {
 		Network:  network.NewManager(),
 		Server:   server.New(stream.New(inspector)),
 		QR:       qr.New(),
+		Sink:     sink.New(),
 		Observer: appObserver{app: app},
 		// Diagnose is what carries an internal diagnostic out of the process.
 		// Without it the coordinator's sink is written by production and read
