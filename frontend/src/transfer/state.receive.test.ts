@@ -148,7 +148,7 @@ describe('starting a receive session', () => {
         expect(refused).toEqual({
             phase: 'idle',
             retainedOutcome: null,
-            commandError: {code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'},
+            commandError: {code: 'invalid_selection', message: 'Choose 1 to 10,000 separate files or folders.'},
         })
     })
 })
