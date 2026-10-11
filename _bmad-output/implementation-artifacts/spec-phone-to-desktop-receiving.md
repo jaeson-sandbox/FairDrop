@@ -2,7 +2,7 @@
 title: 'Receive files from a phone browser onto the desktop'
 type: 'feature'
 created: '2026-10-10'
-status: 'in-progress'
+status: 'done'
 baseline_commit: 'f3077fb'
 review_loop_iteration: 0
 context:
@@ -70,11 +70,11 @@ The work is delivered in two stories, implemented in this order:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Story A: domain/ports/coordinator receive lifecycle with coordinator tests for admission, cancel races and outcome grammar.
-- [ ] Story A: sink adapter with platform no-replace rename, free-space check, sanitization, dedupe, cleanup and marking, with native tests.
-- [ ] Story A: server receive route, pages, multipart streaming and inactivity deadline; real-HTTP tests for every matrix row; bound commands and regenerated bindings.
-- [ ] Story B: frontend receive flow, views, Show in Folder, copy and announcements, with jsdom and rendered-browser tests.
-- [ ] Contracts, architecture decision log, Quartz UX and README updated; evidence file with matrix coverage and scoped mutation proof from one canonical inventory.
+- [x] Story A: domain/ports/coordinator receive lifecycle with coordinator tests for admission, cancel races and outcome grammar.
+- [x] Story A: sink adapter with platform no-replace rename, free-space check, sanitization, dedupe, cleanup and marking, with native tests.
+- [x] Story A: server receive route, pages, multipart streaming and inactivity deadline; real-HTTP tests for every matrix row; bound commands and regenerated bindings.
+- [x] Story B: frontend receive flow, views, Show in Folder, copy and announcements, with jsdom and rendered-browser tests.
+- [x] Contracts, architecture decision log, Quartz UX and README updated; evidence file with matrix coverage and scoped mutation proof from one canonical inventory.
 
 **Acceptance Criteria:**
 - Given a chosen folder and a real multipart POST of mixed files with duplicate names, when the upload completes, then the new subfolder contains exactly the expected bytes under the sanitized/deduped names, no temp files remain, no pre-existing file changed, and the result page and desktop report the exact count.

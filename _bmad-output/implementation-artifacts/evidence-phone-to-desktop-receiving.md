@@ -319,3 +319,21 @@ All sequential, `PATH` prepended with `/opt/homebrew/bin` and `~/go/bin`. `wails
 - The Windows probe needs create and delete rights on the chosen folder. A folder where the user may create but not delete (an unusual ACL) is refused, which is the safe direction.
 - Linux execution of the new POSIX tests and of the Linux mutation anchors.
 - Phone browsers: a quoted-printable part was sent only by a hand-built body.
+
+## Orchestrator integration (2026-10-11)
+
+| Check | Result | Log or run |
+|---|---|---|
+| Integrated Story A + B gate (Wails build, bindings unchanged, drift, gofmt, vet, staticcheck, Go and race in 10 packages, frontend, browser, both live fixtures, line endings, cross-builds) | Passed | `integration/integrated-gate.log` |
+| Post-review gate on the same ordered gate | Passed: 1258 unit tests, 123 browser tests, receiver-live and upload-live | `integration/post-review-gate.log` |
+| `scripts/verify-native-mutations.sh` (repo-wide native inventory) after the receive changes | 68/68 darwin cases killed, source restored | `integration/post-review-native-mutations.log` |
+| Receive Go / frontend inventories | 48/48 and 66/66 killed, as reported above | — |
+| Native CI at the integrated tip `39eda3d` | All three jobs passed | run 38125647702 |
+| Native CI at `2d08c10` (review patches) | Windows failed both unwritable-folder tests; macOS and Linux passed | run 38127093359 |
+| Native CI at `e370171` (self-proving fixture) | All three jobs passed | run 38128065621 |
+
+The first CI run on Story A (run 38112199987) found a data race in `TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome` on all three platforms. The test sent on the fake lane while Cancel closed it; this was a test-harness bug, not a product bug. It was fixed in `1d011e3` by using the synchronized `fakeServer.publish`, and ran clean over 60 `-race` runs.
+
+**The Windows writability refusal is unproven on CI.** The GitHub Windows runner's elevated `runneradmin` token creates folders inside a folder carrying an `Everyone:(DENY)(WD,AD)` entry. The ACL was logged in run 38128065621. The fixture now proves itself first and records a named capability skip, so no refusal assertion runs against a writable folder. The probe performs the same `Mkdir` a receive performs, so it refuses whenever the first save would fail. That reasoning stands in for an executed refusal on Windows, which remains open to a manual check on a standard-user account. The other Windows-only sink tests, including the MAX_PATH tests, ran and passed inside the package run.
+
+Still unobserved: the built app driven by hand, a real phone upload from iOS Safari or Android Chrome through the desktop UI, Show in Folder opening Finder or Explorer, screen readers, and WKWebView focus behaviour. All of these are optional under `docs/release-policy.md`. Every automated gate is green.
