@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T13:51:32.386135-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T13:51:32.632077-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce"}
-{"Time":"2026-10-11T13:51:32.632126-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce","Output":"=== RUN   TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:32.632565-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce","Output":"    coordinator_collection_test.go:50: 10,000 roots refused: invalid_selection: choose between one and 10,000 items\n","OutputType":"error"}
-{"Time":"2026-10-11T13:51:32.632646-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce","Output":"--- FAIL: TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:32.632651-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce","Elapsed":0}
-{"Time":"2026-10-11T13:51:32.63266-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:32.633326-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.247s\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:32.633343-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.247}
+{"Time":"2026-10-11T14:23:01.033921-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T14:23:01.297948-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce"}
+{"Time":"2026-10-11T14:23:01.298005-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce","Output":"=== RUN   TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:01.298609-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce","Output":"    coordinator_collection_test.go:50: 10,000 roots refused: invalid_selection: choose between one and 10,000 items\n","OutputType":"error"}
+{"Time":"2026-10-11T14:23:01.298695-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce","Output":"--- FAIL: TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:01.2987-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionAdmitsTenThousandRootsAndInspectsEachOnce","Elapsed":0}
+{"Time":"2026-10-11T14:23:01.298722-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:01.299322-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.265s\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:01.299329-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.265}

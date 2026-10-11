@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T13:51:35.291305-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T13:51:35.583536-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly"}
-{"Time":"2026-10-11T13:51:35.583652-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Output":"=== RUN   TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:35.585613-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Output":"    landing_test.go:156: Start with 10001 members: err = \u003cnil\u003e, want accepted = false\n","OutputType":"error"}
-{"Time":"2026-10-11T13:51:35.585679-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Output":"--- FAIL: TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:35.585759-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Elapsed":0}
-{"Time":"2026-10-11T13:51:35.586016-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:35.586816-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.295s\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:35.586826-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.296}
+{"Time":"2026-10-11T14:23:03.914126-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T14:23:04.231592-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly"}
+{"Time":"2026-10-11T14:23:04.231804-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Output":"=== RUN   TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:04.235738-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Output":"    landing_test.go:156: Start with 10001 members: err = \u003cnil\u003e, want accepted = false\n","OutputType":"error"}
+{"Time":"2026-10-11T14:23:04.23579-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Output":"--- FAIL: TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:04.235796-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Elapsed":0}
+{"Time":"2026-10-11T14:23:04.235823-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:04.237539-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.323s\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:04.23757-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.323}

@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T13:51:29.990914-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T13:51:30.227597-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork"}
-{"Time":"2026-10-11T13:51:30.227736-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"=== RUN   TestCollectionCountRefusalPrecedesFilesystemAndNetwork\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:30.228845-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"--- PASS: TestCollectionCountRefusalPrecedesFilesystemAndNetwork (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:30.228868-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Elapsed":0}
-{"Time":"2026-10-11T13:51:30.228882-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:30.229914-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.239s\n"}
-{"Time":"2026-10-11T13:51:30.229935-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.239}
+{"Time":"2026-10-11T14:22:58.572704-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T14:22:58.811147-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork"}
+{"Time":"2026-10-11T14:22:58.811335-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"=== RUN   TestCollectionCountRefusalPrecedesFilesystemAndNetwork\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:22:58.814002-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"--- PASS: TestCollectionCountRefusalPrecedesFilesystemAndNetwork (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:22:58.814044-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Elapsed":0}
+{"Time":"2026-10-11T14:22:58.814099-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:22:58.815568-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.242s\n"}
+{"Time":"2026-10-11T14:22:58.815612-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.243}

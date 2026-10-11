@@ -81,3 +81,50 @@ The first native-mutations run stopped at `pin reservation mutation did not matc
 ## Only native Windows CI can prove
 
 `TestWindowsSelectionOverlapUsesCaseFoldAndVolumeComponents` (rewritten onto `overlapIndex`; skipped off Windows, and its UNC and volume-root key handling was derived by reading `filepath.Dir`, not run), the Windows-only native mutation case, the Windows handle-budget behavior underneath `TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether` (the boundary depth is discovered at run time from the real inspector), and the creation cost of the 180-item native fixture on a Windows runner. Native macOS WKWebView behavior of the scrolling draft list (focus ring inside the scroller) is unobserved by a human; only Chromium and stylesheet assertions back it.
+
+## Review triage (2026-10-11)
+
+An independent review of the 1.5.1 hotfix branch (`6bb0601`) produced the findings below. Each is routed; nothing is deferred without an owner. Patched findings follow the repository rule: a failing test first (confirmed red for the stated reason), the fix, then a canonical mutation case that reverts the fix and fails the named assertion.
+
+### Patched
+
+| # | Finding | Fix | Test (red first) | Mutation case |
+|---|---|---|---|---|
+| 1 | Draft rows were keyed `${index}-${name}`, so removing row 0 of 10,000 remounted about 9,999 rows; `showDraft` re-sanitized every path on every add and remove. | The controller assigns each draft entry a monotonic id when it is appended and keeps it beside the private path and the once-derived display name (`DraftEntry` in `useTransfer.ts`). Views receive `names` and `draftIds` only, never a path. Rows are keyed by id, `DraftRow` is `memo`ised, the Remove-button registry is a `Map` by id, and focus after removal targets the successor row by id. Append, removal and refusal paths reuse existing entries (`showDraftEntries`); only genuinely new paths are sanitized and issued ids. | `CollectionDraftView.test.tsx` "keeps the remaining rows mounted when the first row is removed" (same `<li>` element identity for rows 2..200, red against the index key); "re-renders only the new row when a row is appended to an unchanged list" (one Remove-button registration for 300 existing rows plus one); `useTransfer.test.tsx` "gives every draft row a stable id that survives removal and append without exposing a path" (red: `draftIds` absent) and "sanitizes each path once, not again on every append or removal" (counts `String.prototype.split` calls on the draft paths; red: every path re-split on each change). | `row-key`, `row-memo`, `draft-id-issue`, `draft-append-resanitize`, `draft-remove-resanitize`, `draft-refusal-resanitize` |
+| 2 | `.fd-draft__ordinal { flex: 0 0 3ch }` was sized for two digits. | The ordinal is `flex: 0 0 calc((var(--fd-ordinal-digits, 2) + 1) * 1ch)` with tabular figures; the view sets `--fd-ordinal-digits` to `max(2, digits(count))` on the list. Lists up to 99 rows are unchanged (still `3ch`); 10,000 rows get `6ch`, and every row's name starts at the same x. | Browser `collection-draft.test.tsx` "never lets a wide ordinal touch the name at 10,000 rows" (rows 1, 100, 1000 and 10000 scrolled into view; the ordinal text's right edge is at least 8px before the name's left edge, the ordinal box ends at or before the name, and the name column is aligned). `draftListStyles.test.ts` "sizes the ordinal column to the widest ordinal"; `CollectionDraftView.test.tsx` "sizes the ordinal column to the digit width of the count, never below two". | `ordinal-digits`, `ordinal-column`, `ordinal-column-rendered` |
+| 3 | `EXPERIENCE.md` and `docs/fairdrop-contracts.md` read "source changed before headers gives 410" as universal. | Both now say it holds for a collection's first member only; a later member changed, replaced or removed after Stage fails mid-stream (no 410, the receiver's download breaks, the ZIP is never finalized, the sender sees the coded error). A new EXPERIENCE failure-table row, "Receiver/collection member changed after headers", and the contracts error-code table's `source_changed` row carry the same text. | Documentation only; `TestEveryOpenDeferredEntryIsCitedByItsOwningStory` and the workflow pins pass. | n/a |
+| 4 | `lazyCollection.install`'s `closed` branch (a member finishing preparation after `shutdown`) had no test and no mutation; `lazy_install_guard` mutated only `held`. | No code change; the branch was correct. | `TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown`: `shutdown` runs from the existing `afterPrepare` hook between member 1's pin and its install, so member 0 is already released and only the `closed` flag can refuse the install. Asserts the coded `transfer_failed`, no member handed back, `current` still nil, and each member closed exactly once (acquired 2, closed 2, no re-close on `Close`). | `lazy_install_closed` (`closed` read as false): fails with `error = nil, want code "transfer_failed"` |
+| 5 | The rune half of the name bound (`maxDownloadNameRunes-reserve`) had no scripted mutation. | No code change. | `TestCollectionWideOrdinalStaysWithinTheRootNameBound` already asserts exactly 200 runes with a 5-digit ordinal. | `name_runes` (rune bound without the reserve): fails `want exactly 200 starting with the full ordinal` |
+
+Finding 2 was reproduced in Chromium as a ragged column, not as an overlap. The old `flex: 0 0 3ch` item has `min-width: auto`, so the box grows to its content and the text cannot spill over the name; instead the name's x position drifted with the ordinal's width (three distinct name offsets among rows 1, 100 and 10000). The overlap the reviewer described therefore was not reproduced in Chromium; real WKWebView layout is unobserved. The fix removes both possibilities by making the column as wide as the widest ordinal, and the red assertion that proved the defect is the column-alignment check.
+
+### Accepted, with reason
+
+| Finding | Reason |
+|---|---|
+| "10000 items" ungrouped in the Staged and Transferring views | The text is the backend-provided collection name; the grouping the draft count uses is a UI formatting concern and the string is cosmetic. No functional effect. |
+| A later folder's identity window now extends to its turn in the stream | The documented, owner-accepted trade-off of lazy preparation (architecture decision 2026-10-11), pinned by `TestCollectionDirectoryIdentityIsPinnedAtItsOwnPreparation`. A replacement between a folder's own preparation and its walk is still refused. |
+| macOS case-insensitive duplicate spellings are not folded | Pre-existing and unchanged by this story; the overlap index keeps the platform grammar it had. |
+| Overlap ancestor map memory for 10,000 unique deep chains | Bounded by roots times depth; realistic selections share parents. A pathological selection costs memory proportional to its own path text. |
+| Close errors after shutdown are dropped | Pre-existing behaviour of the archive's `Close`; unchanged here. |
+| Duplicate `SafeArchiveSegment` checks | Defence in depth. The up-front check over every derived name is what makes name failures pre-header; the per-entry check remains the guard for descendants. |
+| Windows-only overlap test and the Windows-only native mutation | Only a native Windows runner can prove them (see the section above); this macOS session cannot. |
+| Real WKWebView scrolling and ordinal layout unobserved | Only Chromium and stylesheet assertions back them; a human check on the built binary remains optional under the personal-project release policy. |
+
+### Re-run after the patches (macOS arm64, sequential)
+
+| Step | Result |
+|---|---|
+| `gofmt -l .`, `go vet ./...`, `go tool staticcheck ./...` | empty / clean / clean |
+| `go test -count=1 ./...` | 9 packages ok on the repeat runs. The first run after the changes failed once in the root package: `TestNativeCollectionReplacedLaterRootAbortsAuthorizedHTTP` ("claim did not prepare and replace later directory"). The test file and its package are untouched by this patch; it passed 15 of 15 in isolation and in three further full runs, and in the race run. Recorded as an unreproduced flake, not an absence. |
+| `CGO_ENABLED=1 go test -count=1 -race ./...` (`go env CGO_ENABLED` = 1) | 9 packages ok |
+| `npm run build` | passed |
+| `npm test` | 23 files, 875 tests passed |
+| `npm run test:browser` | 3 browser files, 88 tests, plus the live receiver fixture, passed; `frontend/browser/captures/` reverted with `git checkout` |
+| `GOOS=darwin/linux/windows go build ./...`, bare `staticcheck ./...` under `GOOS=darwin` | all exit 0 |
+
+| Mutation script | Result |
+|---|---|
+| `_bmad-output/implementation-artifacts/mutate-multiple-selected-items.py` (Go) | **35/35 killed** (was 33; adds `lazy_install_closed` and `name_runes`), every case `baseline=pass mutant=named assertion` |
+| `scripts/verify-collection-frontend-mutations.py` | **27/27 killed** (was 18; adds `row-key`, `row-memo`, `draft-id-issue`, `draft-append-resanitize`, `draft-remove-resanitize`, `draft-refusal-resanitize`, `ordinal-digits`, `ordinal-column`, `ordinal-column-rendered`). The runner now routes cases under `browser/` through `vitest.browser.config.ts`, and two existing anchors (`display-name`, `draft-refusal`) follow the refactor to `name: sanitizeDraftBasename(path)}` and `showDraftEntries(...)`. |
+| `bash scripts/verify-native-mutations.sh` | exit status not captured separately, but the run ended on its last case; **51 baselines passed, 68/68 darwin mutations killed**; source restored (`git status` shows no change to `internal/` beyond the new test) |

@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T13:51:50.741554-04:00","Action":"start","Package":"fairdrop"}
-{"Time":"2026-10-11T13:51:51.061266-04:00","Action":"run","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether"}
-{"Time":"2026-10-11T13:51:51.061373-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Output":"=== RUN   TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:51.215658-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Output":"--- PASS: TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether (0.15s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:51.215693-04:00","Action":"pass","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Elapsed":0.15}
-{"Time":"2026-10-11T13:51:51.215712-04:00","Action":"output","Package":"fairdrop","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:51.216444-04:00","Action":"output","Package":"fairdrop","Output":"ok  \tfairdrop\t0.475s\n"}
-{"Time":"2026-10-11T13:51:51.216468-04:00","Action":"pass","Package":"fairdrop","Elapsed":0.475}
+{"Time":"2026-10-11T14:23:19.510018-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-11T14:23:19.825022-04:00","Action":"run","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether"}
+{"Time":"2026-10-11T14:23:19.825109-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Output":"=== RUN   TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:19.980459-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Output":"--- PASS: TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether (0.16s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:19.980476-04:00","Action":"pass","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Elapsed":0.16}
+{"Time":"2026-10-11T14:23:19.980512-04:00","Action":"output","Package":"fairdrop","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:19.981365-04:00","Action":"output","Package":"fairdrop","Output":"ok  \tfairdrop\t0.471s\n"}
+{"Time":"2026-10-11T14:23:19.981379-04:00","Action":"pass","Package":"fairdrop","Elapsed":0.471}

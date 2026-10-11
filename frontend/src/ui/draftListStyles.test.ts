@@ -28,6 +28,13 @@ describe('collection draft list at large counts', () => {
         expect(stylesheet).toContain('.fd-draft .fd-button:focus, .fd-multiple-outcome:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; }')
     })
 
+    it('sizes the ordinal column to the widest ordinal, not a fixed three characters', () => {
+        const ordinal = /\.fd-draft__ordinal \{([^}]*)\}/.exec(stylesheet)?.[1] ?? ''
+        expect(ordinal).toContain('flex: 0 0 calc((var(--fd-ordinal-digits, 2) + 1) * 1ch)')
+        expect(ordinal).not.toContain('3ch')
+        expect(ordinal).toContain('font-variant-numeric: tabular-nums')
+    })
+
     it('keeps a system-colour border and focus outline in forced colors', () => {
         expect(stylesheet).toContain('.fd-draft__row, .fd-draft__list { border-color: CanvasText; }')
         expect(stylesheet).toContain('.fd-draft .fd-button:focus, .fd-multiple-outcome:focus { outline: 2px solid Highlight; }')

@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T13:51:33.578193-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T13:51:33.824689-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork"}
-{"Time":"2026-10-11T13:51:33.824807-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"=== RUN   TestCollectionCountRefusalPrecedesFilesystemAndNetwork\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:33.825953-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"    coordinator_collection_test.go:25: count 10001 reached external work: [entropy.Read entropy.Read source.Inspect source.Inspect]\n","OutputType":"error"}
-{"Time":"2026-10-11T13:51:33.82606-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"--- FAIL: TestCollectionCountRefusalPrecedesFilesystemAndNetwork (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:33.82608-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Elapsed":0}
-{"Time":"2026-10-11T13:51:33.826102-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:33.827297-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.249s\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:33.827339-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.249}
+{"Time":"2026-10-11T14:23:02.199893-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T14:23:02.44153-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork"}
+{"Time":"2026-10-11T14:23:02.441611-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"=== RUN   TestCollectionCountRefusalPrecedesFilesystemAndNetwork\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:02.44271-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"    coordinator_collection_test.go:25: count 10001 reached external work: [entropy.Read entropy.Read source.Inspect source.Inspect]\n","OutputType":"error"}
+{"Time":"2026-10-11T14:23:02.442817-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Output":"--- FAIL: TestCollectionCountRefusalPrecedesFilesystemAndNetwork (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:02.442823-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionCountRefusalPrecedesFilesystemAndNetwork","Elapsed":0}
+{"Time":"2026-10-11T14:23:02.442839-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:02.443687-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.244s\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:02.443703-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.244}

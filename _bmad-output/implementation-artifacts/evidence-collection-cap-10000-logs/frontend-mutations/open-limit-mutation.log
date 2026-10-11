@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-open-limit-_lu3w_h_/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-open-limit-87flh1k0/frontend
 
- ❯ src/transfer/useTransfer.test.tsx (81 tests | 1 failed | 80 skipped) 31ms
-     × starts empty without Stage and refuses an initial 10,001-path drop without truncation 30ms
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 34ms
+     × starts empty without Stage and refuses an initial 10,001-path drop without truncation 33ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -10029,7 +10029,7 @@ AssertionError: expected [ '0', '1', '2', '3', '4', …(9996) ] to deeply equal 
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 80 skipped (81)
-   Start at  13:53:00
-   Duration  572ms (transform 107ms, setup 0ms, import 163ms, tests 31ms, environment 297ms)
+      Tests  1 failed | 82 skipped (83)
+   Start at  14:17:34
+   Duration  587ms (transform 115ms, setup 0ms, import 171ms, tests 34ms, environment 301ms)
 

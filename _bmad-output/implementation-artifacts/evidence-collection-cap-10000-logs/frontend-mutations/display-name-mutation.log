@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-display-name-2mfqhoaw/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-display-name-yrcah6o3/frontend
 
- ❯ src/transfer/useTransfer.test.tsx (81 tests | 1 failed | 80 skipped) 14ms
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 14ms
      × sanitizes draft display names but sends the untouched original paths 13ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -31,7 +31,7 @@ AssertionError: expected [ …(2) ] to deeply equal [ 'report.txt', 'photos' ]
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 80 skipped (81)
-   Start at  13:53:15
-   Duration  554ms (transform 110ms, setup 0ms, import 168ms, tests 14ms, environment 293ms)
+      Tests  1 failed | 82 skipped (83)
+   Start at  14:17:50
+   Duration  569ms (transform 112ms, setup 0ms, import 175ms, tests 14ms, environment 304ms)
 

@@ -60,6 +60,32 @@ describe('rendered collection controls', () => {
         expect(parseFloat(getComputedStyle(far).outlineWidth)).toBeGreaterThanOrEqual(2)
     })
 
+    it('never lets a wide ordinal touch the name at 10,000 rows', async () => {
+        const names = Array.from({length: 10000}, (_, i) => `photo-${i + 1}.jpg`)
+        show(names)
+        const list = document.querySelector<HTMLElement>('.fd-draft__list')!
+        const rows = list.querySelectorAll<HTMLElement>('.fd-draft__row')
+        expect(rows).toHaveLength(10000)
+        for (const ordinalNumber of [1, 100, 1000, 10000]) {
+            const row = rows[ordinalNumber - 1]!
+            row.scrollIntoView({block: 'center'})
+            const ordinal = row.querySelector<HTMLElement>('.fd-draft__ordinal')!
+            const name = row.querySelector<HTMLElement>('.fd-draft__name')!
+            expect(ordinal.textContent).toBe(`${ordinalNumber}.`)
+            // The ordinal's text itself, not just its box, must end before the name begins.
+            const text = document.createRange()
+            text.selectNodeContents(ordinal)
+            const textRight = text.getBoundingClientRect().right
+            const gap = name.getBoundingClientRect().left - textRight
+            expect(gap, `row ${ordinalNumber}: ordinal text right ${textRight} vs name left ${name.getBoundingClientRect().left}`).toBeGreaterThanOrEqual(8)
+            expect(ordinal.getBoundingClientRect().right).toBeLessThanOrEqual(name.getBoundingClientRect().left)
+            expect(ordinal.scrollWidth).toBeLessThanOrEqual(ordinal.clientWidth)
+        }
+        // Every row's name starts at the same x, so the column reads as a column.
+        const lefts = [1, 100, 10000].map(n => rows[n - 1]!.querySelector<HTMLElement>('.fd-draft__name')!.getBoundingClientRect().left)
+        expect(new Set(lefts.map(Math.round)).size).toBe(1)
+    })
+
     it('reflows at 320px and retains visible forced-colors focus', async () => {
         await page.viewport(320, 900)
         await cdp().send('Emulation.setEmulatedMedia', {features: [{name: 'forced-colors', value: 'active'}]})

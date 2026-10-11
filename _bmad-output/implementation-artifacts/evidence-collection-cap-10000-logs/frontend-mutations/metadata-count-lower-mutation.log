@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-metadata-count-lower-cn069b_4/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-metadata-count-lower-3kgzxnvs/frontend
 
- ❯ src/transfer/validation.test.ts (68 tests | 1 failed | 67 skipped) 6ms
-     × accepts a coherent collection and refuses partial or inconsistent metadata 5ms
+ ❯ src/transfer/validation.test.ts (68 tests | 1 failed | 67 skipped) 5ms
+     × accepts a coherent collection and refuses partial or inconsistent metadata 4ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -32,6 +32,6 @@ null
 
  Test Files  1 failed (1)
       Tests  1 failed | 67 skipped (68)
-   Start at  13:52:55
-   Duration  438ms (transform 40ms, setup 0ms, import 50ms, tests 6ms, environment 293ms)
+   Start at  14:17:30
+   Duration  440ms (transform 42ms, setup 0ms, import 52ms, tests 5ms, environment 301ms)
 

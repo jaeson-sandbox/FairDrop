@@ -20,8 +20,10 @@ ordinal_width: baseline=pass mutant=named assertion
 name_fallback: baseline=pass mutant=named assertion
 name_trim: baseline=pass mutant=named assertion
 name_bytes: baseline=pass mutant=named assertion
+name_runes: baseline=pass mutant=named assertion
 lazy_release: baseline=pass mutant=named assertion
 lazy_install_guard: baseline=pass mutant=named assertion
+lazy_install_closed: baseline=pass mutant=named assertion
 first_member_before_headers: baseline=pass mutant=named assertion
 lazy_later_abort: baseline=pass mutant=named assertion
 halt_finalization: baseline=pass mutant=named assertion

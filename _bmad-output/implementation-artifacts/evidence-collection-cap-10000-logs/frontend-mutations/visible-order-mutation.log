@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-visible-order-zq9pwjpq/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-visible-order-sl83fri6/frontend
 
- ❯ src/ui/CollectionDraftView.test.tsx (5 tests | 1 failed | 4 skipped) 34ms
-     × shows explicit one-based order for identical basenames 34ms
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 33ms
+     × shows explicit one-based order for identical basenames 32ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -24,7 +24,7 @@ Received: "same.txtRemove"
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 4 skipped (5)
-   Start at  13:53:19
-   Duration  497ms (transform 40ms, setup 0ms, import 89ms, tests 34ms, environment 292ms)
+      Tests  1 failed | 7 skipped (8)
+   Start at  14:17:53
+   Duration  515ms (transform 40ms, setup 0ms, import 91ms, tests 33ms, environment 300ms)
 

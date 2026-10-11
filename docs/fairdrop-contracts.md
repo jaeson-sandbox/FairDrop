@@ -126,7 +126,7 @@ Stable domain error codes are:
 | `cancelled` | Stage/claim/transfer lost to Cancel or Shutdown |
 | `path_not_found` | selected root or nested entry disappears during inspection or preparation |
 | `path_unsupported` | link, reparse point, special file, or host-unsupported path |
-| `source_changed` | directory identity mismatched before enumeration, or staged regular-file type/size/modtime changed before claim |
+| `source_changed` | directory identity mismatched before enumeration, or staged regular-file type/size/modtime changed before claim (for a collection, before headers only for the first member; a later member fails mid-stream, aborting the unfinalized ZIP) |
 | `network_unavailable` | no eligible LAN IPv4 |
 | `server_start_failed` | listener could not become ready |
 | `qr_failed` | capability QR could not be encoded |
@@ -405,7 +405,7 @@ The Wails adapter emits the event-specific payload without the internal `Kind` f
 - Inspect and stream with filesystem APIs, never shell commands.
 - `App.StageTransfer` remains the one-path command; `StageTransfers` admits one through 10,000 paths (a sanity cap, `transfer.MaxCollectionItems`, refused with `invalid_selection` before any filesystem work and never trimmed). After lifecycle admission a coordinator-facing SourcePort decorator resolves each selection's ancestors sequentially before raw inspection. It checks cancellation before/after resolution and while waiting, permits at most one unresolved filesystem call per decorator, and recovers after the existing bound even if a native call remains wedged. No mutex spans filesystem I/O and cancellation does not claim the OS call itself stopped. The stream adapter keeps the raw inspector and receives canonical staged paths. Selected leaves remain unresolved and retain source grammar/refusals.
 - Reject a selected symlink, Windows junction/reparse point, nested link/reparse traversal, and non-regular special file.
-- Re-`Lstat` a selected file at claim. It must retain regular-file kind, size, and modification time; otherwise fail `source_changed` before headers. A directory instead obtains the no-follow prepared capability described above.
+- Re-`Lstat` a selected file at claim. It must retain regular-file kind, size, and modification time; otherwise fail `source_changed` before headers. A directory instead obtains the no-follow prepared capability described above. For a collection this "before headers" outcome holds for the **first member only**. Later members are prepared lazily as the ZIP reaches them, so a member changed, replaced or removed after Stage fails mid-stream: the response is already under way, so there is no 410, the receiver's download breaks, the ZIP is never finalized (no central directory), and the sender sees the member's coded error (`source_changed`, `path_not_found` or `path_unsupported`).
 - Open a regular file before calculating `Content-Length`, and derive the header from that descriptor.
 - A directory is an unsnapshotted v1 stream. Additions/removals or in-place mutations during traversal may be observed; any entry that becomes missing, link-like, special, or outside the root fails the transfer rather than being followed.
 - Preserve ordinary spaces and Unicode subject to the portable archive-segment refusals below. Support long Windows and UNC paths wherever native Go APIs permit; failures are typed and covered on capable native runners.

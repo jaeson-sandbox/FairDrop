@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T13:52:04.255176-04:00","Action":"start","Package":"fairdrop/internal/stream"}
-{"Time":"2026-10-11T13:52:04.487333-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit"}
-{"Time":"2026-10-11T13:52:04.487444-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Output":"=== RUN   TestCollectionNumberedRootFitsMultibyteFilesystemLimit\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:52:04.494953-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Output":"--- PASS: TestCollectionNumberedRootFitsMultibyteFilesystemLimit (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:52:04.494973-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Elapsed":0.01}
-{"Time":"2026-10-11T13:52:04.495018-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:52:04.496146-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"ok  \tfairdrop/internal/stream\t0.241s\n"}
-{"Time":"2026-10-11T13:52:04.496177-04:00","Action":"pass","Package":"fairdrop/internal/stream","Elapsed":0.241}
+{"Time":"2026-10-11T14:23:33.052721-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T14:23:33.29355-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit"}
+{"Time":"2026-10-11T14:23:33.293648-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Output":"=== RUN   TestCollectionNumberedRootFitsMultibyteFilesystemLimit\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:33.298789-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Output":"--- PASS: TestCollectionNumberedRootFitsMultibyteFilesystemLimit (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:33.298811-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestCollectionNumberedRootFitsMultibyteFilesystemLimit","Elapsed":0.01}
+{"Time":"2026-10-11T14:23:33.298852-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:33.299956-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"ok  \tfairdrop/internal/stream\t0.247s\n"}
+{"Time":"2026-10-11T14:23:33.299983-04:00","Action":"pass","Package":"fairdrop/internal/stream","Elapsed":0.247}

@@ -232,6 +232,50 @@ describe('collection draft and immutable batch admission', () => {
         expect(mocks.stageTransfers).toHaveBeenCalledWith([first, second])
     })
 
+    it('gives every draft row a stable id that survives removal and append without exposing a path', async () => {
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(['/private/a.txt', '/private/b.txt', '/private/c.txt', '/private/d.txt']) })
+        const first = [...hook.result.current.draftIds]
+        expect(first).toHaveLength(4)
+        expect(new Set(first).size).toBe(4)
+        act(() => hook.result.current.removeDraftItem(0))
+        expect(hook.result.current.draft?.names).toEqual(['b.txt', 'c.txt', 'd.txt'])
+        expect(hook.result.current.draftIds).toEqual(first.slice(1))
+        act(() => hook.result.current.appendDraft(['/private/e.txt']))
+        const afterAppend = hook.result.current.draftIds
+        expect(afterAppend.slice(0, 3)).toEqual(first.slice(1))
+        // A removed row's id is never handed to a later row.
+        expect(first).not.toContain(afterAppend[3])
+        expect(JSON.stringify(hook.result.current.draftIds)).not.toContain('/private/')
+        act(() => hook.result.current.appendDraft(['/private/f.txt']))
+        expect(hook.result.current.draftIds.slice(0, 4)).toEqual(afterAppend)
+    })
+
+    it('sanitizes each path once, not again on every append or removal', async () => {
+        const paths = Array.from({length: 50}, (_, i) => `/data/set-${i}/file-${i}.txt`)
+        const incoming = '/data/set-new/file-new.txt'
+        const original = String.prototype.split
+        const seen: string[] = []
+        const spy = vi.spyOn(String.prototype, 'split').mockImplementation(function (this: string, ...args: Parameters<typeof original>) {
+            const value = String(this)
+            if (value.startsWith('/data/')) seen.push(value)
+            return original.apply(this, args)
+        })
+        try {
+            const hook = renderHook(() => useTransfer())
+            await act(async () => { await hook.result.current.openDraft(paths) })
+            expect(seen.filter(value => value === paths[0])).toHaveLength(1)
+            seen.length = 0
+            act(() => hook.result.current.removeDraftItem(0))
+            act(() => hook.result.current.appendDraft([incoming]))
+            act(() => hook.result.current.rejectSelection())
+            expect(hook.result.current.draft?.names).toHaveLength(50)
+            expect(seen).toEqual([incoming])
+        } finally {
+            spy.mockRestore()
+        }
+    })
+
     it('keeps draft rows and shows a safe error after malformed native selection', async () => {
         const hook = renderHook(() => useTransfer())
         await act(async () => { await hook.result.current.openDraft(['/p/one']) })

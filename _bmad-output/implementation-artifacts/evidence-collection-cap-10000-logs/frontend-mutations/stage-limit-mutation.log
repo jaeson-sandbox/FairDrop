@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-stage-limit-abega56q/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-stage-limit-okafbj3z/frontend
 
- ❯ src/transfer/useTransfer.test.tsx (81 tests | 1 failed | 80 skipped) 16ms
-     × stages a draft of exactly 10,000 paths as one batch 15ms
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 17ms
+     × stages a draft of exactly 10,000 paths as one batch 16ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -20,7 +20,7 @@ AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 80 skipped (81)
-   Start at  13:53:02
-   Duration  554ms (transform 107ms, setup 0ms, import 164ms, tests 16ms, environment 293ms)
+      Tests  1 failed | 82 skipped (83)
+   Start at  14:17:36
+   Duration  562ms (transform 112ms, setup 0ms, import 168ms, tests 17ms, environment 298ms)
 

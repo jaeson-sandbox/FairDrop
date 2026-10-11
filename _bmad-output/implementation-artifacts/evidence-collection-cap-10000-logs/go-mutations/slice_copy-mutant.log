@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T13:51:45.417443-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T13:51:45.632381-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership"}
-{"Time":"2026-10-11T13:51:45.632441-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"=== RUN   TestCollectionCheckedSumAndCallerSliceOwnership\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:45.632717-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"    coordinator_collection_test.go:187: caller mutated admitted paths: [/a/one /malicious/changed]\n","OutputType":"error"}
-{"Time":"2026-10-11T13:51:45.63282-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"--- FAIL: TestCollectionCheckedSumAndCallerSliceOwnership (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:45.632833-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Elapsed":0}
-{"Time":"2026-10-11T13:51:45.63285-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:45.633363-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.216s\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:45.633374-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.216}
+{"Time":"2026-10-11T14:23:14.104701-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T14:23:14.349-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership"}
+{"Time":"2026-10-11T14:23:14.349147-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"=== RUN   TestCollectionCheckedSumAndCallerSliceOwnership\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:14.349723-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"    coordinator_collection_test.go:187: caller mutated admitted paths: [/a/one /malicious/changed]\n","OutputType":"error"}
+{"Time":"2026-10-11T14:23:14.349888-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"--- FAIL: TestCollectionCheckedSumAndCallerSliceOwnership (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:14.349914-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Elapsed":0}
+{"Time":"2026-10-11T14:23:14.350139-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:14.351054-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.246s\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:14.351085-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.246}

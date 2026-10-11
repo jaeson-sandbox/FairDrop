@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T13:52:07.837226-04:00","Action":"start","Package":"fairdrop/internal/stream"}
-{"Time":"2026-10-11T13:52:08.091546-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember"}
-{"Time":"2026-10-11T13:52:08.091675-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember","Output":"=== RUN   TestLazyCollectionRefusesToHoldASecondMember\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:52:08.093767-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember","Output":"    collection_lazy_test.go:842: a second held member was installed beside the current one\n","OutputType":"error"}
-{"Time":"2026-10-11T13:52:08.094402-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember","Output":"--- FAIL: TestLazyCollectionRefusesToHoldASecondMember (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:52:08.094411-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember","Elapsed":0}
-{"Time":"2026-10-11T13:52:08.094436-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:52:08.095726-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.258s\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:52:08.095746-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.259}
+{"Time":"2026-10-11T14:23:38.142003-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T14:23:38.402119-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember"}
+{"Time":"2026-10-11T14:23:38.402226-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember","Output":"=== RUN   TestLazyCollectionRefusesToHoldASecondMember\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:38.404242-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember","Output":"    collection_lazy_test.go:842: a second held member was installed beside the current one\n","OutputType":"error"}
+{"Time":"2026-10-11T14:23:38.404957-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember","Output":"--- FAIL: TestLazyCollectionRefusesToHoldASecondMember (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:38.404967-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionRefusesToHoldASecondMember","Elapsed":0}
+{"Time":"2026-10-11T14:23:38.405001-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:38.406181-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.264s\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:38.406195-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.264}

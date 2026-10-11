@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useReducer, useRef, useState} from 'react'
+import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react'
 import {CancelTransfer, SelectDirectory, SelectFile, SelectFiles, StageTransfer, StageTransfers} from '../../wailsjs/go/main/App'
 import {EventsOn} from '../../wailsjs/runtime/runtime'
 import {parseCommandError, publicError} from './errors'
@@ -82,6 +82,8 @@ export interface TransferController {
      */
     readonly canRetry: boolean
     readonly draft: {readonly names: readonly string[]; readonly error: PublicError | null} | null
+    /** One stable id per draft row, in row order, for view keys. Carries no path. */
+    readonly draftIds: readonly number[]
     readonly openDraft: (paths?: readonly string[]) => Promise<void>
     readonly appendDraft: (paths: readonly string[]) => void
     readonly selectDraftFiles: () => Promise<void>
@@ -112,9 +114,15 @@ export function useTransfer(): TransferController {
     // `dispatchStageFailed`, and `dismissRetained`
     // for where it is replaced or cleared.
     const rememberedPathsRef = useRef<readonly string[] | null>(null)
-    const draftPathsRef = useRef<readonly string[] | null>(null)
+    // The editable draft: each entry keeps its private path beside the display
+    // name derived from it once, when the entry is appended, and an id that is
+    // assigned then and never reused. The ids and names are all a view ever sees.
+    const draftEntriesRef = useRef<readonly DraftEntry[] | null>(null)
+    const draftNextIdRef = useRef(1)
     const draftRecoveryRef = useRef<readonly string[] | null>(null)
-    const [draft, setDraft] = useState<{readonly names: readonly string[]; readonly error: PublicError | null} | null>(null)
+    const [draftView, setDraftView] = useState<DraftView | null>(null)
+    const draft = useMemo(() => draftView === null ? null : {names: draftView.names, error: draftView.error}, [draftView])
+    const draftIds = draftView?.ids ?? NO_DRAFT_IDS
     const draftChooserRef = useRef<object | null>(null)
     const draftAdmissionRef = useRef(false)
     const selectionEpochRef = useRef(0)
@@ -137,7 +145,7 @@ export function useTransfer(): TransferController {
             activeCancelRef.current = null
             browseOperationRef.current = null
             rememberedPathsRef.current = null
-            draftPathsRef.current = null
+            draftEntriesRef.current = null
             draftRecoveryRef.current = null
             draftChooserRef.current = null
             selectionEpochRef.current += 1
@@ -428,8 +436,8 @@ export function useTransfer(): TransferController {
     const cancel = useCallback(async (): Promise<void> => { await cancelImpl(false) }, [cancelImpl])
 
     const rejectSelection = useCallback(() => {
-        const current = draftPathsRef.current
-        if (current !== null) showDraft(current, publicError('invalid_selection'))
+        const current = draftEntriesRef.current
+        if (current !== null) showDraftEntries(current, publicError('invalid_selection'))
         else dispatch({type: 'invalid-selection'})
     }, [])
     const dismissRetained = useCallback(() => {
@@ -516,15 +524,25 @@ export function useTransfer(): TransferController {
         await stagePathsFromOutcome([...paths], paths.length > 1 ? 'collection' : 'unknown')
     }, [stagePathsFromOutcome])
 
+    /** Builds entries for paths new to the draft: the only place a name is derived or an id issued. */
+    function newDraftEntries(paths: readonly string[]): DraftEntry[] {
+        return paths.map(path => ({id: draftNextIdRef.current++, path, name: sanitizeDraftBasename(path)}))
+    }
+
+    /** Shows entries that already exist: nothing is re-sanitized or re-identified. */
+    function showDraftEntries(entries: readonly DraftEntry[], error: PublicError | null = null): void {
+        draftEntriesRef.current = entries
+        setDraftView({names: entries.map(entry => entry.name), ids: entries.map(entry => entry.id), error})
+    }
+
     function showDraft(paths: readonly string[], error: PublicError | null = null): void {
-        draftPathsRef.current = [...paths]
-        setDraft({names: paths.map(sanitizeDraftBasename), error})
+        showDraftEntries(newDraftEntries(paths), error)
     }
 
     const openDraft = async (paths: readonly string[] = []): Promise<void> => {
         const proposed = [...paths]
         if (!mountedRef.current || draftAdmissionRef.current || stageOperationRef.current || browseOperationRef.current) return
-        if (draftPathsRef.current !== null) {
+        if (draftEntriesRef.current !== null) {
             appendDraft(paths)
             return
         }
@@ -548,31 +566,31 @@ export function useTransfer(): TransferController {
     }
 
     const appendDraft = (incoming: readonly string[]): void => {
-        const current = draftPathsRef.current
+        const current = draftEntriesRef.current
         if (current === null || draftAdmissionRef.current || draftChooserRef.current !== null ||
             stageOperationRef.current !== null || stateRef.current.phase !== 'idle') return
         const added = [...incoming]
         if (added.length === 0) return
         if (current.length + added.length > MAX_COLLECTION_ITEMS || added.some(path => typeof path !== 'string' || path.trim() === '')) {
-            showDraft(current, publicError('invalid_selection'))
+            showDraftEntries(current, publicError('invalid_selection'))
             return
         }
-        showDraft([...current, ...added])
+        showDraftEntries([...current, ...newDraftEntries(added)])
     }
 
     const chooseDraft = async (open: () => Promise<readonly string[]>): Promise<void> => {
-        if (draftPathsRef.current === null || draftChooserRef.current !== null || draftAdmissionRef.current) return
+        if (draftEntriesRef.current === null || draftChooserRef.current !== null || draftAdmissionRef.current) return
         const operation = {}
         draftChooserRef.current = operation
         try {
             const selected = await open()
-            if (!mountedRef.current || draftChooserRef.current !== operation || draftPathsRef.current === null) return
+            if (!mountedRef.current || draftChooserRef.current !== operation || draftEntriesRef.current === null) return
             draftChooserRef.current = null
             if (Array.isArray(selected)) appendDraft([...selected])
-            else showDraft(draftPathsRef.current, publicError('chooser_failed'))
+            else showDraftEntries(draftEntriesRef.current, publicError('chooser_failed'))
         } catch {
-            if (mountedRef.current && draftChooserRef.current === operation && draftPathsRef.current !== null) {
-                showDraft(draftPathsRef.current, publicError('chooser_failed'))
+            if (mountedRef.current && draftChooserRef.current === operation && draftEntriesRef.current !== null) {
+                showDraftEntries(draftEntriesRef.current, publicError('chooser_failed'))
             }
         } finally {
             if (draftChooserRef.current === operation) draftChooserRef.current = null
@@ -584,23 +602,23 @@ export function useTransfer(): TransferController {
         return path ? [path] : []
     })
     const removeDraftItem = (index: number): void => {
-        const current = draftPathsRef.current
+        const current = draftEntriesRef.current
         if (current === null || !Number.isInteger(index) || index < 0 || index >= current.length) return
-        showDraft(current.filter((_, position) => position !== index))
+        showDraftEntries(current.filter((_, position) => position !== index))
     }
     const cancelDraft = (): void => {
-        draftPathsRef.current = null
+        draftEntriesRef.current = null
         draftRecoveryRef.current = null
         rememberedPathsRef.current = null
         draftChooserRef.current = null
         selectionEpochRef.current += 1
-        setDraft(null)
+        setDraftView(null)
         dispatch({type: 'dismiss-retained'})
     }
     const sendDraft = async (): Promise<void> => {
-        const current = draftPathsRef.current
+        const current = draftEntriesRef.current
         if (current === null || current.length === 0 || draftChooserRef.current !== null || draftAdmissionRef.current) return
-        const paths = [...current]
+        const paths = current.map(entry => entry.path)
         cancelDraft()
         draftRecoveryRef.current = [...paths]
         await stagePaths(paths, paths.length > 1 ? 'collection' : 'unknown')
@@ -612,7 +630,7 @@ export function useTransfer(): TransferController {
         canRetry: rememberedPathsRef.current !== null,
         canSendAgain: rememberedPathsRef.current !== null &&
             (state.phase === 'done' || (state.phase === 'idle' && state.retainedOutcome?.kind === 'done')),
-        draft, openDraft, appendDraft, selectDraftFiles, selectDraftFolder, removeDraftItem, cancelDraft, sendDraft,
+        draft, draftIds, openDraft, appendDraft, selectDraftFiles, selectDraftFolder, removeDraftItem, cancelDraft, sendDraft,
     }
 
     function waitForIdle(): Promise<void> {
@@ -692,6 +710,20 @@ function currentRetryableError(state: TransferState): PublicError | null {
     if (state.retainedOutcome !== null && state.retainedOutcome.kind === 'error') return state.retainedOutcome.error
     return state.commandError
 }
+
+interface DraftEntry {
+    readonly id: number
+    readonly path: string
+    readonly name: string
+}
+
+interface DraftView {
+    readonly names: readonly string[]
+    readonly ids: readonly number[]
+    readonly error: PublicError | null
+}
+
+const NO_DRAFT_IDS: readonly number[] = []
 
 /** Display only. Original paths remain untouched for backend admission. */
 function sanitizeDraftBasename(path: string): string {

@@ -846,6 +846,56 @@ func TestLazyCollectionRefusesToHoldASecondMember(t *testing.T) {
 	}
 }
 
+func TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown(t *testing.T) {
+	root := fixtureDir(t)
+	folder := filepath.Join(root, "folder")
+	if err := os.Mkdir(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folder, "inner.txt"), []byte("inner"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	item := stageAll(t, writeFileIn(t, root, "a.txt", "a"), folder)
+	payloads, counter, held := instrumentedPayloads(source.New())
+	prepared, err := payloads.Prepare(context.Background(), item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer prepared.Close()
+	lazy := prepared.(*archive).lazy
+	// The archive is closed in the window after member 1 acquires its pin and
+	// before it is installed: exactly the race an in-flight Close can hit.
+	// shutdown also releases member 0, so the held branch cannot be what
+	// refuses the install -- only the closed flag can.
+	held.afterPrepare = func(path string) {
+		if path == folder {
+			if err := lazy.shutdown(); err != nil {
+				t.Errorf("shutdown: %v", err)
+			}
+		}
+	}
+	member, err := lazy.next(context.Background(), 1)
+	assertCode(t, err, transfer.ErrTransferFailed)
+	if member != nil {
+		t.Fatal("a member prepared after shutdown was handed to the stream")
+	}
+	lazy.mu.Lock()
+	installed := lazy.current
+	lazy.mu.Unlock()
+	if installed != nil {
+		t.Fatal("a member prepared after shutdown was installed as current")
+	}
+	if got := counter.snapshot(); got.held != 0 || got.acquired != 2 || got.closeCalls != 2 {
+		t.Fatalf("after shutdown mid-preparation held=%d acquired=%d closes=%d; want 0, 2, 2 (each member closed exactly once)", got.held, got.acquired, got.closeCalls)
+	}
+	if err := prepared.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if after := counter.snapshot(); after.closeCalls != 2 {
+		t.Fatalf("Close re-closed a member: %d close calls, want 2", after.closeCalls)
+	}
+}
+
 // cancelAfterSameFile cancels the context the moment the nth identity
 // comparison has passed, which is the last step of a file member's
 // preparation: the member is fully open when the cancellation lands.

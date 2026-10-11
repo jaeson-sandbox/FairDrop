@@ -350,6 +350,7 @@ function App() {
             {transfer.draft !== null ? (
                 <CollectionDraftView
                     names={transfer.draft.names}
+                    ids={transfer.draftIds}
                     error={transfer.draft.error}
                     dropTargetStyle={dropTargetStyle}
                     onAddFiles={() => void transfer.selectDraftFiles()}

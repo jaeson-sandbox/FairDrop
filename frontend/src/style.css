@@ -2889,7 +2889,11 @@ body {
   max-height: min(24rem, 50vh); overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: .5rem;
   border: 1px solid var(--color-separator); border-radius: var(--radius-md); }
 .fd-draft__row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: .5rem; border-bottom: 1px solid var(--color-separator); }
-.fd-draft__ordinal { flex: 0 0 3ch; font-variant-numeric: tabular-nums; }
+/* The ordinal column is as wide as the widest ordinal in the list: the view sets
+   --fd-ordinal-digits to the count's digit width (never below 2), and one more
+   ch covers the dot. With tabular figures every ordinal then fits its box, so
+   "10000." can neither touch the name nor push it out of line with "1.". */
+.fd-draft__ordinal { flex: 0 0 calc((var(--fd-ordinal-digits, 2) + 1) * 1ch); font-variant-numeric: tabular-nums; }
 .fd-draft__name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .fd-draft__actions { display: flex; flex-wrap: wrap; gap: .75rem; }
 .fd-draft__error { color: var(--color-error); }

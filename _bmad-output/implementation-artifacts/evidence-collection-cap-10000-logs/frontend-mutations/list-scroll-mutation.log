@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-list-scroll-_tilofhf/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-list-scroll-cepqyudg/frontend
 
- ❯ src/ui/draftListStyles.test.ts (3 tests | 1 failed | 2 skipped) 5ms
+ ❯ src/ui/draftListStyles.test.ts (4 tests | 1 failed | 3 skipped) 5ms
      × scrolls within the window instead of stretching the page 4ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -29,7 +29,7 @@ AssertionError: expected ' list-style: decimal; padding-inline-…' to contain '
 
 
  Test Files  1 failed (1)
-      Tests  1 failed | 2 skipped (3)
-   Start at  13:53:08
-   Duration  400ms (transform 15ms, setup 0ms, import 21ms, tests 5ms, environment 292ms)
+      Tests  1 failed | 3 skipped (4)
+   Start at  14:17:42
+   Duration  403ms (transform 15ms, setup 0ms, import 21ms, tests 5ms, environment 300ms)
 

@@ -265,6 +265,7 @@ const commands: ControllerCommands = {
     canRetry: false,
     canSendAgain: false,
     draft: null,
+    draftIds: [],
     openDraft: vi.fn(),
     appendDraft: vi.fn(),
     selectDraftFiles: vi.fn(),

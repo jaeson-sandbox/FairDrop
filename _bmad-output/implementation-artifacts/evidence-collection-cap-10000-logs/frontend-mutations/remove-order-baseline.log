@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-remove-order-rz6liajx/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-remove-order-jm5e5odt/frontend
 
 
  Test Files  1 passed (1)
-      Tests  1 passed | 4 skipped (5)
-   Start at  13:53:19
-   Duration  555ms (transform 40ms, setup 0ms, import 89ms, tests 84ms, environment 301ms)
+      Tests  1 passed | 7 skipped (8)
+   Start at  14:17:54
+   Duration  609ms (transform 43ms, setup 0ms, import 94ms, tests 88ms, environment 337ms)
 

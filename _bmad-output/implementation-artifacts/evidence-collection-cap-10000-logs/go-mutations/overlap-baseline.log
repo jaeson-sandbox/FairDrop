@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T13:51:37.52284-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T13:51:37.748509-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections"}
-{"Time":"2026-10-11T13:51:37.748648-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Output":"=== RUN   TestCollectionRejectsDuplicateAndAncestorSelections\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:37.748927-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Output":"--- PASS: TestCollectionRejectsDuplicateAndAncestorSelections (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:37.748936-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Elapsed":0}
-{"Time":"2026-10-11T13:51:37.748953-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T13:51:37.749817-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.227s\n"}
-{"Time":"2026-10-11T13:51:37.749842-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.227}
+{"Time":"2026-10-11T14:23:06.213297-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T14:23:06.438405-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections"}
+{"Time":"2026-10-11T14:23:06.438566-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Output":"=== RUN   TestCollectionRejectsDuplicateAndAncestorSelections\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:06.438785-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Output":"--- PASS: TestCollectionRejectsDuplicateAndAncestorSelections (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:06.438793-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Elapsed":0}
+{"Time":"2026-10-11T14:23:06.438813-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:06.439687-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.226s\n"}
+{"Time":"2026-10-11T14:23:06.439715-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.226}

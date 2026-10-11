@@ -235,7 +235,8 @@ State composition references: [Idle and local preparation](mockups/key-idle-prep
 | Receiver/valid first claim | First exact-token POST from the Download form starts attachment response; sender moves only on accepted backend start. |
 | Receiver/wrong method, route, or token | Generic browser 404; sender cannot diagnose it. Sender help covers wrong/expired link and creating a fresh one. |
 | Receiver/competing valid claim | Generic browser 423 while listener lives; first download continues. Sender help explains another downloader may have claimed it. |
-| Receiver/source changed before headers | Generic browser 410; sender gets fixed `source_changed` Error and recovery. |
+| Receiver/source changed before headers | Generic browser 410; sender gets fixed `source_changed` Error and recovery. For a collection this applies to the **first** member only: it is the only one prepared before headers. |
+| Receiver/collection member changed after headers | A later member is prepared when the ZIP reaches it, so a member changed, replaced or removed after Stage fails mid-stream. There is no 410: headers are already sent, so the receiver's download breaks and the ZIP is never finalized (no central directory, so it will not open as an archive); the sender gets the fixed Error for the member's code (`source_changed`, `path_not_found` or `path_unsupported`) and recovery. |
 | Firewall/allowed | OS prompt returns; focus goes to current Stage Pending or next authoritative heading. |
 | Firewall/denied or blocked | If observable through command failure, show/focus applicable network/server Error and platform recovery. If not observable, Staged troubleshooting remains available. |
 | Second instance | Restore/show/unminimize existing window; preserve active session, retained status, and logical focus. |

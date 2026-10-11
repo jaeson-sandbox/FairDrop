@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T14:23:34.44515-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T14:23:34.658884-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound"}
+{"Time":"2026-10-11T14:23:34.658972-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Output":"=== RUN   TestCollectionWideOrdinalStaysWithinTheRootNameBound\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:34.659092-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Output":"--- PASS: TestCollectionWideOrdinalStaysWithinTheRootNameBound (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:34.659098-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Elapsed":0}
+{"Time":"2026-10-11T14:23:34.659111-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T14:23:34.66003-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"ok  \tfairdrop/internal/stream\t0.215s\n"}
+{"Time":"2026-10-11T14:23:34.660055-04:00","Action":"pass","Package":"fairdrop/internal/stream","Elapsed":0.215}
