@@ -1,25 +1,24 @@
 # FairDrop
 
 Ephemeral, trusted-LAN file and folder handoff from a Windows or macOS desktop to a nearby
-browser. Drop one file or folder, scan the QR code on the receiving device, download once.
+browser. Drop a file, a folder, or up to 16 of them together, scan the QR code on the receiving
+device, download once.
 Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged copies.
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: [v1.4.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.4.0).**
+**Current release: [v1.5.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.5.0).**
 A receiver can open a link to see the offered item, then press **Download** to claim the
 one-shot transfer. After a completed transfer, **Send Again**
-revalidates the same item and offers it with a fresh link and QR code. FairDrop still sends
-one file or folder to one receiver over plain HTTP on a trusted LAN and persists nothing.
+revalidates the same selection and offers it with a fresh link and QR code. FairDrop still sends
+to one receiver over plain HTTP on a trusted LAN and persists nothing.
 
-## In development
-
-The next version adds **Send multiple items**. A native drop of 2–16 paths or the
-accessible selection list can combine files and folders into one handoff. The
-receiver sees the count and aggregate logical size, then downloads one streamed
-`FairDrop.zip` with numbered top-level members. One item still uses the existing
-file or folder flow. This feature is under development and is not part of the
-published v1.4.0 release described above.
+**Send multiple items** (new in 1.5.0): a native drop of 2-16 paths, or the **Send multiple
+items** list with **Add Files** and **Add Folder**, combines files and folders into one handoff.
+The receiver sees the item count and total logical size, then downloads one streamed
+`FairDrop.zip` whose members are numbered (`FairDrop/01-<name>`, `FairDrop/02-<name>`, ...).
+The whole selection is checked before anything is offered, and one failing member fails the
+whole transfer. One file or one folder still uses the single-item flow unchanged.
 
 ## Using FairDrop
 
@@ -29,18 +28,20 @@ published v1.4.0 release described above.
 2. Give it one file or folder, either by dropping it on the drop zone or through the
    **Choose File or Folder** button inside it. That button opens a small menu because Windows'
    native dialog cannot offer both kinds at once; either item leads to the matching chooser.
+   To send several items, drop 2-16 paths together or choose **Send multiple items**, build the
+   list with **Add Files** and **Add Folder**, and press **Send**.
 3. Scan the QR code from a browser on the same Wi-Fi, or use **Copy Link** or **Show Link** to
    open the direct link instead. The receiving browser shows the item first. Tap **Download** there;
    the first valid POST claims the one-shot transfer.
-4. A folder arrives as a ZIP, streamed rather than staged, so nothing extra is written on the
-   sending side.
-5. After a completed transfer, choose **Send Again** to offer the same file or folder with a
-   fresh QR code. FairDrop checks the item again; if that check fails, choose it again.
+4. A folder, or a selection of several items, arrives as a ZIP, streamed rather than staged, so
+   nothing extra is written on the sending side.
+5. After a completed transfer, choose **Send Again** to offer the same file, folder or selection
+   with a fresh QR code. FairDrop checks every item again; if that check fails, choose them again.
    **Send Another** opens the file or folder chooser, and **Done** dismisses the result.
 
 Cancel at any point. The window returns to idle and forgets the selection. Send Again remembers
-only the path to the completed item in memory until it is dismissed or replaced; there is no
-persistent history or staged copy.
+only the path or paths of the completed item in memory until it is dismissed or replaced; there is
+no persistent history or staged copy.
 
 ## Trust model
 

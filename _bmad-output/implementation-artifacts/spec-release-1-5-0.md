@@ -50,10 +50,10 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Bump only product versions to 1.5.0 in `wails.json`, `frontend/package.json`, `frontend/package-lock.json`.
-- [ ] `README.md`: present collections as a 1.5.0 capability; current release v1.5.0; no development-only caveat.
-- [ ] `docs/release-notes-1.5.0.md`: feature description, unchanged single-item behavior, trusted-LAN scope, unsigned Windows / ad-hoc macOS, no notarization/auto-update/Linux packaging, checksums prove integrity not authenticity. Becomes the published release body.
-- [ ] `evidence-release-1-5-0.md` beside this spec: diff audit and focused verification; remote release proof left pending for the orchestrator.
+- [x] Bump only product versions to 1.5.0 in `wails.json`, `frontend/package.json`, `frontend/package-lock.json`.
+- [x] `README.md`: present collections as a 1.5.0 capability; current release v1.5.0; no development-only caveat.
+- [x] `docs/release-notes-1.5.0.md`: feature description, unchanged single-item behavior, trusted-LAN scope, unsigned Windows / ad-hoc macOS, no notarization/auto-update/Linux packaging, checksums prove integrity not authenticity. Becomes the published release body.
+- [x] `evidence-release-1-5-0.md` beside this spec: diff audit and focused verification; remote release proof left pending for the orchestrator.
 
 **Acceptance Criteria:**
 - Given the merged feature baseline, when release changes are inspected, then only product metadata, current-release documentation and this story's artifacts change.
