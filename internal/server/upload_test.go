@@ -565,6 +565,32 @@ func waitForPartial(t *testing.T, rig *receiveRig) {
 	}
 }
 
+// waitForSavedThenPartial waits until saved is in place under its final name
+// and a later file's temporary .part is on disk beside it.
+func waitForSavedThenPartial(t *testing.T, rig *receiveRig, saved string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		for _, name := range listNames(t, rig.dir) {
+			if !strings.HasPrefix(name, "FairDrop ") {
+				continue
+			}
+			found, partial := false, false
+			for _, inner := range listNames(t, filepath.Join(rig.dir, name)) {
+				found = found || inner == saved
+				partial = partial || strings.HasSuffix(inner, ".part")
+			}
+			if found && partial {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s was never saved with a later partial file beside it", saved)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestADroppedConnectionBeforeAnyFileSavedLeavesNoSubfolder(t *testing.T) {
 	rig := startReceiveRig(t)
 	full := multipartBody(uploadFile("only.bin", strings.Repeat("P", 200_000)))
@@ -852,7 +878,10 @@ func TestStopMidFileKeepsCompletedFilesAndRemovesThePartialFile(t *testing.T) {
 	if _, err := conn.Write(full[:cut]); err != nil {
 		t.Fatal(err)
 	}
-	waitForPartial(t, rig)
+	// done.bin also passes through a .part name before its rename, so a bare
+	// waitForPartial can return while the completed file is still uncommitted;
+	// a Stop then rightly saves nothing. Wait for done.bin in place first.
+	waitForSavedThenPartial(t, rig, "done.bin")
 
 	stopped := make(chan error, 1)
 	go func() { stopped <- rig.server.Stop() }()
