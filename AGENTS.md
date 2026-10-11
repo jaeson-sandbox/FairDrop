@@ -6,7 +6,8 @@
 ## FairDrop
 
 FairDrop is an ephemeral LAN peer-to-peer file-transfer desktop app: select a file,
-folder, or bounded collection, let one receiver pull it over HTTP, and persist nothing. It uses Go,
+folder, or bounded collection, let one receiver pull it over HTTP, or receive one
+browser upload into a folder the user chose; it persists nothing else. It uses Go,
 Wails v2, React 19, TypeScript, and Tailwind v4. The canonical product contract is
 `_bmad-output/specs/spec-fairdrop/SPEC.md` with `docs/fairdrop-architecture.md` and
 `docs/fairdrop-contracts.md`; the UX `DESIGN.md` and `EXPERIENCE.md` control visual
@@ -21,6 +22,13 @@ as historical narrative and apply all corrections and supersessions before using
   `NetworkPort`, `QRPort`, and `ServerPort`.
 - `internal/server` owns the consumed `PayloadPort` and `PreparedPayload`;
   `internal/{source,network,qr,stream,server}` provide concrete adapters.
+- Phone-to-desktop receiving (`_bmad-output/specs/spec-phone-to-desktop-receiving/`): the
+  consumer-owned `SinkPort`/`ReceiveDestination` live in `internal/transfer`, `internal/sink`
+  is the only code that writes a received file, and `internal/server/upload.go` is the
+  `/upload/{token}` route. The write-safety rules (exclusive creation, no-replace rename,
+  fail-closed when the filesystem cannot rename exclusively) are in
+  `docs/fairdrop-contracts.md` "Receive session contracts"; do not add an overwrite,
+  check-then-rename or OS-temp-storage path. Receive tests use `fixtureDir(t)` too.
 - Extend these existing ports for Epic 2. Never resurrect the retired
   `NetworkManager`, `Streamer`, `TransferServer`, or `TransferStats` contracts.
 - `frontend/src/App.tsx` owns drop, focus, and announcement routing;

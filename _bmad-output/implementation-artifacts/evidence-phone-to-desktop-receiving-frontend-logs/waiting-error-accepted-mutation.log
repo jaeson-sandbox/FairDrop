@@ -1,0 +1,55 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-accepted-nuh1q0q9/frontend
+
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
+     × accepts a terminal incomplete outcome with nothing saved while still waiting 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > waiting for a phone > accepts a terminal incomplete outcome with nothing saved while still waiting
+AssertionError: expected { phase: 'receive-waiting', …(5) } to deeply equal { phase: 'receive-outcome', …(4) }
+
+- Expected
++ Received
+
+  {
++   "cancelPending": false,
+    "commandError": null,
++   "metadata": {
+      "destination": "Phone Photos",
+-   "outcome": {
+-     "filesSaved": 0,
+-     "kind": "incomplete",
+-     "markingWarning": false,
+-     "subfolderExists": false,
++     "qrBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
++     "sessionId": "0102030405060708090a0b0c0d0e0f10",
++     "url": "http://192.168.1.50:45678/upload/1112131415161718191a1b1c1d1e1f20",
++     "warnings": [],
+    },
+-   "phase": "receive-outcome",
++   "phase": "receive-waiting",
++   "refusals": 0,
+    "session": {
+-     "lastSeq": 1,
++     "lastSeq": 0,
+      "sessionId": "0102030405060708090a0b0c0d0e0f10",
+    },
+  }
+
+ ❯ src/transfer/state.receive.test.ts:211:18
+    209|                 seq: 1, error: {code: 'transfer_failed', message: 'x'},
+    210|                 receive: {filesSaved: 0, result: 'incomplete', subfold…
+    211|             }))).toEqual({
+       |                  ^
+    212|                 phase: 'receive-outcome',
+    213|                 session: {sessionId, lastSeq: 1},
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:01:03
+   Duration  416ms (transform 45ms, setup 0ms, import 55ms, tests 6ms, environment 277ms)
+

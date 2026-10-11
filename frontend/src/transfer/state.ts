@@ -8,6 +8,9 @@ import type {
     PendingItemKind,
     ProgressSnapshot,
     PublicError,
+    ReceiveMetadata,
+    ReceiveResult,
+    ReceiveStatus,
     RetainedOutcome,
 } from './types'
 
@@ -15,6 +18,13 @@ export interface IdleTransferState {
     readonly phase: 'idle'
     readonly retainedOutcome: RetainedOutcome | null
     readonly commandError: PublicError | null
+    /**
+     * Present (and `'receive'`) only when `commandError` came from starting a
+     * receive session, so the failure card can use receive wording ("Choose
+     * Another Folder", not "Choose Another") instead of send wording. Absent
+     * everywhere else, including every send state.
+     */
+    readonly commandContext?: 'receive'
 }
 
 export interface PendingTransferState {
@@ -79,6 +89,73 @@ export interface ErrorTransferState {
     }
 }
 
+/**
+ * A receive session that is open and waiting for a phone.
+ *
+ * Receive has its own phases rather than a flag on the send ones. A send
+ * `StagedTransferState` carries a `FileMetadata` and offers Send Again, retry
+ * and the collection draft; a receive session has none of those, and the
+ * cheapest way to be sure no send affordance can ever attach to it is for it to
+ * be a different type that the send code never names.
+ */
+export interface ReceiveWaitingTransferState {
+    readonly phase: 'receive-waiting'
+    readonly session: SessionCursor
+    readonly metadata: ReceiveMetadata
+    readonly cancelPending: boolean
+    readonly commandError: PublicError | null
+    /**
+     * How many times a phone's upload was refused for space while waiting. The
+     * session keeps waiting; this only exists so each refusal is a new state
+     * and is therefore announced, rather than the second one going unheard.
+     */
+    readonly refusals: number
+}
+
+/** A receive session whose phone has started uploading. */
+export interface ReceiveReceivingTransferState {
+    readonly phase: 'receive-receiving'
+    readonly session: SessionCursor
+    readonly metadata: ReceiveMetadata
+    /** Bytes read from the phone against the declared upload size; `null` until the first accepted snapshot. */
+    readonly progress: ProgressSnapshot | null
+    /** Files whose rename has succeeded so far -- the same count the outcome will state. */
+    readonly filesSaved: number
+    readonly cancelPending: boolean
+    readonly commandError: PublicError | null
+}
+
+/**
+ * What a receive session came to.
+ *
+ * Deliberately not the `ReceiveMetadata`: the capability URL and its QR code
+ * are scrubbed the moment the session ends, exactly as a send receipt is
+ * scrubbed of its own (`CompletionReceipt`). The destination's display name
+ * stays so the outcome can say where the files went.
+ */
+export interface ReceiveOutcome {
+    readonly kind: ReceiveResult
+    readonly filesSaved: number
+    readonly subfolderExists: boolean
+    readonly markingWarning: boolean
+}
+
+/**
+ * A finished receive session, held until the user leaves it.
+ *
+ * The backend does not reset a receive outcome on a timer -- Show in Folder
+ * needs it to still exist -- so this phase has no automatic way out. The only
+ * exit is the user's Done, which is the existing `CancelTransfer`.
+ */
+export interface ReceiveOutcomeTransferState {
+    readonly phase: 'receive-outcome'
+    readonly session: SessionCursor
+    readonly destination: string
+    readonly outcome: ReceiveOutcome
+    /** A failed Show in Folder; the outcome itself is unaffected. */
+    readonly commandError: PublicError | null
+}
+
 export type TransferState =
     | IdleTransferState
     | PendingTransferState
@@ -86,10 +163,14 @@ export type TransferState =
     | TransferringTransferState
     | DoneTransferState
     | ErrorTransferState
+    | ReceiveWaitingTransferState
+    | ReceiveReceivingTransferState
+    | ReceiveOutcomeTransferState
 
 export type TransferAction =
     | {readonly type: 'stage-requested'; readonly generation: number; readonly itemKind: PendingItemKind}
     | {readonly type: 'stage-succeeded'; readonly generation: number; readonly metadata: FileMetadata}
+    | {readonly type: 'receive-started'; readonly generation: number; readonly metadata: ReceiveMetadata}
     | {readonly type: 'stage-failed'; readonly generation: number; readonly error: PublicError}
     | {readonly type: 'invalid-selection'}
     | {readonly type: 'cancel-requested'}
@@ -101,6 +182,8 @@ export type TransferAction =
         readonly args: readonly unknown[]
     }
     | {readonly type: 'clipboard-failed'; readonly sessionId: string}
+    | {readonly type: 'receive-show-requested'; readonly sessionId: string}
+    | {readonly type: 'receive-show-failed'; readonly sessionId: string}
     | {readonly type: 'dismiss-retained'}
 
 export function createInitialTransferState(): IdleTransferState {
@@ -122,7 +205,10 @@ export function transferReducer(state: TransferState, action: TransferAction): T
             }
 
         case 'stage-succeeded': {
-            if (state.phase !== 'pending' || state.generation !== action.generation || state.cancelPending) return state
+            // A pending receive is committed by `receive-started` and nothing
+            // else: a send acknowledgement can never turn it into a Staged send.
+            if (state.phase !== 'pending' || state.generation !== action.generation || state.cancelPending ||
+                state.itemKind === 'receive') return state
             // Already parsed. The controller is the boundary the acknowledgement
             // crosses, and it refuses a malformed one by quiescing the backend
             // session and dispatching stage-failed -- so a second parse here
@@ -141,29 +227,56 @@ export function transferReducer(state: TransferState, action: TransferAction): T
             }
         }
 
+        case 'receive-started': {
+            // The receive twin of stage-succeeded: same generation and
+            // cancel guards, and additionally only a pending *receive* may
+            // become a waiting session, so a send acknowledgement can never
+            // be committed as one by mistake.
+            if (state.phase !== 'pending' || state.generation !== action.generation || state.cancelPending ||
+                state.itemKind !== 'receive') return state
+            const {metadata} = action
+            return {
+                phase: 'receive-waiting',
+                session: {sessionId: metadata.sessionId, lastSeq: 0},
+                metadata,
+                cancelPending: false,
+                commandError: null,
+                refusals: 0,
+            }
+        }
+
         case 'stage-failed':
             if (state.phase !== 'pending' || state.generation !== action.generation || state.cancelPending) return state
-            return idleWithError(action.error.code === 'cancelled' ? null : action.error)
+            return idleWithError(action.error.code === 'cancelled' ? null : action.error, state.itemKind === 'receive')
 
         case 'invalid-selection':
             if (state.phase !== 'idle') return state
-            return {...state, commandError: publicError('invalid_selection')}
+            return {
+                phase: 'idle',
+                retainedOutcome: state.retainedOutcome,
+                commandError: publicError('invalid_selection'),
+            }
 
         case 'cancel-requested':
             if (state.phase === 'pending') {
                 return state.cancelPending ? state : {...state, cancelPending: true}
             }
-            if (state.phase === 'staged' || state.phase === 'transferring') {
+            if (state.phase === 'staged' || state.phase === 'transferring' ||
+                state.phase === 'receive-waiting' || state.phase === 'receive-receiving') {
                 return state.cancelPending ? state : {...state, cancelPending: true, commandError: null}
             }
             return state
 
         case 'pending-cancel-settled':
             if (state.phase !== 'pending' || state.generation !== action.generation || !state.cancelPending) return state
-            return idleWithError(action.error === null || action.error.code === 'cancelled' ? null : action.error)
+            return idleWithError(
+                action.error === null || action.error.code === 'cancelled' ? null : action.error,
+                state.itemKind === 'receive',
+            )
 
         case 'active-cancel-failed':
-            if ((state.phase !== 'staged' && state.phase !== 'transferring') ||
+            if ((state.phase !== 'staged' && state.phase !== 'transferring' &&
+                state.phase !== 'receive-waiting' && state.phase !== 'receive-receiving') ||
                 state.session.sessionId !== action.sessionId || !state.cancelPending) {
                 return state
             }
@@ -195,11 +308,29 @@ export function transferReducer(state: TransferState, action: TransferAction): T
           happening, and a failed copy is not a reason to talk over that.
         */
         case 'clipboard-failed':
-            if (state.phase !== 'staged' || state.session.sessionId !== action.sessionId ||
-                state.cancelPending) {
+            if ((state.phase !== 'staged' && state.phase !== 'receive-waiting') ||
+                state.session.sessionId !== action.sessionId || state.cancelPending) {
                 return state
             }
             return {...state, commandError: publicError('clipboard_failed')}
+
+        /*
+          Show in Folder is the receive outcome's own command, and like the
+          clipboard write it has nowhere else to put a rejection: the outcome
+          itself is still true (files were saved), so a failed open is a note
+          beside it, never a replacement for it. Requesting clears the previous
+          note so a retry that works does not sit beside a stale failure.
+        */
+        case 'receive-show-requested':
+            if (state.phase !== 'receive-outcome' || state.session.sessionId !== action.sessionId ||
+                state.commandError === null) {
+                return state
+            }
+            return {...state, commandError: null}
+
+        case 'receive-show-failed':
+            if (state.phase !== 'receive-outcome' || state.session.sessionId !== action.sessionId) return state
+            return {...state, commandError: publicError('path_not_found')}
 
         /*
           Story 9.6: this action now clears whichever Idle-level outcome is
@@ -230,7 +361,30 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
 
     const session = {sessionId: state.session.sessionId, lastSeq: event.seq}
 
+    // Session kind is enforced here, once, for every send phase: an event that
+    // carries a receive payload, or a receive-only notice, belongs to a receive
+    // session and is never applied to a send one. Without this a confused or
+    // hostile event could drive a send session into a state its views describe
+    // as something else entirely.
+    if (state.phase === 'staged' || state.phase === 'transferring' || state.phase === 'done' || state.phase === 'error') {
+        if (event.kind === 'transfer-notice') return state
+        if ((event.kind === 'transfer-progress' || event.kind === 'transfer-complete' || event.kind === 'transfer-error') &&
+            event.receive !== undefined) return state
+    }
+
     switch (state.phase) {
+        case 'receive-waiting':
+            return reduceReceiveWaiting(state, event, session)
+
+        case 'receive-receiving':
+            return reduceReceiveReceiving(state, event, session)
+
+        case 'receive-outcome':
+            // Held until the user leaves it. Only the reset their Done causes
+            // moves it, and it lands on plain Idle: a receive outcome is not
+            // retained, so nothing downstream can offer Send Again for it.
+            return event.kind === 'transfer-reset' ? createInitialTransferState() : state
+
         case 'staged':
             if (event.kind === 'transfer-started') {
                 return {
@@ -322,8 +476,108 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
     }
 }
 
+function reduceReceiveWaiting(
+    state: ReceiveWaitingTransferState,
+    event: LifecycleEvent,
+    session: SessionCursor,
+): TransferState {
+    switch (event.kind) {
+        case 'transfer-started':
+            return {
+                phase: 'receive-receiving',
+                session,
+                metadata: state.metadata,
+                progress: null,
+                filesSaved: 0,
+                cancelPending: state.cancelPending,
+                commandError: null,
+            }
+        case 'transfer-notice':
+            // The upload that was refused wrote nothing and the session is
+            // still open, so this changes nothing but a count.
+            return {...state, session, refusals: state.refusals + 1}
+        case 'transfer-error': {
+            // The one terminal event that CAN precede `started`: the backend ends
+            // a receive nobody claimed when its server lane closes first (Go
+            // TestALaneThatClosesBeforeAnyClaimFailsAWaitingReceive). Dropping it
+            // left a QR for a listener that no longer exists. Only a payload that
+            // is coherent with a session no phone claimed is applied -- an
+            // incomplete result with nothing saved and no folder; anything else
+            // is refused rather than guessed at.
+            const receive = event.receive
+            if (receive === undefined || receive.result !== 'incomplete' ||
+                receive.filesSaved !== 0 || receive.subfolderExists) return state
+            return receiveOutcomeState(state, session, receive, 'incomplete')
+        }
+        case 'transfer-reset':
+            return createInitialTransferState()
+        default:
+            // A progress or complete event cannot precede `started` in a valid
+            // grammar. Applying one would show a receive that never began.
+            return state
+    }
+}
+
+function reduceReceiveReceiving(
+    state: ReceiveReceivingTransferState,
+    event: LifecycleEvent,
+    session: SessionCursor,
+): TransferState {
+    switch (event.kind) {
+        case 'transfer-progress': {
+            // A receive progress event always names its saved count, and a
+            // receive total is always known (the declared upload size). One
+            // that does not is not a receive progress event.
+            if (event.receive === undefined || !event.progress.totalKnown) return state
+            if (!progressCanFollow(state.progress, event.progress) || event.receive.filesSaved < state.filesSaved) return state
+            return {...state, session, progress: event.progress, filesSaved: event.receive.filesSaved}
+        }
+
+        case 'transfer-complete': {
+            if (event.receive === undefined) return state
+            // FairDrop cannot vouch for bytes it could not reconcile, so a
+            // success whose snapshot does not follow the progress already
+            // accepted is demoted to incomplete -- never the other way round.
+            const coherent = event.progress.totalKnown && progressCanFollow(state.progress, event.progress)
+            return receiveOutcomeState(state, session, event.receive, coherent ? 'complete' : 'incomplete')
+        }
+
+        case 'transfer-error': {
+            if (event.receive === undefined || event.receive.result === null) return state
+            return receiveOutcomeState(state, session, event.receive, event.receive.result)
+        }
+
+        case 'transfer-reset':
+            return createInitialTransferState()
+
+        default:
+            return state
+    }
+}
+
+function receiveOutcomeState(
+    state: ReceiveWaitingTransferState | ReceiveReceivingTransferState,
+    session: SessionCursor,
+    status: ReceiveStatus,
+    kind: ReceiveResult,
+): ReceiveOutcomeTransferState {
+    return {
+        phase: 'receive-outcome',
+        session,
+        destination: state.metadata.destination,
+        outcome: {
+            kind,
+            filesSaved: status.filesSaved,
+            subfolderExists: status.subfolderExists,
+            markingWarning: status.markingWarning,
+        },
+        commandError: null,
+    }
+}
+
 function hasSession(state: TransferState): state is Exclude<TransferState, IdleTransferState | PendingTransferState> {
-    return state.phase === 'staged' || state.phase === 'transferring' || state.phase === 'done' || state.phase === 'error'
+    return state.phase === 'staged' || state.phase === 'transferring' || state.phase === 'done' || state.phase === 'error' ||
+        state.phase === 'receive-waiting' || state.phase === 'receive-receiving' || state.phase === 'receive-outcome'
 }
 
 function progressCanFollow(previous: ProgressSnapshot | null, next: ProgressSnapshot): boolean {
@@ -339,11 +593,15 @@ function progressMatchesMetadata(metadata: FileMetadata, progress: ProgressSnaps
         : progress.totalKnown && progress.totalBytes === metadata.size
 }
 
-function idleWithError(error: PublicError | null): IdleTransferState {
+function idleWithError(error: PublicError | null, receive = false): IdleTransferState {
     return {
         phase: 'idle',
         retainedOutcome: null,
         commandError: error === null ? null : fixedCopy(error),
+        // Only an error that actually shows needs the context, and only a
+        // receive attempt sets it, so every send state stays byte-identical to
+        // what it was before receive existed.
+        ...(receive && error !== null ? {commandContext: 'receive' as const} : {}),
     }
 }
 

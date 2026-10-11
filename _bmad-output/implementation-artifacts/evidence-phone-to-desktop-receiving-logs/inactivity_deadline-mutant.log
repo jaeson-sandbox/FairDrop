@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T04:58:24.763247-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T04:58:25.056782-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound"}
+{"Time":"2026-10-11T04:58:25.057021-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Output":"=== RUN   TestAnUploadThatStallsIsEndedByTheInactivityBound\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:58:35.061487-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Output":"    upload_test.go:734: no terminal event within 10s; saw 1 events\n","OutputType":"error"}
+{"Time":"2026-10-11T04:58:35.064573-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Output":"--- FAIL: TestAnUploadThatStallsIsEndedByTheInactivityBound (10.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:58:35.064648-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Elapsed":10.01}
+{"Time":"2026-10-11T04:58:35.064721-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:58:35.066957-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t10.303s\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:58:35.067019-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":10.304}

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-visible-3e9nzrcr/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed | 17 skipped (22)
+   Start at  05:00:48
+   Duration  571ms (transform 82ms, setup 0ms, import 132ms, tests 89ms, environment 276ms)
+

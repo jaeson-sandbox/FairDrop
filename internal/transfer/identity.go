@@ -24,6 +24,12 @@ const (
 	// constant without inverting the dependency direction -- the server
 	// imports this package -- so a change to either one has to move both.
 	downloadPathPrefix = "/download/"
+
+	// uploadPathPrefix is the receive session's route, with the same coupling:
+	// internal/server registers "/upload/{token}" and nothing here can import
+	// it. A receive session never serves the download route and a send session
+	// never serves this one, so the prefix a URL carries is the session kind.
+	uploadPathPrefix = "/upload/"
 )
 
 // newIdentity draws the session ID and the capability token as two independent
@@ -57,8 +63,10 @@ func (c *Coordinator) randomHex() (string, error) {
 	return hex.EncodeToString(raw), nil
 }
 
-// capabilityURL is the one place the token becomes a shareable string.
-func capabilityURL(address netip.Addr, port int, token CapabilityToken) string {
+// capabilityURL is the one place the token becomes a shareable string. prefix
+// is downloadPathPrefix or uploadPathPrefix: the route a URL carries is the kind
+// of session it belongs to.
+func capabilityURL(address netip.Addr, port int, token CapabilityToken, prefix string) string {
 	endpoint := netip.AddrPortFrom(address, uint16(port))
-	return "http://" + endpoint.String() + downloadPathPrefix + string(token)
+	return "http://" + endpoint.String() + prefix + string(token)
 }

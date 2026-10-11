@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-controller-cancel-outcome-ujv4a516/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 48 skipped (49)
+   Start at  05:00:39
+   Duration  497ms (transform 79ms, setup 0ms, import 134ms, tests 10ms, environment 277ms)
+

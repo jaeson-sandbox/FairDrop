@@ -78,8 +78,12 @@ type Dependencies struct {
 	Server   ServerPort
 	QR       QRPort
 	Observer Observer
-	Entropy  io.Reader
-	Now      func() time.Time
+	// Sink is the receive destination port. It is optional for construction --
+	// a coordinator built without one stages and sends exactly as before and
+	// answers StartReceive with not_ready -- and main.go always supplies it.
+	Sink    SinkPort
+	Entropy io.Reader
+	Now     func() time.Time
 
 	// Diagnose is the optional seam every recorded diagnostic also reaches,
 	// beyond the internal sink that only a test reads today (D-098). It
@@ -124,6 +128,7 @@ type Coordinator struct {
 	network    NetworkPort
 	server     ServerPort
 	qr         QRPort
+	sink       SinkPort
 	observer   Observer
 	entropy    io.Reader
 	now        func() time.Time
@@ -202,6 +207,7 @@ func NewCoordinator(deps Dependencies) *Coordinator {
 		network:    deps.Network,
 		server:     deps.Server,
 		qr:         deps.QR,
+		sink:       deps.Sink,
 		observer:   deps.Observer,
 		entropy:    entropy,
 		now:        now,
@@ -251,50 +257,15 @@ func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileM
 		return FileMetadata{}, err
 	}
 
-	c.mu.Lock()
-	if c.closing {
-		c.mu.Unlock()
-		return FileMetadata{}, NewError(ErrShuttingDown, "FairDrop is closing")
+	live, err := c.admit(ctx, id, token)
+	if err != nil {
+		return FileMetadata{}, err
 	}
-	if c.state != stateIdle {
-		c.mu.Unlock()
-		return FileMetadata{}, NewError(ErrBusy, "a transfer is already in progress")
-	}
-	// This check belongs in the same critical section as state/lease admission.
-	// A check before entropy generation leaves a window where an old teardown
-	// can time out after the check and before this session is installed.
-	if c.cleanupPending() {
-		c.mu.Unlock()
-		return FileMetadata{}, NewError(ErrBusy, "the previous transfer is still being released")
-	}
-	if !c.acquireLease() {
-		// IDLE while the lease is still held means the previous session's
-		// teardown has not finished. The refusal is the same one, and it
-		// changes no state and touches no resource.
-		c.mu.Unlock()
-		return FileMetadata{}, NewError(ErrBusy, "the previous transfer is still being released")
-	}
-	c.generation++
-	generation := c.generation
-	// The session context outlives this call: the listener started below is
-	// still serving long after Stage returns, so it cannot hang off the
-	// caller's command context.
-	sessionCtx, sessionCancel := context.WithCancel(context.WithoutCancel(ctx))
-	live := &session{
-		id:         id,
-		token:      token,
-		generation: generation,
-		ctx:        sessionCtx,
-		cancel:     sessionCancel,
-		warnings:   make([]Warning, 0, 1),
-	}
-	c.state = stateStaging
-	c.session = live
-	c.mu.Unlock()
+	generation := live.generation
 
 	// Setup calls hang off a context of their own, so an abandoned Stage stops
 	// them without cancelling the session a successful commit keeps.
-	setupCtx, stopSetup := context.WithCancel(sessionCtx)
+	setupCtx, stopSetup := context.WithCancel(live.ctx)
 	defer stopSetup()
 	stopCallerWatch := context.AfterFunc(ctx, stopSetup)
 	defer stopCallerWatch()
@@ -393,54 +364,101 @@ func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileM
 		live.warnings = append(live.warnings, unportableNamesWarning())
 	}
 
-	// 2. Resolve the address the receiver will dial.
-	address, err := c.network.GetLocalIP(setupCtx)
+	// Steps 2 to 6 and the commit are shared with StartReceive.
+	ready, err := c.activate(ctx, setupCtx, live, ServerStartRequest{SessionID: id, Token: token, Item: cloneStagedItem(item)}, downloadPathPrefix)
 	if err != nil {
 		return c.failStage(live, err)
 	}
+
+	return FileMetadata{
+		SessionID:    id,
+		Name:         item.Name,
+		Size:         item.LogicalSize,
+		IsDir:        item.Kind == ItemDirectory,
+		IsCollection: item.Kind == ItemCollection,
+		ItemCount:    len(paths),
+		URL:          ready.url,
+		QR:           ready.qr,
+		Warnings:     ready.warnings,
+	}, nil
+}
+
+// activated is what a committed session hands back to its admitting command.
+// It is captured inside the critical section that commits STAGED, so nothing
+// reads a session field after the operation lease has been handed on.
+type activated struct {
+	url      string
+	qr       string
+	warnings []Warning
+}
+
+// activate runs the steps both Stage and StartReceive share once a session has
+// been admitted and its subject (a selected item or a receive destination) is
+// held: address, server, URL, QR, beacon, and the commit to STAGED. The caller
+// owns the operation lease until this commits, and on any error the caller
+// unwinds with failStage -- activate never does, so there is exactly one place
+// an attempt is torn down.
+//
+// pathPrefix is the capability route the URL carries ("/download/" or
+// "/upload/"); it must match the route internal/server registers for the
+// request's kind.
+func (c *Coordinator) activate(
+	ctx context.Context,
+	setupCtx context.Context,
+	live *session,
+	request ServerStartRequest,
+	pathPrefix string,
+) (activated, error) {
+	id, generation := live.id, live.generation
+
+	// 2. Resolve the address the receiver will dial.
+	address, err := c.network.GetLocalIP(setupCtx)
+	if err != nil {
+		return activated{}, err
+	}
 	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
-		return c.failStage(live, err)
+		return activated{}, err
 	}
 	address = address.Unmap()
 	if !address.IsValid() || address.IsUnspecified() {
-		return c.failStage(live, NewError(ErrNetworkUnavailable, "no usable local network address was selected"))
+		return activated{}, NewError(ErrNetworkUnavailable, "no usable local network address was selected")
 	}
 
 	// 3. Start the server and its drainer together. A started server whose
 	//    event lane nobody reads could block its own teardown, so the reader
 	//    exists from the moment the listener does.
-	handle, err := c.server.Start(sessionCtx, ServerStartRequest{SessionID: id, Token: token, Item: cloneStagedItem(item)}, c)
+	handle, err := c.server.Start(live.ctx, request, c)
 	if err != nil {
-		return c.failStage(live, err)
+		return activated{}, err
 	}
 	if handle.Events == nil || handle.Port < 1 || handle.Port > 65535 {
 		// Refusing a handle still means owning it: Stop is safe after any
 		// Start, and leaving it be would strand a listener. Bounded like
 		// every other Stop call this story covers.
 		_ = c.stopServerBounded()
-		return c.failStage(live, NewError(ErrServerStartFailed, "the transfer server did not report a usable listener"))
+		return activated{}, NewError(ErrServerStartFailed, "the transfer server did not report a usable listener")
 	}
 	live.drainerDone = make(chan struct{})
 	go c.drain(live, handle.Events)
 	live.hold(resourceServer)
 	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
-		return c.failStage(live, err)
+		return activated{}, err
 	}
 
 	// 4. Build the capability URL. This is the first value that carries the
 	//    token, and it goes only here and into the QR.
-	live.url = capabilityURL(address, handle.Port, token)
+	live.url = capabilityURL(address, handle.Port, live.token, pathPrefix)
 
 	// 5. Encode the QR.
 	png, err := c.qr.EncodePNG(setupCtx, live.url)
 	if err != nil {
-		return c.failStage(live, err)
+		return activated{}, err
 	}
 	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
-		return c.failStage(live, err)
+		return activated{}, err
 	}
 	if len(png) == 0 {
-		return c.failStage(live, NewError(ErrQRFailed, "the capability code encoder returned no image"))
+		return activated{}, NewError(ErrQRFailed, "the capability code encoder returned no image")
 	}
 	// Standard padded base64 of the PNG bytes with no data-URI prefix: the
 	// prefix belongs to the renderer, and adding it here would make the value
@@ -461,7 +479,7 @@ func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileM
 		live.hold(resourceBeacon)
 	}
 	if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
-		return c.failStage(live, err)
+		return activated{}, err
 	}
 	if beaconErr != nil {
 		// The adapter has already cleaned up its partial registration, so the
@@ -477,30 +495,70 @@ func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileM
 	c.mu.Lock()
 	if err := c.revalidateLocked(setupCtx, id, generation, stateStaging); err != nil {
 		c.mu.Unlock()
-		return c.failStage(live, err)
+		return activated{}, err
 	}
 	live.stagedAt = stagedAt
 	c.state = stateStaged
 	warnings := make([]Warning, len(live.warnings))
 	copy(warnings, live.warnings)
-	metadata := FileMetadata{
-		SessionID:    id,
-		Name:         item.Name,
-		Size:         item.LogicalSize,
-		IsDir:        item.Kind == ItemDirectory,
-		IsCollection: item.Kind == ItemCollection,
-		ItemCount:    len(paths),
-		URL:          live.url,
-		QR:           live.qrBase64,
-		Warnings:     warnings,
-	}
+	ready := activated{url: live.url, qr: live.qrBase64, warnings: warnings}
 	// The lease is handed back inside the same critical section that commits
 	// STAGED, so a claim that observes STAGED can never find this Stage still
 	// holding it.
 	c.releaseLease()
 	c.mu.Unlock()
 
-	return metadata, nil
+	return ready, nil
+}
+
+// admit is the one admission gate for a new session of either kind. Under the
+// state mutex it refuses a closing application, any state but IDLE, and a
+// previous teardown still being released, then takes the operation lease and
+// installs a STAGING session. The refusals change no state and touch no
+// resource, and they are the same for Stage and StartReceive: a receive session
+// is admitted only from IDLE, by the same single-flight rule.
+func (c *Coordinator) admit(ctx context.Context, id SessionID, token CapabilityToken) (*session, error) {
+	c.mu.Lock()
+	if c.closing {
+		c.mu.Unlock()
+		return nil, NewError(ErrShuttingDown, "FairDrop is closing")
+	}
+	if c.state != stateIdle {
+		c.mu.Unlock()
+		return nil, NewError(ErrBusy, "a transfer is already in progress")
+	}
+	// This check belongs in the same critical section as state/lease admission.
+	// A check before entropy generation leaves a window where an old teardown
+	// can time out after the check and before this session is installed.
+	if c.cleanupPending() {
+		c.mu.Unlock()
+		return nil, NewError(ErrBusy, "the previous transfer is still being released")
+	}
+	if !c.acquireLease() {
+		// IDLE while the lease is still held means the previous session's
+		// teardown has not finished. The refusal is the same one, and it
+		// changes no state and touches no resource.
+		c.mu.Unlock()
+		return nil, NewError(ErrBusy, "the previous transfer is still being released")
+	}
+	c.generation++
+	generation := c.generation
+	// The session context outlives this call: the listener started below is
+	// still serving long after Stage returns, so it cannot hang off the
+	// caller's command context.
+	sessionCtx, sessionCancel := context.WithCancel(context.WithoutCancel(ctx))
+	live := &session{
+		id:         id,
+		token:      token,
+		generation: generation,
+		ctx:        sessionCtx,
+		cancel:     sessionCancel,
+		warnings:   make([]Warning, 0, 1),
+	}
+	c.state = stateStaging
+	c.session = live
+	c.mu.Unlock()
+	return live, nil
 }
 
 func cloneStagedItem(item StagedItem) StagedItem {
@@ -676,6 +734,8 @@ func (c *Coordinator) releaseAcquired(live *session) error {
 			err = c.stopBeaconBounded()
 		case resourceServer:
 			err = c.stopServerBounded()
+		case resourceDestination:
+			err = c.closeDestinationBounded(live)
 		}
 		if err != nil {
 			joined = errors.Join(joined, err)

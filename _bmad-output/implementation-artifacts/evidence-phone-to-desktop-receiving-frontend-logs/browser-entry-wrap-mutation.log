@@ -1,0 +1,27 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-entry-wrap-p0awx8cn/frontend
+
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 28 skipped) 5924ms
+     × Idle with the Receive entry scrolls only vertically with nothing clipped 797ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive views at 320 CSS pixels > Idle with the Receive entry scrolls only vertically with nothing clipped
+AssertionError: Idle with the Receive entry: documentElement.scrollWidth (339px) exceeds clientWidth (320px): expected 339 to be less than or equal to 320
+ ❯ assertNoHorizontalOverflow browser/receive.test.tsx:204:6
+    202|         root.scrollWidth,
+    203|         `${sceneName}: documentElement.scrollWidth (${root.scrollWidth…
+    204|     ).toBeLessThanOrEqual(root.clientWidth)
+       |      ^
+    205|
+    206|     for (const element of container.querySelectorAll<HTMLElement>('*')…
+ ❯ browser/receive.test.tsx:266:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed | 28 skipped (37)
+   Start at  05:02:02
+   Duration  6.62s (transform 0ms, setup 0ms, import 174ms, tests 5.92s, environment 0ms)
+

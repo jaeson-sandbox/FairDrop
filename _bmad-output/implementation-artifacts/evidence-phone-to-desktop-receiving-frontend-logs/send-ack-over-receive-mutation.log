@@ -1,0 +1,52 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-send-ack-over-receive-zif36d3f/frontend
+
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
+     × refuses to commit a send acknowledgement over a pending receive 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > starting a receive session > refuses to commit a send acknowledgement over a pending receive
+AssertionError: expected { phase: 'staged', …(4) } to be { phase: 'pending', …(3) } // Object.is equality
+
+- Expected
++ Received
+
+  {
+    "cancelPending": false,
+-   "generation": 1,
+-   "itemKind": "receive",
+-   "phase": "pending",
++   "commandError": null,
++   "metadata": {
++     "isDir": false,
++     "name": "report.pdf",
++     "qrBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
++     "sessionId": "0102030405060708090a0b0c0d0e0f10",
++     "size": 400,
++     "url": "http://192.168.1.50:45678/download/1112131415161718191a1b1c1d1e1f20",
++     "warnings": [],
++   },
++   "phase": "staged",
++   "session": {
++     "lastSeq": 0,
++     "sessionId": "0102030405060708090a0b0c0d0e0f10",
++   },
+  }
+
+ ❯ src/transfer/state.receive.test.ts:95:96
+     93|     it('refuses to commit a send acknowledgement over a pending receiv…
+     94|         const pending = run(createInitialTransferState(), {type: 'stag…
+     95|         expect(run(pending, {type: 'stage-succeeded', generation: 1, m…
+       |                                                                                                ^
+     96|     })
+     97|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:55
+   Duration  416ms (transform 46ms, setup 0ms, import 56ms, tests 6ms, environment 276ms)
+

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-draft-open-nwgkc3jy/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed | 40 skipped (49)
+   Start at  05:00:13
+   Duration  496ms (transform 73ms, setup 0ms, import 125ms, tests 18ms, environment 278ms)
+

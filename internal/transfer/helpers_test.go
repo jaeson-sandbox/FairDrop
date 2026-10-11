@@ -133,6 +133,7 @@ type harness struct {
 	source   *fakeSource
 	network  *fakeNetwork
 	server   *fakeServer
+	sink     *fakeSink
 	qr       *fakeQR
 	observer *fakeObserver
 	entropy  *fakeEntropy

@@ -1,0 +1,151 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-flag-not-count-x27n5dti/frontend
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 31 skipped) 77ms
+     × follows the backend flag, not the count: saved files with no subfolder get no button 66ms
+     × follows the backend flag, not the count: an existing subfolder with a zero count still gets the button 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > Show in Folder > follows the backend flag, not the count: saved files with no subfolder get no button
+AssertionError: expected <button type="button" …(2)></button> to be null
+
+- Expected:
+null
+
++ Received:
+<button
+  class="fd-button fd-button--primary fd-button--pill fd-target"
+  data-receive-show="true"
+  type="button"
+>
+  Show in Folder
+</button>
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:141:72
+    139|     it('follows the backend flag, not the count: saved files with no s…
+    140|         renderOutcome(outcome('incomplete', {filesSaved: 2, subfolderE…
+    141|         expect(screen.queryByRole('button', {name: 'Show in Folder'}))…
+       |                                                                        ^
+    142|     })
+    143|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > Show in Folder > follows the backend flag, not the count: an existing subfolder with a zero count still gets the button
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Show in Folder"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Upload incomplete — no files saved":
+  [36m<section[39m
+    [33maria-describedby[39m=[32m"fd-receive-outcome-body"[39m
+    [33maria-labelledby[39m=[32m"fd-receive-outcome-heading"[39m
+    [33mclass[39m=[32m"fd-outcome fd-outcome--error"[39m
+    [33mdata-focus-target[39m=[32m"receive-outcome"[39m
+    [33mdata-phase-view[39m=[32m"receive-outcome"[39m
+    [33mdata-receive-outcome[39m=[32m"incomplete"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Upload incomplete — no files saved":
+  [36m<h1[39m
+    [33mclass[39m=[32m"fd-state-heading fd-rise"[39m
+    [33mid[39m=[32m"fd-receive-outcome-heading"[39m
+    [33mstyle[39m=[32m"--fd-stagger: 0;"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"fd-outcome__body fd-rise"[39m
+    [33mid[39m=[32m"fd-receive-outcome-body"[39m
+    [33mstyle[39m=[32m"--fd-stagger: 1;"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Done":
+  [36m<button[39m
+    [33mclass[39m=[32m"fd-button fd-button--pill fd-target fd-button--quiet"[39m
+    [33mdata-receive-done[39m=[32m"true"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<section[39m
+      [33maria-describedby[39m=[32m"fd-receive-outcome-body"[39m
+      [33maria-labelledby[39m=[32m"fd-receive-outcome-heading"[39m
+      [33mclass[39m=[32m"fd-outcome fd-outcome--error"[39m
+      [33mdata-focus-target[39m=[32m"receive-outcome"[39m
+      [33mdata-phase-view[39m=[32m"receive-outcome"[39m
+      [33mdata-receive-outcome[39m=[32m"incomplete"[39m
+      [33mtabindex[39m=[32m"-1"[39m
+    [36m>[39m
+      [36m<span[39m
+        [33maria-hidden[39m=[32m"true"[39m
+        [33mclass[39m=[32m"fd-outcome__icon fd-outcome__icon--error"[39m
+      [36m>[39m
+        [0m![0m
+      [36m</span>[39m
+      [36m<h1[39m
+        [33mclass[39m=[32m"fd-state-heading fd-rise"[39m
+        [33mid[39m=[32m"fd-receive-outcome-heading"[39m
+        [33mstyle[39m=[32m"--fd-stagger: 0;"[39m
+      [36m>[39m
+        [0mUpload incomplete — no files saved[0m
+      [36m</h1>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"fd-outcome__body fd-rise"[39m
+        [33mid[39m=[32m"fd-receive-outcome-body"[39m
+        [33mstyle[39m=[32m"--fd-stagger: 1;"[39m
+      [36m>[39m
+        [0mThe upload stopped before any file finished saving. Nothing was added to ⁨Phone Photos⁩.[0m
+      [36m</p>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"fd-outcome__actions fd-rise"[39m
+        [33mstyle[39m=[32m"--fd-stagger: 2;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"fd-button fd-button--pill fd-target fd-button--quiet"[39m
+          [33mdata-receive-done[39m=[32m"true"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mDone[0m
+        [36m</button>[39m
+      [36m</div>[39m
+    [36m</section>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:146:23
+    144|     it('follows the backend flag, not the count: an existing subfolder…
+    145|         renderOutcome(outcome('incomplete', {filesSaved: 0, subfolderE…
+    146|         expect(screen.getByRole('button', {name: 'Show in Folder'})).t…
+       |                       ^
+    147|     })
+    148|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 31 skipped (33)
+   Start at  05:00:17
+   Duration  549ms (transform 59ms, setup 0ms, import 111ms, tests 77ms, environment 278ms)
+

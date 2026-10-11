@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T04:59:04.106194-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-11T04:59:04.411345-04:00","Action":"run","Package":"fairdrop","Test":"TestTheFileManagerCommandIsAnArgumentVectorNeverAShellLine"}
+{"Time":"2026-10-11T04:59:04.411755-04:00","Action":"output","Package":"fairdrop","Test":"TestTheFileManagerCommandIsAnArgumentVectorNeverAShellLine","Output":"=== RUN   TestTheFileManagerCommandIsAnArgumentVectorNeverAShellLine\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:04.41186-04:00","Action":"output","Package":"fairdrop","Test":"TestTheFileManagerCommandIsAnArgumentVectorNeverAShellLine","Output":"--- PASS: TestTheFileManagerCommandIsAnArgumentVectorNeverAShellLine (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:04.411884-04:00","Action":"pass","Package":"fairdrop","Test":"TestTheFileManagerCommandIsAnArgumentVectorNeverAShellLine","Elapsed":0}
+{"Time":"2026-10-11T04:59:04.411905-04:00","Action":"output","Package":"fairdrop","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:04.413193-04:00","Action":"output","Package":"fairdrop","Output":"ok  \tfairdrop\t0.307s\n"}
+{"Time":"2026-10-11T04:59:04.413224-04:00","Action":"pass","Package":"fairdrop","Elapsed":0.307}

@@ -1,0 +1,191 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-choose-label-7yr9c1xc/frontend
+
+ ❯ src/App.receive.test.tsx (39 tests | 1 failed | 34 skipped) 93ms
+     × shows receive wording and a folder-chooser action, never the send ones 72ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/App.receive.test.tsx > a failed Receive start > shows receive wording and a folder-chooser action, never the send ones
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Choose Another Folder"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  [36m<main[39m
+    [33mclass[39m=[32m"fd-app"[39m
+    [33mdata-transfer-phase[39m=[32m"idle"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  region:
+
+  Name "Can’t save there":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"fd-outcome-heading-error"[39m
+    [33mclass[39m=[32m"fd-outcome fd-outcome--error"[39m
+    [33mdata-error-code[39m=[32m"path_unsupported"[39m
+    [33mdata-focus-target[39m=[32m"command-error"[39m
+    [33mdata-outcome[39m=[32m"error"[39m
+    [33mdata-retained[39m=[32m"false"[39m
+    [33mstyle[39m=[32m"--wails-drop-target: drop;"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Can’t save there":
+  [36m<h2[39m
+    [33mclass[39m=[32m"fd-state-heading fd-rise"[39m
+    [33mid[39m=[32m"fd-outcome-heading-error"[39m
+    [33mstyle[39m=[32m"--fd-stagger: 0;"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"fd-outcome__body fd-rise"[39m
+    [33mstyle[39m=[32m"--fd-stagger: 1;"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Try Again":
+  [36m<button[39m
+    [33mclass[39m=[32m"fd-button fd-button--primary fd-button--pill fd-target"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Dismiss":
+  [36m<button[39m
+    [33mclass[39m=[32m"fd-button fd-button--quiet fd-button--pill fd-target"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  status:
+
+  Name "":
+  [36m<div[39m
+    [33maria-atomic[39m=[32m"true"[39m
+    [33maria-live[39m=[32m"polite"[39m
+    [33mclass[39m=[32m"fd-status-announcer"[39m
+    [33mrole[39m=[32m"status"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"fd-app"[39m
+      [33mdata-transfer-phase[39m=[32m"idle"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"fd-region"[39m
+        [33mdata-phase-view[39m=[32m"idle"[39m
+      [36m>[39m
+        [36m<section[39m
+          [33maria-labelledby[39m=[32m"fd-outcome-heading-error"[39m
+          [33mclass[39m=[32m"fd-outcome fd-outcome--error"[39m
+          [33mdata-error-code[39m=[32m"path_unsupported"[39m
+          [33mdata-focus-target[39m=[32m"command-error"[39m
+          [33mdata-outcome[39m=[32m"error"[39m
+          [33mdata-retained[39m=[32m"false"[39m
+          [33mstyle[39m=[32m"--wails-drop-target: drop;"[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"fd-outcome__icon fd-outcome__icon--error"[39m
+          [36m>[39m
+            [0m![0m
+          [36m</span>[39m
+          [36m<h2[39m
+            [33mclass[39m=[32m"fd-state-heading fd-rise"[39m
+            [33mid[39m=[32m"fd-outcome-heading-error"[39m
+            [33mstyle[39m=[32m"--fd-stagger: 0;"[39m
+          [36m>[39m
+            [0mCan’t save there[0m
+          [36m</h2>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"fd-outcome__body fd-rise"[39m
+            [33mstyle[39m=[32m"--fd-stagger: 1;"[39m
+          [36m>[39m
+            [0mFairDrop can only save to a regular folder it can write to. Links, read-only locations and OneDrive-style placeholder folders aren’t supported. Choose another folder.[0m
+          [36m</p>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fd-outcome__actions fd-rise"[39m
+            [33mstyle[39m=[32m"--fd-stagger: 2;"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"fd-button fd-button--primary fd-button--pill fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"fd-button__glyph"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mfocusable[39m=[32m"false"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"1.8"[39m
+                [33mviewBox[39m=[32m"0 0 16 16"[39m
+              [36m>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M13 8a5 5 0 1 1-1.5-3.6"[39m
+                [36m/>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M13 2.5v2.5h-2.5"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [0mTry Again[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-button--pill fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mDismiss[0m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</section>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33maria-atomic[39m=[32m"true"[39m
+        [33maria-live[39m=[32m"polite"[39m
+        [33mclass[39m=[32m"fd-status-announcer"[39m
+        [33mrole[39m=[32m"status"[39m
+      [36m>[39m
+        [36m<span />[39m
+      [36m</div>[39m
+    [36m</main>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/App.receive.test.tsx:446:23
+    444|
+    445|         expect(screen.getByRole('heading', {name: 'Can’t save there'})…
+    446|         expect(screen.getByRole('button', {name: 'Choose Another Folde…
+       |                       ^
+    447|         expect(screen.queryByRole('button', {name: 'Choose Another'}))…
+    448|         expect(screen.queryByRole('menu')).toBeNull()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed | 34 skipped (39)
+   Start at  05:01:02
+   Duration  648ms (transform 131ms, setup 0ms, import 195ms, tests 93ms, environment 282ms)
+

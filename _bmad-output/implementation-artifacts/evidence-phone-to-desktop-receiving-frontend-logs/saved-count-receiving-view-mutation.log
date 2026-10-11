@@ -1,0 +1,115 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-receiving-view-tnp0siax/frontend
+
+ ❯ src/ui/ReceivingView.test.tsx (14 tests | 3 failed | 9 skipped) 35ms
+     × says 1 saved as "1 file saved" 5ms
+     × says 2 saved as "2 files saved" 3ms
+     × says 37 saved as "37 files saved" 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/ReceivingView.test.tsx > the receiving view > says 1 saved as "1 file saved"
+TestingLibraryElementError: Unable to find an element with the text: 1 file saved. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<div[39m
+  [33mclass[39m=[32m"fd-metric"[39m
+  [33mdata-metric[39m=[32m"saved"[39m
+[36m>[39m
+  [36m<strong[39m
+    [33mclass[39m=[32m"fd-metric__value"[39m
+  [36m>[39m
+    [0mno files saved[0m
+  [36m</strong>[39m
+  [36m<span[39m
+    [33mclass[39m=[32m"fd-metric__caption"[39m
+  [36m>[39m
+    [0mSaved[0m
+  [36m</span>[39m
+[36m</div>[39m
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/ReceivingView.test.tsx:74:40
+     72|         render(<ReceivingView state={receiving({filesSaved})} onCancel…
+     73|
+     74|         expect(within(figure('saved')).getByText(text)).toBeTruthy()
+       |                                        ^
+     75|         expect(within(figure('saved')).getByText('Saved')).toBeTruthy()
+     76|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/ui/ReceivingView.test.tsx > the receiving view > says 2 saved as "2 files saved"
+TestingLibraryElementError: Unable to find an element with the text: 2 files saved. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<div[39m
+  [33mclass[39m=[32m"fd-metric"[39m
+  [33mdata-metric[39m=[32m"saved"[39m
+[36m>[39m
+  [36m<strong[39m
+    [33mclass[39m=[32m"fd-metric__value"[39m
+  [36m>[39m
+    [0mno files saved[0m
+  [36m</strong>[39m
+  [36m<span[39m
+    [33mclass[39m=[32m"fd-metric__caption"[39m
+  [36m>[39m
+    [0mSaved[0m
+  [36m</span>[39m
+[36m</div>[39m
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/ReceivingView.test.tsx:74:40
+     72|         render(<ReceivingView state={receiving({filesSaved})} onCancel…
+     73|
+     74|         expect(within(figure('saved')).getByText(text)).toBeTruthy()
+       |                                        ^
+     75|         expect(within(figure('saved')).getByText('Saved')).toBeTruthy()
+     76|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/ui/ReceivingView.test.tsx > the receiving view > says 37 saved as "37 files saved"
+TestingLibraryElementError: Unable to find an element with the text: 37 files saved. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<div[39m
+  [33mclass[39m=[32m"fd-metric"[39m
+  [33mdata-metric[39m=[32m"saved"[39m
+[36m>[39m
+  [36m<strong[39m
+    [33mclass[39m=[32m"fd-metric__value"[39m
+  [36m>[39m
+    [0mno files saved[0m
+  [36m</strong>[39m
+  [36m<span[39m
+    [33mclass[39m=[32m"fd-metric__caption"[39m
+  [36m>[39m
+    [0mSaved[0m
+  [36m</span>[39m
+[36m</div>[39m
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/ReceivingView.test.tsx:74:40
+     72|         render(<ReceivingView state={receiving({filesSaved})} onCancel…
+     73|
+     74|         expect(within(figure('saved')).getByText(text)).toBeTruthy()
+       |                                        ^
+     75|         expect(within(figure('saved')).getByText('Saved')).toBeTruthy()
+     76|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed | 9 skipped (14)
+   Start at  05:00:25
+   Duration  521ms (transform 78ms, setup 0ms, import 132ms, tests 35ms, environment 274ms)
+

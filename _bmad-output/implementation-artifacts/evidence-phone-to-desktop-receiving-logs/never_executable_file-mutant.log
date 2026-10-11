@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T04:59:32.076812-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T04:59:32.294585-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable"}
+{"Time":"2026-10-11T04:59:32.294679-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"=== RUN   TestFilesAndFoldersAreNeverExecutable\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:32.302206-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"    destination_test.go:366: the file mode is 755, want no bit beyond 0644\n","OutputType":"error"}
+{"Time":"2026-10-11T04:59:32.303403-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"--- FAIL: TestFilesAndFoldersAreNeverExecutable (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:32.303421-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Elapsed":0.01}
+{"Time":"2026-10-11T04:59:32.303464-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:32.304419-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.227s\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:32.304482-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.228}

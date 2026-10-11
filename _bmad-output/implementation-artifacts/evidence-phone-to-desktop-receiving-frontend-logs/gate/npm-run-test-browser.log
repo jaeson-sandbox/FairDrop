@@ -1,0 +1,17 @@
+compdef:153: _comps: assignment to invalid subscript range
+
+> fairdrop-frontend@1.4.0 test:browser
+> vitest run --config vitest.browser.config.ts && node browser/receiver-live.mjs && node browser/upload-live.mjs
+
+
+ RUN  v4.1.11 /Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend
+
+1:13:26 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+
+ Test Files  4 passed (4)
+      Tests  123 passed (123)
+   Start at  01:13:26
+   Duration  71.62s (transform 0ms, setup 0ms, import 923ms, tests 97.58s, environment 0ms)
+
+receiver live browser: real GET page, headers, 320px layout, keyboard POST and exact attachment bytes passed
+upload live browser: real page, headers, 320px layout, empty form blocked, multipart POST of 3 files and exact saved bytes passed

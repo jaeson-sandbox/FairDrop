@@ -20,6 +20,33 @@ The receiver sees the item count and total logical size, then downloads one stre
 The whole selection is checked before anything is offered, and one failing member fails the
 whole transfer. One file or one folder still uses the single-item flow unchanged.
 
+**Receive files from a phone** is also under development and is not part of any published
+release. Choose **Receive** in Idle and pick a destination folder; FairDrop then shows a
+one-time QR code. A phone on the same Wi-Fi opens the link, chooses files, and uploads them
+once through a plain script-free web form. The files are **saved to the folder you chose**,
+into a new `FairDrop YYYY-MM-DD HH.MM` subfolder created when the first file arrives, and the
+desktop reports exactly how many files were saved. If the upload stops or you cancel, files
+that had finished saving are kept, the file in progress is removed, and the result says so.
+**Show in Folder** opens the new subfolder. Receiving is the first FairDrop feature that
+writes to your disk, so the "persists nothing" promise above describes sending and
+FairDrop's own state: a receive session saves the files you chose to receive and still stores
+no settings, history, logs, or remembered folder.
+
+Limits worth knowing before you rely on it:
+
+- The destination must be a plain, writable folder. A folder that is, or sits under, a link or
+  reparse point is refused, which includes OneDrive-style placeholder folders.
+- A volume that cannot rename a file without replacing another, or create a hard link, cannot be
+  received into safely. This includes **FAT and exFAT volumes on macOS**: FairDrop fails closed
+  there and reports the upload as incomplete rather than risk overwriting a file.
+- An upload must leave at least 3 GiB free on the destination volume; a larger one is refused
+  and the session keeps waiting.
+- Marking received files as downloaded from the internet (macOS quarantine, Windows
+  Zone.Identifier) is best-effort. Where a volume cannot store it, the file is kept and the
+  result warns about it.
+- Like sending, receiving is plain HTTP on a trusted network with no encryption or
+  authentication, and the link works for one upload.
+
 ## Using FairDrop
 
 1. Launch FairDrop. The first run asks for firewall access — allow it on **Private networks

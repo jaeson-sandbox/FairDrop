@@ -45,11 +45,20 @@ func (r *run) route(writer http.ResponseWriter, request *http.Request) {
 		writeStatus(writer, http.StatusNotFound)
 		return
 	}
-	if _, pattern := r.mux.Handler(request); pattern != downloadPattern {
+	if _, pattern := r.mux.Handler(request); pattern != r.routePattern() {
 		writeStatus(writer, http.StatusNotFound)
 		return
 	}
 	r.mux.ServeHTTP(writer, request)
+}
+
+// routePattern is the one pattern this run answers: the upload route for a
+// receive run, the download route for everything else.
+func (r *run) routePattern() string {
+	if r.destination != nil {
+		return uploadPattern
+	}
+	return downloadPattern
 }
 
 // isCanonicalPath reports whether a path is already the form ServeMux would
@@ -208,6 +217,13 @@ func (r *run) download(writer http.ResponseWriter, request *http.Request) {
 
 func (r *run) finalizeAfterResponse(request *http.Request, event transfer.ServerEvent) {
 	connection, ok := request.Context().Value(responseConnectionKey{}).(*finalizingConn)
+	if !ok && r.destination != nil {
+		// A receive outcome is decided by what the destination saved, not by the
+		// response, so a transport with no finalization observer still reports
+		// it -- and has no half-written download to abort.
+		r.finish(&event)
+		return
+	}
 	if !ok {
 		// Every production request has this observer. An alternate transport
 		// cannot claim success without observing finalization.

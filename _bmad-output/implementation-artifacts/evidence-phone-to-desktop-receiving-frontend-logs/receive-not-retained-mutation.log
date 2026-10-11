@@ -1,0 +1,44 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-not-retained-2al37sts/frontend
+
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
+     × leaves to plain Idle on reset, retaining nothing a send outcome card could offer 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > the held outcome > leaves to plain Idle on reset, retaining nothing a send outcome card could offer
+AssertionError: expected { phase: 'idle', …(2) } to deeply equal { phase: 'idle', …(2) }
+
+- Expected
++ Received
+
+  {
+    "commandError": null,
+    "phase": "idle",
+-   "retainedOutcome": null,
++   "retainedOutcome": {
++     "kind": "done",
++     "receipt": {
++       "bytesSent": 0,
++       "isDir": true,
++       "name": "Phone Photos",
++     },
++   },
+  }
+
+ ❯ src/transfer/state.receive.test.ts:415:72
+    413|
+    414|     it('leaves to plain Idle on reset, retaining nothing a send outcom…
+    415|         expect(run(outcomeState(), event('transfer-reset', {seq: 3})))…
+       |                                                                        ^
+    416|             phase: 'idle', retainedOutcome: null, commandError: null,
+    417|         })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:50
+   Duration  424ms (transform 48ms, setup 0ms, import 57ms, tests 6ms, environment 278ms)
+

@@ -18,18 +18,24 @@ interface StagePendingCardProps {
  * A native drop supplies a path and nothing else, so its kind is `'unknown'`
  * until metadata arrives. An unknown kind therefore shows no kind tab and uses
  * neutral item wording; the source adapter may prove either a file or folder.
+ *
+ * A pending receive is the same local, unacknowledged moment for a different
+ * command (`StartReceive`): the folder is being validated and the listener
+ * opened, nothing has been written, and it says only that. It names no kind,
+ * because there is no item.
  */
 export function StagePendingCard({state, onCancel}: StagePendingCardProps) {
     const itemKind = selectPendingItemKind(state)
     const folder = itemKind === 'directory'
-    const pendingCopy = itemKind === 'collection' ? copy.stage.pending.collection : itemKind === 'unknown'
-        ? copy.stage.pending.item
-        : folder ? copy.stage.pending.folder : copy.stage.pending.file
+    const pendingCopy = itemKind === 'receive' ? copy.receive.pending
+        : itemKind === 'collection' ? copy.stage.pending.collection : itemKind === 'unknown'
+            ? copy.stage.pending.item
+            : folder ? copy.stage.pending.folder : copy.stage.pending.file
 
     return (
         <div className="fd-region" data-phase-view="pending" data-item-kind={itemKind ?? 'none'}>
             <div>
-                {itemKind === 'unknown' ? null : (
+                {itemKind === 'unknown' || itemKind === 'receive' ? null : (
                     <span className="fd-packet-tab">{itemKind === 'collection' ? copy.label.items : folder ? copy.label.folder : copy.label.file}</span>
                 )}
                 <section className="fd-pending-card">

@@ -1,10 +1,17 @@
 import {useEffect, useRef, useState} from 'react'
 import type {CSSProperties, ReactElement} from 'react'
 import {OnFileDrop, OnFileDropOff} from '../wailsjs/runtime/runtime'
-import {selectCommandError, selectEffectiveErrorAction, selectOutcome, selectProgressSnapshot} from './transfer/selectors'
+import {
+    selectCommandContext,
+    selectCommandError,
+    selectEffectiveErrorAction,
+    selectOutcome,
+    selectProgressSnapshot,
+    selectReceiveErrorAction,
+} from './transfer/selectors'
 import {createInitialTransferState, type IdleTransferState, type TransferState} from './transfer/state'
 import type {PublicError} from './transfer/types'
-import {useTransfer, type TransferController} from './transfer/useTransfer'
+import {useTransfer, type ReceiveActivation, type TransferController} from './transfer/useTransfer'
 import {focusSelector, routeTransition, type FocusTarget} from './ui/announce'
 import {nextProgressSpeech, type ProgressSpeechMemory} from './ui/progressSpeech'
 import {copy} from './ui/copy'
@@ -12,6 +19,9 @@ import {IdleView} from './ui/IdleView'
 import {NOTIFICATION_TEXT_ID, Notification} from './ui/Notification'
 import {OutcomePanel, type OutcomeBrowseAction, type OutcomeCardProps} from './ui/OutcomePanel'
 import {StagePendingCard} from './ui/StagePendingCard'
+import {ReceiveOutcomeView} from './ui/ReceiveOutcomeView'
+import {ReceiveWaitingView} from './ui/ReceiveWaitingView'
+import {ReceivingView} from './ui/ReceivingView'
 import {StagedView} from './ui/StagedView'
 import {TransferringView} from './ui/TransferringView'
 import {CollectionDraftView} from './ui/CollectionDraftView'
@@ -120,6 +130,30 @@ function App() {
         await runOutcomeAction(() => transfer.stageFromOutcome(path, 'unknown'))
     }
 
+    /**
+     * "Try Again" / "Choose Another Folder" on a failed Receive: opens the
+     * folder chooser again, with the same busy bookkeeping every outcome-card
+     * action shares. There is no remembered folder to reuse -- a receive never
+     * stores one -- so "again" always means "choose".
+     */
+    async function receiveAgain(): Promise<void> {
+        await runOutcomeAction(async () => { await transfer.receive() })
+    }
+
+    /** A Receive failure card's actions: the receive wording, and never a send affordance. */
+    function receiveErrorCardProps(error: PublicError, dismiss: () => void): OutcomeCardProps {
+        const action = selectReceiveErrorAction(error.code)
+        const again = action === 'again' || action === 'choose'
+        return {
+            dropTargetStyle,
+            onDismiss: dismiss,
+            receive: true,
+            onRetry: again ? receiveAgain : undefined,
+            retryLabel: action === 'choose' ? copy.receive.chooseAnotherFolder : undefined,
+            busy: outcomeActionPending,
+        }
+    }
+
     async function openMultiple(paths: readonly string[] = []): Promise<void> {
         await runOutcomeAction(() => transfer.openDraft(paths))
     }
@@ -203,7 +237,7 @@ function App() {
 
         // Leaving Transferring cancels progress speech: a terminal outcome must
         // not be followed by a queued update about the transfer that ended.
-        if (next.phase !== 'transferring') speechRef.current = null
+        if (next.phase !== 'transferring' && next.phase !== 'receive-receiving') speechRef.current = null
 
         const routed = routeTransition(previous, next)
 
@@ -251,8 +285,10 @@ function App() {
     }, [focusRequest])
 
     function speakProgress(previous: TransferState, next: TransferState): void {
-        if (next.phase !== 'transferring' || next.progress === null) return
-        if (previous.phase === 'transferring' && previous.progress === next.progress) return
+        // A receive reads its bytes against the declared size on the same
+        // throttle a send uses; the sentence is the same registry composition.
+        if ((next.phase !== 'transferring' && next.phase !== 'receive-receiving') || next.progress === null) return
+        if (previous.phase === next.phase && previous.progress === next.progress) return
 
         const speech = nextProgressSpeech(
             speechRef.current,
@@ -292,7 +328,8 @@ function App() {
         // The session, not just the phase: a staged -> transferring -> staged
         // round trip returns to the same phase under a different session, and
         // an in-flight command belongs to the session that started it.
-        if (current.phase !== 'staged' || current.session.sessionId !== sessionId) return
+        if ((current.phase !== 'staged' && current.phase !== 'receive-waiting') ||
+            current.session.sessionId !== sessionId) return
         // A retiring session has already been announced. `cancel-requested` is a
         // spoken row -- "Canceling" -- and a copy that resolves a moment later
         // would replace the one confirmation the user is waiting on with an
@@ -373,7 +410,7 @@ function App() {
                 />
             )}
             {transfer.draft === null ? phaseBody(transfer, cancelWon, announceFromStaged, errorCardProps,
-                () => void openMultiple()) : null}
+                () => void openMultiple(), {onReceive: () => transfer.receive(), errorCardProps: receiveErrorCardProps}) : null}
             {transfer.draft === null && outcome !== null && (transfer.state.phase === 'idle' || terminal) ? (
                 <button type="button" data-draft-entry className="fd-button fd-button--secondary fd-target fd-multiple-outcome"
                     onClick={() => void openMultiple()}>{copy.selection.open}</button>
@@ -401,6 +438,7 @@ function phaseBody(
     announce: (sessionId: string, text: string) => void,
     errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps,
     onOpenMultiple: () => void,
+    receive: ReceiveHandlers,
 ): ReactElement | null {
     const {state} = transfer
 
@@ -410,7 +448,7 @@ function phaseBody(
             // rather than stacking above it -- App's top-level OutcomePanel
             // slot already renders it; IdleView (the drop zone, the pill, the
             // grouped disclosures) is not rendered at all while it shows.
-            return state.retainedOutcome === null ? idleView(transfer, state, cancelWon, errorCardProps, onOpenMultiple) : null
+            return state.retainedOutcome === null ? idleView(transfer, state, cancelWon, errorCardProps, onOpenMultiple, receive) : null
 
         case 'pending':
             return <StagePendingCard state={state} onCancel={() => void transfer.cancel()}/>
@@ -428,6 +466,30 @@ function phaseBody(
         case 'transferring':
             return <TransferringView state={state} onCancel={() => void transfer.cancel()}/>
 
+        case 'receive-waiting':
+            return (
+                <ReceiveWaitingView
+                    state={state}
+                    onCancel={() => void transfer.cancel()}
+                    onAnnounce={announce}
+                    onCopyFailed={transfer.reportCopyFailure}
+                />
+            )
+
+        case 'receive-receiving':
+            return <ReceivingView state={state} onCancel={() => void transfer.cancel()}/>
+
+        case 'receive-outcome':
+            // Leaving is the existing Cancel command: the backend holds a receive
+            // outcome until it is cancelled, and its reset is what returns to Idle.
+            return (
+                <ReceiveOutcomeView
+                    state={state}
+                    onShowInFolder={() => void transfer.showReceivedFolder()}
+                    onDone={() => void transfer.cancel()}
+                />
+            )
+
         case 'done':
         case 'error':
             // The selector, not this switch, decides an outcome is renderable:
@@ -438,9 +500,15 @@ function phaseBody(
             // sends that transition to the Idle cancellation summary, so Idle is
             // rendered here with the summary showing.
             return selectOutcome(state) === null
-                ? idleView(transfer, createInitialTransferState(), cancelWon, errorCardProps, onOpenMultiple)
+                ? idleView(transfer, createInitialTransferState(), cancelWon, errorCardProps, onOpenMultiple, receive)
                 : null
     }
+}
+
+/** What Receive adds to the Idle composition and to its failure card. */
+interface ReceiveHandlers {
+    readonly onReceive: () => Promise<ReceiveActivation>
+    readonly errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps
 }
 
 function idleView(
@@ -449,8 +517,12 @@ function idleView(
     cancelWon: boolean,
     errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps,
     onOpenMultiple: () => void,
+    receive: ReceiveHandlers,
 ): ReactElement {
     const commandError = selectCommandError(state)
+    // A failure that came from Receive keeps its own wording and its own
+    // actions; every other failure is a send failure, exactly as before.
+    const cardProps = selectCommandContext(state) === 'receive' ? receive.errorCardProps : errorCardProps
     return (
         <IdleView
             state={state}
@@ -459,10 +531,11 @@ function idleView(
             onSelectFile={() => void transfer.selectFile()}
             onSelectDirectory={() => void transfer.selectDirectory()}
             onOpenMultiple={onOpenMultiple}
+            onReceive={receive.onReceive}
             commandErrorPanelProps={
                 commandError === null
                     ? EMPTY_OUTCOME_CARD_PROPS
-                    : errorCardProps(commandError, transfer.dismissRetained)
+                    : cardProps(commandError, transfer.dismissRetained)
             }
         />
     )

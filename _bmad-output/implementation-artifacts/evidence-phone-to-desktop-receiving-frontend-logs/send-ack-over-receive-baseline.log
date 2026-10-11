@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-send-ack-over-receive-zif36d3f/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 39 skipped (40)
+   Start at  05:00:55
+   Duration  411ms (transform 48ms, setup 0ms, import 58ms, tests 2ms, environment 277ms)
+

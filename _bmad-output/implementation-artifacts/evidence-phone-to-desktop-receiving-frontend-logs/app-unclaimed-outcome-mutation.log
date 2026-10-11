@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-app-unclaimed-outcome-st3odfqd/frontend
+
+ ❯ src/App.receive.test.tsx (39 tests | 1 failed | 38 skipped) 86ms
+     × replaces a waiting QR with an incomplete outcome when the session ends before any phone claimed it 85ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/App.receive.test.tsx > receive transitions: one owner each > replaces a waiting QR with an incomplete outcome when the session ends before any phone claimed it
+AssertionError: expected null to be 'receive-outcome' // Object.is equality
+
+- Expected:
+"receive-outcome"
+
++ Received:
+null
+
+ ❯ src/App.receive.test.tsx:309:31
+    307|         expect(screen.queryByRole('button', {name: 'Show in Folder'}))…
+    308|         expect(screen.getByRole('button', {name: 'Done'})).toBeTruthy()
+    309|         expect(focusTarget()).toBe('receive-outcome')
+       |                               ^
+    310|         expect(announcer()).toBe('')
+    311|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 skipped (39)
+   Start at  05:01:10
+   Duration  673ms (transform 155ms, setup 0ms, import 231ms, tests 86ms, environment 276ms)
+

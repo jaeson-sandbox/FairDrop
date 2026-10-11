@@ -1,0 +1,44 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-double-activation-ormk425d/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 2 failed | 45 skipped) 5043ms
+     × refuses a second activation while the chooser is open 5018ms
+     × refuses Receive while a send chooser is open, and a send chooser while Receive is 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > single flight > refuses a second activation while the chooser is open
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/transfer/useTransfer.receive.test.tsx:196:5
+    194|
+    195| describe('single flight', () => {
+    196|     it('refuses a second activation while the chooser is open', async …
+       |     ^
+    197|         const chooser = deferred<string>()
+    198|         mocks.selectReceiveFolder.mockReturnValue(chooser.promise)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > single flight > refuses Receive while a send chooser is open, and a send chooser while Receive is
+AssertionError: expected 'dismissed' to be 'ignored' // Object.is equality
+
+Expected: "ignored"
+Received: "dismissed"
+
+ ❯ src/transfer/useTransfer.receive.test.tsx:257:24
+    255|         let result: unknown
+    256|         await act(async () => { result = await hook.result.current.rec…
+    257|         expect(result).toBe('ignored')
+       |                        ^
+    258|         expect(mocks.selectReceiveFolder).not.toHaveBeenCalled()
+    259|         await act(async () => { sendChooser.resolve(''); await sending…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed | 45 skipped (49)
+   Start at  04:59:52
+   Duration  5.53s (transform 73ms, setup 0ms, import 125ms, tests 5.04s, environment 277ms)
+

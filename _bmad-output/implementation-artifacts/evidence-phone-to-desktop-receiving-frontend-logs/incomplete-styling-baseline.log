@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-styling-u3se2lgv/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 29 skipped (33)
+   Start at  05:00:33
+   Duration  524ms (transform 55ms, setup 0ms, import 106ms, tests 67ms, environment 274ms)
+

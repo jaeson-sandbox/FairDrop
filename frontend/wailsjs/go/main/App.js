@@ -22,10 +22,22 @@ export function SelectFiles() {
   return window['go']['main']['App']['SelectFiles']();
 }
 
+export function SelectReceiveFolder() {
+  return window['go']['main']['App']['SelectReceiveFolder']();
+}
+
+export function ShowReceivedFolder() {
+  return window['go']['main']['App']['ShowReceivedFolder']();
+}
+
 export function StageTransfer(arg1) {
   return window['go']['main']['App']['StageTransfer'](arg1);
 }
 
 export function StageTransfers(arg1) {
   return window['go']['main']['App']['StageTransfers'](arg1);
+}
+
+export function StartReceive(arg1) {
+  return window['go']['main']['App']['StartReceive'](arg1);
 }

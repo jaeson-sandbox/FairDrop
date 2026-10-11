@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-status-extra-field-tog0af7q/frontend
+
+ ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 79 skipped) 4ms
+     × refuses an extra field naming a path 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/validation.receive.test.ts > parseReceiveStatus > refuses an extra field naming a path
+AssertionError: expected { filesSaved: 1, result: null, …(2) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "filesSaved": 1,
+  "markingWarning": false,
+  "result": null,
+  "subfolderExists": false,
+}
+
+ ❯ src/transfer/validation.receive.test.ts:137:49
+    135|         ['an array', [], 'progress'],
+    136|     ] as const)('refuses %s', (_name, value, kind) => {
+    137|         expect(parseReceiveStatus(value, kind)).toBeNull()
+       |                                                 ^
+    138|     })
+    139| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 79 skipped (80)
+   Start at  05:00:08
+   Duration  403ms (transform 35ms, setup 0ms, import 44ms, tests 4ms, environment 276ms)
+

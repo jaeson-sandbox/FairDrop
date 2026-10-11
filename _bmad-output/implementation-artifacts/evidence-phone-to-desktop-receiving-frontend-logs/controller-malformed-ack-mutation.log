@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-controller-malformed-ack-amx76wkk/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 11ms
+     × refuses a malformed acknowledgement, quiesces the backend once, and says nothing started 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > refusals > refuses a malformed acknowledgement, quiesces the backend once, and says nothing started
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ src/transfer/useTransfer.receive.test.tsx:382:38
+    380|         await act(async () => { await hook.result.current.receive() })
+    381|
+    382|         expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1)
+       |                                      ^
+    383|         expect(hook.result.current.state).toMatchObject({
+    384|             phase: 'idle', commandError: {code: 'setup_failed'}, comma…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 48 skipped (49)
+   Start at  05:00:12
+   Duration  493ms (transform 76ms, setup 0ms, import 128ms, tests 11ms, environment 277ms)
+

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-receiving-view-tnp0siax/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed | 9 skipped (14)
+   Start at  05:00:25
+   Duration  513ms (transform 80ms, setup 0ms, import 130ms, tests 32ms, environment 277ms)
+

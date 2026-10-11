@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-retry-action-hp39wuic/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed | 34 skipped (39)
+   Start at  05:00:59
+   Duration  638ms (transform 138ms, setup 0ms, import 201ms, tests 87ms, environment 274ms)
+

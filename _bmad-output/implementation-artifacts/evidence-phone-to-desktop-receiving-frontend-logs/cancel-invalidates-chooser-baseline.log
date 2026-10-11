@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancel-invalidates-chooser-w5obi4st/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 45 skipped (49)
+   Start at  04:59:59
+   Duration  482ms (transform 73ms, setup 0ms, import 124ms, tests 11ms, environment 272ms)
+

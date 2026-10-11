@@ -1,0 +1,59 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-monotonic-ro92tsim/frontend
+
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
+     × refuses progress that goes backwards, changes the declared total, or lowers the saved count 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > receiving > refuses progress that goes backwards, changes the declared total, or lowers the saved count
+AssertionError: expected { phase: 'receive-receiving', …(6) } to be { phase: 'receive-receiving', …(6) } // Object.is equality
+
+- Expected
++ Received
+
+  {
+    "cancelPending": false,
+    "commandError": null,
+-   "filesSaved": 2,
++   "filesSaved": 1,
+    "metadata": {
+      "destination": "Phone Photos",
+      "qrBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "sessionId": "0102030405060708090a0b0c0d0e0f10",
+      "url": "http://192.168.1.50:45678/upload/1112131415161718191a1b1c1d1e1f20",
+      "warnings": [],
+    },
+    "phase": "receive-receiving",
+    "progress": {
+-     "bytesSent": 200,
+-     "percent": 50,
++     "bytesSent": 250,
++     "percent": 62.5,
+      "speedBytesPerSec": 0,
+      "totalBytes": 400,
+      "totalKnown": true,
+    },
+    "session": {
+-     "lastSeq": 2,
++     "lastSeq": 3,
+      "sessionId": "0102030405060708090a0b0c0d0e0f10",
+    },
+  }
+
+ ❯ src/transfer/state.receive.test.ts:287:115
+    285|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
+    286|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
+    287|         expect(run(base, event('transfer-progress', {seq: 3, progress:…
+       |                                                                                                                   ^
+    288|     })
+    289|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 skipped (40)
+   Start at  05:00:28
+   Duration  415ms (transform 44ms, setup 0ms, import 55ms, tests 7ms, environment 276ms)
+

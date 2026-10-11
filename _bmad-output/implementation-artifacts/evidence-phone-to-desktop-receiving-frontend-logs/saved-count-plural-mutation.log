@@ -1,0 +1,101 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-plural-_rehwfe5/frontend
+
+ ❯ src/ui/copy.receive.test.ts (35 tests | 5 failed | 18 skipped) 7ms
+     × says 1 as "1 file saved" 3ms
+     × heads a complete outcome of 1 as "1 file saved" 0ms
+     × heads an incomplete outcome of 1 as "Upload incomplete — 1 file saved" 0ms
+     × heads a cancelled outcome of 1 as "Upload cancelled — 1 file saved" 0ms
+     × never says "1 files" for any wording 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/copy.receive.test.ts > the composed count copy > says 1 as "1 file saved"
+AssertionError: expected '1 files saved' to be '1 file saved' // Object.is equality
+
+Expected: "1 file saved"
+Received: "1 files saved"
+
+ ❯ src/ui/copy.receive.test.ts:68:48
+     66|         [1234, '1234 files saved'],
+     67|     ])('says %i as "%s"', (count, text) => {
+     68|         expect(copy.receive.filesSaved(count)).toBe(text)
+       |                                                ^
+     69|     })
+     70|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/ui/copy.receive.test.ts > the composed count copy > heads a complete outcome of 1 as "1 file saved"
+AssertionError: expected '1 files saved' to be '1 file saved' // Object.is equality
+
+Expected: "1 file saved"
+Received: "1 files saved"
+
+ ❯ src/ui/copy.receive.test.ts:76:53
+     74|         [3, '3 files saved'],
+     75|     ])('heads a complete outcome of %i as "%s"', (count, text) => {
+     76|         expect(copy.receive.completeHeading(count)).toBe(text)
+       |                                                     ^
+     77|     })
+     78|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/ui/copy.receive.test.ts > the composed count copy > heads an incomplete outcome of 1 as "Upload incomplete — 1 file saved"
+AssertionError: expected 'Upload incomplete — 1 files saved' to be 'Upload incomplete — 1 file saved' // Object.is equality
+
+Expected: "Upload incomplete — 1 file saved"
+Received: "Upload incomplete — 1 files saved"
+
+ ❯ src/ui/copy.receive.test.ts:84:55
+     82|         [2, 'Upload incomplete — 2 files saved'],
+     83|     ])('heads an incomplete outcome of %i as "%s"', (count, text) => {
+     84|         expect(copy.receive.incompleteHeading(count)).toBe(text)
+       |                                                       ^
+     85|     })
+     86|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/ui/copy.receive.test.ts > the composed count copy > heads a cancelled outcome of 1 as "Upload cancelled — 1 file saved"
+AssertionError: expected 'Upload cancelled — 1 files saved' to be 'Upload cancelled — 1 file saved' // Object.is equality
+
+Expected: "Upload cancelled — 1 file saved"
+Received: "Upload cancelled — 1 files saved"
+
+ ❯ src/ui/copy.receive.test.ts:92:54
+     90|         [2, 'Upload cancelled — 2 files saved'],
+     91|     ])('heads a cancelled outcome of %i as "%s"', (count, text) => {
+     92|         expect(copy.receive.cancelledHeading(count)).toBe(text)
+       |                                                      ^
+     93|     })
+     94|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/ui/copy.receive.test.ts > the composed count copy > never says "1 files" for any wording
+AssertionError: expected '1 files saved' not to match /\b1 files\b/
+
+- Expected:
+/\b1 files\b/
+
++ Received:
+"1 files saved"
+
+ ❯ src/ui/copy.receive.test.ts:100:30
+     98|             copy.receive.incompleteHeading(1), copy.receive.cancelledH…
+     99|         ]) {
+    100|             expect(text).not.toMatch(/\b1 files\b/)
+       |                              ^
+    101|         }
+    102|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 12 passed | 18 skipped (35)
+   Start at  05:00:23
+   Duration  408ms (transform 32ms, setup 0ms, import 41ms, tests 7ms, environment 277ms)
+

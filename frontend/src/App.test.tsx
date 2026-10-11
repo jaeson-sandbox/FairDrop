@@ -34,6 +34,8 @@ const mocks = vi.hoisted(() => ({
     // lease-release/chooser_failed/cancelled-chooser proof of what this
     // command actually does; here it is only wiring.
     selectFromOutcome: vi.fn(),
+    receive: vi.fn(),
+    showReceivedFolder: vi.fn(),
 }))
 
 vi.mock('../wailsjs/runtime/runtime', () => ({
@@ -84,11 +86,15 @@ beforeEach(() => {
     mocks.retry.mockResolvedValue(undefined)
     mocks.sendAgain.mockResolvedValue(undefined)
     mocks.selectFromOutcome.mockResolvedValue(undefined)
+    mocks.receive.mockResolvedValue('proceeded')
+    mocks.showReceivedFolder.mockResolvedValue(undefined)
     mocks.useTransfer.mockReturnValue({
         state: {phase: 'idle', retainedOutcome: null, commandError: null},
         stage: mocks.stage,
         selectFile: mocks.selectFile,
         selectDirectory: mocks.selectDirectory,
+        receive: mocks.receive,
+        showReceivedFolder: mocks.showReceivedFolder,
         cancel: mocks.cancel,
         rejectSelection: mocks.rejectSelection,
         dismissRetained: mocks.dismissRetained,
@@ -254,6 +260,8 @@ const commands: ControllerCommands = {
     stage: mocks.stage,
     selectFile: mocks.selectFile,
     selectDirectory: mocks.selectDirectory,
+    receive: mocks.receive,
+    showReceivedFolder: mocks.showReceivedFolder,
     cancel: mocks.cancel,
     rejectSelection: mocks.rejectSelection,
     reportCopyFailure: mocks.reportCopyFailure,

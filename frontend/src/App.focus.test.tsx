@@ -66,6 +66,8 @@ const commands: ControllerCommands = {
     stage: mocks.noop,
     selectFile: mocks.noop,
     selectDirectory: mocks.noop,
+    receive: mocks.noop,
+    showReceivedFolder: mocks.noop,
     cancel: mocks.noop,
     rejectSelection: mocks.noop,
     reportCopyFailure: mocks.noop,

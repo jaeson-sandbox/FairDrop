@@ -36,6 +36,10 @@ type resource int
 const (
 	resourceServer resource = iota
 	resourceBeacon
+	// resourceDestination is a receive session's opened destination. It is
+	// acquired before the server, so reverse release closes it last: by then
+	// the server has stopped and nothing is still writing into it.
+	resourceDestination
 )
 
 // session is everything one staged transfer owns.
@@ -70,7 +74,10 @@ type session struct {
 	stagedAt  time.Time
 	startedAt time.Time
 
-	item     StagedItem
+	item StagedItem
+	// receive is non-nil exactly for a receive session. Its fields beyond dest
+	// are guarded by Coordinator.mu.
+	receive  *receiveSession
 	url      string
 	qrBase64 string
 	warnings []Warning

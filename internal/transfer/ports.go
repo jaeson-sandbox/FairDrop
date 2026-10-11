@@ -108,10 +108,16 @@ type NetworkPort interface {
 // ServerStartRequest is the immutable description of the one transfer an
 // ephemeral server exists to serve. Token authorizes exactly one download;
 // SessionID only correlates events and is never put on the wire.
+//
+// Destination is non-nil exactly for a receive session. A receive request has no
+// Item -- there is nothing staged to send -- and the server serves the upload
+// route instead of the download route. The server only calls the destination;
+// the coordinator opened it and is the one that closes it.
 type ServerStartRequest struct {
-	SessionID SessionID
-	Token     CapabilityToken
-	Item      StagedItem
+	SessionID   SessionID
+	Token       CapabilityToken
+	Item        StagedItem
+	Destination ReceiveDestination
 }
 
 // ClaimAuthorizer is the coordinator handshake a reserved claim must clear
@@ -124,13 +130,17 @@ type ClaimAuthorizer interface {
 	AuthorizeClaim(ctx context.Context, sessionID SessionID) error
 }
 
-// ServerEventKind names the three things an ephemeral server reports.
+// ServerEventKind names the four things an ephemeral server reports.
 type ServerEventKind string
 
 const (
 	ServerProgress ServerEventKind = "progress"
 	ServerComplete ServerEventKind = "complete"
 	ServerFailed   ServerEventKind = "failed"
+	// ServerNotice reports something that happened to a waiting receive session
+	// without claiming it (an upload refused for space). It is droppable like
+	// progress: it never decides an outcome.
+	ServerNotice ServerEventKind = "notice"
 )
 
 // ServerEvent is one observation from the serving lane.
@@ -140,11 +150,18 @@ const (
 // otherwise, so a failure before any byte cannot be mistaken for one that
 // stalled at zero. Err is set only on ServerFailed and preserves the coded
 // cause unchanged for the coordinator to classify.
+//
+// Receive is set only by a receive server, on progress events, and carries just
+// FilesSaved: the terminal receive outcome is read from the destination by the
+// coordinator once the server has stopped, never reported by the server, so the
+// two cannot disagree. Notice is set only on ServerNotice.
 type ServerEvent struct {
 	SessionID SessionID
 	Kind      ServerEventKind
 	Progress  *ProgressSnapshot
 	Err       error
+	Receive   *ReceiveStatus
+	Notice    NoticeCode
 }
 
 // ServerHandle is what a started server hands back: the port the receiver must
@@ -192,7 +209,7 @@ type ServerPort interface {
 	Stop() error
 }
 
-// EventKind names the five lifecycle events the coordinator publishes.
+// EventKind names the six lifecycle events the coordinator publishes.
 type EventKind string
 
 const (
@@ -201,6 +218,10 @@ const (
 	TransferComplete EventKind = "transfer-complete"
 	TransferError    EventKind = "transfer-error"
 	TransferReset    EventKind = "transfer-reset"
+	// TransferNotice is published only for a receive session that is still
+	// waiting. It carries a Notice and changes no state; a UI that does not
+	// know it can ignore it.
+	TransferNotice EventKind = "transfer-notice"
 )
 
 // Event is one lifecycle observation for one session.
@@ -210,12 +231,19 @@ const (
 // never assigned a sequence number, so a gap cannot occur. Kind is excluded
 // from JSON because the Wails adapter carries it as the event name rather than
 // as part of the payload.
+//
+// Receive and Notice are populated only for a receive session. On a receive
+// session BytesSent in Progress counts bytes read from the phone's request and
+// TotalBytes is its declared Content-Length; Receive.FilesSaved says how many
+// files have been renamed into place.
 type Event struct {
 	SessionID SessionID         `json:"sessionId"`
 	Seq       uint64            `json:"seq"`
 	Kind      EventKind         `json:"-"`
 	Progress  *ProgressSnapshot `json:"progress,omitempty"`
 	Error     *PublicError      `json:"error,omitempty"`
+	Receive   *ReceiveStatus    `json:"receive,omitempty"`
+	Notice    NoticeCode        `json:"notice,omitempty"`
 }
 
 // Observer receives lifecycle events on the coordinator's single emission

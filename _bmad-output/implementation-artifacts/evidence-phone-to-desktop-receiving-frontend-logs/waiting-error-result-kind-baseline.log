@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-result-kind-tao0kpr1/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 39 skipped (40)
+   Start at  05:01:07
+   Duration  415ms (transform 46ms, setup 0ms, import 55ms, tests 2ms, environment 282ms)
+

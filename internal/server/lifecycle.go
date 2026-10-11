@@ -57,6 +57,15 @@ const (
 	// WriteTimeout is added, and was used to disprove the read-deadline theory.
 	readTimeout = 20 * time.Second
 
+	// uploadIdleTimeout is the progress-based bound a claimed receive upload
+	// runs under instead of readTimeout: the connection may take as long as it
+	// likes to deliver the body, but not go this long without delivering a
+	// byte. It is armed per read with http.ResponseController, which replaces
+	// the whole-request deadline net/http set when the request began, so a large
+	// phone upload over slow Wi-Fi is not cut off at twenty seconds while a
+	// stalled one still is. Download requests never reach it.
+	uploadIdleTimeout = 30 * time.Second
+
 	// idleTimeout reaps a connection that claims nothing. Keep-alives are
 	// disabled, so this covers the window between accept and request only.
 	idleTimeout = 30 * time.Second
@@ -127,6 +136,9 @@ type serverTimeouts struct {
 	read       time.Duration
 	idle       time.Duration
 	teardown   time.Duration
+	// uploadIdle is the receive upload's inactivity bound. Zero means the
+	// default, so every existing partial literal keeps its meaning.
+	uploadIdle time.Duration
 }
 
 func defaultTimeouts() serverTimeouts {
@@ -135,6 +147,7 @@ func defaultTimeouts() serverTimeouts {
 		read:       readTimeout,
 		idle:       idleTimeout,
 		teardown:   TeardownBound,
+		uploadIdle: uploadIdleTimeout,
 	}
 }
 
@@ -203,12 +216,15 @@ func (w panicOnlyErrorLog) Write(p []byte) (int, error) {
 // released by a single teardown. A fresh Start builds a fresh run, so no state
 // from a finished transfer can leak into the next one.
 type run struct {
-	sessionID  transfer.SessionID
-	token      transfer.CapabilityToken
-	item       transfer.StagedItem
-	payloads   PayloadPort
-	authorizer transfer.ClaimAuthorizer
-	now        clock
+	sessionID transfer.SessionID
+	token     transfer.CapabilityToken
+	item      transfer.StagedItem
+	payloads  PayloadPort
+	// destination is non-nil exactly for a receive run, which serves the upload
+	// route and never the download route.
+	destination transfer.ReceiveDestination
+	authorizer  transfer.ClaimAuthorizer
+	now         clock
 	// timeouts carries the teardown bound from the Server that started this
 	// run, captured once at Start so a later change to s.timeouts (a test
 	// reusing one *Server across cases) cannot reach back into a run already
@@ -270,13 +286,17 @@ func (s *Server) Start(
 	if request.Token == "" {
 		return transfer.ServerHandle{}, startError("transfer server start requires a capability token", nil)
 	}
-	if request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > 16) {
+	receiving := request.Destination != nil
+	if receiving && request.Item.Path != "" {
+		return transfer.ServerHandle{}, startError("a receive session has no staged item", nil)
+	}
+	if !receiving && request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > 16) {
 		return transfer.ServerHandle{}, startError("transfer server start requires a staged item", nil)
 	}
 	if authorizer == nil {
 		return transfer.ServerHandle{}, startError("transfer server start requires a claim authorizer", nil)
 	}
-	if s.payloads == nil {
+	if !receiving && s.payloads == nil {
 		return transfer.ServerHandle{}, startError("transfer server start requires a payload port", nil)
 	}
 
@@ -316,6 +336,7 @@ func (s *Server) Start(
 		token:        request.Token,
 		item:         cloneServerItem(request.Item),
 		payloads:     s.payloads,
+		destination:  request.Destination,
 		authorizer:   authorizer,
 		now:          s.clock(),
 		timeouts:     s.timeouts,
@@ -335,7 +356,14 @@ func (s *Server) Start(
 	// header, and route HEAD into this handler -- both of which tell an
 	// unauthorized caller that the resource exists. Handing every method to
 	// the handler is what lets a wrong method look exactly like a wrong path.
-	active.mux.HandleFunc(downloadPattern, active.download)
+	//
+	// A receive run registers the upload route instead and never the download
+	// one, so the route a URL carries is the kind of session it belongs to.
+	if receiving {
+		active.mux.HandleFunc(uploadPattern, active.upload)
+	} else {
+		active.mux.HandleFunc(downloadPattern, active.download)
+	}
 
 	active.http = &http.Server{
 		Handler:           http.HandlerFunc(active.route),
@@ -665,7 +693,11 @@ func (r *run) trackConnection(conn net.Conn, state http.ConnState) {
 	if state == http.StateClosed && !stopping && r.ctx.Err() == nil {
 		if tracked, ok := conn.(*finalizingConn); ok && tracked.terminal != nil {
 			event := *tracked.terminal
-			if tracked.writeErr != nil && event.Kind == transfer.ServerComplete {
+			// A receive upload is complete when its files are saved, not when the
+			// phone has read the result page, so a failed page write does not
+			// demote it: the desktop would otherwise report an upload whose
+			// files are all on disk as failed.
+			if tracked.writeErr != nil && event.Kind == transfer.ServerComplete && r.destination == nil {
 				event = failedEvent(r.sessionID, *event.Progress, transfer.WrapError(
 					transfer.ErrTransferFailed, "the HTTP response could not be finalized", tracked.writeErr))
 			}

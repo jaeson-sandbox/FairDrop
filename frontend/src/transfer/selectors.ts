@@ -8,7 +8,7 @@ import type {
     TransferErrorCode,
     Warning,
 } from './types'
-import type {TransferState} from './state'
+import type {ReceiveOutcomeTransferState, TransferState} from './state'
 
 export type ProgressSelection =
     | {
@@ -91,6 +91,23 @@ export function selectProgressSnapshot(progress: ProgressSnapshot): ProgressSele
     }
 }
 
+/**
+ * The bytes-received figure for a receive session, derived exactly the way a
+ * send's is: from the two authoritative integers, never from the wire's
+ * `percent`. `null` until the first accepted snapshot, and outside
+ * `receive-receiving`.
+ */
+export function selectReceiveProgress(state: TransferState): ProgressSelection | null {
+    return state.phase === 'receive-receiving' && state.progress !== null
+        ? selectProgressSnapshot(state.progress)
+        : null
+}
+
+/** The held receive outcome the outcome view renders, or `null` outside it. */
+export function selectReceiveOutcome(state: TransferState): ReceiveOutcomeTransferState | null {
+    return state.phase === 'receive-outcome' ? state : null
+}
+
 export function selectMetadata(state: TransferState): FileMetadata | null {
     return state.phase === 'staged' || state.phase === 'transferring' ? state.metadata : null
 }
@@ -130,8 +147,18 @@ export function selectPendingItemKind(state: TransferState): PendingItemKind | n
  * so it lives here rather than anywhere near the error selectors.
  */
 export function selectWarnings(state: TransferState): readonly Warning[] {
+    if (state.phase === 'receive-waiting') return state.metadata.warnings
     const metadata = selectMetadata(state)
     return metadata === null ? emptyWarnings : metadata.warnings
+}
+
+/**
+ * Whether the visible command failure belongs to a receive attempt. Only an
+ * Idle failure carries the context; a failure beside a live receive session
+ * (a clipboard write, a Show in Folder) is described by the session's own view.
+ */
+export function selectCommandContext(state: TransferState): 'receive' | null {
+    return state.phase === 'idle' && state.commandContext === 'receive' ? 'receive' : null
 }
 
 /**
@@ -142,7 +169,9 @@ export function selectWarnings(state: TransferState): readonly Warning[] {
  * as an Error" holds even if a later reducer change forgets it.
  */
 export function selectCommandError(state: TransferState): PublicError | null {
-    if (state.phase !== 'idle' && state.phase !== 'staged' && state.phase !== 'transferring') return null
+    if (state.phase !== 'idle' && state.phase !== 'staged' && state.phase !== 'transferring' &&
+        state.phase !== 'receive-waiting' && state.phase !== 'receive-receiving' &&
+        state.phase !== 'receive-outcome') return null
     const error = state.commandError
     if (error === null || error.code === 'cancelled') return null
     return error
@@ -232,4 +261,28 @@ export function selectErrorAction(code: TransferErrorCode): ErrorAction | null {
 export function selectEffectiveErrorAction(code: TransferErrorCode, canRetry: boolean): ErrorAction | null {
     const action = selectErrorAction(code)
     return action === 'retry' && !canRetry ? 'choose' : action
+}
+
+/**
+ * What a receive-start failure card offers, derived from the same owner-approved
+ * table a send failure uses so the two cannot disagree about which codes are
+ * recoverable. `again` re-opens the folder chooser (the receive twin of
+ * retry -- there is no remembered path, by design: a receive never stores a
+ * folder), `choose` is the same action worded for a folder that cannot be
+ * used, and `dismiss` leaves only Dismiss.
+ */
+export type ReceiveErrorAction = 'again' | 'choose' | 'dismiss'
+
+export function selectReceiveErrorAction(code: TransferErrorCode): ReceiveErrorAction | null {
+    const action = selectErrorAction(code)
+    switch (action) {
+        case 'retry':
+            return 'again'
+        case 'choose':
+            return 'choose'
+        case 'dismiss':
+            return 'dismiss'
+        case null:
+            return null
+    }
 }

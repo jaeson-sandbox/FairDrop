@@ -4,7 +4,11 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -37,6 +41,7 @@ var emittableKinds = map[transfer.EventKind]bool{
 	transfer.TransferComplete: true,
 	transfer.TransferError:    true,
 	transfer.TransferReset:    true,
+	transfer.TransferNotice:   true,
 }
 
 // dialogFunc is the shape both native open dialogs share.
@@ -110,6 +115,10 @@ type App struct {
 	setClipboard      clipboardFunc
 	unminimise        windowActionFunc
 	show              windowActionFunc
+	// openFolder hands a folder to the OS file manager. It is a seam because a
+	// test must not open a Finder or Explorer window, and because the argument
+	// vector it builds is exactly what the Show in Folder tests assert.
+	openFolder func(dir string) error
 
 	// logf is the diagnostic seam. A transfer otherwise leaves no record at
 	// all -- FairDrop persists nothing, by contract -- so this is the one place
@@ -169,6 +178,7 @@ func NewApp() *App {
 		setClipboard:      wailsruntime.ClipboardSetText,
 		unminimise:        wailsruntime.WindowUnminimise,
 		show:              wailsruntime.WindowShow,
+		openFolder:        openFolderNatively,
 		homeDir:           os.UserHomeDir,
 		logf:              log.Printf,
 	}
@@ -274,6 +284,118 @@ func (a *App) SelectFiles() ([]string, error) {
 	return append([]string{}, paths...), nil
 }
 
+// SelectReceiveFolder opens the native folder chooser at the Downloads folder
+// and returns the chosen path. It starts nothing: dismissing the chooser is an
+// empty selection and changes nothing, and the folder is held by the caller only
+// until StartReceive, never persisted.
+func (a *App) SelectReceiveFolder() (string, error) {
+	return a.chooseIn(a.openDirectory, wailsruntime.OpenDialogOptions{
+		Title:                "Choose where to save received files",
+		DefaultDirectory:     a.downloadsDirectory(),
+		CanCreateDirectories: true,
+	})
+}
+
+// StartReceive opens a receive session into the chosen folder and returns the
+// acknowledgement the waiting view needs. The metadata names the folder by its
+// basename only. Progress, the outcome and a refused upload arrive as
+// lifecycle events, and CancelTransfer ends the session.
+func (a *App) StartReceive(folder string) (*transfer.ReceiveMetadata, error) {
+	ctx, coordinator := a.delegate()
+	if ctx == nil || coordinator == nil {
+		return nil, errNotComposed()
+	}
+	receiver, ok := coordinator.(interface {
+		StartReceive(context.Context, string) (transfer.ReceiveMetadata, error)
+	})
+	if !ok {
+		return nil, transfer.NewError(transfer.ErrNotReady, "receiving is unavailable")
+	}
+	metadata, err := receiver.StartReceive(ctx, folder)
+	if err != nil {
+		return nil, err
+	}
+	return &metadata, nil
+}
+
+// ShowReceivedFolder opens the session's subfolder in the OS file manager. The
+// coordinator refuses when the session has no subfolder. The path goes to the OS
+// as one argument of an argument vector and never through a shell, so a folder
+// name cannot become a command.
+func (a *App) ShowReceivedFolder() error {
+	_, coordinator := a.delegate()
+	if coordinator == nil {
+		return errNotComposed()
+	}
+	shower, ok := coordinator.(interface{ ReceivedFolder() (string, error) })
+	if !ok {
+		return transfer.NewError(transfer.ErrNotReady, "showing a folder is unavailable")
+	}
+	folder, err := shower.ReceivedFolder()
+	if err != nil {
+		return err
+	}
+	open := a.openFolder
+	if open == nil {
+		open = openFolderNatively
+	}
+	if err := open(folder); err != nil {
+		// The OS's own diagnostic names the path, so it stays behind Unwrap.
+		return transfer.WrapError(transfer.ErrPathNotFound, "the received folder could not be opened", err)
+	}
+	return nil
+}
+
+// fileManagerCommand is the argument vector that opens dir in the platform's
+// file manager: a program name and its arguments, never a command line. dir is
+// placed as one element of the vector, so spaces, quotes, semicolons and
+// ampersands in a folder name are inert. It is a pure function of the platform
+// name so the same table is exercised on every host.
+func fileManagerCommand(goos, dir string) (string, []string, error) {
+	if dir == "" || strings.IndexByte(dir, 0) >= 0 || !filepath.IsAbs(dir) {
+		return "", nil, transfer.NewError(transfer.ErrPathNotFound, "the received folder is not a usable path")
+	}
+	switch goos {
+	case "darwin":
+		return "open", []string{dir}, nil
+	case "windows":
+		return "explorer.exe", []string{dir}, nil
+	default:
+		return "xdg-open", []string{dir}, nil
+	}
+}
+
+// openFolderNatively starts the platform file manager on dir without waiting for
+// it. It is not waited on for a real reason: explorer.exe exits with status 1
+// even when it opened the folder, so an exit code says nothing here, and a
+// launch that failed to start is the only failure worth reporting.
+func openFolderNatively(dir string) error {
+	name, args, err := fileManagerCommand(runtime.GOOS, dir)
+	if err != nil {
+		return err
+	}
+	command := exec.Command(name, args...)
+	if err := command.Start(); err != nil {
+		return err
+	}
+	go func() { _ = command.Wait() }()
+	return nil
+}
+
+// downloadsDirectory is where the receive chooser opens: the user's Downloads
+// folder when it exists, otherwise home, otherwise "" (wherever the OS left it).
+func (a *App) downloadsDirectory() string {
+	home := a.startingDirectory()
+	if home == "" {
+		return ""
+	}
+	downloads := filepath.Join(home, "Downloads")
+	if info, err := os.Stat(downloads); err == nil && info.IsDir() {
+		return downloads
+	}
+	return home
+}
+
 // maxClipboardText bounds what the window may put on the user's clipboard.
 // The only legitimate payload is one capability URL, which is well under a
 // hundred characters; the bound keeps a defect in the view from handing the
@@ -321,6 +443,14 @@ func (a *App) CopyToClipboard(text string) error {
 
 // chooseWith runs one native open dialog.
 func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
+	return a.chooseIn(open, wailsruntime.OpenDialogOptions{Title: title, DefaultDirectory: a.startingDirectory()})
+}
+
+// chooseIn runs one native open dialog with the options the caller built. The
+// two chooser commands that open at home and the one that opens at Downloads
+// share every refusal below, so a chooser failure reads the same whichever
+// command it came from.
+func (a *App) chooseIn(open dialogFunc, dialogOptions wailsruntime.OpenDialogOptions) (string, error) {
 	ctx := a.runtimeContext()
 	if ctx == nil {
 		// The real dialog answers a context that did not come from a running
@@ -334,10 +464,7 @@ func (a *App) chooseWith(open dialogFunc, title string) (string, error) {
 		)
 	}
 
-	selection, err := open(ctx, wailsruntime.OpenDialogOptions{
-		Title:            title,
-		DefaultDirectory: a.startingDirectory(),
-	})
+	selection, err := open(ctx, dialogOptions)
 	if err != nil {
 		// A dialog's own diagnostic text names directories, so it stays behind
 		// Unwrap: what crosses the boundary is the code and the fixed copy.
@@ -475,6 +602,16 @@ func (a *App) logEvent(what string, event transfer.Event) {
 	}
 	if event.Error != nil {
 		detail += " code=" + string(event.Error.Code)
+	}
+	if event.Receive != nil {
+		// Counts and fixed words only: never a name, a path or the folder.
+		detail += " files=" + strconv.Itoa(event.Receive.FilesSaved)
+		if event.Receive.Result != "" {
+			detail += " result=" + string(event.Receive.Result)
+		}
+	}
+	if event.Notice != "" {
+		detail += " notice=" + string(event.Notice)
 	}
 	a.logf("fairdrop: %s %s seq=%d session=%s%s", what, event.Kind, event.Seq, event.SessionID, detail)
 }

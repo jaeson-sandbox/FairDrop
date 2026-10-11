@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-outcome-centred-xyt8u62m/frontend
+
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 36 skipped) 621ms
+     × centres the outcome card in the window rather than pinning it to the top 620ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the held outcome does not jump when it appears > centres the outcome card in the window rather than pinning it to the top
+AssertionError: the card sits 24px from the top and 447px from the bottom: expected 422.96875 to be less than 40
+ ❯ browser/receive.test.tsx:398:13
+    396|         const below = window.innerHeight - rect.bottom
+    397|         expect(Math.abs(above - below), `the card sits ${above.toFixed…
+    398|             .toBeLessThan(40)
+       |             ^
+    399|     })
+    400| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 36 skipped (37)
+   Start at  05:01:54
+   Duration  1.33s (transform 0ms, setup 0ms, import 178ms, tests 621ms, environment 0ms)
+

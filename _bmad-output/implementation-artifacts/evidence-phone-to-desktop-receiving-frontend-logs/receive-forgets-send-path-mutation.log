@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-forgets-send-path-zjvy0tbl/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 13ms
+     × forgets a remembered send path when a receive session starts 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > send flows stay out of a receive session > forgets a remembered send path when a receive session starts
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/transfer/useTransfer.receive.test.tsx:651:46
+    649|         await act(async () => { await hook.result.current.receive() })
+    650|         expect(hook.result.current.state.phase).toBe('receive-waiting')
+    651|         expect(hook.result.current.canRetry).toBe(false)
+       |                                              ^
+    652|
+    653|         await act(async () => { await hook.result.current.retry() })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 48 skipped (49)
+   Start at  05:00:51
+   Duration  488ms (transform 72ms, setup 0ms, import 124ms, tests 13ms, environment 274ms)
+

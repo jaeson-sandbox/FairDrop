@@ -143,3 +143,21 @@ func failedEvent(sessionID transfer.SessionID, snapshot transfer.ProgressSnapsho
 	}
 	return event
 }
+
+// receiveProgressEvent is a receive session's progress: the wire-accurate byte
+// count of the phone's request against its declared length, plus the number of
+// files renamed into place so far. The count is read from the destination, which
+// owns it; this event only carries it.
+func receiveProgressEvent(sessionID transfer.SessionID, snapshot transfer.ProgressSnapshot, filesSaved int) transfer.ServerEvent {
+	event := progressEvent(sessionID, snapshot)
+	event.Receive = &transfer.ReceiveStatus{FilesSaved: filesSaved}
+	return event
+}
+
+// noticeEvent reports something that happened to a waiting receive session. It
+// rides the same droppable path progress does: a notice never decides an
+// outcome, so losing one to a full lane costs a line of text on the desktop and
+// nothing else.
+func noticeEvent(sessionID transfer.SessionID, code transfer.NoticeCode) transfer.ServerEvent {
+	return transfer.ServerEvent{SessionID: sessionID, Kind: transfer.ServerNotice, Notice: code}
+}

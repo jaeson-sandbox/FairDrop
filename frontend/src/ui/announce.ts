@@ -19,7 +19,13 @@
  * the table stays the one enumeration of owners.
  */
 
-import type {IdleTransferState, TransferState} from '../transfer/state'
+import type {
+    IdleTransferState,
+    ReceiveOutcomeTransferState,
+    ReceiveReceivingTransferState,
+    ReceiveWaitingTransferState,
+    TransferState,
+} from '../transfer/state'
 import type {PublicError} from '../transfer/types'
 import {copy} from './copy'
 
@@ -38,6 +44,9 @@ export const focusTargets = [
     'staged-heading',
     'transferring-heading',
     'outcome',
+    'receive-waiting-heading',
+    'receive-receiving-heading',
+    'receive-outcome',
 ] as const
 
 export type FocusTarget = (typeof focusTargets)[number]
@@ -55,6 +64,11 @@ export type TransitionRow =
     | 'cancel-won'
     | 'terminal-outcome'
     | 'dismiss-retained'
+    | 'receive-ready'
+    | 'receive-notice'
+    | 'receive-started'
+    | 'receive-outcome'
+    | 'receive-leave'
 
 export interface FocusAnnouncement {
     readonly row: TransitionRow
@@ -111,6 +125,15 @@ export function routeTransition(previous: TransferState, next: TransferState): A
             return next.outcome.error.code === 'cancelled'
                 ? focusRow('cancel-won', 'idle-instruction')
                 : focusRow('terminal-outcome', 'outcome')
+
+        case 'receive-waiting':
+            return toReceiveWaiting(previous, next)
+
+        case 'receive-receiving':
+            return toReceiveReceiving(previous, next)
+
+        case 'receive-outcome':
+            return toReceiveOutcome(previous, next)
 
         case 'idle':
             return toIdle(previous, next)
@@ -173,10 +196,54 @@ function toTransferring(
     return null
 }
 
+/**
+ * A receive session opens: focus moves to its heading, once, exactly as Stage
+ * success does for a send. The rows after that mirror Staged's, plus the one
+ * receive adds -- a refused upload, which is a fact about a session that is
+ * still waiting and so is spoken rather than focused (the spine's rule for a
+ * non-terminal warning: keep focus where it is).
+ */
+function toReceiveWaiting(previous: TransferState, next: ReceiveWaitingTransferState): Announcement | null {
+    if (previous.phase !== 'receive-waiting') return focusRow('receive-ready', 'receive-waiting-heading')
+    if (isNewCommandError(previous.commandError, next.commandError)) return focusRow('command-failure', 'command-error')
+    if (!previous.cancelPending && next.cancelPending) return spokenRow('cancel-requested', copy.cancel.pending)
+
+    // While a cancellation is pending the user has said what they want and the
+    // announcer is already holding "Canceling"; a refusal that lands in that
+    // window changes the screen but is not spoken over it.
+    if (next.refusals > previous.refusals && !next.cancelPending) return spokenRow('receive-notice', copy.receive.tooLarge)
+    return null
+}
+
+function toReceiveReceiving(previous: TransferState, next: ReceiveReceivingTransferState): Announcement | null {
+    if (previous.phase !== 'receive-receiving') return focusRow('receive-started', 'receive-receiving-heading')
+    if (isNewCommandError(previous.commandError, next.commandError)) return focusRow('command-failure', 'command-error')
+    if (!previous.cancelPending && next.cancelPending) return spokenRow('cancel-requested', copy.cancel.pending)
+
+    // Progress repaints the figures and speaks on the same throttle a send
+    // does; owning it here would turn every snapshot into an announcement.
+    return null
+}
+
+function toReceiveOutcome(previous: TransferState, next: ReceiveOutcomeTransferState): Announcement | null {
+    // The outcome is the one thing a receive can end in, however it ended, so
+    // it has the one owner a send's terminal outcome has: focus lands on it.
+    if (previous.phase !== 'receive-outcome') return focusRow('receive-outcome', 'receive-outcome')
+    if (isNewCommandError(previous.commandError, next.commandError)) return focusRow('command-failure', 'command-error')
+    return null
+}
+
 function toIdle(previous: TransferState, next: IdleTransferState): Announcement | null {
     // Reset after a terminal outcome moves no focus and says nothing: the same
     // visible node stays mounted, and focus already inside it stays there.
     if (previous.phase === 'done' || previous.phase === 'error') return null
+
+    // A receive outcome is the exception, and the reason is the one the rule
+    // above gives: nothing stays mounted. Leaving it (Done) removes the whole
+    // outcome and retains nothing, so focus would fall to the document body;
+    // it moves to the Idle instruction instead, as Dismiss does, and that move
+    // is the transition's only owner.
+    if (previous.phase === 'receive-outcome') return focusRow('receive-leave', 'idle-instruction')
 
     const previousError = previous.phase === 'idle' ? previous.commandError : null
     if (isNewCommandError(previousError, next.commandError)) return focusRow('command-failure', 'command-error')

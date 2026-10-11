@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T04:59:25.844179-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T04:59:26.105163-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestPartsOutsideTheFilesFieldAreDiscardedNeverWritten"}
+{"Time":"2026-10-11T04:59:26.105275-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestPartsOutsideTheFilesFieldAreDiscardedNeverWritten","Output":"=== RUN   TestPartsOutsideTheFilesFieldAreDiscardedNeverWritten\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:26.116452-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestPartsOutsideTheFilesFieldAreDiscardedNeverWritten","Output":"--- PASS: TestPartsOutsideTheFilesFieldAreDiscardedNeverWritten (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:26.116473-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestPartsOutsideTheFilesFieldAreDiscardedNeverWritten","Elapsed":0.01}
+{"Time":"2026-10-11T04:59:26.116569-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:26.117902-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.273s\n"}
+{"Time":"2026-10-11T04:59:26.117942-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.274}

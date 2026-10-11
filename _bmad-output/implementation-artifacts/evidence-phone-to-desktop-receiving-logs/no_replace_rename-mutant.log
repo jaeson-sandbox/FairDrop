@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T04:59:36.042022-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T04:59:36.279835-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile"}
+{"Time":"2026-10-11T04:59:36.27993-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile","Output":"=== RUN   TestRenameNoReplaceNeverReplacesAnExistingFile\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:36.281628-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile","Output":"    fs_test.go:110: renameNoReplace onto an existing file = \u003cnil\u003e, want fs.ErrExist\n","OutputType":"error"}
+{"Time":"2026-10-11T04:59:36.282244-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile","Output":"--- FAIL: TestRenameNoReplaceNeverReplacesAnExistingFile (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:36.282257-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestRenameNoReplaceNeverReplacesAnExistingFile","Elapsed":0}
+{"Time":"2026-10-11T04:59:36.282276-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:36.283132-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.241s\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:36.283148-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.241}

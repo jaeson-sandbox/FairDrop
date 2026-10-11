@@ -170,7 +170,11 @@ export function TransferringView({state, onCancel}: TransferringViewProps) {
  * is absolute and the primary button already spends the product's one
  * gradient (`styles.test.ts` counts it).
  */
-function ProgressRing({progress}: {readonly progress: ProgressSelection | null}) {
+export function ProgressRing({progress, label = copy.label.sending}: {
+    readonly progress: ProgressSelection | null
+    /** The ring's accessible name: "Sending" here, "Receiving" for a receive session (which reuses this ring). */
+    readonly label?: string
+}) {
     if (progress === null) {
         return (
             <div className="fd-ring-panel">
@@ -219,7 +223,7 @@ function ProgressRing({progress}: {readonly progress: ProgressSelection | null})
             className="fd-ring-panel"
             data-progress-mode="known-positive"
             role="progressbar"
-            aria-label={copy.label.sending}
+            aria-label={label}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={percent}

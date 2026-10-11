@@ -1,0 +1,81 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-styling-u3se2lgv/frontend
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 4 failed | 29 skipped) 71ms
+     × heads it "Upload incomplete" with the exact count and no success wording 61ms
+     × says "1 file saved" for one 4ms
+     × explains that finished files were kept and the one in progress was removed 2ms
+     × says no files saved, and that nothing was added, when none finished 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > an incomplete receive is never shown as a success > heads it "Upload incomplete" with the exact count and no success wording
+AssertionError: expected '2 files saved' to be 'Upload incomplete — 2 files saved' // Object.is equality
+
+Expected: "Upload incomplete — 2 files saved"
+Received: "2 files saved"
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:73:39
+     71|         const {container} = renderOutcome(outcome('incomplete', {files…
+     72|
+     73|         expect(heading().textContent).toBe('Upload incomplete — 2 file…
+       |                                       ^
+     74|         expect(heading().textContent).not.toBe('2 files saved')
+     75|         const card = container.querySelector('.fd-outcome') as HTMLEle…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > an incomplete receive is never shown as a success > says "1 file saved" for one
+AssertionError: expected '1 file saved' to be 'Upload incomplete — 1 file saved' // Object.is equality
+
+Expected: "Upload incomplete — 1 file saved"
+Received: "1 file saved"
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:85:39
+     83|     it('says "1 file saved" for one', () => {
+     84|         renderOutcome(outcome('incomplete', {filesSaved: 1}))
+     85|         expect(heading().textContent).toBe('Upload incomplete — 1 file…
+       |                                       ^
+     86|     })
+     87|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > an incomplete receive is never shown as a success > explains that finished files were kept and the one in progress was removed
+AssertionError: expected 'Saved to this computer, in a new fold…' to be 'The upload stopped early. Files that …' // Object.is equality
+
+Expected: "The upload stopped early. Files that finished are saved to this computer, in a new folder inside Phone Photos. The file in progress was removed."
+Received: "Saved to this computer, in a new folder inside Phone Photos."
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:90:30
+     88|     it('explains that finished files were kept and the one in progress…
+     89|         renderOutcome(outcome('incomplete', {filesSaved: 2}))
+     90|         expect(text(body())).toBe(
+       |                              ^
+     91|             'The upload stopped early. Files that finished are saved t…
+     92|         )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > an incomplete receive is never shown as a success > says no files saved, and that nothing was added, when none finished
+AssertionError: expected 'No files saved' to be 'Upload incomplete — no files saved' // Object.is equality
+
+Expected: "Upload incomplete — no files saved"
+Received: "No files saved"
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:98:39
+     96|         renderOutcome(outcome('incomplete', {filesSaved: 0, subfolderE…
+     97|
+     98|         expect(heading().textContent).toBe('Upload incomplete — no fil…
+       |                                       ^
+     99|         expect(text(body())).toBe('The upload stopped before any file …
+    100|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 29 skipped (33)
+   Start at  05:00:34
+   Duration  538ms (transform 54ms, setup 0ms, import 104ms, tests 71ms, environment 277ms)
+

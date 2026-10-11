@@ -4,7 +4,7 @@ import type {OutcomePresentation} from '../transfer/selectors'
 import type {CompletionReceipt as CompletionReceiptData} from '../transfer/types'
 import type {FocusTarget} from './announce'
 import {BrowseControl} from './BrowseControl'
-import {copy, errorHeadings, errorMessages} from './copy'
+import {copy, errorHeadingFor, errorMessageFor} from './copy'
 import {formatBytes} from './format'
 
 /**
@@ -54,6 +54,15 @@ export interface OutcomeCardProps {
      * followed by a stage firing later" defect this guards against.
      */
     readonly busy?: boolean
+    /**
+     * True when this failure came from starting a receive session: the heading
+     * and message then read from the receive wording where it has some, and
+     * the card is never offered the send affordances. Absent for every send
+     * failure, which is how the existing cards stay exactly as they were.
+     */
+    readonly receive?: boolean
+    /** The retry button's label when it is not "Try Again" (a receive failure that needs another folder). */
+    readonly retryLabel?: string
 }
 
 interface OutcomePanelProps extends OutcomeCardProps {
@@ -114,6 +123,8 @@ export function OutcomePanel({
     onRetry,
     onSendAgain,
     busy = false,
+    receive = false,
+    retryLabel,
 }: OutcomePanelProps) {
     const done = outcome.kind === 'done'
     const Heading = level === 1 ? 'h1' : 'h2'
@@ -158,14 +169,14 @@ export function OutcomePanel({
         >
             <OutcomeIcon done={done}/>
             <Heading className="fd-state-heading fd-rise" id={headingId} style={rise(headingStep)}>
-                {done ? copy.done.heading : errorHeadings[outcome.error.code]}
+                {done ? copy.done.heading : errorHeadingFor(outcome.error.code, receive)}
             </Heading>
             {receiptStep === null ? null : done
                 ? <DoneReceipt receipt={outcome.receipt} rise={rise(receiptStep)}/>
                 : <ErrorReceipt name={itemName ?? ''} rise={rise(receiptStep)}/>}
             {messageStep === null || done ? null : (
                 <p className="fd-outcome__body fd-rise" style={rise(messageStep)}>
-                    {errorMessages[outcome.error.code]}
+                    {errorMessageFor(outcome.error.code, receive)}
                 </p>
             )}
             <div className="fd-outcome__actions fd-rise" style={rise(actionsStep)}>
@@ -203,7 +214,7 @@ export function OutcomePanel({
                         onClick={() => { if (!busy) onRetry() }}
                     >
                         <RefreshGlyph/>
-                        {copy.outcome.tryAgain}
+                        {retryLabel ?? copy.outcome.tryAgain}
                     </button>
                 ) : null}
                 {onDismiss === undefined ? null : (
@@ -229,7 +240,7 @@ function noop(): void {
 }
 
 /** Story 9.1's per-child stagger, typed so `--fd-stagger` needs no cast at each call site. */
-function rise(step: number): CSSProperties {
+export function rise(step: number): CSSProperties {
     return {'--fd-stagger': step} as CSSProperties
 }
 
@@ -261,7 +272,7 @@ function rise(step: number): CSSProperties {
  * ~520ms scale-in means the check is not legible until partway through that
  * motion regardless.
  */
-function OutcomeIcon({done}: {readonly done: boolean}) {
+export function OutcomeIcon({done}: {readonly done: boolean}) {
     const [drawn, setDrawn] = useState(false)
 
     useEffect(() => {

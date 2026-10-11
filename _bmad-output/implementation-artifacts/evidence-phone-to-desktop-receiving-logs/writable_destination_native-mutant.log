@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T04:59:30.969027-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-11T04:59:31.273787-04:00","Action":"run","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource"}
+{"Time":"2026-10-11T04:59:31.273929-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Output":"=== RUN   TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:31.289561-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Output":"    receive_native_test.go:310: StartReceive of an unwritable folder code=, want path_unsupported\n","OutputType":"error"}
+{"Time":"2026-10-11T04:59:31.290675-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Output":"--- FAIL: TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource (0.02s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:31.290684-04:00","Action":"fail","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Elapsed":0.02}
+{"Time":"2026-10-11T04:59:31.290711-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:31.291946-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\tfairdrop\t0.323s\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:59:31.29197-04:00","Action":"fail","Package":"fairdrop","Elapsed":0.323}

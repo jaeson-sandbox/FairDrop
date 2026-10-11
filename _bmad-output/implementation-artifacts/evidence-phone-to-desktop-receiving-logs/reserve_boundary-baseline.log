@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T04:58:08.986535-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T04:58:09.205489-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary"}
+{"Time":"2026-10-11T04:58:09.205655-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary","Output":"=== RUN   TestTheSpaceReserveBoundary\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:58:09.20575-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary","Output":"--- PASS: TestTheSpaceReserveBoundary (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:58:09.205771-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestTheSpaceReserveBoundary","Elapsed":0}
+{"Time":"2026-10-11T04:58:09.205784-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T04:58:09.206412-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.220s\n"}
+{"Time":"2026-10-11T04:58:09.206439-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.22}

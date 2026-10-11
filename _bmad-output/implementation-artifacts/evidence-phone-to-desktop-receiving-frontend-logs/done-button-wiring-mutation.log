@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-done-button-wiring-wyjzy4v1/frontend
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 1 failed | 30 skipped) 78ms
+     × Done calls onDone once and nothing else 63ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > leaving > Done calls onDone once and nothing else
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:207:22
+    205|         fireEvent.click(screen.getByRole('button', {name: 'Done'}))
+    206|
+    207|         expect(done).toHaveBeenCalledTimes(1)
+       |                      ^
+    208|         expect(show).not.toHaveBeenCalled()
+    209|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed | 30 skipped (33)
+   Start at  05:00:39
+   Duration  537ms (transform 54ms, setup 0ms, import 104ms, tests 78ms, environment 279ms)
+

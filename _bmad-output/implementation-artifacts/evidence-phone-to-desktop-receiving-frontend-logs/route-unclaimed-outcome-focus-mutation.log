@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-route-unclaimed-outcome-focus-j514db7y/frontend
+
+ ❯ src/ui/announce.receive.test.ts (20 tests | 1 failed | 19 skipped) 4ms
+     × focuses the outcome when a receive nobody claimed ends while still waiting 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/announce.receive.test.ts > the outcome and leaving it > focuses the outcome when a receive nobody claimed ends while still waiting
+AssertionError: expected null to deeply equal { row: 'receive-outcome', …(2) }
+
+- Expected:
+{
+  "owner": "focus",
+  "row": "receive-outcome",
+  "target": "receive-outcome",
+}
+
++ Received:
+null
+
+ ❯ src/ui/announce.receive.test.ts:142:56
+    140|         const unclaimed = outcome({outcome: {kind: 'incomplete', files…
+    141|         for (const before of [waiting(), waiting({cancelPending: true}…
+    142|             expect(routeTransition(before, unclaimed)).toEqual({row: '…
+       |                                                        ^
+    143|         }
+    144|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 19 skipped (20)
+   Start at  05:01:09
+   Duration  402ms (transform 36ms, setup 0ms, import 43ms, tests 4ms, environment 276ms)
+

@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancel-invalidates-chooser-w5obi4st/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 45 skipped) 15ms
+     × ignores a folder chosen after Cancel was activated 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > invalidated chooser completions > ignores a folder chosen after Cancel was activated
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "/Users/someone/late",
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/transfer/useTransfer.receive.test.tsx:295:40
+    293|         await act(async () => { chooser.resolve('/Users/someone/late')…
+    294|
+    295|         expect(mocks.startReceive).not.toHaveBeenCalled()
+       |                                        ^
+    296|         expect(hook.result.current.state.phase).toBe('idle')
+    297|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed | 45 skipped (49)
+   Start at  05:00:00
+   Duration  577ms (transform 74ms, setup 0ms, import 124ms, tests 15ms, environment 348ms)
+

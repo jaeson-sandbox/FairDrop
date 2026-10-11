@@ -1,0 +1,64 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-zero-izpht2ev/frontend
+
+ ❯ src/ui/copy.receive.test.ts (35 tests | 3 failed | 18 skipped) 6ms
+     × says 0 as "no files saved" 4ms
+     × heads an incomplete outcome of 0 as "Upload incomplete — no files saved" 0ms
+     × heads a cancelled outcome of 0 as "Upload cancelled — no files saved" 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/copy.receive.test.ts > the composed count copy > says 0 as "no files saved"
+AssertionError: expected '0 files saved' to be 'no files saved' // Object.is equality
+
+Expected: "no files saved"
+Received: "0 files saved"
+
+ ❯ src/ui/copy.receive.test.ts:68:48
+     66|         [1234, '1234 files saved'],
+     67|     ])('says %i as "%s"', (count, text) => {
+     68|         expect(copy.receive.filesSaved(count)).toBe(text)
+       |                                                ^
+     69|     })
+     70|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/ui/copy.receive.test.ts > the composed count copy > heads an incomplete outcome of 0 as "Upload incomplete — no files saved"
+AssertionError: expected 'Upload incomplete — 0 files saved' to be 'Upload incomplete — no files saved' // Object.is equality
+
+Expected: "Upload incomplete — no files saved"
+Received: "Upload incomplete — 0 files saved"
+
+ ❯ src/ui/copy.receive.test.ts:84:55
+     82|         [2, 'Upload incomplete — 2 files saved'],
+     83|     ])('heads an incomplete outcome of %i as "%s"', (count, text) => {
+     84|         expect(copy.receive.incompleteHeading(count)).toBe(text)
+       |                                                       ^
+     85|     })
+     86|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/ui/copy.receive.test.ts > the composed count copy > heads a cancelled outcome of 0 as "Upload cancelled — no files saved"
+AssertionError: expected 'Upload cancelled — 0 files saved' to be 'Upload cancelled — no files saved' // Object.is equality
+
+Expected: "Upload cancelled — no files saved"
+Received: "Upload cancelled — 0 files saved"
+
+ ❯ src/ui/copy.receive.test.ts:92:54
+     90|         [2, 'Upload cancelled — 2 files saved'],
+     91|     ])('heads a cancelled outcome of %i as "%s"', (count, text) => {
+     92|         expect(copy.receive.cancelledHeading(count)).toBe(text)
+       |                                                      ^
+     93|     })
+     94|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 14 passed | 18 skipped (35)
+   Start at  05:00:24
+   Duration  401ms (transform 31ms, setup 0ms, import 39ms, tests 6ms, environment 274ms)
+
