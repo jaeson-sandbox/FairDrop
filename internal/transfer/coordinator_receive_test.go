@@ -535,18 +535,16 @@ func TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome(t *testing.T
 	complete, cancelled := 0, 0
 	for round := 0; round < 40; round++ {
 		h := newReceiveHarness(t)
+		// The completion is published through the fake's synchronized producer,
+		// as a live handler publishes through the real lane: a raw send on the
+		// lane raced Cancel's close of it, which the race detector reports.
+		h.bufferLane(1)
 		metadata := h.receiveTransferring()
 		h.sink.destination(0).finalResult(ReceiveResult{FilesSaved: 1, SubfolderExists: true})
 
 		done := make(chan error, 1)
 		go func() { done <- h.coordinator.Cancel(context.Background()) }()
-		func() {
-			defer func() { _ = recover() }()
-			select {
-			case h.server.events <- completeEvent(metadata.SessionID, receiveProgressSnapshot(10, 10, 100)):
-			case <-time.After(200 * time.Millisecond):
-			}
-		}()
+		h.server.publish(completeEvent(metadata.SessionID, receiveProgressSnapshot(10, 10, 100)))
 		if err := <-done; err != nil {
 			t.Fatalf("Cancel = %v", err)
 		}
