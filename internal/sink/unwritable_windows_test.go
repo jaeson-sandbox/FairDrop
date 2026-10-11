@@ -25,5 +25,18 @@ func unwritableDir(t *testing.T, parent string) string {
 		t.Fatalf("icacls could not deny writes on the fixture folder: %v\n%s", err, output)
 	}
 	t.Cleanup(func() { _ = exec.Command("icacls", dir, "/remove:d", "*S-1-1-0").Run() })
+	// The fixture must prove itself before it is used: an environment whose
+	// token can still create here (an elevated runner, say) cannot produce an
+	// unwritable folder, and a refusal assertion against a writable folder
+	// would test the fixture, not the product. That is a named capability
+	// skip with the evidence logged, never a silent pass.
+	sentinel := filepath.Join(dir, "precondition")
+	if err := os.Mkdir(sentinel, 0o755); err == nil {
+		_ = os.Remove(sentinel)
+		acl, _ := exec.Command("icacls", dir).CombinedOutput()
+		privileges, _ := exec.Command("whoami", "/priv").CombinedOutput()
+		t.Logf("deny ACL in place:\n%s\ntoken privileges:\n%s", acl, privileges)
+		t.Skip("capability: this Windows token can create inside a write-denied folder, so no unwritable fixture exists here")
+	}
 	return dir
 }
