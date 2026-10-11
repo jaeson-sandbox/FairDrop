@@ -7,13 +7,13 @@ Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged cop
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: [v1.5.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.5.0).**
+**Current release: [v1.5.1](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.5.1).**
 A receiver can open a link to see the offered item, then press **Download** to claim the
 one-shot transfer. After a completed transfer, **Send Again**
 revalidates the same selection and offers it with a fresh link and QR code. FairDrop still sends
 to one receiver over plain HTTP on a trusted LAN and persists nothing.
 
-**Send multiple items** (new in 1.5.0): a native drop of
+**Send multiple items** (new in 1.5.0; up to 10,000 items since 1.5.1): a native drop of
 2-10,000 paths, or the **Send multiple items** list with **Add Files** and **Add Folder**,
 combines files and folders into one handoff. The receiver sees the item count and total logical
 size, then downloads one streamed `FairDrop.zip` whose members are numbered and zero-padded to
