@@ -137,31 +137,6 @@ func (s *selectionSource) acceptResolved(ctx context.Context, canonical string) 
 	return canonical, nil
 }
 
-// InspectWithRetained uses the already canonical path returned by Inspect and
-// keeps the decorator's one-resolution-at-a-time admission guarantee.
-func (s *selectionSource) InspectWithRetained(ctx context.Context, path string, otherPins int) (transfer.StagedItem, error) {
-	canonical, err := s.resolveCanonical(ctx, path)
-	if err != nil {
-		return transfer.StagedItem{}, err
-	}
-	budgeted, ok := s.SourcePort.(transfer.CollectionSourcePort)
-	if !ok {
-		return transfer.StagedItem{}, transfer.NewError(transfer.ErrSetupFailed, "collection source accounting is unavailable")
-	}
-	if _, err := s.acceptResolved(ctx, canonical); err != nil {
-		return transfer.StagedItem{}, err
-	}
-	return budgeted.InspectWithRetained(ctx, canonical, otherPins)
-}
-
-func (s *selectionSource) PrepareDirectoryWithRetained(ctx context.Context, path string, otherPins int) (transfer.PreparedDirectory, error) {
-	budgeted, ok := s.SourcePort.(transfer.CollectionSourcePort)
-	if !ok {
-		return nil, transfer.NewError(transfer.ErrSetupFailed, "collection source accounting is unavailable")
-	}
-	return budgeted.PrepareDirectoryWithRetained(ctx, path, otherPins)
-}
-
 // release clears the busy flag only if it is still held by gen. See the
 // resolving field comment: a worker abandoned by the bound still calls this
 // when it eventually finishes, and the keyed compare-and-swap is what keeps

@@ -1,0 +1,17 @@
+{"Time":"2026-10-11T13:52:13.408612-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T13:52:13.647365-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced"}
+{"Time":"2026-10-11T13:52:13.647456-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced","Output":"=== RUN   TestCollectionPreparedFileLengthIsEnforced\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:13.647498-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/truncate"}
+{"Time":"2026-10-11T13:52:13.647501-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/truncate","Output":"=== RUN   TestCollectionPreparedFileLengthIsEnforced/truncate\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:13.649558-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/truncate","Output":"    collection_test.go:392: short source yielded successful collection\n","OutputType":"error"}
+{"Time":"2026-10-11T13:52:13.650448-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/truncate","Output":"--- FAIL: TestCollectionPreparedFileLengthIsEnforced/truncate (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:13.650457-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/truncate","Elapsed":0}
+{"Time":"2026-10-11T13:52:13.650473-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/grow"}
+{"Time":"2026-10-11T13:52:13.650476-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/grow","Output":"=== RUN   TestCollectionPreparedFileLengthIsEnforced/grow\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:13.652255-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/grow","Output":"--- PASS: TestCollectionPreparedFileLengthIsEnforced/grow (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:13.65226-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced/grow","Elapsed":0}
+{"Time":"2026-10-11T13:52:13.652268-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced","Output":"--- FAIL: TestCollectionPreparedFileLengthIsEnforced (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:13.652278-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionPreparedFileLengthIsEnforced","Elapsed":0.01}
+{"Time":"2026-10-11T13:52:13.652285-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:13.652875-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.244s\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:13.652885-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.244}

@@ -3,6 +3,14 @@
 import type {TransferErrorCode} from './errors'
 export type {TransferErrorCode} from './errors'
 
+/**
+ * The most roots one collection may select. A sanity cap against a broken or
+ * accidental selection, not a resource budget: the backend prepares members
+ * one at a time, so the item count never consumes a handle budget. The backend
+ * (transfer.MaxCollectionItems) stays authoritative.
+ */
+export const MAX_COLLECTION_ITEMS = 10000
+
 export interface PublicError {
     readonly code: TransferErrorCode
     readonly message: string

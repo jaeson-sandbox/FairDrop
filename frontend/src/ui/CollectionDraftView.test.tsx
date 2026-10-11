@@ -23,12 +23,21 @@ describe('collection draft focus', () => {
         expect(screen.getByRole('button', {name: 'Remove 2. same.txt'})).toBeTruthy()
     })
 
+    it('shows the count out of 10,000, grouped for large lists', () => {
+        const {unmount} = render(<Harness initial={['one.txt', 'two.txt']}/> )
+        expect(screen.getByText('2 of 10,000 items')).toBeTruthy()
+        unmount()
+        render(<Harness initial={Array.from({length: 1234}, (_, i) => `file-${i}.txt`)}/> )
+        expect(screen.getByText('1,234 of 10,000 items')).toBeTruthy()
+        expect(screen.getByRole('button', {name: 'Remove 1234. file-1233.txt'})).toBeTruthy()
+    })
+
     it('describes a newly focused draft heading with its restored refusal', () => {
-        render(<CollectionDraftView names={['one.txt']} error={{code: 'invalid_selection', message: 'Choose 1 to 16 separate files or folders.'}}
+        render(<CollectionDraftView names={['one.txt']} error={{code: 'invalid_selection', message: 'Choose 1 to 10,000 separate files or folders.'}}
             dropTargetStyle={{}} onAddFiles={vi.fn()} onAddFolder={vi.fn()} onRemove={vi.fn()}
             onSend={vi.fn()} onCancel={vi.fn()}/> )
         const heading = screen.getByRole('heading', {name: 'Selected items'})
-        const error = screen.getByText('Choose 1 to 16 separate files or folders.')
+        const error = screen.getByText('Choose 1 to 10,000 separate files or folders.')
         expect(document.activeElement).toBe(heading)
         expect(heading.getAttribute('aria-describedby')).toBe(error.id)
     })

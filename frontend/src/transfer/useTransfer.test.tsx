@@ -100,13 +100,13 @@ beforeEach(() => {
 })
 
 describe('collection draft and immutable batch admission', () => {
-    it('starts empty without Stage and refuses an initial 17-path drop without truncation', async () => {
+    it('starts empty without Stage and refuses an initial 10,001-path drop without truncation', async () => {
         const hook = renderHook(() => useTransfer())
         await act(async () => { await hook.result.current.openDraft() })
         expect(hook.result.current.draft).toEqual({names: [], error: null})
         expect(mocks.stageTransfers).not.toHaveBeenCalled()
         act(() => hook.result.current.cancelDraft())
-        await act(async () => { await hook.result.current.openDraft(Array.from({length: 17}, (_, i) => `/p/${i}`)) })
+        await act(async () => { await hook.result.current.openDraft(Array.from({length: 10001}, (_, i) => `/p/${i}`)) })
         expect(hook.result.current.draft?.names).toEqual([])
         expect(hook.result.current.draft?.error?.code).toBe('invalid_selection')
         expect(mocks.stageTransfers).not.toHaveBeenCalled()
@@ -127,13 +127,39 @@ describe('collection draft and immutable batch admission', () => {
         expect(hook.result.current.state.phase).toBe('staged')
     })
 
-    it('rejects a seventeenth append without losing the sixteen editable rows', async () => {
+    it('rejects a 10,001st append without losing the 10,000 editable rows', async () => {
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(Array.from({length: 10000}, (_, i) => `/p/${i}`)) })
+        expect(hook.result.current.draft?.names).toHaveLength(10000)
+        act(() => hook.result.current.appendDraft(['/p/10000']))
+        expect(hook.result.current.draft?.names).toHaveLength(10000)
+        expect(hook.result.current.draft?.names[0]).toBe('0')
+        expect(hook.result.current.draft?.names[9999]).toBe('9999')
+        expect(hook.result.current.draft?.error?.code).toBe('invalid_selection')
+        expect(hook.result.current.draft?.error?.message).toBe('Choose 1 to 10,000 separate files or folders.')
+        expect(mocks.stageTransfers).not.toHaveBeenCalled()
+    })
+
+    it('accepts appends up to exactly 10,000 rows, including past the old sixteen', async () => {
         const hook = renderHook(() => useTransfer())
         await act(async () => { await hook.result.current.openDraft(Array.from({length: 16}, (_, i) => `/p/${i}`)) })
         act(() => hook.result.current.appendDraft(['/p/16']))
-        expect(hook.result.current.draft?.names).toHaveLength(16)
-        expect(hook.result.current.draft?.error?.code).toBe('invalid_selection')
-        expect(mocks.stageTransfers).not.toHaveBeenCalled()
+        expect(hook.result.current.draft?.names).toHaveLength(17)
+        expect(hook.result.current.draft?.error).toBeNull()
+        act(() => hook.result.current.appendDraft(Array.from({length: 9983}, (_, i) => `/q/${i}`)))
+        expect(hook.result.current.draft?.names).toHaveLength(10000)
+        expect(hook.result.current.draft?.error).toBeNull()
+    })
+
+    it('stages a draft of exactly 10,000 paths as one batch', async () => {
+        const paths = Array.from({length: 10000}, (_, i) => `/p/${i}`)
+        const hook = renderHook(() => useTransfer())
+        await act(async () => { await hook.result.current.openDraft(paths) })
+        mocks.stageTransfers.mockResolvedValue(metadata({name: '10000 items', isCollection: true, itemCount: 10000}))
+        await act(async () => { await hook.result.current.sendDraft() })
+        expect(mocks.stageTransfers).toHaveBeenCalledTimes(1)
+        expect(mocks.stageTransfers.mock.calls[0][0]).toHaveLength(10000)
+        expect(hook.result.current.state.phase).toBe('staged')
     })
 
     it('ignores a chooser completion after Cancel', async () => {
@@ -175,7 +201,7 @@ describe('collection draft and immutable batch admission', () => {
         await act(async () => { await hook.result.current.openDraft(['/p/a', '/p/a']) })
         await act(async () => { await hook.result.current.sendDraft() })
         expect(hook.result.current.draft?.names).toEqual(['a', 'a'])
-        expect(hook.result.current.draft?.error?.message).toBe('Choose 1 to 16 separate files or folders.')
+        expect(hook.result.current.draft?.error?.message).toBe('Choose 1 to 10,000 separate files or folders.')
         act(() => hook.result.current.removeDraftItem(1))
         mocks.stageTransfer.mockResolvedValue(metadata({name: 'a'}))
         await act(async () => { await hook.result.current.sendDraft() })

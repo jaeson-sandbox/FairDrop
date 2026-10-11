@@ -1,0 +1,13 @@
+
+> fairdrop-frontend@1.5.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ae28d761e338c44ec/frontend
+
+
+ Test Files  23 passed (23)
+      Tests  869 passed (869)
+   Start at  13:59:00
+   Duration  3.53s (transform 2.20s, setup 0ms, import 4.23s, tests 7.55s, environment 14.96s)
+

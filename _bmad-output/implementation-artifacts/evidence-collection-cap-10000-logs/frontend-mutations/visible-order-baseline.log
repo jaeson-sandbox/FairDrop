@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-visible-order-zq9pwjpq/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 4 skipped (5)
+   Start at  13:53:18
+   Duration  556ms (transform 38ms, setup 0ms, import 88ms, tests 86ms, environment 300ms)
+

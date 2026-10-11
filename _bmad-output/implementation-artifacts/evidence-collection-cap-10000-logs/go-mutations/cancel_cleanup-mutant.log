@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T13:52:18.96627-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T13:52:19.230486-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionCancelledJustAfterALaterMemberOpensClosesIt"}
+{"Time":"2026-10-11T13:52:19.230703-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCancelledJustAfterALaterMemberOpensClosesIt","Output":"=== RUN   TestCollectionCancelledJustAfterALaterMemberOpensClosesIt\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:19.233487-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCancelledJustAfterALaterMemberOpensClosesIt","Output":"    collection_lazy_test.go:893: cancelled just after a later member opened: held=1 acquired=2 closes=1; want 0, 2, 2\n","OutputType":"error"}
+{"Time":"2026-10-11T13:52:19.23417-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionCancelledJustAfterALaterMemberOpensClosesIt","Output":"--- FAIL: TestCollectionCancelledJustAfterALaterMemberOpensClosesIt (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:19.234179-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionCancelledJustAfterALaterMemberOpensClosesIt","Elapsed":0}
+{"Time":"2026-10-11T13:52:19.234192-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:19.235597-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.269s\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:19.235637-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.269}

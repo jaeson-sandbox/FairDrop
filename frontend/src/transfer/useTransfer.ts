@@ -5,7 +5,7 @@ import {parseCommandError, publicError} from './errors'
 import {selectErrorAction} from './selectors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
 import {parseFileMetadata} from './validation'
-import type {LifecycleEventName, PendingItemKind, PublicError} from './types'
+import {MAX_COLLECTION_ITEMS, type LifecycleEventName, type PendingItemKind, type PublicError} from './types'
 
 interface StageOperation {
     readonly generation: number
@@ -195,7 +195,7 @@ export function useTransfer(): TransferController {
     ): Promise<void> => {
         if (!mountedRef.current || stateRef.current.phase !== 'idle') return
         if (stageOperationRef.current !== null || browseOperationRef.current !== null) return
-        if (selectedPaths.length < 1 || selectedPaths.length > 16 ||
+        if (selectedPaths.length < 1 || selectedPaths.length > MAX_COLLECTION_ITEMS ||
             selectedPaths.some(path => typeof path !== 'string' || path.trim() === '')) {
             dispatch({type: 'invalid-selection'})
             return
@@ -538,7 +538,7 @@ export function useTransfer(): TransferController {
             }
             if (!mountedRef.current || selectionEpochRef.current !== epoch || stateRef.current.phase !== 'idle') return
             rememberedPathsRef.current = null
-            const invalid = proposed.length > 16 ||
+            const invalid = proposed.length > MAX_COLLECTION_ITEMS ||
                 proposed.some(path => typeof path !== 'string' || path.trim() === '')
             showDraft(invalid ? [] : proposed, invalid ? publicError('invalid_selection') : null)
             dispatch({type: 'dismiss-retained'})
@@ -553,7 +553,7 @@ export function useTransfer(): TransferController {
             stageOperationRef.current !== null || stateRef.current.phase !== 'idle') return
         const added = [...incoming]
         if (added.length === 0) return
-        if (current.length + added.length > 16 || added.some(path => typeof path !== 'string' || path.trim() === '')) {
+        if (current.length + added.length > MAX_COLLECTION_ITEMS || added.some(path => typeof path !== 'string' || path.trim() === '')) {
             showDraft(current, publicError('invalid_selection'))
             return
         }

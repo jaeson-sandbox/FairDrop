@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T13:51:58.742692-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T13:51:58.958543-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionStreamsAllMembersWithNumberedRoots"}
+{"Time":"2026-10-11T13:51:58.958712-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionStreamsAllMembersWithNumberedRoots","Output":"=== RUN   TestCollectionStreamsAllMembersWithNumberedRoots\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:58.963746-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionStreamsAllMembersWithNumberedRoots","Output":"--- PASS: TestCollectionStreamsAllMembersWithNumberedRoots (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:58.963763-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestCollectionStreamsAllMembersWithNumberedRoots","Elapsed":0.01}
+{"Time":"2026-10-11T13:51:58.963787-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:58.964498-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"ok  \tfairdrop/internal/stream\t0.222s\n"}
+{"Time":"2026-10-11T13:51:58.964513-04:00","Action":"pass","Package":"fairdrop/internal/stream","Elapsed":0.222}

@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T13:51:36.988147-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T13:51:37.245593-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource"}
+{"Time":"2026-10-11T13:51:37.245752-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource","Output":"=== RUN   TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:37.265234-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource","Output":"    collection_lazy_test.go:778: ErrorCodeOf(err) = \"path_not_found\", want \"setup_failed\" (error: path_not_found: payload source no longer exists)\n","OutputType":"error"}
+{"Time":"2026-10-11T13:51:37.265381-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource","Output":"--- FAIL: TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource (0.02s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:37.265391-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareRefusesCountsOutsideTheContractBeforeTouchingTheSource","Elapsed":0.02}
+{"Time":"2026-10-11T13:51:37.265452-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:37.266593-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.278s\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:37.266613-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.278}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -131,6 +132,30 @@ func TestFolderLandingExplainsZIPWithoutPromisingArchiveSize(t *testing.T) {
 	body := string(readBody(t, response))
 	if !strings.Contains(body, "Downloads as a ZIP") || strings.Contains(body, "File ·") || strings.Contains(body, "12 bytes") {
 		t.Fatalf("folder page = %q", body)
+	}
+}
+
+func TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly(t *testing.T) {
+	// Literal boundaries written at the assertion site, not the exported cap.
+	for _, test := range []struct {
+		count  int
+		accept bool
+	}{{1, false}, {2, true}, {17, true}, {10000, true}, {10001, false}} {
+		members := make([]transfer.StagedItem, test.count)
+		for index := range members {
+			members[index] = transfer.StagedItem{Path: "/private/item", Kind: transfer.ItemFile}
+		}
+		server := newTestServer(t, &stubPayloads{})
+		request := startRequest()
+		request.Item = transfer.StagedItem{
+			Kind: transfer.ItemCollection, Name: fmt.Sprintf("%d items", test.count),
+			Collection: &transfer.StagedCollection{Members: members},
+		}
+		_, err := server.Start(context.Background(), request, &stubAuthorizer{})
+		if (err == nil) != test.accept {
+			t.Fatalf("Start with %d members: err = %v, want accepted = %v", test.count, err, test.accept)
+		}
+		_ = server.Stop()
 	}
 }
 

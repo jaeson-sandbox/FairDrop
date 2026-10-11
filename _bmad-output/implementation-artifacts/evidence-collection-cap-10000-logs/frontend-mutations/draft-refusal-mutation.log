@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-refusal-l7k978p2/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (81 tests | 1 failed | 80 skipped) 13ms
+     × keeps draft rows and shows a safe error after malformed native selection 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > keeps draft rows and shows a safe error after malformed native selection
+AssertionError: expected undefined to be 'invalid_selection' // Object.is equality
+
+- Expected:
+"invalid_selection"
+
++ Received:
+undefined
+
+ ❯ src/transfer/useTransfer.test.tsx:240:56
+    238|         act(() => hook.result.current.rejectSelection())
+    239|         expect(hook.result.current.draft?.names).toEqual(['one'])
+    240|         expect(hook.result.current.draft?.error?.code).toBe('invalid_s…
+       |                                                        ^
+    241|     })
+    242|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 80 skipped (81)
+   Start at  13:53:17
+   Duration  561ms (transform 106ms, setup 0ms, import 162ms, tests 13ms, environment 303ms)
+

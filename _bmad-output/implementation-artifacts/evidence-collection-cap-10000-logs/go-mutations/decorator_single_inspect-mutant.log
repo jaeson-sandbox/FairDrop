@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T13:51:58.04374-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-11T13:51:58.353565-04:00","Action":"run","Package":"fairdrop","Test":"TestSelectionResolvesAndTraversesEachCollectionRootOnce"}
+{"Time":"2026-10-11T13:51:58.353696-04:00","Action":"output","Package":"fairdrop","Test":"TestSelectionResolvesAndTraversesEachCollectionRootOnce","Output":"=== RUN   TestSelectionResolvesAndTraversesEachCollectionRootOnce\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:58.35631-04:00","Action":"output","Package":"fairdrop","Test":"TestSelectionResolvesAndTraversesEachCollectionRootOnce","Output":"    selection_source_test.go:50: three roots resolved 3 times and traversed 6 times; want once each\n","OutputType":"error"}
+{"Time":"2026-10-11T13:51:58.357047-04:00","Action":"output","Package":"fairdrop","Test":"TestSelectionResolvesAndTraversesEachCollectionRootOnce","Output":"--- FAIL: TestSelectionResolvesAndTraversesEachCollectionRootOnce (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:58.357057-04:00","Action":"fail","Package":"fairdrop","Test":"TestSelectionResolvesAndTraversesEachCollectionRootOnce","Elapsed":0}
+{"Time":"2026-10-11T13:51:58.35709-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:58.358329-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\tfairdrop\t0.314s\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:58.358342-04:00","Action":"fail","Package":"fairdrop","Elapsed":0.315}

@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-metadata-count-lower-cn069b_4/frontend
+
+ ❯ src/transfer/validation.test.ts (68 tests | 1 failed | 67 skipped) 6ms
+     × accepts a coherent collection and refuses partial or inconsistent metadata 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/validation.test.ts > Stage metadata validation > accepts a coherent collection and refuses partial or inconsistent metadata
+AssertionError: expected null to match object { name: '10000 items', …(2) }
+
+- Expected:
+{
+  "isCollection": true,
+  "itemCount": 10000,
+  "name": "10000 items",
+}
+
++ Received:
+null
+
+ ❯ src/transfer/validation.test.ts:49:14
+     47|         // Literal boundaries: the cap is exactly 10,000, accepted at …
+     48|         expect(parseFileMetadata(metadata({name: '10000 items', isColl…
+     49|             .toMatchObject({name: '10000 items', isCollection: true, i…
+       |              ^
+     50|         expect(parseFileMetadata(metadata({name: '10001 items', isColl…
+     51|         expect(parseFileMetadata(metadata({name: '17 items', isCollect…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 skipped (68)
+   Start at  13:52:55
+   Duration  438ms (transform 40ms, setup 0ms, import 50ms, tests 6ms, environment 293ms)
+

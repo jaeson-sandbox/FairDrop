@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T13:52:01.499263-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T13:52:01.727742-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit"}
+{"Time":"2026-10-11T13:52:01.727835-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Output":"=== RUN   TestCollectionRootNameFallbackAndPostPrefixLimit\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:01.732119-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Output":"--- PASS: TestCollectionRootNameFallbackAndPostPrefixLimit (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:01.732133-04:00","Action":"pass","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Elapsed":0}
+{"Time":"2026-10-11T13:52:01.732151-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:52:01.733334-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"ok  \tfairdrop/internal/stream\t0.234s\n"}
+{"Time":"2026-10-11T13:52:01.733357-04:00","Action":"pass","Package":"fairdrop/internal/stream","Elapsed":0.234}

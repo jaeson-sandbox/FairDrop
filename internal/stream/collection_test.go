@@ -37,16 +37,10 @@ type trackingCollectionSource struct {
 	transfer.SourcePort
 	directoryCloses []*int
 	closeFailureAt  int
-	preparePins     []int
 }
 
-func (s *trackingCollectionSource) InspectWithRetained(ctx context.Context, path string, pins int) (transfer.StagedItem, error) {
-	return s.SourcePort.(transfer.CollectionSourcePort).InspectWithRetained(ctx, path, pins)
-}
-
-func (s *trackingCollectionSource) PrepareDirectoryWithRetained(ctx context.Context, path string, pins int) (transfer.PreparedDirectory, error) {
-	s.preparePins = append(s.preparePins, pins)
-	pin, err := s.SourcePort.(transfer.CollectionSourcePort).PrepareDirectoryWithRetained(ctx, path, pins)
+func (s *trackingCollectionSource) PrepareDirectory(ctx context.Context, path string) (transfer.PreparedDirectory, error) {
+	pin, err := s.SourcePort.PrepareDirectory(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -137,15 +131,28 @@ func twoDirectoryCollection(t *testing.T) transfer.StagedItem {
 }
 
 func TestCollectionDirectoryPinsCloseExactlyOnceOnEveryExit(t *testing.T) {
-	for _, scenario := range []string{"success", "close before write", "cancelled write", "prepare failure", "close failure"} {
-		t.Run(scenario, func(t *testing.T) {
+	// Members are folder, file, folder. Members are prepared lazily, so each
+	// exit prepares and closes exactly the members it reached: a stream that
+	// never starts has prepared only the first.
+	for _, test := range []struct {
+		scenario     string
+		wantPins     int
+		wantFileOpen int
+	}{
+		{"success", 2, 1},
+		{"close before write", 1, 0},
+		{"cancelled write", 1, 0},
+		{"later prepare failure", 1, 1},
+		{"close failure", 2, 1},
+	} {
+		t.Run(test.scenario, func(t *testing.T) {
 			item := twoDirectoryCollection(t)
 			raw := &trackingCollectionSource{SourcePort: source.New()}
-			if scenario == "close failure" {
+			if test.scenario == "close failure" {
 				raw.closeFailureAt = 2
 			}
-			if scenario == "prepare failure" {
-				item.Collection.Members[2].Path = filepath.Join(fixtureDir(t), "missing.txt")
+			if test.scenario == "later prepare failure" {
+				item.Collection.Members[2].Path = filepath.Join(fixtureDir(t), "missing-folder")
 			}
 			fileCloses := 0
 			payloads := New(raw)
@@ -157,56 +164,44 @@ func TestCollectionDirectoryPinsCloseExactlyOnceOnEveryExit(t *testing.T) {
 				return &trackedCollectionFile{File: file, closed: &fileCloses}, nil
 			}
 			prepared, err := payloads.Prepare(context.Background(), item)
-			if scenario == "prepare failure" {
-				if err == nil {
-					_ = prepared.Close()
-					t.Fatal("missing last member prepared")
-				}
-			} else {
-				if err != nil {
+			if err != nil {
+				t.Fatalf("Prepare failed for a first member that is present: %v", err)
+			}
+			switch test.scenario {
+			case "success", "close failure":
+				if err := prepared.WriteTo(context.Background(), io.Discard); err != nil {
 					t.Fatal(err)
 				}
-				switch scenario {
-				case "success":
-					if err := prepared.WriteTo(context.Background(), io.Discard); err != nil {
-						t.Fatal(err)
-					}
-				case "cancelled write":
-					ctx, cancel := context.WithCancel(context.Background())
-					cancel()
-					if err := prepared.WriteTo(ctx, io.Discard); err == nil {
-						t.Fatal("cancelled write succeeded")
-					}
-				}
-				err = prepared.Close()
-				if scenario == "close failure" {
-					if err == nil || !strings.Contains(err.Error(), "injected directory close failure") {
-						t.Fatalf("close failure = %v", err)
-					}
-				} else if err != nil {
-					t.Fatal(err)
-				}
-				if err := prepared.Close(); err != nil {
-					t.Fatalf("repeated close = %v", err)
+			case "later prepare failure":
+				assertCode(t, prepared.WriteTo(context.Background(), io.Discard), transfer.ErrPathNotFound)
+			case "cancelled write":
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				if err := prepared.WriteTo(ctx, io.Discard); err == nil {
+					t.Fatal("cancelled write succeeded")
 				}
 			}
-			wantDirectories := 2
-			if scenario == "prepare failure" {
-				wantDirectories = 1
+			err = prepared.Close()
+			if test.scenario == "close failure" {
+				if err == nil || !strings.Contains(err.Error(), "injected directory close failure") {
+					t.Fatalf("close failure = %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
 			}
-			if len(raw.directoryCloses) != wantDirectories {
-				t.Fatalf("prepared %d directory pins, want %d", len(raw.directoryCloses), wantDirectories)
+			if err := prepared.Close(); err != nil {
+				t.Fatalf("repeated close = %v", err)
+			}
+			if len(raw.directoryCloses) != test.wantPins {
+				t.Fatalf("prepared %d directory pins, want %d", len(raw.directoryCloses), test.wantPins)
 			}
 			for index, count := range raw.directoryCloses {
 				if *count != 1 {
 					t.Fatalf("directory %d Close called %d times, want once", index, *count)
 				}
 			}
-			if fileCloses != 1 {
-				t.Fatalf("mixed top-level file Close called %d times, want once", fileCloses)
-			}
-			if len(raw.preparePins) != 2 || raw.preparePins[0] != 1 || raw.preparePins[1] != 1 {
-				t.Fatalf("two simultaneous directory pins reserved %v slots, want [1 1]", raw.preparePins)
+			if fileCloses != test.wantFileOpen {
+				t.Fatalf("mixed top-level file Close called %d times, want %d", fileCloses, test.wantFileOpen)
 			}
 		})
 	}
@@ -267,43 +262,32 @@ func TestCollectionStreamsAllMembersWithNumberedRoots(t *testing.T) {
 	}
 }
 
-func TestCollectionLaterDirectoryReplacementAbortsWithoutCentralDirectory(t *testing.T) {
-	item, folder := collectionFixture(t)
-	prepared, err := New(source.New()).Prepare(context.Background(), item)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer prepared.Close()
-	if err := os.Rename(folder, folder+"-old"); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(folder, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	var body bytes.Buffer
-	if err := prepared.WriteTo(context.Background(), &body); err == nil {
-		t.Fatal("replaced later root streamed successfully")
-	}
-	if _, err := zip.NewReader(bytes.NewReader(body.Bytes()), int64(body.Len())); err == nil {
-		t.Fatal("failed collection has a valid ZIP central directory")
-	}
-}
-
 func TestCollectionCloseBeforeWriteReleasesEveryMember(t *testing.T) {
 	item, _ := collectionFixture(t)
-	prepared, err := New(source.New()).Prepare(context.Background(), item)
+	payloads, counter, _ := instrumentedPayloads(source.New())
+	prepared, err := payloads.Prepare(context.Background(), item)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Only the first member exists before the stream starts.
+	if got := counter.snapshot(); got.held != 1 || got.acquired != 1 {
+		t.Fatalf("after Prepare held=%d acquired=%d; want only the first member", got.held, got.acquired)
+	}
 	if err := prepared.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := prepared.Close(); err != nil {
 		t.Fatal(err)
+	}
+	if got := counter.snapshot(); got.held != 0 || got.acquired != 1 || got.closeCalls != 1 {
+		t.Fatalf("after Close held=%d acquired=%d closes=%d; want 0, 1, 1", got.held, got.acquired, got.closeCalls)
 	}
 	err = prepared.WriteTo(context.Background(), io.Discard)
 	if err == nil || errors.Is(err, io.EOF) {
 		t.Fatalf("write after close = %v", err)
+	}
+	if got := counter.snapshot(); got.acquired != 1 {
+		t.Fatalf("a closed collection prepared %d members", got.acquired)
 	}
 }
 
@@ -320,12 +304,17 @@ func TestCollectionLaterFilePrepareFailureClosesEarlierDescriptor(t *testing.T) 
 		}
 		return &trackedCollectionFile{File: file, closed: &closed}, nil
 	}
-	if prepared, err := payloads.Prepare(context.Background(), item); err == nil {
-		_ = prepared.Close()
-		t.Fatal("missing later source prepared successfully")
+	// The first member is present, so Prepare succeeds; the missing second
+	// member is found when the stream reaches it, and the first member's
+	// descriptor is closed by then.
+	prepared, err := payloads.Prepare(context.Background(), item)
+	if err != nil {
+		t.Fatalf("Prepare refused a present first member: %v", err)
 	}
+	defer prepared.Close()
+	assertCode(t, prepared.WriteTo(context.Background(), io.Discard), transfer.ErrPathNotFound)
 	if closed != 1 {
-		t.Fatalf("earlier descriptor close count = %d, want 1", closed)
+		t.Fatalf("earlier descriptor close count = %d, want 1 before the collection is closed", closed)
 	}
 }
 
@@ -344,9 +333,15 @@ func TestCollectionCancellationBetweenMembersClosesEarlierDescriptor(t *testing.
 		}
 		return &trackedCollectionFile{File: file, closed: &closed}, nil
 	}
-	if prepared, err := payloads.Prepare(ctx, item); err == nil {
-		_ = prepared.Close()
-		t.Fatal("cancelled collection prepared successfully")
+	prepared, err := payloads.Prepare(ctx, item)
+	if err != nil {
+		t.Fatalf("Prepare failed before the cancellation point: %v", err)
+	}
+	defer prepared.Close()
+	// Cancellation lands as the second member begins preparing, during the
+	// stream, so the stream stops and the first descriptor is already closed.
+	if err := prepared.WriteTo(ctx, io.Discard); transfer.ErrorCodeOf(err) != transfer.ErrCancelled {
+		t.Fatalf("cancelled stream = %v, want cancelled", err)
 	}
 	if tracked.calls != 2 || closed != 1 {
 		t.Fatalf("cancelled after %d source calls and %d descriptor closes; want 2 and 1", tracked.calls, closed)
@@ -419,8 +414,10 @@ func TestCollectionPreparationSnapshotsCallerMembersBeforeExternalWork(t *testin
 		t.Fatal("mutation seam never ran")
 	}
 	var body bytes.Buffer
+	// Member 2 is prepared lazily during the stream, after the caller's
+	// mutation; it must still be the admitted path.
 	if err := prepared.WriteTo(context.Background(), &body); err != nil {
-		t.Fatal(err)
+		t.Fatalf("caller mutation replaced admitted member %q during the stream: %v", second, err)
 	}
 	reader, err := zip.NewReader(bytes.NewReader(body.Bytes()), int64(body.Len()))
 	if err != nil {

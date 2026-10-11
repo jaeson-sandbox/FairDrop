@@ -44,11 +44,17 @@ describe('Stage metadata validation', () => {
     it('accepts a coherent collection and refuses partial or inconsistent metadata', () => {
         expect(parseFileMetadata(metadata({name: '2 items', isCollection: true, itemCount: 2})))
             .toMatchObject({name: '2 items', isDir: false, isCollection: true, itemCount: 2})
+        // Literal boundaries: the cap is exactly 10,000, accepted at 10,000 and refused at 10,001.
+        expect(parseFileMetadata(metadata({name: '10000 items', isCollection: true, itemCount: 10000})))
+            .toMatchObject({name: '10000 items', isCollection: true, itemCount: 10000})
+        expect(parseFileMetadata(metadata({name: '10001 items', isCollection: true, itemCount: 10001}))).toBeNull()
+        expect(parseFileMetadata(metadata({name: '17 items', isCollection: true, itemCount: 17})))
+            .toMatchObject({itemCount: 17})
         expect(parseFileMetadata(metadata({isCollection: false, itemCount: 1})))
             .toMatchObject({isCollection: false, itemCount: 1})
         for (const fields of [
             {isCollection: true}, {itemCount: 2},
-            {isCollection: true, itemCount: 1}, {isCollection: true, itemCount: 17, name: '17 items'},
+            {isCollection: true, itemCount: 1}, {isCollection: true, itemCount: 10001, name: '10001 items'},
             {isCollection: true, itemCount: 2, isDir: true},
             {isCollection: true, itemCount: 2, name: 'report.pdf'},
             {isCollection: false, itemCount: 2},

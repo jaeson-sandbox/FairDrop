@@ -10,11 +10,19 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-LOGS = ROOT / "_bmad-output/implementation-artifacts/evidence-multiple-selected-items-frontend-logs"
+LOGS = ROOT / "_bmad-output/implementation-artifacts/evidence-collection-cap-10000-logs/frontend-mutations"
 NODE = shutil.which("node")
 CASES = (
-    ("metadata-count", "src/transfer/validation.ts", "(itemCount as number) > 16", "(itemCount as number) > 17", "src/transfer/validation.test.ts", "accepts a coherent collection"),
-    ("append-limit", "src/transfer/useTransfer.ts", "current.length + added.length > 16", "current.length + added.length > 17", "src/transfer/useTransfer.test.tsx", "rejects a seventeenth append"),
+    ("metadata-count", "src/transfer/validation.ts", "(itemCount as number) > MAX_COLLECTION_ITEMS", "(itemCount as number) > MAX_COLLECTION_ITEMS + 1", "src/transfer/validation.test.ts", "accepts a coherent collection"),
+    ("metadata-count-lower", "src/transfer/validation.ts", "(itemCount as number) > MAX_COLLECTION_ITEMS", "(itemCount as number) >= MAX_COLLECTION_ITEMS", "src/transfer/validation.test.ts", "accepts a coherent collection"),
+    ("append-limit", "src/transfer/useTransfer.ts", "current.length + added.length > MAX_COLLECTION_ITEMS", "current.length + added.length > MAX_COLLECTION_ITEMS + 1", "src/transfer/useTransfer.test.tsx", "rejects a 10,001st append"),
+    ("append-limit-lower", "src/transfer/useTransfer.ts", "current.length + added.length > MAX_COLLECTION_ITEMS", "current.length + added.length >= MAX_COLLECTION_ITEMS", "src/transfer/useTransfer.test.tsx", "accepts appends up to exactly 10,000 rows"),
+    ("open-limit", "src/transfer/useTransfer.ts", "const invalid = proposed.length > MAX_COLLECTION_ITEMS ||", "const invalid = proposed.length > MAX_COLLECTION_ITEMS + 1 ||", "src/transfer/useTransfer.test.tsx", "refuses an initial 10,001-path drop"),
+    ("stage-limit", "src/transfer/useTransfer.ts", "selectedPaths.length > MAX_COLLECTION_ITEMS ||", "selectedPaths.length >= MAX_COLLECTION_ITEMS ||", "src/transfer/useTransfer.test.tsx", "stages a draft of exactly 10,000 paths as one batch"),
+    ("count-copy", "src/ui/copy.ts", "} of 10,000 items`", "} of 16 items`", "src/ui/CollectionDraftView.test.tsx", "shows the count out of 10,000"),
+    ("count-grouping", "src/ui/copy.ts", "${count.toLocaleString('en-US')} of 10,000 items", "${count} of 10,000 items", "src/ui/CollectionDraftView.test.tsx", "shows the count out of 10,000"),
+    ("list-scroll", "src/style.css", "overflow-y: auto; overscroll-behavior: contain;", "overflow-y: visible; overscroll-behavior: contain;", "src/ui/draftListStyles.test.ts", "scrolls within the window instead of stretching the page"),
+    ("focus-room", "src/style.css", "padding-inline-end: .75rem; padding-block: .25rem; margin-block: 1rem;", "margin-block: 1rem;", "src/ui/draftListStyles.test.ts", "leaves room inside the scrollport"),
     ("batch-command", "src/transfer/useTransfer.ts", "paths.length === 1\n            ? StageTransfer", "false\n            ? StageTransfer", "src/transfer/useTransfer.test.tsx", "restores the editable batch"),
     ("draft-recovery", "src/transfer/useTransfer.ts", "const error = parseCommandError(rejection)\n            const recovery = draftRecoveryRef.current\n            draftRecoveryRef.current = null\n            if (recovery !== null) showDraft(recovery, error)", "const error = parseCommandError(rejection)\n            const recovery = draftRecoveryRef.current\n            draftRecoveryRef.current = null\n            if (false) showDraft(recovery, error)", "src/transfer/useTransfer.test.tsx", "restores the editable batch"),
     ("cancel-forgets", "src/transfer/useTransfer.ts", "draftRecoveryRef.current = null\n        rememberedPathsRef.current = null\n        draftChooserRef.current = null", "draftRecoveryRef.current = null\n        void rememberedPathsRef.current\n        draftChooserRef.current = null", "src/transfer/useTransfer.test.tsx", "forgets retryable remembered paths"),

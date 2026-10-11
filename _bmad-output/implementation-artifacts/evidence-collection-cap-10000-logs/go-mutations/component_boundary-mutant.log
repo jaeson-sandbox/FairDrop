@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T13:51:43.001457-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T13:51:43.249335-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries"}
+{"Time":"2026-10-11T13:51:43.24947-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"=== RUN   TestSelectionOverlapRespectsRootAndComponentBoundaries\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:43.249567-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"    coordinator_collection_test.go:111: component prefix mistaken for ancestor\n","OutputType":"error"}
+{"Time":"2026-10-11T13:51:43.2496-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"--- FAIL: TestSelectionOverlapRespectsRootAndComponentBoundaries (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:43.249618-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Elapsed":0}
+{"Time":"2026-10-11T13:51:43.249647-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:43.25055-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.249s\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:43.250572-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.249}

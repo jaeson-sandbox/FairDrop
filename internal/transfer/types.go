@@ -26,6 +26,13 @@ const (
 	ItemCollection ItemKind = "collection"
 )
 
+// MaxCollectionItems is the most roots one collection may select. It is a
+// sanity cap against a broken or accidental selection, not a resource budget:
+// collection members are prepared lazily, one at a time, so the item count
+// never consumes the source's directory-handle budget (owner decision
+// 2026-10-11, superseding an agent-chosen 16).
+const MaxCollectionItems = 10000
+
 // StagedItem is an immutable metadata snapshot of a validated source item.
 type StagedItem struct {
 	Path        string

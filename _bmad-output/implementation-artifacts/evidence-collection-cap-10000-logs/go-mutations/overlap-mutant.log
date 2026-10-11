@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T13:51:38.216768-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T13:51:38.455356-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections"}
+{"Time":"2026-10-11T13:51:38.455464-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Output":"=== RUN   TestCollectionRejectsDuplicateAndAncestorSelections\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:38.456244-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Output":"    coordinator_collection_test.go:89: paths [/a/report /a/report]: \u003cnil\u003e\n","OutputType":"error"}
+{"Time":"2026-10-11T13:51:38.456409-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Output":"--- FAIL: TestCollectionRejectsDuplicateAndAncestorSelections (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:38.456425-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionRejectsDuplicateAndAncestorSelections","Elapsed":0}
+{"Time":"2026-10-11T13:51:38.456452-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:38.457436-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.240s\n","OutputType":"frame"}
+{"Time":"2026-10-11T13:51:38.457452-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.241}

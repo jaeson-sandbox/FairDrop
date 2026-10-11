@@ -444,15 +444,23 @@ ordered by how much they cost.
   invisible to an `internal/`-only check, and `docs/fairdrop-spec.md` kept publishing
   deleted interfaces twice because of it.
 
-## Collection handoff (2026-10-07)
+## Collection handoff (2026-10-07, amended 2026-10-11)
 
 - The collection extension is `_bmad-output/specs/spec-multiple-selected-items/SPEC.md`
   and its `selection-contract.md`. It supersedes older single-root restrictions only
-  for at most 16 selected roots; singleton file/folder transfers stay unchanged.
-- Collection source accounting covers all prepared directory pins plus active lexical
-  ancestors and traversal within the existing 64 retained + 3 transient limit. Independent
-  one-pin budgets do not prove that bound. Top-level verified file descriptors are separately
-  bounded by the selection limit. No second index of every descendant is permitted.
+  for at most 10,000 selected roots (`transfer.MaxCollectionItems`, a sanity cap, not a
+  resource budget; it was 16 until the owner's 2026-10-11 decision); singleton
+  file/folder transfers stay unchanged.
+- Collection members are prepared **lazily, one at a time** in archive order: the first
+  before response headers (so its failure is a clean pre-stream refusal), each later one
+  when the ZIP worker reaches it, closing each before preparing the next
+  (`internal/stream/collection.go`). At most one top-level file descriptor and one prepared
+  directory pin exist at any moment, so the item count never consumes the 64 retained + 3
+  transient handle budget and Stage reserves one future pin per directory like the singleton
+  path. This supersedes the earlier "all members before headers / accumulated pins" design
+  and its `CollectionSourcePort`; do not reintroduce a count-aware source port. A later
+  member that changed or vanished after Stage fails mid-stream and aborts the ZIP unfinalized.
+  No second index of every descendant is permitted.
 - Preserve the distinction between source kinds: a prepared file streams its verified
   descriptor after pathname replacement; a prepared directory rejects root replacement
   when Walk compares its retained identity pin. Neither promises a content snapshot.

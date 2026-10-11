@@ -1,7 +1,7 @@
 # FairDrop
 
 Ephemeral, trusted-LAN file and folder handoff from a Windows or macOS desktop to a nearby
-browser. Drop a file, a folder, or up to 16 of them together, scan the QR code on the receiving
+browser. Drop a file, a folder, or up to 10,000 of them together, scan the QR code on the receiving
 device, download once.
 Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged copies.
 
@@ -13,12 +13,17 @@ one-shot transfer. After a completed transfer, **Send Again**
 revalidates the same selection and offers it with a fresh link and QR code. FairDrop still sends
 to one receiver over plain HTTP on a trusted LAN and persists nothing.
 
-**Send multiple items** (new in 1.5.0): a native drop of 2-16 paths, or the **Send multiple
-items** list with **Add Files** and **Add Folder**, combines files and folders into one handoff.
-The receiver sees the item count and total logical size, then downloads one streamed
-`FairDrop.zip` whose members are numbered (`FairDrop/01-<name>`, `FairDrop/02-<name>`, ...).
-The whole selection is checked before anything is offered, and one failing member fails the
-whole transfer. One file or one folder still uses the single-item flow unchanged.
+**Send multiple items** (new in 1.5.0): a native drop of
+2-10,000 paths, or the **Send multiple items** list with **Add Files** and **Add Folder**,
+combines files and folders into one handoff. The receiver sees the item count and total logical
+size, then downloads one streamed `FairDrop.zip` whose members are numbered and zero-padded to
+the width of the count (`FairDrop/01-<name>` ... for up to 99 items, `FairDrop/001-<name>` ...
+for 100 to 999, and so on). The whole selection is checked before anything is offered. Members
+are then opened one at a time as the ZIP reaches them, so the number of items does not change
+how many files or folders FairDrop holds open (at most one); the first is opened before the
+download starts, and a later member that changed or vanished after you pressed Send fails the
+whole transfer partway rather than being skipped. One file or one folder still uses the
+single-item flow unchanged.
 
 ## Using FairDrop
 
@@ -28,7 +33,7 @@ whole transfer. One file or one folder still uses the single-item flow unchanged
 2. Give it one file or folder, either by dropping it on the drop zone or through the
    **Choose File or Folder** button inside it. That button opens a small menu because Windows'
    native dialog cannot offer both kinds at once; either item leads to the matching chooser.
-   To send several items, drop 2-16 paths together or choose **Send multiple items**, build the
+   To send several items, drop 2-10,000 paths together or choose **Send multiple items**, build the
    list with **Add Files** and **Add Folder**, and press **Send**.
 3. Scan the QR code from a browser on the same Wi-Fi, or use **Copy Link** or **Show Link** to
    open the direct link instead. The receiving browser shows the item first. Tap **Download** there;

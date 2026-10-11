@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-count-grouping-p_pmtvkl/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 4 skipped (5)
+   Start at  13:53:05
+   Duration  1.19s (transform 41ms, setup 0ms, import 88ms, tests 726ms, environment 296ms)
+

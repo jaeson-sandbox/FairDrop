@@ -78,7 +78,7 @@ export const copy = {
         send: 'Send',
         cancel: 'Cancel',
         remove: 'Remove',
-        count: (count: number) => `${count} of 16 items`,
+        count: (count: number) => `${count.toLocaleString('en-US')} of 10,000 items`,
     },
     directLink: {
         action: 'Copy Link',
@@ -237,7 +237,7 @@ export const copy = {
 
 /** The visible heading for each stable failure code. */
 export const errorHeadings: Readonly<Record<TransferErrorCode, string>> = {
-    invalid_selection: 'Choose 1 to 16 items',
+    invalid_selection: 'Choose 1 to 10,000 items',
     busy: 'FairDrop is still busy',
     cancelled: 'Transfer canceled',
     path_not_found: 'Item not found',

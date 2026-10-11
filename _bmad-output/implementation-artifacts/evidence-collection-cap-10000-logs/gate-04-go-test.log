@@ -1,0 +1,9 @@
+ok  	fairdrop	1.775s
+ok  	fairdrop/internal/network	0.616s
+ok  	fairdrop/internal/qr	0.286s
+ok  	fairdrop/internal/server	5.126s
+ok  	fairdrop/internal/source	0.790s
+ok  	fairdrop/internal/stream	4.208s
+ok  	fairdrop/internal/transfer	1.978s
+ok  	fairdrop/scripts	1.350s
+ok  	fairdrop/scripts/mutationverdict	1.517s

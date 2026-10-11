@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-error-focus-j_ktauct/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 4 skipped (5)
+   Start at  13:53:21
+   Duration  557ms (transform 37ms, setup 0ms, import 89ms, tests 81ms, environment 305ms)
+
