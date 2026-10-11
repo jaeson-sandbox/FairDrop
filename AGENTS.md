@@ -6,7 +6,8 @@
 ## FairDrop
 
 FairDrop is an ephemeral LAN peer-to-peer file-transfer desktop app: select a file,
-folder, or bounded collection, let one receiver pull it over HTTP, and persist nothing. It uses Go,
+folder, or bounded collection, let one receiver pull it over HTTP, or receive one
+browser upload into a folder the user chose; it persists nothing else. It uses Go,
 Wails v2, React 19, TypeScript, and Tailwind v4. The canonical product contract is
 `_bmad-output/specs/spec-fairdrop/SPEC.md` with `docs/fairdrop-architecture.md` and
 `docs/fairdrop-contracts.md`; the UX `DESIGN.md` and `EXPERIENCE.md` control visual

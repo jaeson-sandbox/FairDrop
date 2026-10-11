@@ -2,6 +2,7 @@
 id: SPEC-fairdrop
 companions:
   - ../spec-multiple-selected-items/selection-contract.md
+  - ../spec-phone-to-desktop-receiving/receive-contract.md
   - ../../planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md
   - ../../../docs/fairdrop-contracts.md
   - ../../../docs/fairdrop-architecture.md
@@ -59,13 +60,17 @@ People need a quick way to move a local file or directory from a Windows or macO
   - **intent:** A sender can offer a successfully sent file, folder or collection again without selecting it again.
   - **success:** Send Again revalidates an immutable in-memory copy of every selected path through ordinary Stage and displays a fresh session/token/QR after the prior terminal lease resets. One activation stages once; a failed lease release restores usable outcome controls without staging early. User cancellation, dismissal, replacement and unmount forget the selection. Send Another and error retry remain available in their permitted states.
 
+- **CAP-9**
+  - **intent:** A desktop user can receive files uploaded once from a nearby browser into a folder they choose for that session.
+  - **success:** No listener exists until a folder is chosen. One upload streams into a fresh time-named subfolder. Space is checked before writing, with a 3 GiB reserve. Names are sanitized and deduplicated, and no existing file is overwritten. Failure keeps completed files and removes the partial one. The outcome states the exact saved count, offers Show in Folder, and received files carry the OS download marking.
+
 ## Constraints
 
-- FairDrop permits one process, one live session, one through 16 selected roots, and one receiver; only IDLE accepts Stage. Collection admission validates all members, canonical overlap and checked aggregate logical size before networking; the selection-contract companion defines the extension.
-- Runtime product state is ephemeral: no database, settings, telemetry, persistent logs, cloud service, or payload archive is written.
+- FairDrop permits one process, one live send or receive session, one through 16 selected roots, and one counterpart browser; only IDLE accepts Stage. Collection admission validates all members, canonical overlap and checked aggregate logical size before networking; the selection-contract companion defines the extension.
+- Runtime product state is ephemeral: no database, settings, telemetry, persistent logs, cloud service, or payload archive is written. The only exception is a receive session, which writes the files it receives. They go into a newly created subfolder of a destination the user chose for that session, are created exclusively, and never replace an existing file; the receive-contract companion defines this.
 - Payload memory remains O(buffer) in payload bytes regardless of payload size; files and ZIPs stream with prompt context cancellation and no whole-payload reads. A streamed ZIP additionally retains the one central-directory record per entry that the format requires (measured at ~250 bytes each) and never a second per-entry index of its own. Collections additionally retain at most 16 selected-root records.
 - V1 is trusted-LAN plain HTTP with a separate cryptographically random capability token of at least 128 bits. The receiver uses a modern browser on the same LAN, and the sender permits the operating-system firewall access required for inbound HTTP.
-- Capability tokens and source paths never enter mDNS, diagnostics, unrelated HTTP errors, or persistent storage; receiver-visible names are sanitized as specified by the binding contracts.
+- Capability tokens, source paths and receive destination paths never enter mDNS, diagnostics, unrelated HTTP errors, or persistent storage; receiver-visible names are sanitized as specified by the binding contracts.
 - The coordinator is the sole lifecycle owner. External calls occur outside its mutex, state commits are generation-checked, and every Stop is idempotent and force-closing. Teardown waits are bounded: successful teardown proves quiescence; an elapsed bound reports a coded failure and never claims the underlying resource has stopped. One outstanding cleanup call is retained per adapter, and new Stage admission remains busy until it returns; an inner unquiescent server result is propagated through the longer outer bound (Stories 3.4/3.8).
 - Natural transfer completion follows successful HTTP final body/framing writes, including chunk termination; a final-write error or short write is failure. Cancel/Stop force-close pending finalization within documented teardown bounds. Connection wrapping preserves TCP half-close for responses rejecting unread bodies or oversized headers.
 - Metadata inspection grants no content-read access: Windows uses attribute handles, Linux `O_PATH`, and Darwin parent-relative no-follow stat snapshots. Darwin snapshots do not pin a leaf; later search/enumeration/content descriptors must match their device/inode, generation and birth timestamp before use. Filesystems exposing identical or zero generation/birth fields retain a residual snapshot fingerprint collision risk. Leaf and traversal no-follow guards remain mandatory.
