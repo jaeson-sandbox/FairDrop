@@ -32,17 +32,25 @@ Windows and macOS are native senders. Windows, macOS, and iPhone are browser rec
 
 One process owns one live session and receiver. V1 has no receiver app, account, cloud service, history, settings, telemetry, persistent log, payload archive, resume, or multiple-receiver path. Detailed behavior and boundaries live in the component, interaction, platform, trust, and anti-pattern sections. The approved external promise is `copy.external.promise`; AirDrop is an internal benchmark only and never product or release copy.
 
+**Receive amendment (spec-phone-to-desktop-receiving, Story B; in development, not yet released).** The sections below describe sending. A desktop user can also choose **Receive**, pick a destination folder, and show a one-time QR code that lets one phone browser upload files into a new subfolder of it. Sending is unchanged and every send rule still binds; receive adds its own surfaces, states, copy and routing rows, each marked *Receive* below, and the canonical product rules live in `_bmad-output/specs/spec-phone-to-desktop-receiving/` (`SPEC.md`, `receive-contract.md`). The statement above that V1 has no history, persistence or payload archive stays true of FairDrop's own state: a receive session saves the received files into the folder the user chose, and nothing else.
+
 ## Information Architecture
 
 | Surface | Reached from | Purpose and boundary |
 |---|---|---|
 | **FairDrop desktop window — Idle** | App open; accepted `transfer-reset` | Native drop target, one browse control (`copy.label.chooseFileOrFolder`) opening a menu for file or folder, firewall preflight, optional retained Done/Error, and staged troubleshooting. |
 | **Native file/directory dialogs** | Selection Controls | OS-owned selection; empty result is a quiet cancel. Dialog does not stage itself. |
+| **Receive entry (Idle)** | Idle, when no outcome or failure card replaces it | *Receive.* One secondary button (`copy.receive.open`) and one line of hint (`copy.receive.hint`), between the drop zone and the disclosures and outside the drop zone, so it is never a native drop target. Activating it opens the native folder chooser. |
+| **Native folder chooser (Receive)** | Receive entry, or a failed Receive's retry action | *Receive.* OS-owned, opened at the Downloads folder. A dismissed chooser is a quiet no-op: no session, no listener, no message, and focus returns to the Receive control. |
 | **Multiple-selection list** | Send multiple items or native drop of 2–16 paths | Editable memory-only list with Add Files, Add Folder, Remove, Send and Cancel. Listener setup starts only on Send. |
 | **Local staging-pending presentation** | One valid drop or non-empty dialog result | Shows local preparation and **Cancel preparation** while `StageTransfer` is pending; never claims backend STAGED. |
 | **FairDrop desktop window — Staged** | Successful `FileMetadata` | Item, QR-primary handoff, readonly URL, exact trust/link guidance, warnings, troubleshooting, and Cancel. |
 | **FairDrop desktop window — Transferring** | Accepted `transfer-started` | Honest wire progress/bytes, throughput, and Cancel. |
 | **FairDrop desktop window — Done / Error** | Accepted `transfer-complete` / `transfer-error` | Sender-observed terminal outcome. Backend normally clears the session after about three seconds. |
+| **Receive pending** | A chosen receive folder, until `StartReceive` answers | *Receive.* The Stage Pending Card with `copy.receive.pending` and **Cancel preparation**. Never claims the backend reached its waiting state. |
+| **Receive waiting** | Successful `ReceiveMetadata` | *Receive.* QR-primary handoff: the destination's basename (never its path), the upload link behind Show Link and Copy Link, the one-upload and not-encrypted caveats, troubleshooting, Cancel, and a note when an upload was refused for space. |
+| **Receiving** | Accepted `transfer-started` for a receive session | *Receive.* Bytes received against the size the phone declared, files saved so far, and Cancel. |
+| **Receive outcome (held)** | Accepted terminal receive event | *Receive.* How the upload ended and how many files were saved, a marking warning when it applies, **Show in Folder** when the subfolder exists, and **Done**. Held until the user leaves it; the backend does not reset it on a timer. |
 | **Idle with retained outcome** | Matching `transfer-reset` after Done/Error | Same visible Done/Error content becomes a dismissible, non-session current status until the next Stage attempt or Dismiss. It is not history and is never persisted. |
 | **Receiver browser/download UI** | Exact-token `GET` shows the FairDrop item page; its Download form sends `POST` | Browser/OS-owned attachment download starts only after Download. |
 | **Product firewall guidance** | Always in Idle before first Stage | Explains the possible OS prompt and platform-specific allow/deny recovery in document order. |
@@ -68,6 +76,26 @@ Backend lifecycle and protocol remain unchanged.
 | `transfer-reset` | Clear the matching backend session and expose Idle controls. After Done/Error, preserve that outcome visibly as dismissible non-session Idle status; reset itself does not move focus or announce. |
 
 Valid event grammars remain exact: success `started, progress*, final progress, complete, reset`; natural failure `started, progress*, optional final progress, error, reset`; pre-claim cancel after Stage `reset`; post-commit cancel `started, progress*, reset`; pre-ack setup failure/cancel emits none.
+
+### Receive sessions
+
+A receive session reuses the same events and the same sequence rules, with one new event and one different ending.
+
+| Input | Public presentation rule |
+|---|---|
+| `SelectReceiveFolder` empty result | No state change, no command, no message. Focus returns to the Receive control. |
+| `StartReceive` pending | Local Receive pending presentation only. |
+| Successful `ReceiveMetadata` | Initialize `(sessionId, lastSeq=0)` and show Receive waiting. The metadata is validated strictly: a malformed acknowledgement is refused, the backend session is cancelled once, and the user is told nothing started. |
+| `transfer-notice` `receive_too_large` | Accepted only while waiting and only for the matching session with an increasing `seq`. Shows a note beside the code and is spoken once; the session keeps waiting. Ignored in every other state. |
+| `transfer-started` | Show Receiving. |
+| `transfer-progress` with `receive.filesSaved` | Bytes received against the declared total, and the saved count, which never goes down. |
+| `transfer-complete` with `receive.result` `complete` | Show the held outcome "N files saved". A success whose snapshot cannot be reconciled with the progress already accepted is shown as **incomplete**, never as complete. |
+| `transfer-error` with `receive.result` `incomplete` or `cancelled` | Show the held outcome with the exact count. `cancelled` is accepted only together with the `cancelled` code. |
+| `transfer-reset` | After a held outcome (the user's Done) or a cancel while waiting, return to plain Idle. Nothing is retained: a receive outcome never becomes a retained Done or Error card, so Send Again, Try Again and Send Another are never offered for one. |
+
+Receive event payloads carry `receive: {filesSaved, result?, subfolderExists, markingWarning}`, validated to exactly those keys. An event that carries a receive payload is never applied to a send session, and a send event is never applied to a receive session. Receive failures to start reuse the existing public error codes and are worded through the receive copy table below.
+
+Valid receive grammars: `notice*, started, progress*, final progress, complete`; `notice*, started, progress*, optional final progress, error(incomplete)`; `notice*, started, progress*, error(cancelled)`. Each is followed by a `reset` only when the user leaves the held outcome. Cancel while waiting emits `reset` and writes nothing.
 
 ## Voice and Tone
 
@@ -129,8 +157,62 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.help.heading` | Staged troubleshooting disclosure summary | “Trouble connecting?” |
 | `copy.help.different_lan` | Different-LAN help | “Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.” |
 | `copy.help.receiver_http` | Generic receiver-error help | “Browser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.” |
+| `copy.receive.open` | Idle Receive action | “Receive” |
+| `copy.receive.choose_another_folder` | Receive failure card's primary action when the folder cannot be used | “Choose Another Folder” |
+| `copy.receive.hint` | Idle line beside the Receive action | “Get files from a phone on the same local network.” |
+| `copy.receive.pending` | Receive start pending (Stage Pending Card heading) | “Preparing to receive…” |
+| `copy.receive.heading` | Receive waiting heading | “Ready to receive” |
+| `copy.receive.instruction` | Receive waiting instruction, beneath the heading | “Scan the code with the phone’s camera, then choose the files to upload.” |
+| `copy.receive.qr_alt` | Receive QR accessible-name template | “Upload QR code for [folder name]” |
+| `copy.receive.destination_note` | Receive destination meta line (waiting and receiving) | “Each upload is saved in a new folder here.” |
+| `copy.receive.once` | Receive one-upload caveat, always visible | “Works once: this link accepts one upload.” |
+| `copy.receive.discovery_warning` | Receive discovery warning (`beacon_warning` during a receive session) | “Device discovery isn’t available. The QR code and upload link still work.” |
+| `copy.receive.too_large_title` | Refused-upload note title (`transfer-notice` `receive_too_large`) | “Upload too large” |
+| `copy.receive.too_large` | Refused-upload note body and its sole announcement | “A phone tried to upload more than this computer has room for. FairDrop is still waiting. Choose fewer files on the phone, or cancel and pick a folder with more free space.” |
+| `copy.receive.help_different_lan` | Receive different-LAN help, inside “Trouble connecting?” | “Phone can’t open the page? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and choose Receive again for a fresh link.” |
+| `copy.receive.receiving` | Receiving heading and progress-ring name | “Receiving” |
+| `copy.receive.received_caption` | Receiving figure caption (bytes against the declared size) | “Received” |
+| `copy.receive.saved_caption` | Receiving figure caption (files saved so far) | “Saved” |
+| `copy.receive.saved_note` | Receiving note: what “saved” means | “A file counts as saved once it has finished.” |
+| `copy.receive.marking_warning` | Receive outcome warning when the OS download mark could not be applied | “FairDrop couldn’t add the download mark to some files on this drive. The files were saved without it.” |
+| `copy.receive.show_in_folder` | Receive outcome primary action, only when the subfolder exists | “Show in Folder” |
+| `copy.receive.show_failed` | Receive outcome note when Show in Folder fails | “FairDrop couldn’t open that folder. It may have been moved or renamed.” |
+
+**Receive composed copy (spec-phone-to-desktop-receiving, Story B).** The `copy.receive.*` entries above are whole strings. The ones below are composed from a count or a folder name, so they are functions in the registry, not table rows, and are pinned literal-for-literal in `copy.test.ts`. A count is the backend's own number and is never derived or rounded. `N` is a decimal integer; `{folder}` is the destination's display name wrapped in Unicode isolates (U+2068..U+2069) so a right-to-left name cannot reorder the sentence.
+
+| Composed key | Use | Literal copy |
+| --- | --- | --- |
+| `receive.files_saved(N)` | Count phrase | “1 file saved”, “N files saved” (N >= 2), “no files saved” (0) |
+| `receive.complete_heading(N)` | Outcome heading, `complete` | “1 file saved”, “N files saved”, “No files saved” (0, defensive) |
+| `receive.incomplete_heading(N)` | Outcome heading, `incomplete` | “Upload incomplete — ” followed by the count phrase |
+| `receive.cancelled_heading(N)` | Outcome heading, `cancelled` | “Upload cancelled — ” followed by the count phrase |
+| `receive.saved_to({folder})` | Outcome body, `complete` | “Saved to this computer, in a new folder inside {folder}.” |
+| `receive.stopped_kept({folder})` | Outcome body, `incomplete`, N >= 1 | “The upload stopped early. Files that finished are saved to this computer, in a new folder inside {folder}. The file in progress was removed.” |
+| `receive.stopped_none({folder})` | Outcome body, `incomplete`, N = 0 | “The upload stopped before any file finished saving. Nothing was added to {folder}.” |
+| `receive.cancelled_kept({folder})` | Outcome body, `cancelled`, N >= 1 | “You cancelled the upload. Files that finished are saved to this computer, in a new folder inside {folder}. The file in progress was removed.” |
+| `receive.cancelled_none({folder})` | Outcome body, `cancelled`, N = 0 | “You cancelled the upload before any file finished saving. Nothing was added to {folder}.” |
+| `copy.label.upload_link_heading` | Receive link field's accessible name (a `label` entry) | “Upload link” |
+
+The word **saved** is used only for a file whose rename has completed, and only with “to this computer”. Cancelled keeps the spec's spelling in these headings (“cancelled”); the older transfer copy's “canceled” is unchanged.
 
 `copy.done.heading` means sender-observed response-stream completion only. It never asserts where the browser saved the item, that iOS Files contains it, or that the receiver opened it.
+
+**Receive failure copy.** A failure that comes from starting a receive reads from this table first, because the send wording for the same code says "item", "send" and "prepare". The codes are the existing public codes; no new code exists. A code not listed here (`busy`, `network_unavailable`, `server_start_failed`, `clipboard_failed`) keeps its shared wording, which is already accurate. Messages are fixed; no value is interpolated.
+
+| Code | Receive heading | Receive message |
+| --- | --- | --- |
+| `invalid_selection` | Choose a folder | “Choose a folder to save the received files in.” |
+| `path_not_found` | Folder not found | “That folder is no longer available. Choose it again.” |
+| `path_unsupported` | Can’t save there | “FairDrop can only save to a regular folder it can write to. Links, read-only locations and OneDrive-style placeholder folders aren’t supported. Choose another folder.” |
+| `setup_failed` | Couldn’t start receiving | “FairDrop couldn’t start receiving into that folder. Nothing was saved. Choose it again.” |
+| `transfer_failed` | Couldn’t start receiving | “FairDrop couldn’t finish getting ready to receive. Nothing was saved. Try again.” |
+| `qr_failed` | Couldn’t create the QR code | “FairDrop couldn’t create the QR code. Try receiving again.” |
+| `cleanup_unconfirmed` | Couldn’t confirm it stopped | “FairDrop couldn’t confirm it released the connection. Nothing was saved. Close FairDrop and reopen it before receiving again.” |
+| `not_ready` | FairDrop isn’t ready | “FairDrop isn’t ready to receive. Another copy may already be running. Close this window and use that one.” |
+| `shutting_down` | FairDrop is closing | “FairDrop is closing. Reopen it to start receiving.” |
+| `chooser_failed` | Couldn’t open the chooser | “FairDrop couldn’t open the folder chooser. Try again.” |
+
+A receive failure card offers **Try Again** (re-opens the folder chooser) for the codes the send table calls `retry`, **Choose Another Folder** (`copy.receive.choose_another_folder`, also the chooser) for the codes it calls `choose`, and only **Dismiss** for the codes it calls `dismiss`. There is no remembered folder to reuse: a receive never stores one.
 
 The receiver page uses a separate Go-owned copy registry in `internal/server/landing.go`; it does not mount the desktop React UI or duplicate strings in the TypeScript registry.
 
@@ -144,7 +226,7 @@ The receiver page uses a separate Go-owned copy registry in `internal/server/lan
 | `receiver.sizeUnavailable` | Unknown logical size | “Size unavailable” |
 | `receiver.trust` | Local-network and single-download guidance | “Use only on a local network you trust. FairDrop keeps no copy; the receiving device keeps what it downloads. The first device to download gets this item.” |
 
-Use **file**, **folder**, **download**, **ZIP**, **same local network**, **plain HTTP**, and **not encrypted**. **Cloud** and **upload** are allowed only in the truthful negated disclosure above. Do not use **secure**, **private**, **pair**, **sync**, “AirDrop for any device,” “works with every device,” or any claim of receiver identity, storage completion, or universal compatibility. Release copy additionally never claims **signed**, **notarized**, **auto-update**, or **Linux** support.
+Use **file**, **folder**, **download**, **ZIP**, **same local network**, **plain HTTP**, and **not encrypted**. **Cloud** and **upload** are allowed only in the truthful negated disclosure above, with one addition: **upload** also names the phone's own action in the receive copy (`copy.receive.*`), where the phone really does upload to this computer. Receive copy never says **sync**, **private**, **secure**, **pair** or **encrypted**, and its refusal copy says “OneDrive-style placeholder folders” rather than **cloud**. Do not use **secure**, **private**, **pair**, **sync**, “AirDrop for any device,” “works with every device,” or any claim of receiver identity, storage completion, or universal compatibility. Release copy additionally never claims **signed**, **notarized**, **auto-update**, or **Linux** support.
 
 ### Stable public error and warning copy
 
@@ -198,6 +280,10 @@ Behavioral contract; visual specs live under the same names in `DESIGN.md.Compon
 | **Error Panel** | Error, retained Idle status, command/validation failures | **Story 9.6 rebuild:** the same one-card shape as Done -- the fixed heading/message table, the retained item name when Story 9.2 kept one, and the primary action `selectEffectiveErrorAction` names (Try Again/Choose Another/none), plus Dismiss on every card. Terminal Error persists after reset as dismissible non-session status. Focused errors are not simultaneously alerts. |
 | **Status Announcer** | Non-focus status only | One pre-mounted `role="status" aria-live="polite" aria-atomic="true"`; never repeats content announced by focus and never becomes an event log. |
 | **Notification** | Idle, after a cancel-winning reset (Story 10.2) | The one sanctioned transient notification (see the Interaction Primitives amendment above and the Copy Feedback row, which is not this). Not interactive: no controls, takes no focus, not `role="alert"`, not a live region -- the Idle heading's focus move is this transition's one owner, and the notification's text reaches assistive technology only through that heading's `aria-describedby`. Appears via `copy.cancel.wonTitle`/`copy.cancel.wonBody`, holds for a few seconds (paused while the pointer is over it, restarted if a second cancellation lands while one is still showing), then removes itself -- via its own presentation-only dismissal timer, never a lifecycle or reset timer -- without any further announcement or focus move. Starting a Stage, or the app leaving Idle by any other path, removes it immediately. |
+| **Receive Entry** | Idle | *Receive.* A secondary 44px button labelled `copy.receive.open` beside one line of `copy.receive.hint` that describes it, outside the drop zone. Activation focuses the control explicitly (WebKit does not focus a clicked button), opens the chooser, and is single-flight: a second activation while the chooser is open or the session is starting is refused, not queued. A dismissed chooser returns focus to the control; a keyboard activation also sets `data-focus-return` so the ring is visible after the scripted focus. Unmount or Cancel invalidates a chooser result that arrives late. |
+| **ReceiveWaitingView** | Receive waiting | *Receive.* The Staged card geometry: `copy.receive.heading` and `copy.receive.instruction` above one card holding the QR tile (named `copy.receive.qr_alt`, non-draggable) and, beside it, the destination's basename in a bidi isolate with `copy.receive.destination_note`, **Copy Link** and **Show Link** (the same behaviour as Staged's, through the bound `CopyToClipboard`), the readonly link field named `copy.label.upload_link_heading`, and the two caveats `copy.receive.once` and `copy.network.disclosure`. Below the card: "Trouble connecting?" (`copy.receive.help_different_lan`) and Cancel. A refused upload adds one note (`copy.receive.too_large_title`, `copy.receive.too_large`) inside the card; it is plain text, not a live region. |
+| **ReceivingView** | Receiving | *Receive.* Staged's card geometry with the progress ring in the QR slot and three figures beside it: **Received** (bytes against the declared total, with a percentage because the total is known), **Saved** (files whose rename has completed) and **Speed** (visual only). `copy.receive.saved_note` says what saved means. Cancel at full target size. |
+| **Receive Outcome** | Receive outcome | *Receive.* One centred card at column width: a disc (a check for `complete`, the error disc with `!` for `incomplete` and `cancelled`), a heading that states the result and the exact count, one body paragraph, the marking warning when `markingWarning`, and the actions. **Show in Folder** (primary) is rendered only when the backend reports the subfolder exists, never inferred from the count. **Done** is quiet beside it and primary alone; it is the existing `CancelTransfer`, and the reset it causes is the only way out. A failed Show in Folder adds `copy.receive.show_failed` beside the outcome, which stays true. No Send Again, Send Another, Try Again or Choose Another ever appears on it. |
 
 ### Stage-preparation cancellation
 
@@ -240,6 +326,14 @@ State composition references: [Idle and local preparation](mockups/key-idle-prep
 | Firewall/denied or blocked | If observable through command failure, show/focus applicable network/server Error and platform recovery. If not observable, Staged troubleshooting remains available. |
 | Second instance | Restore/show/unminimize existing window; preserve active session, retained status, and logical focus. |
 | Offline/different LAN | No cloud fallback. Sender-side same-Wi-Fi/guest-isolation help instructs Cancel and a fresh link. |
+| Receive/chooser open or dismissed | OS owns focus. A dismissed chooser changes nothing and focus returns to Receive. |
+| Receive/start pending | Stage Pending Card with `copy.receive.pending` and Cancel preparation. |
+| Receive/start refused | The focused Receive failure card replaces Idle's composition (receive wording, receive actions); no QR, URL, listener or event. |
+| Receive/waiting | Focused waiting heading; QR, destination basename, the two link actions, the two caveats, "Trouble connecting?" (collapsed) and Cancel visible. |
+| Receive/upload refused for space | A note appears beside the code and is spoken once; the session keeps waiting and focus does not move. |
+| Receive/receiving | Focused Receiving heading; determinate ring, bytes received of declared total, files saved, speed and Cancel. |
+| Receive/outcome | Focused outcome card; the result and the exact saved count, held with no timer. |
+| Receive/leave outcome | Done calls `CancelTransfer`; the reset returns to plain Idle with nothing retained, and focus moves to the Idle instruction. |
 
 Generic 404/423/410 error responses remain part of the receiver protocol. A valid GET renders the item page and its Download form submits POST. Sender help uses `copy.help.receiver_http`.
 
@@ -283,6 +377,15 @@ Every transition has exactly one owner. Focused content is excluded from live/al
 | Complete or terminal Error | Focused outcome heading/panel | Move once; no polite/alert duplicate. |
 | Reset after terminal | None | No second focus move; retained node remains mounted. |
 | Dismiss retained outcome | Focused Idle instruction | Focus is the only owner. Story 9.6: the same row now also covers dismissing an Idle Stage-time command failure. |
+| Receive start pending | Focused pending heading | Move after the chooser returns; no status duplicate (the Stage pending row). |
+| Receive session opens | Focused waiting heading | Move once; no live duplicate. |
+| Refused upload (`receive_too_large`) | Atomic polite Status Announcer | Keep focus where it is; the visible note is not a live region. A refusal that lands while a cancel is pending is not spoken over "Canceling". |
+| Receive starts uploading | Focused Receiving heading | Move once; no live duplicate. |
+| Receive progress | Atomic polite Status Announcer, on the shared throttle | No focus move. |
+| Receive outcome (complete, incomplete or cancelled) | Focused outcome card | Move once; no polite or alert duplicate. The heading names it and the body describes it. |
+| Show in Folder failed | Focused command-error note | Normal description; no `role="alert"`. |
+| Leave the receive outcome (Done) | Focused Idle instruction | Focus is the only owner: nothing stays mounted to hold it. |
+| Dismissed receive chooser | None | Return to the Receive control; no new speech. |
 
 An actionable error may use `role="alert"` only if an exceptional implementation path does not move focus to it; the same transition can never use both mechanisms.
 
@@ -312,6 +415,8 @@ Recovery remains available from Idle and Staged:
 - Done is limited to sender-observed transport completion. Browser saving, filename prompts, Files integration, ZIP opening, and subsequent storage are receiver-owned actions.
 - Generic receiver failures remain canonical. Sender-side troubleshooting and new-link guidance are the V1 recovery experience.
 - No cloud fallback or queue exists. After correcting network/firewall issues or a competing downloader claim, Cancel and prepare the item again to create a fresh capability link.
+- **Receive (in development).** A receive session writes the received files to disk, into a new subfolder of the folder the user chose, so the sender-only statement that FairDrop stores nothing does not apply to files the user chose to receive. Wording never claims otherwise: a file is **saved to this computer** only after it has been written, flushed and renamed into place, and the outcome says exactly how many files that is. The chosen folder and the outcome are held in memory for the session and never persisted. The destination path never reaches the phone, mDNS, a diagnostic or the frontend (the UI knows the folder's basename only), and the link is plain HTTP on a trusted network like every other FairDrop link, with the same not-encrypted disclosure.
+- **Receive destinations.** Folders that are links or reparse points, read-only, or OneDrive-style placeholders are refused. A volume that can neither rename exclusively nor hard-link (FAT and exFAT on macOS) fails closed: the upload is reported incomplete rather than saved by a check-then-rename fallback. Marking a downloaded file with the OS download mark is best-effort; a volume that cannot store it keeps the file and the outcome says so.
 - Release artifacts and their copy make no signing, notarization, auto-update, or Linux-packaging claim. The macOS build carries only an ad-hoc signature (`codesign --sign -`) so the OS will launch it unsigned by a developer identity; that is not notarization and must never be described as one.
 
 ## Accessibility Floor

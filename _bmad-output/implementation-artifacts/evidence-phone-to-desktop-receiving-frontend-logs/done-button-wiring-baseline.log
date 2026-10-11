@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-done-button-wiring-7rh3b2yk/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 30 skipped (33)
+   Start at  01:16:03
+   Duration  550ms (transform 57ms, setup 0ms, import 106ms, tests 79ms, environment 286ms)
+

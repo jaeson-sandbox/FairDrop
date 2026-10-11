@@ -1,0 +1,55 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-clipped-text-vkphmm4y/frontend
+
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 3 failed | 29 skipped) 5223ms
+     × receive waiting grows without horizontal scroll or a clipped container 683ms
+     × receive waiting after a refused upload grows without horizontal scroll or a clipped container 680ms
+     × receiving grows without horizontal scroll or a clipped container 630ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive views under 200% text and the WCAG text-spacing overrides > receive waiting grows without horizontal scroll or a clipped container
+AssertionError: receive waiting: div.fd-hero__details "Phone PhotosEach upload is saved in a ne" clips its content: scrollHeight (456px) exceeds clientHeight (40px): expected 456 to be less than or equal to 40.5
+ ❯ assertNoFixedHeightClipsGrownText browser/receive.test.tsx:230:10
+    228|             `${sceneName}: ${describeElement(element)} clips its conte…
+    229|                 `exceeds clientHeight (${element.clientHeight}px)`,
+    230|         ).toBeLessThanOrEqual(element.clientHeight + 0.5)
+       |          ^
+    231|     }
+    232| }
+ ❯ browser/receive.test.tsx:313:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive views under 200% text and the WCAG text-spacing overrides > receive waiting after a refused upload grows without horizontal scroll or a clipped container
+AssertionError: receive waiting after a refused upload: div.fd-hero__details "Phone PhotosEach upload is saved in a ne" clips its content: scrollHeight (456px) exceeds clientHeight (40px): expected 456 to be less than or equal to 40.5
+ ❯ assertNoFixedHeightClipsGrownText browser/receive.test.tsx:230:10
+    228|             `${sceneName}: ${describeElement(element)} clips its conte…
+    229|                 `exceeds clientHeight (${element.clientHeight}px)`,
+    230|         ).toBeLessThanOrEqual(element.clientHeight + 0.5)
+       |          ^
+    231|     }
+    232| }
+ ❯ browser/receive.test.tsx:313:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive views under 200% text and the WCAG text-spacing overrides > receiving grows without horizontal scroll or a clipped container
+AssertionError: receiving: div.fd-hero__details "Phone PhotosEach upload is saved in a ne" clips its content: scrollHeight (594px) exceeds clientHeight (40px): expected 594 to be less than or equal to 40.5
+ ❯ assertNoFixedHeightClipsGrownText browser/receive.test.tsx:230:10
+    228|             `${sceneName}: ${describeElement(element)} clips its conte…
+    229|                 `exceeds clientHeight (${element.clientHeight}px)`,
+    230|         ).toBeLessThanOrEqual(element.clientHeight + 0.5)
+       |          ^
+    231|     }
+    232| }
+ ❯ browser/receive.test.tsx:313:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 5 passed | 29 skipped (37)
+   Start at  01:17:00
+   Duration  5.95s (transform 0ms, setup 0ms, import 177ms, tests 5.22s, environment 0ms)
+

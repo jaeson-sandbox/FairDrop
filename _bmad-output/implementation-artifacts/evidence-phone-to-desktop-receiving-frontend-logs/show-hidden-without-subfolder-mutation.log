@@ -1,0 +1,43 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-hidden-without-subfolder-lq4oliug/frontend
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 3 failed | 30 skipped) 75ms
+     × is not rendered for a complete outcome with no subfolder 66ms
+     × is not rendered for a incomplete outcome with no subfolder 5ms
+     × is not rendered for a cancelled outcome with no subfolder 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > Show in Folder > is not rendered for a complete outcome with no subfolder
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > Show in Folder > is not rendered for a incomplete outcome with no subfolder
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > Show in Folder > is not rendered for a cancelled outcome with no subfolder
+AssertionError: expected <button type="button" …(2)></button> to be null
+
+- Expected:
+null
+
++ Received:
+<button
+  class="fd-button fd-button--primary fd-button--pill fd-target"
+  data-receive-show="true"
+  type="button"
+>
+  Show in Folder
+</button>
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:136:72
+    134|     it.each(['complete', 'incomplete', 'cancelled'] as const)('is not …
+    135|         renderOutcome(outcome(kind, {filesSaved: 0, subfolderExists: f…
+    136|         expect(screen.queryByRole('button', {name: 'Show in Folder'}))…
+       |                                                                        ^
+    137|     })
+    138|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 30 skipped (33)
+   Start at  01:15:39
+   Duration  558ms (transform 58ms, setup 0ms, import 110ms, tests 75ms, environment 289ms)
+

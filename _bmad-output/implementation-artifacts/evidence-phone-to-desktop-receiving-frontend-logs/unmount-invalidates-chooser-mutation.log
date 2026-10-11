@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-unmount-invalidates-chooser-7_z_144e/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (48 tests | 1 failed | 44 skipped) 15ms
+     × ignores a folder chosen after unmount 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > invalidated chooser completions > ignores a folder chosen after unmount
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "/Users/someone/late",
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/transfer/useTransfer.receive.test.tsx:282:40
+    280|         await act(async () => { chooser.resolve('/Users/someone/late')…
+    281|
+    282|         expect(mocks.startReceive).not.toHaveBeenCalled()
+       |                                        ^
+    283|     })
+    284|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed | 44 skipped (48)
+   Start at  01:15:25
+   Duration  508ms (transform 74ms, setup 0ms, import 129ms, tests 15ms, environment 284ms)
+

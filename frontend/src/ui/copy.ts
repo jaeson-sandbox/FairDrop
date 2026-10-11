@@ -29,6 +29,22 @@
 
 import {fixedErrorMessages, type TransferErrorCode} from '../transfer/errors'
 
+/**
+ * Wraps a folder name in Unicode first-strong isolates (U+2068 .. U+2069) so a
+ * right-to-left or bidi-control-bearing name cannot reorder the sentence it sits
+ * in. The name arrives already free of control characters (`parseReceiveMetadata`
+ * refuses them), but bidi *format* characters are not controls, and plain
+ * strings have no `<bdi>` to lean on.
+ */
+function isolate(name: string): string {
+    return `\u2068${name}\u2069`
+}
+
+/** "1 file saved", "3 files saved", "no files saved": the one place singular and plural are decided. */
+function savedCount(count: number): string {
+    return count === 0 ? 'no files saved' : `${count} ${count === 1 ? 'file' : 'files'} saved`
+}
+
 export const copy = {
     external: {
         promise: 'Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.',
@@ -154,6 +170,51 @@ export const copy = {
         /** Story 9.6: the Error card's primary action when `selectEffectiveErrorAction` returns `choose`. */
         chooseAnother: 'Choose Another',
     },
+    /**
+     * Receiving from a phone (spec-phone-to-desktop-receiving, Story B).
+     *
+     * Strings are tabulated in EXPERIENCE.md's Voice and Tone table like every
+     * other approved string. The entries that are functions (a count, a folder
+     * name) compose approved fragments rather than stand for one sentence, so
+     * they are documented in the table's "Receive composed copy" subsection and
+     * pinned literal-for-literal in `copy.test.ts` instead.
+     *
+     * "Saved" is said only for files whose rename has completed: the backend's
+     * count is the only source for any number here, and no sentence claims more
+     * than "saved to this computer".
+     */
+    receive: {
+        open: 'Receive',
+        chooseAnotherFolder: 'Choose Another Folder',
+        hint: 'Get files from a phone on the same local network.',
+        pending: 'Preparing to receive…',
+        heading: 'Ready to receive',
+        instruction: 'Scan the code with the phone’s camera, then choose the files to upload.',
+        qrAlt: 'Upload QR code for [folder name]',
+        destinationNote: 'Each upload is saved in a new folder here.',
+        once: 'Works once: this link accepts one upload.',
+        discoveryWarning: 'Device discovery isn’t available. The QR code and upload link still work.',
+        tooLargeTitle: 'Upload too large',
+        tooLarge: 'A phone tried to upload more than this computer has room for. FairDrop is still waiting. Choose fewer files on the phone, or cancel and pick a folder with more free space.',
+        helpDifferentLan: 'Phone can’t open the page? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and choose Receive again for a fresh link.',
+        receiving: 'Receiving',
+        receivedCaption: 'Received',
+        savedCaption: 'Saved',
+        savedNote: 'A file counts as saved once it has finished.',
+        markingWarning: 'FairDrop couldn’t add the download mark to some files on this drive. The files were saved without it.',
+        showInFolder: 'Show in Folder',
+        showFailed: 'FairDrop couldn’t open that folder. It may have been moved or renamed.',
+        /** "1 file saved", "3 files saved", "no files saved". The one place singular and plural are decided. */
+        filesSaved: savedCount,
+        completeHeading: (count: number) => count === 0 ? 'No files saved' : savedCount(count),
+        incompleteHeading: (count: number) => `Upload incomplete — ${savedCount(count)}`,
+        cancelledHeading: (count: number) => `Upload cancelled — ${savedCount(count)}`,
+        savedTo: (destination: string) => `Saved to this computer, in a new folder inside ${isolate(destination)}.`,
+        stoppedKept: (destination: string) => `The upload stopped early. Files that finished are saved to this computer, in a new folder inside ${isolate(destination)}. The file in progress was removed.`,
+        stoppedNone: (destination: string) => `The upload stopped before any file finished saving. Nothing was added to ${isolate(destination)}.`,
+        cancelledKept: (destination: string) => `You cancelled the upload. Files that finished are saved to this computer, in a new folder inside ${isolate(destination)}. The file in progress was removed.`,
+        cancelledNone: (destination: string) => `You cancelled the upload before any file finished saving. Nothing was added to ${isolate(destination)}.`,
+    },
     help: {
         /**
          * Story 9.4: the "Trouble connecting?" disclosure's own summary --
@@ -197,6 +258,8 @@ export const copy = {
         logicalSize: 'logical size',
         /** Direct URL Row heading, from the staged production reference. */
         directLinkHeading: 'Direct download link',
+        /** The receive waiting view's link field name: the phone uploads here, it does not download. */
+        uploadLinkHeading: 'Upload link',
         /** Transferring state heading, from the transferring production reference. */
         sending: 'Sending',
         /**
@@ -262,6 +325,77 @@ export const errorHeadings: Readonly<Record<TransferErrorCode, string>> = {
 export const errorMessages = fixedErrorMessages
 
 /**
+ * Receive-specific wording for the stable failure codes a receive attempt can
+ * produce, keyed by the same codes (no new code exists). The send copy for
+ * these says "item", "send" and "prepare", which is wrong beside a folder
+ * chooser, so a failure that came from Receive reads from here first and falls
+ * back to the shared table only for the codes whose send wording is already
+ * accurate (`busy`, `network_unavailable`, `server_start_failed`,
+ * `clipboard_failed`). Messages are fixed registry strings like their siblings;
+ * no value is ever interpolated, so a path or adapter text cannot reach one.
+ */
+export const receiveErrorCopy: Readonly<Partial<Record<TransferErrorCode, {
+    readonly heading: string
+    readonly message: string
+}>>> = {
+    invalid_selection: {
+        heading: 'Choose a folder',
+        message: 'Choose a folder to save the received files in.',
+    },
+    path_not_found: {
+        heading: 'Folder not found',
+        message: 'That folder is no longer available. Choose it again.',
+    },
+    path_unsupported: {
+        heading: 'Can’t save there',
+        message: 'FairDrop can only save to a regular folder it can write to. Links, read-only locations and OneDrive-style placeholder folders aren’t supported. Choose another folder.',
+    },
+    setup_failed: {
+        heading: 'Couldn’t start receiving',
+        message: 'FairDrop couldn’t start receiving into that folder. Nothing was saved. Choose it again.',
+    },
+    transfer_failed: {
+        heading: 'Couldn’t start receiving',
+        message: 'FairDrop couldn’t finish getting ready to receive. Nothing was saved. Try again.',
+    },
+    qr_failed: {
+        heading: 'Couldn’t create the QR code',
+        message: 'FairDrop couldn’t create the QR code. Try receiving again.',
+    },
+    cleanup_unconfirmed: {
+        heading: 'Couldn’t confirm it stopped',
+        message: 'FairDrop couldn’t confirm it released the connection. Nothing was saved. Close FairDrop and reopen it before receiving again.',
+    },
+    not_ready: {
+        heading: 'FairDrop isn’t ready',
+        message: 'FairDrop isn’t ready to receive. Another copy may already be running. Close this window and use that one.',
+    },
+    shutting_down: {
+        heading: 'FairDrop is closing',
+        message: 'FairDrop is closing. Reopen it to start receiving.',
+    },
+    chooser_failed: {
+        heading: 'Couldn’t open the chooser',
+        message: 'FairDrop couldn’t open the folder chooser. Try again.',
+    },
+}
+
+/** The heading a failure shows: receive wording when the failure came from Receive and has some. */
+export function errorHeadingFor(code: TransferErrorCode, receive: boolean): string {
+    return (receive ? receiveErrorCopy[code]?.heading : undefined) ?? errorHeadings[code]
+}
+
+/** The message a failure shows, under the same rule as `errorHeadingFor`. */
+export function errorMessageFor(code: TransferErrorCode, receive: boolean): string {
+    return (receive ? receiveErrorCopy[code]?.message : undefined) ?? errorMessages[code]
+}
+
+/** Fills the one placeholder in the receive QR accessible-name template; see `qrAltFor` for why the replacement is a function. */
+export function receiveQrAltFor(folderName: string): string {
+    return copy.receive.qrAlt.replace('[folder name]', () => folderName)
+}
+
+/**
  * Fills the one placeholder in the QR accessible-name template.
  *
  * The replacement is a function on purpose. A string replacement makes `$&`,
@@ -289,3 +423,4 @@ function freezeDeep(value: object): void {
 
 freezeDeep(copy)
 freezeDeep(errorHeadings)
+freezeDeep(receiveErrorCopy)

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-done-calls-cancel-_z3jyl4s/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 37 skipped (38)
+   Start at  01:16:01
+   Duration  642ms (transform 138ms, setup 0ms, import 206ms, tests 67ms, environment 288ms)
+

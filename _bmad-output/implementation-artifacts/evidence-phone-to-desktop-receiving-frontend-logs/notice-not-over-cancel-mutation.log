@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-not-over-cancel-ddhmfxkz/frontend
+
+ ❯ src/ui/announce.receive.test.ts (19 tests | 1 failed | 18 skipped) 4ms
+     × is not spoken over a pending cancellation 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/announce.receive.test.ts > a refused upload > is not spoken over a pending cancellation
+AssertionError: expected { row: 'receive-notice', …(2) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "owner": "announcer",
+  "row": "receive-notice",
+  "text": "A phone tried to upload more than this computer has room for. FairDrop is still waiting. Choose fewer files on the phone, or cancel and pick a folder with more free space.",
+}
+
+ ❯ src/ui/announce.receive.test.ts:88:110
+     86|
+     87|     it('is not spoken over a pending cancellation', () => {
+     88|         expect(routeTransition(waiting({cancelPending: true}), waiting…
+       |                                                                                                              ^
+     89|     })
+     90|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  01:16:12
+   Duration  416ms (transform 36ms, setup 0ms, import 44ms, tests 4ms, environment 288ms)
+

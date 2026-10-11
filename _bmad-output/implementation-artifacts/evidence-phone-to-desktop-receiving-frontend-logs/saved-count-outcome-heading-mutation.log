@@ -1,0 +1,47 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-outcome-heading-5lyhyrn5/frontend
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 29 skipped) 72ms
+     × heads it "Upload incomplete" with the exact count and no success wording 63ms
+     × says "1 file saved" for one 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > an incomplete receive is never shown as a success > heads it "Upload incomplete" with the exact count and no success wording
+AssertionError: expected 'Upload incomplete — no files saved' to be 'Upload incomplete — 2 files saved' // Object.is equality
+
+Expected: "Upload incomplete — 2 files saved"
+Received: "Upload incomplete — no files saved"
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:73:39
+     71|         const {container} = renderOutcome(outcome('incomplete', {files…
+     72|
+     73|         expect(heading().textContent).toBe('Upload incomplete — 2 file…
+       |                                       ^
+     74|         expect(heading().textContent).not.toBe('2 files saved')
+     75|         const card = container.querySelector('.fd-outcome') as HTMLEle…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > an incomplete receive is never shown as a success > says "1 file saved" for one
+AssertionError: expected 'Upload incomplete — no files saved' to be 'Upload incomplete — 1 file saved' // Object.is equality
+
+Expected: "Upload incomplete — 1 file saved"
+Received: "Upload incomplete — no files saved"
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:85:39
+     83|     it('says "1 file saved" for one', () => {
+     84|         renderOutcome(outcome('incomplete', {filesSaved: 1}))
+     85|         expect(heading().textContent).toBe('Upload incomplete — 1 file…
+       |                                       ^
+     86|     })
+     87|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed | 29 skipped (33)
+   Start at  01:15:51
+   Duration  550ms (transform 61ms, setup 0ms, import 111ms, tests 72ms, environment 284ms)
+

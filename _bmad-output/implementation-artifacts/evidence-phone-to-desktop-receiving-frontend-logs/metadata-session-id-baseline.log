@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-session-id-um2whua6/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 79 skipped (80)
+   Start at  01:15:30
+   Duration  421ms (transform 38ms, setup 0ms, import 48ms, tests 2ms, environment 289ms)
+

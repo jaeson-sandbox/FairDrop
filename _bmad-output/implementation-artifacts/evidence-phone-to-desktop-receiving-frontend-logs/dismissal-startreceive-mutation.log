@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-dismissal-startreceive-xg5bv3vh/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (48 tests | 1 failed | 47 skipped) 12ms
+     × does nothing when the chooser is dismissed: no session, no command, no error 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > activating Receive > does nothing when the chooser is dismissed: no session, no command, no error
+AssertionError: expected 'proceeded' to be 'dismissed' // Object.is equality
+
+Expected: "dismissed"
+Received: "proceeded"
+
+ ❯ src/transfer/useTransfer.receive.test.tsx:130:24
+    128|         await act(async () => { result = await hook.result.current.rec…
+    129|
+    130|         expect(result).toBe('dismissed')
+       |                        ^
+    131|         expect(mocks.selectReceiveFolder).toHaveBeenCalledTimes(1)
+    132|         expect(mocks.startReceive).not.toHaveBeenCalled()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 47 skipped (48)
+   Start at  01:15:11
+   Duration  512ms (transform 75ms, setup 0ms, import 130ms, tests 12ms, environment 289ms)
+

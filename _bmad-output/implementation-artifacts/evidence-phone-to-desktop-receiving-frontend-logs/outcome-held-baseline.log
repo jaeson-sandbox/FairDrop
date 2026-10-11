@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-outcome-held-dge9rkpp/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 37 skipped (38)
+   Start at  01:16:06
+   Duration  422ms (transform 45ms, setup 0ms, import 54ms, tests 2ms, environment 287ms)
+

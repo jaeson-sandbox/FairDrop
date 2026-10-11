@@ -1,0 +1,61 @@
+KILLED dismissal-noop: treats a whitespace-only result like a dismissal
+KILLED dismissal-startreceive: does nothing when the chooser is dismissed
+KILLED dismissal-focus-return: does not touch focus or the marker when the activation ends
+KILLED focus-ring-marker-pointer: returns focus after a pointer activation without marking it
+KILLED double-activation: refuses a second activation while the chooser is open
+KILLED receive-outside-idle: refuses Receive outside Idle
+KILLED cancel-invalidates-chooser: ignores a folder chosen after Cancel was activated
+KILLED unmount-invalidates-chooser: ignores a folder chosen after unmount
+KILLED metadata-send-url: refuses a send (download) url
+KILLED metadata-extra-field: refuses an extra field
+KILLED metadata-control-chars: refuses a destination with a control character
+KILLED metadata-session-id: refuses a non-hex session id
+KILLED status-extra-field: refuses an extra field naming a path
+KILLED status-complete-result: refuses error saying complete
+KILLED cancel-code-contradiction: a contradiction is never guessed at
+KILLED controller-malformed-ack: refuses a malformed acknowledgement
+KILLED receive-draft-open: refuses Receive while the collection draft is open, without opening a chooser
+KILLED show-hidden-without-subfolder: is not rendered for a complete outcome with no subfolder
+KILLED show-flag-not-count: follows the backend flag, not the count
+KILLED show-controller-guard: never calls the command when the subfolder does not exist
+KILLED show-single-launch: launches once for a double activation
+KILLED show-failure-note: records a failed Show in Folder beside the outcome
+KILLED saved-count-plural: the composed count copy > says 1 as
+KILLED saved-count-zero: the composed count copy > says 0 as
+KILLED saved-count-receiving-view: the receiving view > says 2 saved
+KILLED saved-count-outcome-heading: heads it "Upload incomplete" with the exact count
+KILLED saved-count-monotonic: refuses progress that goes backwards, changes the declared total, or lowers the saved count
+KILLED incomplete-as-complete-reducer: shows an incomplete upload as incomplete with the exact count
+KILLED incomplete-as-complete-demotion: demotes a success whose snapshot does not follow the accepted progress to incomplete
+KILLED incomplete-as-complete-view: heads it "Upload incomplete" with the exact count
+KILLED incomplete-styling: heads it "Upload incomplete" with the exact count
+KILLED cancelled-heading: heads it "Upload cancelled" with the exact count
+KILLED done-calls-cancel: Done leaves through the existing Cancel command, never a new one
+KILLED done-button-wiring: Done calls onDone once and nothing else
+KILLED controller-cancel-outcome: leaves the outcome through the existing Cancel command, and only the reset returns to Idle
+KILLED outcome-held: is held: nothing but a reset moves it
+KILLED notice-keeps-waiting: counts each refused upload as a new state and keeps waiting
+KILLED notice-count: counts each refused upload as a new state and keeps waiting
+KILLED notice-announced: a refused upload > is spoken by the announcer, not focused
+KILLED notice-not-over-cancel: is not spoken over a pending cancellation
+KILLED notice-visible: keeps waiting and says what happened
+KILLED receive-not-retained: leaves to plain Idle on reset, retaining nothing a send outcome card could offer
+KILLED receive-forgets-send-path: forgets a remembered send path when a receive session starts
+KILLED send-rejects-receive-events: ignores receive progress, complete and error on a transferring send session
+KILLED receive-rejects-send-events: refuses progress with no receive payload and progress with an unknown total
+KILLED send-ack-over-receive: refuses to commit a send acknowledgement over a pending receive
+KILLED receive-error-context: marks a failed receive start so the failure card uses receive wording
+KILLED receive-card-wording: uses receive wording for the folder it could not use
+KILLED receive-retry-action: says Try Again for a failure that is worth another attempt, and reopens the Receive chooser
+KILLED receive-choose-label: shows receive wording and a folder-chooser action, never the send ones
+KILLED route-leave-outcome: focuses the Idle instruction when the outcome is left
+KILLED route-outcome-focus: focuses the outcome when a receive ends, whichever way it ended
+KILLED qr-draggable: marks the QR image non-draggable
+KILLED marking-warning: appears when the backend says marking failed
+KILLED browser-forced-colors-outline: draws a real outline, not a box-shadow, on the Receive control after a scripted focus return
+KILLED browser-reflow-320: scrolls only vertically with nothing clipped
+KILLED browser-clipped-text: grows without horizontal scroll or a clipped container
+KILLED browser-qr-draggable: marks the receive QR non-draggable both ways
+KILLED browser-outcome-centred: centres the outcome card in the window rather than pinning it to the top
+KILLED browser-entry-wrap: scrolls only vertically with nothing clipped
+60/60 receive frontend mutations killed

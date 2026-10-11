@@ -408,6 +408,11 @@ describe('the focus selector', () => {
             'staged-heading',
             'transferring-heading',
             'outcome',
+            // Receive (spec-phone-to-desktop-receiving): one heading per live
+            // receive view and one for the held outcome.
+            'receive-waiting-heading',
+            'receive-receiving-heading',
+            'receive-outcome',
         ])
     })
 })

@@ -34,12 +34,50 @@ export interface ProgressSnapshot {
     readonly speedBytesPerSec: number
 }
 
+/**
+ * What `StartReceive` acknowledges: everything the waiting view needs and
+ * nothing more.
+ *
+ * `destination` is the chosen folder's basename (or, for a volume root that has
+ * no basename, the volume spelling) and never a deeper path. `url` and
+ * `qrBase64` are the two places the capability token may appear, exactly as in
+ * `FileMetadata`.
+ */
+export interface ReceiveMetadata {
+    readonly sessionId: string
+    readonly destination: string
+    readonly url: string
+    readonly qrBase64: string
+    readonly warnings: readonly Warning[]
+}
+
+/** How a receive session ended. `complete` is the only one that may be shown as success. */
+export type ReceiveResult = 'complete' | 'incomplete' | 'cancelled'
+
+/**
+ * The receive payload an event may carry, validated.
+ *
+ * `result` is `null` on a progress event and set on a terminal one; the two
+ * flags are meaningful only on a terminal event. No field here is, or can
+ * carry, a path or a file name.
+ */
+export interface ReceiveStatus {
+    readonly filesSaved: number
+    readonly result: ReceiveResult | null
+    readonly subfolderExists: boolean
+    readonly markingWarning: boolean
+}
+
+/** The one notice a waiting receive session can publish. */
+export type TransferNoticeCode = 'receive_too_large'
+
 export const lifecycleEventNames = [
     'transfer-started',
     'transfer-progress',
     'transfer-complete',
     'transfer-error',
     'transfer-reset',
+    'transfer-notice',
 ] as const
 
 export type LifecycleEventName = (typeof lifecycleEventNames)[number]
@@ -56,11 +94,15 @@ export interface TransferStartedEvent extends EventCursor {
 export interface TransferProgressEvent extends EventCursor {
     readonly kind: 'transfer-progress'
     readonly progress: ProgressSnapshot
+    /** Absent on a send event. Present exactly when the event belongs to a receive session. */
+    readonly receive?: ReceiveStatus
 }
 
 export interface TransferCompleteEvent extends EventCursor {
     readonly kind: 'transfer-complete'
     readonly progress: ProgressSnapshot
+    /** Absent on a send event; `result` is `'complete'` whenever it is present. */
+    readonly receive?: ReceiveStatus
 }
 
 export interface TransferErrorEvent extends EventCursor {
@@ -68,10 +110,21 @@ export interface TransferErrorEvent extends EventCursor {
     /** `null` means the optional wire field was absent. */
     readonly progress: ProgressSnapshot | null
     readonly error: PublicError
+    /** Absent on a send event; `result` is `'incomplete'` or `'cancelled'` whenever it is present. */
+    readonly receive?: ReceiveStatus
 }
 
 export interface TransferResetEvent extends EventCursor {
     readonly kind: 'transfer-reset'
+}
+
+/**
+ * A non-terminal fact about a waiting receive session. It changes no state of
+ * the session itself; it only has something to tell the desktop user.
+ */
+export interface TransferNoticeEvent extends EventCursor {
+    readonly kind: 'transfer-notice'
+    readonly notice: TransferNoticeCode
 }
 
 export type LifecycleEvent =
@@ -80,8 +133,9 @@ export type LifecycleEvent =
     | TransferCompleteEvent
     | TransferErrorEvent
     | TransferResetEvent
+    | TransferNoticeEvent
 
-export type PendingItemKind = 'file' | 'directory' | 'collection' | 'unknown'
+export type PendingItemKind = 'file' | 'directory' | 'collection' | 'unknown' | 'receive'
 
 /**
  * What the completion receipt needs, and nothing else `FileMetadata` carries.

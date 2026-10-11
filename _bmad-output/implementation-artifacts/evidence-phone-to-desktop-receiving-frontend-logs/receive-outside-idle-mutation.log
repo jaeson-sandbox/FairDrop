@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-outside-idle-ovjxuu7x/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (48 tests | 1 failed | 47 skipped) 13ms
+     × refuses Receive outside Idle 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > single flight > refuses Receive outside Idle
+AssertionError: expected 'proceeded' to be 'ignored' // Object.is equality
+
+Expected: "ignored"
+Received: "proceeded"
+
+ ❯ src/transfer/useTransfer.receive.test.tsx:243:24
+    241|         await act(async () => { result = await hook.result.current.rec…
+    242|
+    243|         expect(result).toBe('ignored')
+       |                        ^
+    244|         expect(mocks.selectReceiveFolder).not.toHaveBeenCalled()
+    245|         expect(hook.result.current.state.phase).toBe('receive-waiting')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 47 skipped (48)
+   Start at  01:15:22
+   Duration  505ms (transform 74ms, setup 0ms, import 128ms, tests 13ms, environment 284ms)
+

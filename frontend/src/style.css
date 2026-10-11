@@ -448,7 +448,9 @@ body {
 */
 .fd-region[data-phase-view='pending'],
 .fd-region[data-phase-view='transferring'],
-.fd-region[data-phase-view='staged'] {
+.fd-region[data-phase-view='staged'],
+.fd-region[data-phase-view='receive-waiting'],
+.fd-region[data-phase-view='receive-receiving'] {
     flex: 1 1 auto;
     justify-content: center;
 }
@@ -1207,6 +1209,25 @@ body {
 .fd-disclosure__region-inner {
     overflow: hidden;
     min-height: 0;
+}
+
+/*
+  The Receive entry (spec-phone-to-desktop-receiving, Story B): one line saying
+  what it is for and the one control, between the drop zone and the
+  disclosures. It lives outside `.fd-drop-zone` because the zone is a native
+  drop target for sending and this is the opposite direction. The control is a
+  secondary button -- the pill in the zone stays Idle's one primary action --
+  and carries `.fd-target`, so its 44px floor is the shared rule and not a
+  value repeated here. Wrapping, not a fixed row, so at 320px the line sits
+  above the button and nothing scrolls sideways.
+*/
+.fd-receive-entry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-3) var(--spacing-4);
+    text-align: center;
 }
 
 /*

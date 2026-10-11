@@ -1,6 +1,8 @@
-import type {CSSProperties} from 'react'
+import type {CSSProperties, MouseEvent} from 'react'
+import {useId, useState} from 'react'
 import {selectCommandError} from '../transfer/selectors'
 import type {IdleTransferState} from '../transfer/state'
+import type {ReceiveActivation} from '../transfer/useTransfer'
 import {BrowseControl} from './BrowseControl'
 import {Disclosure} from './Disclosure'
 import {NOTIFICATION_TEXT_ID} from './Notification'
@@ -51,6 +53,13 @@ interface IdleViewProps {
     readonly onSelectFile: () => void
     readonly onSelectDirectory: () => void
     readonly onOpenMultiple?: () => void
+    /**
+     * Receive: opens the folder chooser and starts a receive session. Resolves
+     * `dismissed` when the chooser was closed without a folder, in which case
+     * this view puts focus back on the control that opened it. Optional so the
+     * view still renders standalone, like `onOpenMultiple`.
+     */
+    readonly onReceive?: () => Promise<ReceiveActivation>
     /**
      * Story 9.6: the Stage-time command-failure card's own action wiring
      * (dropTargetStyle, onDismiss, browse/onRetry, busy) -- built by App using
@@ -104,9 +113,34 @@ export function IdleView({
     onSelectFile,
     onSelectDirectory,
     onOpenMultiple,
+    onReceive,
     commandErrorPanelProps,
 }: IdleViewProps) {
     const commandError = selectCommandError(state)
+    const receiveHintId = useId()
+    // Whether focus was put back on Receive by script after a keyboard
+    // activation. WebKit never matches `:focus-visible` for a script-focused
+    // element (AGENTS.md, WebKit focus fact 2), so the ring is keyed to this
+    // marker -- the same `[data-focus-return]` BrowseControl uses -- and cleared
+    // on blur. A pointer activation never sets it, which is what keeps the ring
+    // from painting after a mouse click.
+    const [receiveFocusReturned, setReceiveFocusReturned] = useState(false)
+
+    async function handleReceive(event: MouseEvent<HTMLButtonElement>): Promise<void> {
+        if (onReceive === undefined) return
+        const button = event.currentTarget
+        // `detail` is 0 for a click synthesized from the keyboard.
+        const fromKeyboard = event.detail === 0
+        // WebKit does not focus a clicked <button> (AGENTS.md, fact 3), and the
+        // chooser is an OS dialog that hands focus back to the window afterwards.
+        // Focus is put on the control explicitly so "back to Receive" is a fact
+        // on every engine and not only on the ones that focus on click.
+        button.focus()
+        const result = await onReceive()
+        if (result !== 'dismissed' || !button.isConnected) return
+        button.focus()
+        setReceiveFocusReturned(fromKeyboard)
+    }
 
     if (commandError !== null) {
         return (
@@ -216,7 +250,31 @@ export function IdleView({
                   surface and rule between the two rows it now contains. See
                   `.fd-idle-disclosures` in style.css.
                 */}
-                <div className="fd-idle-disclosures fd-rise" style={rise(4)}>
+                {onReceive === undefined ? null : (
+                    /*
+                      Outside the drop zone on purpose. The zone is a native
+                      drop target for *sending*; Receive is the opposite
+                      direction, and a button inside the zone would read as one
+                      more way to send. It sits between the zone and the
+                      disclosures as its own small row: one line saying what it
+                      is for, and the one control.
+                    */
+                    <div className="fd-receive-entry fd-rise" style={rise(4)} data-receive-entry>
+                        <p className="fd-meta" id={receiveHintId}>{copy.receive.hint}</p>
+                        <button
+                            type="button"
+                            className="fd-button fd-button--secondary fd-target"
+                            aria-describedby={receiveHintId}
+                            data-focus-return={receiveFocusReturned ? '' : undefined}
+                            onBlur={() => setReceiveFocusReturned(false)}
+                            onClick={(event) => void handleReceive(event)}
+                        >
+                            {copy.receive.open}
+                        </button>
+                    </div>
+                )}
+
+                <div className="fd-idle-disclosures fd-rise" style={rise(5)}>
                     {/*
                       FR23 amendment (Story 7.3, reordered by Story 7.8):
                       still present on first paint, but collapsed by default

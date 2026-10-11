@@ -1,0 +1,60 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-announced-xebqn3bn/frontend
+
+ ❯ src/ui/announce.receive.test.ts (19 tests | 2 failed | 15 skipped) 6ms
+     × is spoken by the announcer, not focused 4ms
+     × is spoken again for each further refusal 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/announce.receive.test.ts > a refused upload > is spoken by the announcer, not focused
+AssertionError: expected null to deeply equal { row: 'receive-notice', …(2) }
+
+- Expected:
+{
+  "owner": "announcer",
+  "row": "receive-notice",
+  "text": "A phone tried to upload more than this computer has room for. FairDrop is still waiting. Choose fewer files on the phone, or cancel and pick a folder with more free space.",
+}
+
++ Received:
+null
+
+ ❯ src/ui/announce.receive.test.ts:76:68
+     74| describe('a refused upload', () => {
+     75|     it('is spoken by the announcer, not focused', () => {
+     76|         expect(routeTransition(waiting(), waiting({refusals: 1}))).toE…
+       |                                                                    ^
+     77|             row: 'receive-notice',
+     78|             owner: 'announcer',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/announce.receive.test.ts > a refused upload > is spoken again for each further refusal
+AssertionError: expected null to match object { row: 'receive-notice', …(1) }
+
+- Expected:
+{
+  "owner": "announcer",
+  "row": "receive-notice",
+}
+
++ Received:
+null
+
+ ❯ src/ui/announce.receive.test.ts:84:81
+     82|
+     83|     it('is spoken again for each further refusal', () => {
+     84|         expect(routeTransition(waiting({refusals: 1}), waiting({refusa…
+       |                                                                                 ^
+     85|     })
+     86|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed | 15 skipped (19)
+   Start at  01:16:11
+   Duration  422ms (transform 35ms, setup 0ms, import 43ms, tests 6ms, environment 290ms)
+

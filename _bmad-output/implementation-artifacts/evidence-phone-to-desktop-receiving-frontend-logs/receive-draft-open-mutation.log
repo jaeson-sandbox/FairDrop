@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-draft-open-oqm5n8mk/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (48 tests | 1 failed | 39 skipped) 22ms
+     × refuses Receive while the collection draft is open, without opening a chooser 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > send flows stay out of a receive session > refuses Receive while the collection draft is open, without opening a chooser
+AssertionError: expected 'dismissed' to be 'ignored' // Object.is equality
+
+Expected: "ignored"
+Received: "dismissed"
+
+ ❯ src/transfer/useTransfer.receive.test.tsx:665:24
+    663|         await act(async () => { result = await hook.result.current.rec…
+    664|
+    665|         expect(result).toBe('ignored')
+       |                        ^
+    666|         expect(mocks.selectReceiveFolder).not.toHaveBeenCalled()
+    667|         expect(hook.result.current.draft?.names).toEqual(['a', 'b'])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed | 39 skipped (48)
+   Start at  01:15:38
+   Duration  512ms (transform 76ms, setup 0ms, import 129ms, tests 22ms, environment 283ms)
+

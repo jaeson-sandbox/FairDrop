@@ -1,0 +1,48 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-outcome-held-dge9rkpp/frontend
+
+ ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 6ms
+     × is held: nothing but a reset moves it 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > the held outcome > is held: nothing but a reset moves it
+AssertionError: expected { phase: 'idle', …(2) } to be { phase: 'receive-outcome', …(4) } // Object.is equality
+
+- Expected
++ Received
+
+  {
+    "commandError": null,
+-   "destination": "Phone Photos",
+-   "outcome": {
+-     "filesSaved": 3,
+-     "kind": "complete",
+-     "markingWarning": false,
+-     "subfolderExists": true,
+-   },
+-   "phase": "receive-outcome",
+-   "session": {
+-     "lastSeq": 2,
+-     "sessionId": "0102030405060708090a0b0c0d0e0f10",
+-   },
++   "phase": "idle",
++   "retainedOutcome": null,
+  }
+
+ ❯ src/transfer/state.receive.test.ts:367:115
+    365|     it('is held: nothing but a reset moves it', () => {
+    366|         const held = outcomeState()
+    367|         expect(run(held, event('transfer-progress', {seq: 3, progress:…
+       |                                                                                                                   ^
+    368|         expect(run(held, event('transfer-started', {seq: 3}))).toBe(he…
+    369|         expect(run(held, event('transfer-notice', {seq: 3, notice: 're…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  01:16:06
+   Duration  433ms (transform 45ms, setup 0ms, import 55ms, tests 6ms, environment 288ms)
+

@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-route-outcome-focus-qaevl7tk/frontend
+
+ ❯ src/ui/announce.receive.test.ts (19 tests | 1 failed | 18 skipped) 5ms
+     × focuses the outcome when a receive ends, whichever way it ended 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/announce.receive.test.ts > the outcome and leaving it > focuses the outcome when a receive ends, whichever way it ended
+AssertionError: expected null to deeply equal { row: 'receive-outcome', …(2) }
+
+- Expected:
+{
+  "owner": "focus",
+  "row": "receive-outcome",
+  "target": "receive-outcome",
+}
+
++ Received:
+null
+
+ ❯ src/ui/announce.receive.test.ts:133:56
+    131|         for (const kind of ['complete', 'incomplete', 'cancelled'] as …
+    132|             const next = outcome({outcome: {kind, filesSaved: 1, subfo…
+    133|             expect(routeTransition(receiving(), next)).toEqual({row: '…
+       |                                                        ^
+    134|         }
+    135|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  01:16:30
+   Duration  419ms (transform 37ms, setup 0ms, import 46ms, tests 5ms, environment 287ms)
+

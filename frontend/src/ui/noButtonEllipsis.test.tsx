@@ -5,11 +5,17 @@ import type {FileMetadata, ProgressSnapshot, PublicError} from '../transfer/type
 import type {
     IdleTransferState,
     PendingTransferState,
+    ReceiveOutcomeTransferState,
+    ReceiveReceivingTransferState,
+    ReceiveWaitingTransferState,
     StagedTransferState,
     TransferringTransferState,
 } from '../transfer/state'
 import {IdleView} from './IdleView'
 import {OutcomePanel} from './OutcomePanel'
+import {ReceiveOutcomeView} from './ReceiveOutcomeView'
+import {ReceiveWaitingView} from './ReceiveWaitingView'
+import {ReceivingView} from './ReceivingView'
 import {StagePendingCard} from './StagePendingCard'
 import {StagedView} from './StagedView'
 import {TransferringView} from './TransferringView'
@@ -226,6 +232,119 @@ describe('no button or menu item ends in an ellipsis (Epic 9, owner rule 2026-09
             <OutcomePanel outcome={{kind: 'error', retained: true, error}} onDismiss={() => undefined}/>,
         )
         assertNoTrailingEllipsis(container, 'retained Error outcome')
+    })
+})
+
+/*
+  The receive views (spec-phone-to-desktop-receiving, Story B) join the same
+  rule. "Preparing to receive…" is a heading, out of the rule like the other
+  Preparing headings; every control a receive view renders is swept here, in
+  each state it ships a different label in (Canceling, the outcome's two
+  actions, a failed start's retry labels).
+*/
+describe('no receive button or menu item ends in an ellipsis', () => {
+    const receiveMetadata = {
+        sessionId: '0'.repeat(32),
+        destination: 'Phone Photos',
+        url: 'http://192.0.2.1:34123/upload/deadbeef',
+        qrBase64: '',
+        warnings: [],
+    }
+    const session = {sessionId: '0'.repeat(32), lastSeq: 1}
+
+    function waiting(overrides: Partial<ReceiveWaitingTransferState> = {}): ReceiveWaitingTransferState {
+        return {phase: 'receive-waiting', session, metadata: receiveMetadata, cancelPending: false, commandError: null, refusals: 0, ...overrides}
+    }
+
+    function receiving(overrides: Partial<ReceiveReceivingTransferState> = {}): ReceiveReceivingTransferState {
+        return {
+            phase: 'receive-receiving', session, metadata: receiveMetadata, filesSaved: 2, cancelPending: false, commandError: null,
+            progress: {bytesSent: 10, totalBytes: 100, totalKnown: true, percent: 10, speedBytesPerSec: 1},
+            ...overrides,
+        }
+    }
+
+    function outcome(overrides: Partial<ReceiveOutcomeTransferState['outcome']> = {}, commandError: PublicError | null = null): ReceiveOutcomeTransferState {
+        return {
+            phase: 'receive-outcome', session, destination: 'Phone Photos', commandError,
+            outcome: {kind: 'complete', filesSaved: 2, subfolderExists: true, markingWarning: false, ...overrides},
+        }
+    }
+
+    it('Idle with the Receive entry', () => {
+        const {container} = render(
+            <IdleView
+                state={idle()}
+                dropTargetStyle={dropTargetStyle}
+                cancelWon={false}
+                onSelectFile={() => undefined}
+                onSelectDirectory={() => undefined}
+                onReceive={() => Promise.resolve('proceeded')}
+                commandErrorPanelProps={{}}
+            />,
+        )
+        assertNoTrailingEllipsis(container, 'Idle with Receive')
+    })
+
+    it('Receive pending, and with the cancellation requested', () => {
+        const first = render(<StagePendingCard state={{...pending(false), itemKind: 'receive'}} onCancel={() => undefined}/>)
+        assertNoTrailingEllipsis(first.container, 'Receive pending')
+        first.unmount()
+        const second = render(<StagePendingCard state={{...pending(true), itemKind: 'receive'}} onCancel={() => undefined}/>)
+        assertNoTrailingEllipsis(second.container, 'Receive pending, cancelling')
+    })
+
+    it('Receive waiting, and with the cancellation requested', () => {
+        const first = render(<ReceiveWaitingView state={waiting()} onCancel={() => undefined}/>)
+        assertNoTrailingEllipsis(first.container, 'Receive waiting')
+        first.unmount()
+        const second = render(<ReceiveWaitingView state={waiting({cancelPending: true, refusals: 1})} onCancel={() => undefined}/>)
+        assertNoTrailingEllipsis(second.container, 'Receive waiting, cancelling')
+    })
+
+    it('Receiving, and with the cancellation requested', () => {
+        const first = render(<ReceivingView state={receiving()} onCancel={() => undefined}/>)
+        assertNoTrailingEllipsis(first.container, 'Receiving')
+        first.unmount()
+        const second = render(<ReceivingView state={receiving({cancelPending: true})} onCancel={() => undefined}/>)
+        assertNoTrailingEllipsis(second.container, 'Receiving, cancelling')
+    })
+
+    it.each(['complete', 'incomplete', 'cancelled'] as const)('the %s outcome, with and without a folder to show', (kind) => {
+        const withFolder = render(<ReceiveOutcomeView state={outcome({kind})} onShowInFolder={() => undefined} onDone={() => undefined}/>)
+        assertNoTrailingEllipsis(withFolder.container, `${kind} outcome`)
+        withFolder.unmount()
+        const without = render(
+            <ReceiveOutcomeView
+                state={outcome({kind, filesSaved: 0, subfolderExists: false})}
+                onShowInFolder={() => undefined}
+                onDone={() => undefined}
+            />,
+        )
+        assertNoTrailingEllipsis(without.container, `${kind} outcome with no folder`)
+    })
+
+    it('a failed Receive start, with each retry label', () => {
+        const first = render(
+            <OutcomePanel
+                outcome={{kind: 'error', retained: false, error}}
+                receive
+                onRetry={() => undefined}
+                onDismiss={() => undefined}
+            />,
+        )
+        assertNoTrailingEllipsis(first.container, 'receive failure, Try Again')
+        first.unmount()
+        const second = render(
+            <OutcomePanel
+                outcome={{kind: 'error', retained: false, error}}
+                receive
+                onRetry={() => undefined}
+                retryLabel="Choose Another Folder"
+                onDismiss={() => undefined}
+            />,
+        )
+        assertNoTrailingEllipsis(second.container, 'receive failure, Choose Another Folder')
     })
 })
 

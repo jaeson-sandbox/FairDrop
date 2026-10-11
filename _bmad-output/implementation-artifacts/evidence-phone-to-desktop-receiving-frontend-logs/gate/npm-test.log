@@ -1,0 +1,14 @@
+compdef:153: _comps: assignment to invalid subscript range
+
+> fairdrop-frontend@1.4.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a732077f8dce492a2/frontend
+
+
+ Test Files  34 passed (34)
+      Tests  1253 passed (1253)
+   Start at  01:13:14
+   Duration  4.21s (transform 2.05s, setup 0ms, import 5.12s, tests 7.55s, environment 18.91s)
+

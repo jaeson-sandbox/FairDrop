@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-done-calls-cancel-_z3jyl4s/frontend
+
+ ❯ src/App.receive.test.tsx (38 tests | 1 failed | 37 skipped) 68ms
+     × Done leaves through the existing Cancel command, never a new one 67ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/App.receive.test.tsx > the held outcome at the App boundary > Done leaves through the existing Cancel command, never a new one
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ src/App.receive.test.tsx:366:30
+    364|         fireEvent.click(screen.getByRole('button', {name: 'Done'}))
+    365|
+    366|         expect(mocks.cancel).toHaveBeenCalledTimes(1)
+       |                              ^
+    367|         expect(mocks.dismissRetained).not.toHaveBeenCalled()
+    368|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  01:16:02
+   Duration  632ms (transform 134ms, setup 0ms, import 197ms, tests 68ms, environment 288ms)
+

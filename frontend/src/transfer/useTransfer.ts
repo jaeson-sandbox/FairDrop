@@ -1,10 +1,20 @@
 import {useCallback, useEffect, useReducer, useRef, useState} from 'react'
-import {CancelTransfer, SelectDirectory, SelectFile, SelectFiles, StageTransfer, StageTransfers} from '../../wailsjs/go/main/App'
+import {
+    CancelTransfer,
+    SelectDirectory,
+    SelectFile,
+    SelectFiles,
+    SelectReceiveFolder,
+    ShowReceivedFolder,
+    StageTransfer,
+    StageTransfers,
+    StartReceive,
+} from '../../wailsjs/go/main/App'
 import {EventsOn} from '../../wailsjs/runtime/runtime'
 import {parseCommandError, publicError} from './errors'
 import {selectErrorAction} from './selectors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
-import {parseFileMetadata} from './validation'
+import {parseFileMetadata, parseReceiveMetadata} from './validation'
 import type {LifecycleEventName, PendingItemKind, PublicError} from './types'
 
 interface StageOperation {
@@ -20,13 +30,37 @@ interface ActiveCancelOperation {
 
 interface BrowseOperation {
     readonly generation: number
+    /** True for the folder chooser Receive opens, which Cancel and unmount must also invalidate. */
+    readonly receive?: boolean
 }
+
+/**
+ * How one activation of Receive ended, for the caller that owns focus.
+ *
+ * `dismissed` is the only result a view acts on: the chooser was closed
+ * without a folder, nothing changed, and focus belongs back on the control
+ * that opened it. `proceeded` means a folder was chosen and a session start
+ * was attempted (its result arrives as state), and `ignored` means the
+ * activation was refused before any chooser opened -- another operation was
+ * already in flight, or the controller is gone.
+ */
+export type ReceiveActivation = 'dismissed' | 'proceeded' | 'ignored'
 
 export interface TransferController {
     readonly state: TransferState
     readonly stage: (absolutePath: string, itemKind?: PendingItemKind) => Promise<void>
     readonly selectFile: () => Promise<void>
     readonly selectDirectory: () => Promise<void>
+    /**
+     * Receive: opens the folder chooser, then starts a receive session into the
+     * chosen folder. A dismissed chooser changes nothing. Single-flight: a
+     * second activation while the chooser is open or the session is starting is
+     * refused rather than queued, and unmount or Cancel invalidates a chooser
+     * result that arrives late.
+     */
+    readonly receive: () => Promise<ReceiveActivation>
+    /** Opens the held receive outcome's subfolder in the OS file manager. */
+    readonly showReceivedFolder: () => Promise<void>
     readonly cancel: () => Promise<void>
     readonly rejectSelection: () => void
     /** Reported by the staged view, which is the only thing that issues the command. */
@@ -119,6 +153,7 @@ export function useTransfer(): TransferController {
     const draftAdmissionRef = useRef(false)
     const selectionEpochRef = useRef(0)
     const sendAgainPendingRef = useRef(false)
+    const showFolderPendingRef = useRef(false)
     const idleWaitersRef = useRef<Set<() => void>>(new Set())
     stateRef.current = state
 
@@ -142,6 +177,7 @@ export function useTransfer(): TransferController {
             draftChooserRef.current = null
             selectionEpochRef.current += 1
             sendAgainPendingRef.current = false
+            showFolderPendingRef.current = false
             for (const resolve of idleWaitersRef.current) resolve()
             idleWaitersRef.current = new Set()
         }
@@ -177,6 +213,7 @@ export function useTransfer(): TransferController {
             disposers.push(subscribe('transfer-complete'))
             disposers.push(subscribe('transfer-error'))
             disposers.push(subscribe('transfer-reset'))
+            disposers.push(subscribe('transfer-notice'))
         } catch (error) {
             if (subscriptionEpochRef.current === epoch) subscriptionEpochRef.current = epoch + 1
             disposeAll(disposers)
@@ -290,31 +327,34 @@ export function useTransfer(): TransferController {
     const browse = useCallback(async (
         open: () => Promise<string>,
         itemKind: PendingItemKind,
-    ): Promise<void> => {
-        if (!mountedRef.current || stateRef.current.phase !== 'idle') return
-        if (stageOperationRef.current !== null || browseOperationRef.current !== null) return
+        proceed: (selected: string) => Promise<void> = (selected) => stage(selected, itemKind),
+        receive = false,
+    ): Promise<ReceiveActivation> => {
+        if (!mountedRef.current || stateRef.current.phase !== 'idle') return 'ignored'
+        if (stageOperationRef.current !== null || browseOperationRef.current !== null) return 'ignored'
 
         const generation = stageGenerationRef.current + 1
         stageGenerationRef.current = generation
-        const operation: BrowseOperation = {generation}
+        const operation: BrowseOperation = receive ? {generation, receive: true} : {generation}
         browseOperationRef.current = operation
 
         try {
             const selected = await Promise.resolve().then(open)
-            if (!browseMayCommit(operation)) return
+            if (!browseMayCommit(operation)) return 'ignored'
 
             // A dismissed chooser returns an empty selection, which the spine
             // makes a quiet cancel: no dispatch, no error, no announcement.
-            if (typeof selected !== 'string' || selected.trim() === '') return
+            if (typeof selected !== 'string' || selected.trim() === '') return 'dismissed'
 
             browseOperationRef.current = null
-            await stage(selected, itemKind)
+            await proceed(selected)
+            return 'proceeded'
         } catch (rejection) {
-            if (!browseMayCommit(operation)) return
+            if (!browseMayCommit(operation)) return 'ignored'
             // The success path is guarded by stage()'s own idle check; this one
             // has to make it itself, or a chooser that failed while a drop was
             // being staged would report against someone else's session.
-            if (stateRef.current.phase !== 'idle') return
+            if (stateRef.current.phase !== 'idle') return 'ignored'
 
             // The chooser failed, so no Stage was ever attempted -- yet the
             // reducer is the only owner of a visible command error, and its one
@@ -324,13 +364,101 @@ export function useTransfer(): TransferController {
             // a preparation that never started.
             dispatch({type: 'stage-requested', generation, itemKind})
             dispatchStageFailed(generation, parseCommandError(rejection))
+            return 'proceeded'
         } finally {
             if (browseOperationRef.current === operation) browseOperationRef.current = null
         }
     }, [stage])
 
-    const selectFile = useCallback(() => browse(SelectFile, 'file'), [browse])
-    const selectDirectory = useCallback(() => browse(SelectDirectory, 'directory'), [browse])
+    const selectFile = useCallback(async () => { await browse(SelectFile, 'file') }, [browse])
+    const selectDirectory = useCallback(async () => { await browse(SelectDirectory, 'directory') }, [browse])
+
+    /**
+     * Starts a receive session into an already-chosen folder.
+     *
+     * The receive twin of `stagePaths`, and deliberately not built on it:
+     * nothing here is remembered. A receive never stores its folder, so there
+     * is nothing for Send Again or Try Again to re-stage, and starting one
+     * forgets any send path so a stale one cannot be offered beside it. It
+     * shares the Stage operation slot, which is what makes Cancel preparation,
+     * the cancelled-while-pending race and the unmount cleanup the same proven
+     * machinery as a send rather than a second copy of it.
+     */
+    const startReceiveAt = useCallback(async (folder: string): Promise<void> => {
+        if (!mountedRef.current || stateRef.current.phase !== 'idle') return
+        if (stageOperationRef.current !== null || browseOperationRef.current !== null) return
+
+        const generation = stageGenerationRef.current + 1
+        stageGenerationRef.current = generation
+        selectionEpochRef.current += 1
+        rememberedPathsRef.current = null
+        const promise = Promise.resolve().then(() => StartReceive(folder) as Promise<unknown>)
+        const operation: StageOperation = {generation, promise, cancelRequested: false}
+        stageOperationRef.current = operation
+        dispatch({type: 'stage-requested', generation, itemKind: 'receive'})
+
+        try {
+            const rawMetadata = await promise
+            if (!stageMayCommit(operation)) return
+
+            const metadata = parseReceiveMetadata(rawMetadata)
+            if (metadata === null) {
+                operation.cancelRequested = true
+                // The same rule as a malformed Stage acknowledgement: it may
+                // still describe a live backend session with a listener, so
+                // quiesce it once before reporting that nothing started.
+                let quiesced = true
+                try {
+                    await CancelTransfer()
+                } catch {
+                    quiesced = false
+                }
+                if (mountedRef.current && stageOperationRef.current === operation) {
+                    dispatchStageFailed(generation, publicError(quiesced ? 'setup_failed' : 'cleanup_unconfirmed'))
+                }
+                if (stageOperationRef.current === operation) stageOperationRef.current = null
+                return
+            }
+
+            dispatch({type: 'receive-started', generation, metadata})
+        } catch (rejection) {
+            if (!stageMayCommit(operation)) return
+            dispatchStageFailed(generation, parseCommandError(rejection))
+        } finally {
+            if (stageOperationRef.current === operation && !operation.cancelRequested) {
+                stageOperationRef.current = null
+            }
+        }
+    }, [])
+
+    const receive = useCallback(async (): Promise<ReceiveActivation> => {
+        // The collection draft replaces Idle's composition, so no control can
+        // reach this while one is open; the guard is for a caller that is not a
+        // control, and keeps "one thing at a time" true at the command level.
+        if (draftPathsRef.current !== null || draftChooserRef.current !== null || draftAdmissionRef.current) return 'ignored'
+        return browse(SelectReceiveFolder, 'receive', startReceiveAt, true)
+    }, [browse, startReceiveAt])
+
+    const showReceivedFolder = useCallback(async (): Promise<void> => {
+        const current = stateRef.current
+        // Only the held outcome, only when its subfolder exists, and only one
+        // launch at a time: the OS file manager is not something to open twice
+        // because a button was pressed twice.
+        if (!mountedRef.current || current.phase !== 'receive-outcome' || !current.outcome.subfolderExists) return
+        if (showFolderPendingRef.current) return
+        showFolderPendingRef.current = true
+        const sessionId = current.session.sessionId
+        dispatch({type: 'receive-show-requested', sessionId})
+        try {
+            await ShowReceivedFolder()
+        } catch {
+            // The rejection is adapter text and never shown; the failure is
+            // reported as a fixed note beside an outcome that is still true.
+            if (mountedRef.current) dispatch({type: 'receive-show-failed', sessionId})
+        } finally {
+            showFolderPendingRef.current = false
+        }
+    }, [])
 
     const cancelImpl = useCallback(async (releaseForOutcome: boolean): Promise<boolean | void> => {
         const current = stateRef.current
@@ -338,6 +466,10 @@ export function useTransfer(): TransferController {
             rememberedPathsRef.current = null
             draftRecoveryRef.current = null
             selectionEpochRef.current += 1
+            // A folder chooser still open when Cancel lands belongs to a
+            // session the user has just abandoned; whatever it returns later
+            // must not start one.
+            if (browseOperationRef.current?.receive === true) browseOperationRef.current = null
             // A live terminal Cancel can reject without a reset event. The
             // reducer then stays on Done, so refresh the derived action
             // availability after forgetting the path.
@@ -372,7 +504,7 @@ export function useTransfer(): TransferController {
         // transition comes from the backend's own transfer-reset, which is what
         // retires the session and returns the UI to Idle with the outcome
         // retained.
-        if (current.phase === 'done' || current.phase === 'error') {
+        if (current.phase === 'done' || current.phase === 'error' || current.phase === 'receive-outcome') {
             const outstanding = activeCancelRef.current
             if (outstanding !== null && outstanding.sessionId === current.session.sessionId) return
 
@@ -400,7 +532,8 @@ export function useTransfer(): TransferController {
             return true
         }
 
-        if (current.phase !== 'staged' && current.phase !== 'transferring') return
+        if (current.phase !== 'staged' && current.phase !== 'transferring' &&
+            current.phase !== 'receive-waiting' && current.phase !== 'receive-receiving') return
         if (current.cancelPending) return
         const outstandingCancel = activeCancelRef.current
         if (outstandingCancel !== null && outstandingCancel.sessionId === current.session.sessionId) return
@@ -607,7 +740,7 @@ export function useTransfer(): TransferController {
     }
 
     return {
-        state, stage, selectFile, selectDirectory, cancel, rejectSelection, reportCopyFailure, dismissRetained,
+        state, stage, selectFile, selectDirectory, receive, showReceivedFolder, cancel, rejectSelection, reportCopyFailure, dismissRetained,
         stageFromOutcome, selectFromOutcome, retry, sendAgain,
         canRetry: rememberedPathsRef.current !== null,
         canSendAgain: rememberedPathsRef.current !== null &&
@@ -646,7 +779,8 @@ export function useTransfer(): TransferController {
             cancelGenerationRef.current !== operation.generation) return false
 
         const latest = stateRef.current
-        return (latest.phase === 'staged' || latest.phase === 'transferring') &&
+        return (latest.phase === 'staged' || latest.phase === 'transferring' ||
+            latest.phase === 'receive-waiting' || latest.phase === 'receive-receiving') &&
             latest.session.sessionId === operation.sessionId
     }
 }

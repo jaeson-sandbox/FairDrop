@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-rejects-send-events-xrsbdd_1/frontend
+
+ ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 4ms
+     × refuses progress with no receive payload and progress with an unknown total 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > receiving > refuses progress with no receive payload and progress with an unknown total
+TypeError: Cannot read properties of undefined (reading 'filesSaved')
+ ❯ reduceReceiveReceiving src/transfer/state.ts:519:85
+    517|             // that does not is not a receive progress event.
+    518|             if (!event.progress.totalKnown) return state
+    519|             if (!progressCanFollow(state.progress, event.progress) || …
+       |                                                                                     ^
+    520|             return {...state, session, progress: event.progress, files…
+    521|         }
+ ❯ reduceLifecycle src/transfer/state.ts:380:20
+ ❯ transferReducer src/transfer/state.ts:293:45
+ ❯ run src/transfer/state.receive.test.ts:41:20
+ ❯ src/transfer/state.receive.test.ts:251:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  01:16:19
+   Duration  426ms (transform 45ms, setup 0ms, import 57ms, tests 4ms, environment 286ms)
+

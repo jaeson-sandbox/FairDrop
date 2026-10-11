@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-dismissal-focus-return-hy1kcpz9/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  7 passed | 13 skipped (20)
+   Start at  01:15:11
+   Duration  614ms (transform 72ms, setup 0ms, import 124ms, tests 127ms, environment 286ms)
+

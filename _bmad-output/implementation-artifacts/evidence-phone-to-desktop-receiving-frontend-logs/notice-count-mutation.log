@@ -1,0 +1,41 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-count-ao6fettx/frontend
+
+ ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 6ms
+     × counts each refused upload as a new state and keeps waiting 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > waiting for a phone > counts each refused upload as a new state and keeps waiting
+AssertionError: expected { phase: 'receive-waiting', …(5) } to match object { phase: 'receive-waiting', …(2) }
+(8 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "phase": "receive-waiting",
+-   "refusals": 1,
++   "refusals": 0,
+    "session": {
+      "lastSeq": 1,
+      "sessionId": "0102030405060708090a0b0c0d0e0f10",
+    },
+  }
+
+ ❯ src/transfer/state.receive.test.ts:161:22
+    159|         const twice = run(once, event('transfer-notice', {seq: 2, noti…
+    160|
+    161|         expect(once).toMatchObject({phase: 'receive-waiting', refusals…
+       |                      ^
+    162|         expect(twice).toMatchObject({phase: 'receive-waiting', refusal…
+    163|         expect(twice).not.toBe(once)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  01:16:09
+   Duration  434ms (transform 45ms, setup 0ms, import 57ms, tests 6ms, environment 290ms)
+

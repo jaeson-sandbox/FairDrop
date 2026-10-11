@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-status-complete-result-dr9w7qcl/frontend
+
+ ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 79 skipped) 4ms
+     × refuses error saying complete 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/validation.receive.test.ts > parseReceiveStatus > refuses error saying complete
+AssertionError: expected { filesSaved: 1, …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "filesSaved": 1,
+  "markingWarning": false,
+  "result": "complete",
+  "subfolderExists": true,
+}
+
+ ❯ src/transfer/validation.receive.test.ts:137:49
+    135|         ['an array', [], 'progress'],
+    136|     ] as const)('refuses %s', (_name, value, kind) => {
+    137|         expect(parseReceiveStatus(value, kind)).toBeNull()
+       |                                                 ^
+    138|     })
+    139| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 79 skipped (80)
+   Start at  01:15:33
+   Duration  420ms (transform 35ms, setup 0ms, import 45ms, tests 4ms, environment 288ms)
+

@@ -1,0 +1,44 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-reducer-bvwk__zr/frontend
+
+ ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 7ms
+     × shows an incomplete upload as incomplete with the exact count 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > receiving > shows an incomplete upload as incomplete with the exact count
+AssertionError: expected { phase: 'receive-outcome', …(4) } to deeply equal { phase: 'receive-outcome', …(4) }
+
+- Expected
++ Received
+
+@@ -1,11 +1,11 @@
+  {
+    "commandError": null,
+    "destination": "Phone Photos",
+    "outcome": {
+      "filesSaved": 2,
+-     "kind": "incomplete",
++     "kind": "complete",
+      "markingWarning": true,
+      "subfolderExists": true,
+    },
+    "phase": "receive-outcome",
+    "session": {
+
+ ❯ src/transfer/state.receive.test.ts:303:23
+    301|         }))
+    302|
+    303|         expect(state).toEqual({
+       |                       ^
+    304|             phase: 'receive-outcome',
+    305|             session: {sessionId, lastSeq: 2},
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  01:15:54
+   Duration  433ms (transform 47ms, setup 0ms, import 58ms, tests 7ms, environment 287ms)
+

@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-qr-draggable-cok0lr32/frontend
+
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 36 skipped) 681ms
+     × marks the receive QR non-draggable both ways 680ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive QR image cannot start a drag (AGENTS.md, WebKit fact 6) > marks the receive QR non-draggable both ways
+AssertionError: the receive QR <img> is draggable -- the Wails drop handler crashes on a non-file NSURL: expected true to be false // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+ ❯ browser/receive.test.tsx:378:120
+    376|         if (qr === null) throw new Error('.fd-qr did not render')
+    377|
+    378|         expect(qr.draggable, 'the receive QR <img> is draggable -- the…
+       |                                                                                                                        ^
+    379|         expect(
+    380|             getComputedStyle(qr).getPropertyValue('-webkit-user-drag')…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 36 skipped (37)
+   Start at  01:17:08
+   Duration  1.40s (transform 0ms, setup 0ms, import 176ms, tests 681ms, environment 0ms)
+

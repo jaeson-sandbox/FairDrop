@@ -1,0 +1,39 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-error-context-gt_3xdqj/frontend
+
+ ❯ src/transfer/state.receive.test.ts (38 tests | 1 failed | 37 skipped) 6ms
+     × marks a failed receive start so the failure card uses receive wording 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/state.receive.test.ts > starting a receive session > marks a failed receive start so the failure card uses receive wording
+AssertionError: expected { phase: 'idle', …(2) } to deeply equal { phase: 'idle', …(3) }
+
+- Expected
++ Received
+
+@@ -1,7 +1,6 @@
+  {
+-   "commandContext": "receive",
+    "commandError": {
+      "code": "path_not_found",
+      "message": "That file or folder is no longer available. Choose it again.",
+    },
+    "phase": "idle",
+
+ ❯ src/transfer/state.receive.test.ts:102:24
+    100|         const failed = run(pending, {type: 'stage-failed', generation:…
+    101|
+    102|         expect(failed).toEqual({
+       |                        ^
+    103|             phase: 'idle',
+    104|             retainedOutcome: null,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  01:16:22
+   Duration  440ms (transform 47ms, setup 0ms, import 57ms, tests 6ms, environment 287ms)
+

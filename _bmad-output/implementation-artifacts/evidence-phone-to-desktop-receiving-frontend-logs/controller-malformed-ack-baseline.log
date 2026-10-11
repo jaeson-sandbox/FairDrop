@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-controller-malformed-ack-qurg8yo3/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 47 skipped (48)
+   Start at  01:15:36
+   Duration  507ms (transform 75ms, setup 0ms, import 131ms, tests 10ms, environment 287ms)
+

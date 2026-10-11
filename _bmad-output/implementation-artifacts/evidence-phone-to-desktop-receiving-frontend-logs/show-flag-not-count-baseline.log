@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-flag-not-count-fin8869z/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 31 skipped (33)
+   Start at  01:15:40
+   Duration  541ms (transform 58ms, setup 0ms, import 112ms, tests 68ms, environment 283ms)
+

@@ -6,6 +6,9 @@ import {
     type LifecycleEventName,
     type ProgressSnapshot,
     type PublicError,
+    type ReceiveMetadata,
+    type ReceiveResult,
+    type ReceiveStatus,
     type Warning,
 } from './types'
 
@@ -59,6 +62,78 @@ export function parseFileMetadata(value: unknown): FileMetadata | null {
             qrBase64,
             warnings: parsedWarnings,
         }
+    } catch {
+        return null
+    }
+}
+
+/**
+ * Parses the `StartReceive` acknowledgement into a fresh record holding only
+ * contract fields.
+ *
+ * Stricter than it looks in two places that matter for a feature that writes
+ * to the user's disk. The URL must be the receive route (`/upload/` plus the
+ * 128-bit token), so a send URL cannot be mistaken for a receive session, and
+ * `destination` must be a plain display name: non-empty, bounded, and free of
+ * control characters, so a hostile or corrupted value cannot reach the view as
+ * anything but text. A volume root legitimately carries separators (it has no
+ * basename), so separators are not refused.
+ */
+export function parseReceiveMetadata(value: unknown): ReceiveMetadata | null {
+    try {
+        const record = asRecord(value)
+        if (record === null || !ownsExactly(record, receiveMetadataFields)) return null
+
+        const {sessionId, destination, url, qrBase64, warnings} = record
+        if (!isSessionId(sessionId) || !isDestinationName(destination)) return null
+        if (!isUploadURL(url) || !isCompletePNGBase64(qrBase64) || !Array.isArray(warnings)) return null
+
+        const parsedWarnings: Warning[] = []
+        for (const warning of warnings) {
+            const parsed = parseWarning(warning)
+            if (parsed === null) return null
+            parsedWarnings.push(parsed)
+        }
+
+        return {sessionId, destination, url, qrBase64, warnings: parsedWarnings}
+    } catch {
+        return null
+    }
+}
+
+/**
+ * Parses the `receive` payload of one event.
+ *
+ * `kind` is the event it arrived on, because the contract fixes what each may
+ * say: a progress event carries only a saved count (no result, both flags
+ * false); a complete event says `complete`; an error event says `incomplete` or
+ * `cancelled`. Anything else is malformed, including an extra field -- the
+ * payload is pinned to exactly these keys so nothing that names a path or a
+ * file can ride along.
+ */
+export function parseReceiveStatus(value: unknown, kind: 'progress' | 'complete' | 'error'): ReceiveStatus | null {
+    try {
+        const record = asRecord(value)
+        if (record === null) return null
+        const allowed = ['filesSaved', 'result', 'subfolderExists', 'markingWarning']
+        if (Object.keys(record).some((key) => !allowed.includes(key))) return null
+        if (!hasOwn(record, 'filesSaved') || !hasOwn(record, 'subfolderExists') || !hasOwn(record, 'markingWarning')) {
+            return null
+        }
+
+        const {filesSaved, subfolderExists, markingWarning} = record
+        if (!isNonNegativeSafeInteger(filesSaved)) return null
+        if (typeof subfolderExists !== 'boolean' || typeof markingWarning !== 'boolean') return null
+
+        if (kind === 'progress') {
+            if (hasOwn(record, 'result') || subfolderExists || markingWarning) return null
+            return {filesSaved, result: null, subfolderExists: false, markingWarning: false}
+        }
+
+        const result = record.result
+        if (!isReceiveResult(result)) return null
+        if (kind === 'complete' ? result !== 'complete' : result === 'complete') return null
+        return {filesSaved, result, subfolderExists, markingWarning}
     } catch {
         return null
     }
@@ -136,17 +211,22 @@ export function parseLifecycleEvent(eventName: unknown, args: readonly unknown[]
         const record = asRecord(args[0])
         if (record === null || !ownsEvery(record, ['sessionId', 'seq'])) return null
         if (!isNonEmptyString(record.sessionId) || !isPositiveSafeInteger(record.seq)) return null
+        // A notice field belongs to the notice event alone, and nothing else may
+        // borrow it: an unexpected one is a malformed event, not an ignored extra.
+        if (eventName !== 'transfer-notice' && hasOwn(record, 'notice')) return null
 
         const cursor = {sessionId: record.sessionId, seq: record.seq}
         switch (eventName) {
             case 'transfer-started':
-                if (ownsEither(record, 'progress', 'error')) return null
+                if (ownsEither(record, 'progress', 'error') || hasOwn(record, 'receive')) return null
                 return {...cursor, kind: eventName}
 
             case 'transfer-progress': {
                 if (!hasOwn(record, 'progress') || hasOwn(record, 'error')) return null
                 const progress = parseProgressSnapshot(record.progress)
-                return progress === null ? null : {...cursor, kind: eventName, progress}
+                if (progress === null) return null
+                const receive = parseOptionalReceive(record, 'progress')
+                return receive === undefined ? null : {...cursor, kind: eventName, progress, ...withReceive(receive)}
             }
 
             case 'transfer-complete': {
@@ -154,32 +234,72 @@ export function parseLifecycleEvent(eventName: unknown, args: readonly unknown[]
                 const progress = parseProgressSnapshot(record.progress)
                 if (progress === null) return null
                 if (progress.totalKnown && progress.bytesSent !== progress.totalBytes) return null
-                return {...cursor, kind: eventName, progress}
+                const receive = parseOptionalReceive(record, 'complete')
+                return receive === undefined ? null : {...cursor, kind: eventName, progress, ...withReceive(receive)}
             }
 
             case 'transfer-error': {
                 if (hasOwn(record, 'progress') && record.progress === undefined) return null
                 const progress = hasOwn(record, 'progress') ? parseProgressSnapshot(record.progress) : null
                 if (hasOwn(record, 'progress') && progress === null) return null
+                const receive = parseOptionalReceive(record, 'error')
+                if (receive === undefined) return null
 
-                return {
-                    ...cursor,
-                    kind: eventName,
-                    progress,
-                    error: parseTerminalError(record),
-                }
+                if (receive === null) return {...cursor, kind: eventName, progress, error: parseTerminalError(record)}
+
+                // The two results that end in an error event must agree with the
+                // code beside them. Only a cancellation may say `cancelled`, and an
+                // incomplete upload must never arrive dressed as one: either
+                // mismatch is a contradiction, and the event is refused rather
+                // than guessed at.
+                const cancelledCode = receiveCancelled(record)
+                if ((receive.result === 'cancelled') !== cancelledCode) return null
+                const error = cancelledCode ? publicError('cancelled') : parseTerminalError(record)
+                return {...cursor, kind: eventName, progress, error, receive}
             }
 
             case 'transfer-reset':
-                if (ownsEither(record, 'progress', 'error')) return null
+                if (ownsEither(record, 'progress', 'error') || hasOwn(record, 'receive')) return null
                 return {...cursor, kind: eventName}
+
+            case 'transfer-notice':
+                if (ownsEither(record, 'progress', 'error') || hasOwn(record, 'receive')) return null
+                if (record.notice !== 'receive_too_large') return null
+                return {...cursor, kind: eventName, notice: record.notice}
         }
     } catch {
         return null
     }
 }
 
+/** The `receive` field of a parsed event: present only for a receive session, so a send event keeps its exact shape. */
+function withReceive(receive: ReceiveStatus | null): {readonly receive?: ReceiveStatus} {
+    return receive === null ? {} : {receive}
+}
+
+/**
+ * The event's `receive` payload: `null` when the field is absent (a send
+ * event), the parsed status when it is present and well formed, and
+ * `undefined` when it is present and malformed -- the caller refuses the whole
+ * event in that case.
+ */
+function parseOptionalReceive(
+    record: UnknownRecord,
+    kind: 'progress' | 'complete' | 'error',
+): ReceiveStatus | null | undefined {
+    if (!hasOwn(record, 'receive')) return null
+    return parseReceiveStatus(record.receive, kind) ?? undefined
+}
+
+/** Whether a terminal error event's own code is the cancellation code. */
+function receiveCancelled(record: UnknownRecord): boolean {
+    if (!hasOwn(record, 'error')) return false
+    const parsed = parsePublicError(record.error)
+    return parsed !== null && parsed.code === 'cancelled'
+}
+
 const metadataFields = ['sessionId', 'name', 'size', 'isDir', 'url', 'qrBase64', 'warnings'] as const
+const receiveMetadataFields = ['sessionId', 'destination', 'url', 'qrBase64', 'warnings'] as const
 const progressFields = ['bytesSent', 'totalBytes', 'totalKnown', 'percent', 'speedBytesPerSec'] as const
 
 function parseTerminalError(record: UnknownRecord): PublicError {
@@ -207,6 +327,10 @@ function ownsEvery(record: UnknownRecord, keys: readonly string[]): boolean {
     return keys.every((key) => hasOwn(record, key))
 }
 
+function ownsExactly(record: UnknownRecord, keys: readonly string[]): boolean {
+    return Object.keys(record).length === keys.length && ownsEvery(record, keys)
+}
+
 function ownsEither(record: UnknownRecord, first: string, second: string): boolean {
     return hasOwn(record, first) || hasOwn(record, second)
 }
@@ -217,6 +341,8 @@ function isNonEmptyString(value: unknown): value is string {
 
 const sessionIdPattern = /^[0-9a-f]{32}$/
 const capabilityURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/download\/[0-9a-f]{32})$/
+const uploadURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/upload\/[0-9a-f]{32})$/
+const maximumDestinationLength = 1024
 const maximumQRBase64Length = 2 * 1024 * 1024
 const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10] as const
 
@@ -232,6 +358,25 @@ function isCapabilityURL(value: unknown): value is string {
     const port = Number(match[2])
     if (octets.some((octet) => octet > 255) || !Number.isInteger(port) || port < 1 || port > 65535) return false
     return true
+}
+
+function isUploadURL(value: unknown): value is string {
+    if (typeof value !== 'string') return false
+    const match = uploadURLPattern.exec(value)
+    if (match === null) return false
+    const octets = match[1].split('.').map(Number)
+    const port = Number(match[2])
+    return !octets.some((octet) => octet > 255) && Number.isInteger(port) && port >= 1 && port <= 65535
+}
+
+/** A name to display: present, bounded, and free of control characters. */
+function isDestinationName(value: unknown): value is string {
+    return typeof value === 'string' && value.trim() !== '' && value.length <= maximumDestinationLength &&
+        !/\p{Cc}/u.test(value)
+}
+
+function isReceiveResult(value: unknown): value is ReceiveResult {
+    return value === 'complete' || value === 'incomplete' || value === 'cancelled'
 }
 
 function isCompletePNGBase64(value: unknown): value is string {

@@ -1,0 +1,85 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancel-code-contradiction-pt0f47j4/frontend
+
+ ❯ src/transfer/validation.receive.test.ts (80 tests | 3 failed | 77 skipped) 5ms
+     × refuses an incomplete result beside the cancelled code: a contradiction is never guessed at 4ms
+     × refuses a cancelled result beside transfer_failed: a contradiction is never guessed at 0ms
+     × refuses a cancelled result beside an unknown code: a contradiction is never guessed at 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/validation.receive.test.ts > receive lifecycle events > refuses an incomplete result beside the cancelled code: a contradiction is never guessed at
+AssertionError: expected { …(6) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "error": {
+    "code": "cancelled",
+    "message": "Transfer canceled.",
+  },
+  "kind": "transfer-error",
+  "progress": null,
+  "receive": {
+    "filesSaved": 1,
+    "markingWarning": false,
+    "result": "incomplete",
+    "subfolderExists": true,
+  },
+  "seq": 5,
+  "sessionId": "0102030405060708090a0b0c0d0e0f10",
+}
+
+ ❯ src/transfer/validation.receive.test.ts:211:14
+    209|             error: {code, message: 'x'},
+    210|             receive: {filesSaved: 1, result, subfolderExists: true, ma…
+    211|         }])).toBeNull()
+       |              ^
+    212|     })
+    213|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/transfer/validation.receive.test.ts > receive lifecycle events > refuses a cancelled result beside transfer_failed: a contradiction is never guessed at
+ FAIL  src/transfer/validation.receive.test.ts > receive lifecycle events > refuses a cancelled result beside an unknown code: a contradiction is never guessed at
+AssertionError: expected { …(6) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "error": {
+    "code": "transfer_failed",
+    "message": "The transfer stopped before FairDrop finished sending. Check the local network and create a fresh link.",
+  },
+  "kind": "transfer-error",
+  "progress": null,
+  "receive": {
+    "filesSaved": 1,
+    "markingWarning": false,
+    "result": "cancelled",
+    "subfolderExists": true,
+  },
+  "seq": 5,
+  "sessionId": "0102030405060708090a0b0c0d0e0f10",
+}
+
+ ❯ src/transfer/validation.receive.test.ts:211:14
+    209|             error: {code, message: 'x'},
+    210|             receive: {filesSaved: 1, result, subfolderExists: true, ma…
+    211|         }])).toBeNull()
+       |              ^
+    212|     })
+    213|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 77 skipped (80)
+   Start at  01:15:35
+   Duration  421ms (transform 34ms, setup 0ms, import 43ms, tests 5ms, environment 289ms)
+

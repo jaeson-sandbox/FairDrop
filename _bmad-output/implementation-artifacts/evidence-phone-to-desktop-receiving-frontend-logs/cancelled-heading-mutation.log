@@ -1,0 +1,47 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancelled-heading-fyt5xiuk/frontend
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 30 skipped) 71ms
+     × heads it "Upload cancelled" with the exact count 63ms
+     × says that nothing was added when nothing was saved 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > a cancelled receive > heads it "Upload cancelled" with the exact count
+AssertionError: expected 'Upload incomplete — 1 file saved' to be 'Upload cancelled — 1 file saved' // Object.is equality
+
+Expected: "Upload cancelled — 1 file saved"
+Received: "Upload incomplete — 1 file saved"
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:107:39
+    105|         renderOutcome(outcome('cancelled', {filesSaved: 1}))
+    106|
+    107|         expect(heading().textContent).toBe('Upload cancelled — 1 file …
+       |                                       ^
+    108|         expect(text(body())).toBe(
+    109|             'You cancelled the upload. Files that finished are saved t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > a cancelled receive > says that nothing was added when nothing was saved
+AssertionError: expected 'Upload incomplete — no files saved' to be 'Upload cancelled — no files saved' // Object.is equality
+
+Expected: "Upload cancelled — no files saved"
+Received: "Upload incomplete — no files saved"
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:117:39
+    115|         renderOutcome(outcome('cancelled', {filesSaved: 0, subfolderEx…
+    116|
+    117|         expect(heading().textContent).toBe('Upload cancelled — no file…
+       |                                       ^
+    118|         expect(text(body())).toBe('You cancelled the upload before any…
+    119|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed | 30 skipped (33)
+   Start at  01:16:00
+   Duration  550ms (transform 57ms, setup 0ms, import 108ms, tests 71ms, environment 286ms)
+

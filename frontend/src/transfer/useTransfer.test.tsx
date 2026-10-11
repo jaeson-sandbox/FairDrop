@@ -240,7 +240,7 @@ describe('collection draft and immutable batch admission', () => {
     })
 })
 describe('Wails lifecycle subscriptions', () => {
-    it('registers the five literal names once and invokes each disposer exactly once', () => {
+    it('registers the six literal names once and invokes each disposer exactly once', () => {
         const hook = renderHook(() => useTransfer())
 
         expect(mocks.eventsOn.mock.calls.map(([name]) => name)).toEqual([
@@ -249,6 +249,7 @@ describe('Wails lifecycle subscriptions', () => {
             'transfer-complete',
             'transfer-error',
             'transfer-reset',
+            'transfer-notice',
         ])
 
         hook.unmount()
@@ -268,8 +269,8 @@ describe('Wails lifecycle subscriptions', () => {
         })
         first.unmount()
 
-        expect(subscriptions.slice(0, 5).every(({dispose}) => dispose.mock.calls.length === 1)).toBe(true)
-        expect(subscriptions.slice(5).every(({dispose}) => dispose.mock.calls.length === 0)).toBe(true)
+        expect(subscriptions.slice(0, 6).every(({dispose}) => dispose.mock.calls.length === 1)).toBe(true)
+        expect(subscriptions.slice(6).every(({dispose}) => dispose.mock.calls.length === 0)).toBe(true)
 
         act(() => emit('transfer-started', {sessionId, seq: 1}))
         expect(second.result.current.state.phase).toBe('transferring')
@@ -278,14 +279,15 @@ describe('Wails lifecycle subscriptions', () => {
     it('keeps one live listener per name through StrictMode cleanup and remount', () => {
         const hook = renderHook(() => useTransfer(), {wrapper: StrictMode})
 
-        expect(mocks.eventsOn).toHaveBeenCalledTimes(10)
-        expect(subscriptions.slice(0, 5).every(({dispose}) => dispose.mock.calls.length === 1)).toBe(true)
+        expect(mocks.eventsOn).toHaveBeenCalledTimes(12)
+        expect(subscriptions.slice(0, 6).every(({dispose}) => dispose.mock.calls.length === 1)).toBe(true)
         expect(subscriptions.filter(({active}) => active).map(({name}) => name)).toEqual([
             'transfer-started',
             'transfer-progress',
             'transfer-complete',
             'transfer-error',
             'transfer-reset',
+            'transfer-notice',
         ])
 
         hook.unmount()
@@ -297,8 +299,8 @@ describe('Wails lifecycle subscriptions', () => {
         const hook = renderHook(() => useTransfer(), {wrapper: StrictMode})
         await act(async () => { await hook.result.current.stage('C:\\one.pdf') })
         const stagedState = hook.result.current.state
-        const stale = subscriptions.slice(0, 5).find(({name}) => name === 'transfer-started')!.callback
-        const live = subscriptions.slice(5).find(({name}) => name === 'transfer-started')!.callback
+        const stale = subscriptions.slice(0, 6).find(({name}) => name === 'transfer-started')!.callback
+        const live = subscriptions.slice(6).find(({name}) => name === 'transfer-started')!.callback
 
         act(() => stale({sessionId, seq: 1}))
         expect(hook.result.current.state).toBe(stagedState)
@@ -343,7 +345,7 @@ describe('Wails lifecycle subscriptions', () => {
         subscriptions[1].dispose.mockImplementation(() => { throw new Error('dispose failed') })
 
         expect(() => hook.unmount()).not.toThrow()
-        expect(subscriptions.map(({dispose}) => dispose.mock.calls.length)).toEqual([1, 1, 1, 1, 1])
+        expect(subscriptions.map(({dispose}) => dispose.mock.calls.length)).toEqual([1, 1, 1, 1, 1, 1])
     })
 })
 

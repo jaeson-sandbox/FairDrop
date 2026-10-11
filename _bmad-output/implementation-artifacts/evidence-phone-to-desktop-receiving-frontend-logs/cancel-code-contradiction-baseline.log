@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-cancel-code-contradiction-pt0f47j4/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 77 skipped (80)
+   Start at  01:15:34
+   Duration  409ms (transform 35ms, setup 0ms, import 44ms, tests 2ms, environment 286ms)
+

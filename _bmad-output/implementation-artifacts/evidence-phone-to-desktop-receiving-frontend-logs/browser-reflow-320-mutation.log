@@ -1,0 +1,69 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-reflow-320-q9um447d/frontend
+
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 4 failed | 28 skipped) 5910ms
+     × receive waiting scrolls only vertically with nothing clipped 683ms
+     × receive waiting after a refused upload scrolls only vertically with nothing clipped 685ms
+     × receiving scrolls only vertically with nothing clipped 633ms
+     × keeps a long folder name inside the card instead of widening it 685ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive views at 320 CSS pixels > receive waiting scrolls only vertically with nothing clipped
+AssertionError: receive waiting: documentElement.scrollWidth (453px) exceeds clientWidth (320px): expected 453 to be less than or equal to 320
+ ❯ assertNoHorizontalOverflow browser/receive.test.tsx:204:6
+    202|         root.scrollWidth,
+    203|         `${sceneName}: documentElement.scrollWidth (${root.scrollWidth…
+    204|     ).toBeLessThanOrEqual(root.clientWidth)
+       |      ^
+    205|
+    206|     for (const element of container.querySelectorAll<HTMLElement>('*')…
+ ❯ browser/receive.test.tsx:266:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive views at 320 CSS pixels > receive waiting after a refused upload scrolls only vertically with nothing clipped
+AssertionError: receive waiting after a refused upload: documentElement.scrollWidth (453px) exceeds clientWidth (320px): expected 453 to be less than or equal to 320
+ ❯ assertNoHorizontalOverflow browser/receive.test.tsx:204:6
+    202|         root.scrollWidth,
+    203|         `${sceneName}: documentElement.scrollWidth (${root.scrollWidth…
+    204|     ).toBeLessThanOrEqual(root.clientWidth)
+       |      ^
+    205|
+    206|     for (const element of container.querySelectorAll<HTMLElement>('*')…
+ ❯ browser/receive.test.tsx:266:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive views at 320 CSS pixels > receiving scrolls only vertically with nothing clipped
+AssertionError: receiving: documentElement.scrollWidth (377px) exceeds clientWidth (320px): expected 377 to be less than or equal to 320
+ ❯ assertNoHorizontalOverflow browser/receive.test.tsx:204:6
+    202|         root.scrollWidth,
+    203|         `${sceneName}: documentElement.scrollWidth (${root.scrollWidth…
+    204|     ).toBeLessThanOrEqual(root.clientWidth)
+       |      ^
+    205|
+    206|     for (const element of container.querySelectorAll<HTMLElement>('*')…
+ ❯ browser/receive.test.tsx:266:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |chromium| browser/receive.test.tsx > the receive views at 320 CSS pixels > keeps a long folder name inside the card instead of widening it
+AssertionError: receive waiting with a long folder name: documentElement.scrollWidth (453px) exceeds clientWidth (320px): expected 453 to be less than or equal to 320
+ ❯ assertNoHorizontalOverflow browser/receive.test.tsx:204:6
+    202|         root.scrollWidth,
+    203|         `${sceneName}: documentElement.scrollWidth (${root.scrollWidth…
+    204|     ).toBeLessThanOrEqual(root.clientWidth)
+       |      ^
+    205|
+    206|     for (const element of container.querySelectorAll<HTMLElement>('*')…
+ ❯ browser/receive.test.tsx:277:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 5 passed | 28 skipped (37)
+   Start at  01:16:46
+   Duration  6.64s (transform 0ms, setup 0ms, import 177ms, tests 5.91s, environment 0ms)
+

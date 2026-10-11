@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-marking-warning-zhxmlr5c/frontend
+
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 1 failed | 30 skipped) 26ms
+     × appears when the backend says marking failed, and says the files were still saved 20ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/ReceiveOutcomeView.test.tsx > the marking warning > appears when the backend says marking failed, and says the files were still saved
+TypeError: Cannot read properties of null (reading 'textContent')
+ ❯ src/ui/ReceiveOutcomeView.test.tsx:183:24
+    181|
+    182|         const warning = document.querySelector('[data-receive-marking-…
+    183|         expect(warning.textContent).toBe('FairDrop couldn’t add the do…
+       |                        ^
+    184|     })
+    185|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed | 30 skipped (33)
+   Start at  01:16:33
+   Duration  505ms (transform 57ms, setup 0ms, import 108ms, tests 26ms, environment 289ms)
+

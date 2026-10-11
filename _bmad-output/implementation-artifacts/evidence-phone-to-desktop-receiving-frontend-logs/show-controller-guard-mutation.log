@@ -1,0 +1,36 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-controller-guard-eta6v6nn/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (48 tests | 1 failed | 47 skipped) 14ms
+     × never calls the command when the subfolder does not exist 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > Show in Folder > never calls the command when the subfolder does not exist
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array []
+
+
+Number of calls: 1
+
+ ❯ src/transfer/useTransfer.receive.test.tsx:553:46
+    551|         await act(async () => { await hook.result.current.showReceived…
+    552|
+    553|         expect(mocks.showReceivedFolder).not.toHaveBeenCalled()
+       |                                              ^
+    554|     })
+    555|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 47 skipped (48)
+   Start at  01:15:42
+   Duration  519ms (transform 78ms, setup 0ms, import 133ms, tests 14ms, environment 289ms)
+

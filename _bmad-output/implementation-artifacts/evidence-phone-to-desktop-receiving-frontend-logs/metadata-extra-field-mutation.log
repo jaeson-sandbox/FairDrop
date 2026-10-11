@@ -1,0 +1,39 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-extra-field-wzgxnuv7/frontend
+
+ ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 77 skipped) 6ms
+     × refuses an extra field 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/validation.receive.test.ts > parseReceiveMetadata > refuses an extra field
+AssertionError: expected { …(5) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "destination": "Phone Photos",
+  "qrBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "sessionId": "0102030405060708090a0b0c0d0e0f10",
+  "url": "http://192.168.1.50:45678/upload/1112131415161718191a1b1c1d1e1f20",
+  "warnings": [],
+}
+
+ ❯ src/transfer/validation.receive.test.ts:81:45
+     79|         ['a malformed warning', metadata({warnings: [{code: 'beacon_wa…
+     80|     ])('refuses %s', (_name, value) => {
+     81|         expect(parseReceiveMetadata(value)).toBeNull()
+       |                                             ^
+     82|     })
+     83|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed | 77 skipped (80)
+   Start at  01:15:28
+   Duration  416ms (transform 34ms, setup 0ms, import 43ms, tests 6ms, environment 284ms)
+

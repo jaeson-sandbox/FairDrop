@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-controller-cancel-outcome-bj943lkd/frontend
+
+ ❯ src/transfer/useTransfer.receive.test.tsx (48 tests | 1 failed | 47 skipped) 12ms
+     × leaves the outcome through the existing Cancel command, and only the reset returns to Idle 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.receive.test.tsx > the session lifecycle > leaves the outcome through the existing Cancel command, and only the reset returns to Idle
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ src/transfer/useTransfer.receive.test.tsx:482:38
+    480|
+    481|         await act(async () => { await hook.result.current.cancel() })
+    482|         expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1)
+       |                                      ^
+    483|         expect(hook.result.current.state.phase).toBe('receive-outcome')
+    484|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 47 skipped (48)
+   Start at  01:16:05
+   Duration  508ms (transform 73ms, setup 0ms, import 126ms, tests 12ms, environment 287ms)
+
