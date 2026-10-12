@@ -1,17 +1,18 @@
 # FairDrop
 
 Ephemeral, trusted-LAN file and folder handoff from a Windows or macOS desktop to a nearby
-browser. Drop a file, a folder, or up to 10,000 of them together, scan the QR code on the receiving
-device, download once.
-Nothing is persisted: no accounts, no cloud, no settings, no logs, no staged copies.
+browser, and from a nearby phone browser back to the desktop. Drop a file, a folder, or up to
+10,000 of them together, scan the QR code on the receiving device, download once.
+No accounts, no cloud, no settings, no logs, no staged copies. The only thing FairDrop ever
+writes is files you choose to receive, into a folder you pick.
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: [v1.5.1](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.5.1).**
+**Current release: [v1.6.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.6.0).**
 A receiver can open a link to see the offered item, then press **Download** to claim the
 one-shot transfer. After a completed transfer, **Send Again**
 revalidates the same selection and offers it with a fresh link and QR code. FairDrop still sends
-to one receiver over plain HTTP on a trusted LAN and persists nothing.
+to one receiver over plain HTTP on a trusted LAN and keeps no state of its own.
 
 **Send multiple items** (new in 1.5.0; up to 10,000 items since 1.5.1): a native drop of
 2-10,000 paths, or the **Send multiple items** list with **Add Files** and **Add Folder**,
@@ -25,8 +26,7 @@ download starts, and a later member that changed or vanished after you pressed S
 whole transfer partway rather than being skipped. One file or one folder still uses the
 single-item flow unchanged.
 
-**Receive files from a phone** is also under development and is not part of any published
-release. Choose **Receive** in Idle and pick a destination folder; FairDrop then shows a
+**Receive files from a phone** (new in 1.6.0): choose **Receive** in Idle and pick a destination folder; FairDrop then shows a
 one-time QR code. A phone on the same Wi-Fi opens the link, chooses files, and uploads them
 once through a plain script-free web form. The files are **saved to the folder you chose**,
 into a new `FairDrop YYYY-MM-DD HH.MM` subfolder created when the first file arrives, and the
