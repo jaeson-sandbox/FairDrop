@@ -2023,3 +2023,41 @@ describe('the cancellation notification overlays Idle rather than displacing it 
         assertNoHorizontalOverflow(container)
     })
 })
+
+describe('Send multiple items sits clear of the browse pill (defect fix)', () => {
+    /*
+      Reported on the built macOS app (owner, 2026-10-11): the secondary
+      "Send multiple items" button rendered flush against the bottom of the
+      "Choose File or Folder" pill. The drop zone's inner box is a grid with
+      no row gap and the button had no margin of its own, so the two
+      controls touched. Measured at the two sizes the drop-zone packing test
+      above uses, in the real `.fd-app` shell.
+    */
+    it.each([
+        ['the default viewport', 1024, 900],
+        ['the 640x480 minimum main.go sets', 640, 480],
+    ])('at %s, leaves a visible gap between the pill and the secondary button', async (_name, width, height) => {
+        await page.viewport(width, height)
+        const {container} = render(
+            <div className="fd-app" style={{height: '100vh'}}>
+                <IdleView
+                    state={idle()}
+                    dropTargetStyle={dropTargetStyle}
+                    cancelWon={false}
+                    onSelectFile={() => undefined}
+                    onSelectDirectory={() => undefined}
+                    onOpenMultiple={() => undefined}
+                    commandErrorPanelProps={{}}
+                />
+            </div>,
+        )
+        await waitForEntranceToSettle(container)
+        const pill = screen.getByRole('button', {name: 'Choose File or Folder'})
+        const multiple = screen.getByRole('button', {name: 'Send multiple items'})
+
+        const gap = multiple.getBoundingClientRect().top - pill.getBoundingClientRect().bottom
+
+        expect(gap, `the secondary button's top edge sits ${gap.toFixed(1)}px below the pill's bottom edge`).toBeGreaterThanOrEqual(12)
+        expect(gap, `the secondary button's top edge sits ${gap.toFixed(1)}px below the pill's bottom edge`).toBeLessThanOrEqual(20)
+    })
+})

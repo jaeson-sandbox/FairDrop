@@ -1061,6 +1061,15 @@ body {
 }
 
 /*
+  The secondary "Send multiple items" button sits under the browse pill. This
+  grid has no row gap, so without its own margin the button rendered flush
+  against the pill (owner report on the built macOS app, 2026-10-11).
+*/
+.fd-drop-zone__inner [data-draft-entry] {
+    margin-top: var(--spacing-3);
+}
+
+/*
   DESIGN.md's Disclosure component: a {rounded.xl} surface at {elevation.sh-1}
   with a chevron that rotates when open and a hover fill.
 
