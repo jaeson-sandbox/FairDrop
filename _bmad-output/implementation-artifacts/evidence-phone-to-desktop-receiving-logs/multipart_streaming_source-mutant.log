@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:25:44.490467-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:25:44.742547-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody"}
-{"Time":"2026-10-11T15:25:44.742642-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Output":"=== RUN   TestTheServerNeverBuffersAMultipartBody\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:44.743765-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Output":"    streaming_test.go:37: upload.go:213 buffers a multipart body: _, _ = multi.ReadForm(1 \u003c\u003c 20)\n","OutputType":"error"}
-{"Time":"2026-10-11T15:25:44.743811-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Output":"--- FAIL: TestTheServerNeverBuffersAMultipartBody (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:44.743824-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Elapsed":0}
-{"Time":"2026-10-11T15:25:44.743844-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:44.745269-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.255s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:44.745296-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.255}
+{"Time":"2026-10-11T23:47:34.036407-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:47:34.308238-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody"}
+{"Time":"2026-10-11T23:47:34.308409-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Output":"=== RUN   TestTheServerNeverBuffersAMultipartBody\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:34.309834-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Output":"    streaming_test.go:37: upload.go:213 buffers a multipart body: _, _ = multi.ReadForm(1 \u003c\u003c 20)\n","OutputType":"error"}
+{"Time":"2026-10-11T23:47:34.309906-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Output":"--- FAIL: TestTheServerNeverBuffersAMultipartBody (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:34.309913-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestTheServerNeverBuffersAMultipartBody","Elapsed":0}
+{"Time":"2026-10-11T23:47:34.309932-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:34.311245-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.275s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:34.311267-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.275}

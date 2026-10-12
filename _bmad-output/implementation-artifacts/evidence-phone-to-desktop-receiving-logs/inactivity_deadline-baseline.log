@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:25:29.963443-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:25:30.240745-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound"}
-{"Time":"2026-10-11T15:25:30.24089-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Output":"=== RUN   TestAnUploadThatStallsIsEndedByTheInactivityBound\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:30.55206-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Output":"--- PASS: TestAnUploadThatStallsIsEndedByTheInactivityBound (0.31s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:30.552126-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Elapsed":0.31}
-{"Time":"2026-10-11T15:25:30.552177-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:30.553776-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.590s\n"}
-{"Time":"2026-10-11T15:25:30.55381-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.59}
+{"Time":"2026-10-11T23:47:19.663878-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:47:19.914319-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound"}
+{"Time":"2026-10-11T23:47:19.914407-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Output":"=== RUN   TestAnUploadThatStallsIsEndedByTheInactivityBound\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:20.224985-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Output":"--- PASS: TestAnUploadThatStallsIsEndedByTheInactivityBound (0.31s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:20.2251-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestAnUploadThatStallsIsEndedByTheInactivityBound","Elapsed":0.31}
+{"Time":"2026-10-11T23:47:20.225185-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:20.227526-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.563s\n"}
+{"Time":"2026-10-11T23:47:20.227605-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.564}

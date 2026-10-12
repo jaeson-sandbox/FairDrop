@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:26:44.35651-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:26:44.563931-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused"}
-{"Time":"2026-10-11T15:26:44.564003-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Output":"=== RUN   TestARefusedDestinationIsDescribedByWhyItWasRefused\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:44.565163-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Output":"--- PASS: TestARefusedDestinationIsDescribedByWhyItWasRefused (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:44.565186-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Elapsed":0}
-{"Time":"2026-10-11T15:26:44.565196-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:44.565629-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.209s\n"}
-{"Time":"2026-10-11T15:26:44.565657-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.209}
+{"Time":"2026-10-11T23:48:35.906911-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:48:36.095342-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused"}
+{"Time":"2026-10-11T23:48:36.095403-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Output":"=== RUN   TestARefusedDestinationIsDescribedByWhyItWasRefused\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:36.096308-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Output":"--- PASS: TestARefusedDestinationIsDescribedByWhyItWasRefused (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:36.096321-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestARefusedDestinationIsDescribedByWhyItWasRefused","Elapsed":0}
+{"Time":"2026-10-11T23:48:36.09633-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:36.096776-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.190s\n"}
+{"Time":"2026-10-11T23:48:36.096787-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.19}

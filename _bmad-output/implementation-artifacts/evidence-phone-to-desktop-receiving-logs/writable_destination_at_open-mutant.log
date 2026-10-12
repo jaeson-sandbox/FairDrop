@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:26:36.956081-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:26:37.192093-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto"}
-{"Time":"2026-10-11T15:26:37.192185-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"=== RUN   TestOpenDestinationRefusesAFolderTheUserCannotWriteInto\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:37.193286-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"    destination_test.go:691: OpenDestination(\"/private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/TestOpenDestinationRefusesAFolderTheUserCannotWriteInto2970027765/001/readonly\") returned a destination for an unwritable folder\n","OutputType":"error"}
-{"Time":"2026-10-11T15:26:37.193902-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"--- FAIL: TestOpenDestinationRefusesAFolderTheUserCannotWriteInto (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:37.193909-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Elapsed":0}
-{"Time":"2026-10-11T15:26:37.193933-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:37.194762-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.238s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:37.194774-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.239}
+{"Time":"2026-10-11T23:48:28.802391-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:48:29.003954-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto"}
+{"Time":"2026-10-11T23:48:29.004027-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"=== RUN   TestOpenDestinationRefusesAFolderTheUserCannotWriteInto\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:29.004607-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"    destination_test.go:691: OpenDestination(\"/private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/TestOpenDestinationRefusesAFolderTheUserCannotWriteInto3161123125/001/readonly\") returned a destination for an unwritable folder\n","OutputType":"error"}
+{"Time":"2026-10-11T23:48:29.004949-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"--- FAIL: TestOpenDestinationRefusesAFolderTheUserCannotWriteInto (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:29.004953-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Elapsed":0}
+{"Time":"2026-10-11T23:48:29.004969-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:29.005386-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.203s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:29.0054-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.203}

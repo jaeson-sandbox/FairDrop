@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:26:21.636549-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:26:21.918682-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded"}
-{"Time":"2026-10-11T15:26:21.918799-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"=== RUN   TestAQuotedPrintablePartIsSavedAsSentNotDecoded\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:21.930394-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"--- PASS: TestAQuotedPrintablePartIsSavedAsSentNotDecoded (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:21.930423-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Elapsed":0.01}
-{"Time":"2026-10-11T15:26:21.930499-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:21.931809-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.295s\n"}
-{"Time":"2026-10-11T15:26:21.931844-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.295}
+{"Time":"2026-10-11T23:48:14.016276-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:48:14.284242-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded"}
+{"Time":"2026-10-11T23:48:14.284304-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"=== RUN   TestAQuotedPrintablePartIsSavedAsSentNotDecoded\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:14.296503-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"--- PASS: TestAQuotedPrintablePartIsSavedAsSentNotDecoded (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:14.296528-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Elapsed":0.01}
+{"Time":"2026-10-11T23:48:14.296564-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:14.297941-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.281s\n"}
+{"Time":"2026-10-11T23:48:14.297967-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.282}

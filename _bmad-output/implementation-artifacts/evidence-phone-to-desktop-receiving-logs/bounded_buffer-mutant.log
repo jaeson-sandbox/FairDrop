@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:25:20.391801-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:25:20.61406-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage"}
-{"Time":"2026-10-11T15:25:20.614134-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Output":"=== RUN   TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:20.636587-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Output":"    destination_test.go:673: SaveFile offered a 1048576 byte buffer, want exactly 64 KiB\n","OutputType":"error"}
-{"Time":"2026-10-11T15:25:20.637425-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Output":"--- FAIL: TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage (0.02s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:20.637431-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Elapsed":0.02}
-{"Time":"2026-10-11T15:25:20.637447-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:20.637857-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.246s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:20.637867-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.246}
+{"Time":"2026-10-11T23:47:10.225746-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:47:10.458176-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage"}
+{"Time":"2026-10-11T23:47:10.458339-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Output":"=== RUN   TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:10.489695-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Output":"    destination_test.go:673: SaveFile offered a 1048576 byte buffer, want exactly 64 KiB\n","OutputType":"error"}
+{"Time":"2026-10-11T23:47:10.491371-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Output":"--- FAIL: TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage (0.03s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:10.491387-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestAFileIsCopiedThroughOneBoundedBufferAndNothingGoesToOSTempStorage","Elapsed":0.03}
+{"Time":"2026-10-11T23:47:10.491417-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:10.492424-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.266s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:10.492437-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.267}

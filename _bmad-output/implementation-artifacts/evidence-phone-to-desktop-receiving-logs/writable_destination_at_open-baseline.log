@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:26:36.43319-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:26:36.63561-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto"}
-{"Time":"2026-10-11T15:26:36.635675-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"=== RUN   TestOpenDestinationRefusesAFolderTheUserCannotWriteInto\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:36.636438-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"--- PASS: TestOpenDestinationRefusesAFolderTheUserCannotWriteInto (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:36.636455-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Elapsed":0}
-{"Time":"2026-10-11T15:26:36.636468-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:36.636962-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.204s\n"}
-{"Time":"2026-10-11T15:26:36.63698-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.204}
+{"Time":"2026-10-11T23:48:28.263571-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:48:28.479432-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto"}
+{"Time":"2026-10-11T23:48:28.479533-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"=== RUN   TestOpenDestinationRefusesAFolderTheUserCannotWriteInto\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:28.481316-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Output":"--- PASS: TestOpenDestinationRefusesAFolderTheUserCannotWriteInto (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:28.481327-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestOpenDestinationRefusesAFolderTheUserCannotWriteInto","Elapsed":0}
+{"Time":"2026-10-11T23:48:28.481353-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:28.482366-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.218s\n"}
+{"Time":"2026-10-11T23:48:28.482391-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.219}

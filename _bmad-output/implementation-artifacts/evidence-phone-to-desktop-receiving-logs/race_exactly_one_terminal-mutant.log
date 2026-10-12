@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:26:23.704132-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T15:26:23.929691-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome"}
-{"Time":"2026-10-11T15:26:23.929876-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"=== RUN   TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:23.931303-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"    coordinator_receive_test.go:622: round 11 published 0 terminal outcomes, want exactly 1\n","OutputType":"error"}
-{"Time":"2026-10-11T15:26:23.93136-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"--- FAIL: TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:23.931366-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Elapsed":0}
-{"Time":"2026-10-11T15:26:23.931391-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:23.932389-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.228s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:23.932428-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.228}
+{"Time":"2026-10-11T23:48:15.964351-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T23:48:16.171782-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome"}
+{"Time":"2026-10-11T23:48:16.17194-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"=== RUN   TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:16.173212-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"    coordinator_receive_test.go:622: round 5 published 0 terminal outcomes, want exactly 1\n","OutputType":"error"}
+{"Time":"2026-10-11T23:48:16.173243-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"--- FAIL: TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:16.17325-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Elapsed":0}
+{"Time":"2026-10-11T23:48:16.173277-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:16.17437-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.209s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:16.174389-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.21}

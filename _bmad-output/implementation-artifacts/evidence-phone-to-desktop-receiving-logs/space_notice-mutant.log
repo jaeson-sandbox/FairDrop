@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:25:47.687284-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:25:47.990223-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting"}
-{"Time":"2026-10-11T15:25:47.990329-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting","Output":"=== RUN   TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:57.997077-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting","Output":"    upload_test.go:421: no notice within 10s\n","OutputType":"error"}
-{"Time":"2026-10-11T15:25:57.999055-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting","Output":"--- FAIL: TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting (10.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:57.999106-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting","Elapsed":10.01}
-{"Time":"2026-10-11T15:25:57.999168-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:58.001408-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t10.314s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:58.001438-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":10.314}
+{"Time":"2026-10-11T23:47:37.210705-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:47:37.512782-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting"}
+{"Time":"2026-10-11T23:47:37.512984-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting","Output":"=== RUN   TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:47.519168-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting","Output":"    upload_test.go:421: no notice within 10s\n","OutputType":"error"}
+{"Time":"2026-10-11T23:47:47.521449-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting","Output":"--- FAIL: TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting (10.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:47.521521-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting","Elapsed":10.01}
+{"Time":"2026-10-11T23:47:47.521598-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:47.524234-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t10.313s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:47.524288-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":10.314}

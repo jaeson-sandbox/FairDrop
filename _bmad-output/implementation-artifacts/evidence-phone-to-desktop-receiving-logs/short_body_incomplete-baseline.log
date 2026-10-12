@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:26:31.661742-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:26:31.948358-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete"}
-{"Time":"2026-10-11T15:26:31.94846-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"=== RUN   TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:31.958496-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"--- PASS: TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:31.958508-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Elapsed":0.01}
-{"Time":"2026-10-11T15:26:31.958531-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:31.959327-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.297s\n"}
-{"Time":"2026-10-11T15:26:31.959337-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.298}
+{"Time":"2026-10-11T23:48:23.764869-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:48:24.024226-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete"}
+{"Time":"2026-10-11T23:48:24.024318-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"=== RUN   TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:24.044254-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"--- PASS: TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete (0.02s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:24.044263-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Elapsed":0.02}
+{"Time":"2026-10-11T23:48:24.044284-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:24.044824-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.280s\n"}
+{"Time":"2026-10-11T23:48:24.045078-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.28}

@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:25:18.776009-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:25:18.990789-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses"}
-{"Time":"2026-10-11T15:25:18.990952-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"=== RUN   TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:18.993126-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"--- PASS: TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:18.993155-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Elapsed":0}
-{"Time":"2026-10-11T15:25:18.993183-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:18.994183-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.218s\n"}
-{"Time":"2026-10-11T15:25:18.994241-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.218}
+{"Time":"2026-10-11T23:47:08.717443-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:47:08.914163-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses"}
+{"Time":"2026-10-11T23:47:08.914249-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"=== RUN   TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:08.915351-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"--- PASS: TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:08.915365-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Elapsed":0}
+{"Time":"2026-10-11T23:47:08.915375-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:08.915773-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.198s\n"}
+{"Time":"2026-10-11T23:47:08.915796-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.198}

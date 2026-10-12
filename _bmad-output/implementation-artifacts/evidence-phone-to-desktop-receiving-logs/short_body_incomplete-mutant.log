@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:26:32.575387-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:26:32.885623-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete"}
-{"Time":"2026-10-11T15:26:32.885743-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"=== RUN   TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:32.899079-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"    upload_test.go:697: status = 200, want the incomplete-upload page for a body 500 bytes short\n","OutputType":"error"}
-{"Time":"2026-10-11T15:26:32.900063-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"--- FAIL: TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:32.900101-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Elapsed":0.01}
-{"Time":"2026-10-11T15:26:32.900121-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:32.901408-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.326s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:32.901424-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.326}
+{"Time":"2026-10-11T23:48:24.637697-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:48:24.912652-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete"}
+{"Time":"2026-10-11T23:48:24.912769-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"=== RUN   TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:24.930536-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"    upload_test.go:697: status = 200, want the incomplete-upload page for a body 500 bytes short\n","OutputType":"error"}
+{"Time":"2026-10-11T23:48:24.931045-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Output":"--- FAIL: TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete (0.02s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:24.931053-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestABodyThatEndsCleanlyShortOfItsDeclaredLengthIsIncompleteNotComplete","Elapsed":0.02}
+{"Time":"2026-10-11T23:48:24.931075-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:24.9318-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.294s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:24.931816-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.294}

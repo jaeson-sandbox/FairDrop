@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:26:08.065057-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T15:26:08.317631-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt"}
-{"Time":"2026-10-11T15:26:08.317726-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt","Output":"=== RUN   TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:08.318745-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt","Output":"    coordinator_receive_test.go:351: a receive outcome armed 1 resets, want it held until the user leaves it\n","OutputType":"error"}
-{"Time":"2026-10-11T15:26:08.318767-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt","Output":"--- FAIL: TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:08.318774-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt","Elapsed":0}
-{"Time":"2026-10-11T15:26:08.318799-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:08.319818-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.255s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:08.319855-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.255}
+{"Time":"2026-10-11T23:47:57.372713-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T23:47:57.604072-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt"}
+{"Time":"2026-10-11T23:47:57.604294-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt","Output":"=== RUN   TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:57.605383-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt","Output":"    coordinator_receive_test.go:351: a receive outcome armed 1 resets, want it held until the user leaves it\n","OutputType":"error"}
+{"Time":"2026-10-11T23:47:57.605435-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt","Output":"--- FAIL: TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:57.605443-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestACompleteUploadPublishesProgressThenAnOutcomeAndHoldsIt","Elapsed":0}
+{"Time":"2026-10-11T23:47:57.605461-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:57.606614-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.234s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:57.606634-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.234}

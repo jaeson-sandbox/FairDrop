@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:26:06.038328-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T15:26:06.263501-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets"}
-{"Time":"2026-10-11T15:26:06.263661-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"=== RUN   TestCancellingAWaitingReceiveWritesNothingAndResets\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:06.264082-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"--- PASS: TestCancellingAWaitingReceiveWritesNothingAndResets (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:06.264105-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Elapsed":0}
-{"Time":"2026-10-11T15:26:06.264135-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:06.264972-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.226s\n"}
-{"Time":"2026-10-11T15:26:06.265007-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.227}
+{"Time":"2026-10-11T23:47:55.358397-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T23:47:55.568601-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets"}
+{"Time":"2026-10-11T23:47:55.568821-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"=== RUN   TestCancellingAWaitingReceiveWritesNothingAndResets\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:55.569333-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"--- PASS: TestCancellingAWaitingReceiveWritesNothingAndResets (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:55.569355-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Elapsed":0}
+{"Time":"2026-10-11T23:47:55.569404-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:55.570524-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.212s\n"}
+{"Time":"2026-10-11T23:47:55.570569-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.212}

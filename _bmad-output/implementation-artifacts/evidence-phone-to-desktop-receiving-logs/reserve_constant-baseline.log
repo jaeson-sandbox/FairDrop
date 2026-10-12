@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:25:16.632682-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:25:16.842215-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve"}
-{"Time":"2026-10-11T15:25:16.842329-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"=== RUN   TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:16.843757-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"--- PASS: TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:16.843771-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Elapsed":0}
-{"Time":"2026-10-11T15:25:16.84382-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:16.844642-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.212s\n"}
-{"Time":"2026-10-11T15:25:16.844671-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.212}
+{"Time":"2026-10-11T23:47:06.7348-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:47:06.926633-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve"}
+{"Time":"2026-10-11T23:47:06.926692-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"=== RUN   TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:06.927232-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"--- PASS: TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:06.927238-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Elapsed":0}
+{"Time":"2026-10-11T23:47:06.927249-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:06.927642-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.193s\n"}
+{"Time":"2026-10-11T23:47:06.927653-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.193}

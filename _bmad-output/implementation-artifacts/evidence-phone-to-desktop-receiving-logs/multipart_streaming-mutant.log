@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:25:42.993982-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:25:43.287555-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage"}
-{"Time":"2026-10-11T15:25:43.28768-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"=== RUN   TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:43.440803-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"    upload_test.go:983: status = 400, want 200\n","OutputType":"error"}
-{"Time":"2026-10-11T15:25:43.442638-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"--- FAIL: TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage (0.16s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:43.442658-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Elapsed":0.16}
-{"Time":"2026-10-11T15:25:43.442683-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:43.443544-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.449s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:43.443556-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.45}
+{"Time":"2026-10-11T23:47:32.572762-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:47:32.85998-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage"}
+{"Time":"2026-10-11T23:47:32.860122-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"=== RUN   TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:33.003407-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"    upload_test.go:1034: status = 400, want 200\n","OutputType":"error"}
+{"Time":"2026-10-11T23:47:33.004846-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"--- FAIL: TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage (0.14s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:33.004862-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Elapsed":0.14}
+{"Time":"2026-10-11T23:47:33.004891-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:33.005625-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.432s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:33.005633-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.433}
