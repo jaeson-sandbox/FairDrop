@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:26:22.573868-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:26:22.873091-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded"}
-{"Time":"2026-10-11T15:26:22.87321-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"=== RUN   TestAQuotedPrintablePartIsSavedAsSentNotDecoded\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:22.888678-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"    upload_test.go:289: saved bytes = \"ABC softbreak =\", want exactly the quoted-printable text that was sent\n","OutputType":"error"}
-{"Time":"2026-10-11T15:26:22.889598-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"--- FAIL: TestAQuotedPrintablePartIsSavedAsSentNotDecoded (0.02s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:22.889611-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Elapsed":0.02}
-{"Time":"2026-10-11T15:26:22.889736-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:22.890983-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.317s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:22.891-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.317}
+{"Time":"2026-10-11T23:48:14.912427-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:48:15.199454-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded"}
+{"Time":"2026-10-11T23:48:15.199548-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"=== RUN   TestAQuotedPrintablePartIsSavedAsSentNotDecoded\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:15.215521-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"    upload_test.go:289: saved bytes = \"ABC softbreak =\", want exactly the quoted-printable text that was sent\n","OutputType":"error"}
+{"Time":"2026-10-11T23:48:15.216673-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Output":"--- FAIL: TestAQuotedPrintablePartIsSavedAsSentNotDecoded (0.02s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:15.216688-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestAQuotedPrintablePartIsSavedAsSentNotDecoded","Elapsed":0.02}
+{"Time":"2026-10-11T23:48:15.216717-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:15.218413-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.305s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:15.218438-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.306}

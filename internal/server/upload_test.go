@@ -868,6 +868,57 @@ func TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound(t *testi
 	}
 }
 
+// The same rule within one file. Windows CI (run 38199503856) failed
+// TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes at about twice
+// the bound: the deadline was re-armed only after a read delivered bytes, so a
+// write to disk that stalled before the next read (Windows Defender scanning a
+// fresh file is enough) left that next read facing an already-expired deadline
+// while the phone's bytes sat waiting in the socket.
+func TestASlowWriteMidFileDoesNotConsumeTheInactivityBound(t *testing.T) {
+	const bound = 300 * time.Millisecond
+	rig := startReceiveRig(t,
+		withTimeouts(serverTimeouts{
+			readHeader: readHeaderTimeout, read: readTimeout, idle: idleTimeout, teardown: TeardownBound,
+			uploadIdle: bound,
+		}),
+		withDestination(func(real transfer.ReceiveDestination) transfer.ReceiveDestination {
+			spy := &spyDestination{ReceiveDestination: real}
+			spy.saveFile = func(ctx context.Context, name string, content io.Reader) (int64, error) {
+				return real.SaveFile(ctx, name, &stallAfterFirstRead{reader: content, stall: 3 * bound})
+			}
+			return spy
+		}))
+
+	body := strings.Repeat("0123456789abcdef", 16384) // 256 KiB, several reads
+	response, page := rig.post(multipartBody(uploadFile("slow.bin", body)))
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d (%s), want 200: a slow disk mid-file is not a stalled phone", response.StatusCode, page)
+	}
+	if _, terminal := awaitTerminal(t, rig.handle.Events); terminal.Kind != transfer.ServerComplete {
+		t.Fatalf("terminal = %s (%v), want complete", terminal.Kind, terminal.Err)
+	}
+	if got := readText(t, filepath.Join(rig.subfolder(), "slow.bin")); got != body {
+		t.Fatal("the saved bytes differ from the uploaded bytes")
+	}
+}
+
+// stallAfterFirstRead passes reads through and sleeps once, after the first
+// read, standing in for a write to disk that blocks between two reads.
+type stallAfterFirstRead struct {
+	reader  io.Reader
+	stall   time.Duration
+	stalled bool
+}
+
+func (r *stallAfterFirstRead) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 && !r.stalled {
+		r.stalled = true
+		time.Sleep(r.stall)
+	}
+	return n, err
+}
+
 // --- Desktop Cancel -------------------------------------------------------------
 
 func TestStopMidFileKeepsCompletedFilesAndRemovesThePartialFile(t *testing.T) {

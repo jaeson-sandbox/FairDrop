@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T15:25:25.044193-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T15:25:25.320269-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes"}
-{"Time":"2026-10-11T15:25:25.320395-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Output":"=== RUN   TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:27.773378-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Output":"--- PASS: TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes (2.45s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:27.773602-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Elapsed":2.45}
-{"Time":"2026-10-11T15:25:27.773722-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:27.775874-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t2.731s\n"}
-{"Time":"2026-10-11T15:25:27.775923-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":2.732}
+{"Time":"2026-10-11T23:47:14.727094-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:47:14.995834-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes"}
+{"Time":"2026-10-11T23:47:14.995931-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Output":"=== RUN   TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:17.445704-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Output":"--- PASS: TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes (2.45s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:17.44581-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes","Elapsed":2.45}
+{"Time":"2026-10-11T23:47:17.445898-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:17.449863-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t2.722s\n"}
+{"Time":"2026-10-11T23:47:17.449955-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":2.723}

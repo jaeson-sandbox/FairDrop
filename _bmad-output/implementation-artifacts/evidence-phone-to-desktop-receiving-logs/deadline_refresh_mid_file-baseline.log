@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T23:48:10.342373-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T23:48:10.611846-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestASlowWriteMidFileDoesNotConsumeTheInactivityBound"}
+{"Time":"2026-10-11T23:48:10.611927-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestASlowWriteMidFileDoesNotConsumeTheInactivityBound","Output":"=== RUN   TestASlowWriteMidFileDoesNotConsumeTheInactivityBound\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:11.526542-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestASlowWriteMidFileDoesNotConsumeTheInactivityBound","Output":"--- PASS: TestASlowWriteMidFileDoesNotConsumeTheInactivityBound (0.91s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:11.526648-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestASlowWriteMidFileDoesNotConsumeTheInactivityBound","Elapsed":0.91}
+{"Time":"2026-10-11T23:48:11.526712-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:11.530701-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t1.188s\n"}
+{"Time":"2026-10-11T23:48:11.530826-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":1.188}

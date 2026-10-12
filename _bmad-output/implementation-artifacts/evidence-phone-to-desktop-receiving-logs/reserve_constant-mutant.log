@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:25:17.20499-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:25:17.435745-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve"}
-{"Time":"2026-10-11T15:25:17.435842-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"=== RUN   TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:17.435897-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"    destination_test.go:598: ReserveBytes = 2147483648, want exactly 3 GiB\n","OutputType":"error"}
-{"Time":"2026-10-11T15:25:17.43595-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"--- FAIL: TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:17.435962-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Elapsed":0}
-{"Time":"2026-10-11T15:25:17.435985-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:17.436856-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.232s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:17.436874-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.232}
+{"Time":"2026-10-11T23:47:07.227509-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:47:07.457165-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve"}
+{"Time":"2026-10-11T23:47:07.457639-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"=== RUN   TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:07.457711-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"    destination_test.go:598: ReserveBytes = 2147483648, want exactly 3 GiB\n","OutputType":"error"}
+{"Time":"2026-10-11T23:47:07.457755-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Output":"--- FAIL: TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:07.457777-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestCheckSpaceUsesTheVolumeAnswerAndTheThreeGiBReserve","Elapsed":0}
+{"Time":"2026-10-11T23:47:07.457812-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:07.458212-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.231s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:07.458242-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.231}

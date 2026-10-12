@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:26:47.975733-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:26:48.211524-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName"}
-{"Time":"2026-10-11T15:26:48.211649-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName","Output":"=== RUN   TestCreateExclusiveNeverOpensAnExistingName\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:48.213096-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName","Output":"    fs_test.go:37: createExclusive opened a file that already existed\n","OutputType":"error"}
-{"Time":"2026-10-11T15:26:48.214012-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName","Output":"--- FAIL: TestCreateExclusiveNeverOpensAnExistingName (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:48.214029-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName","Elapsed":0}
-{"Time":"2026-10-11T15:26:48.214041-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:48.214911-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.239s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:26:48.21493-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.239}
+{"Time":"2026-10-11T23:48:39.466708-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:48:39.697181-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName"}
+{"Time":"2026-10-11T23:48:39.697315-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName","Output":"=== RUN   TestCreateExclusiveNeverOpensAnExistingName\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:39.698884-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName","Output":"    fs_test.go:37: createExclusive opened a file that already existed\n","OutputType":"error"}
+{"Time":"2026-10-11T23:48:39.69968-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName","Output":"--- FAIL: TestCreateExclusiveNeverOpensAnExistingName (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:39.699696-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestCreateExclusiveNeverOpensAnExistingName","Elapsed":0}
+{"Time":"2026-10-11T23:48:39.699709-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:39.700794-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.234s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:48:39.700816-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.234}

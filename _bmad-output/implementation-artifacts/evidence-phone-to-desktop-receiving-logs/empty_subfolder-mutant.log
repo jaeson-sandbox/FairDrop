@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T15:25:19.33225-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T15:25:19.563731-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses"}
-{"Time":"2026-10-11T15:25:19.563774-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"=== RUN   TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:19.564398-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"    destination_test.go:419: a session that saved nothing left [FairDrop 2026-10-10 14.05] behind\n","OutputType":"error"}
-{"Time":"2026-10-11T15:25:19.564682-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"--- FAIL: TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:19.564686-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Elapsed":0}
-{"Time":"2026-10-11T15:25:19.564706-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:19.565098-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.233s\n","OutputType":"frame"}
-{"Time":"2026-10-11T15:25:19.565106-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.233}
+{"Time":"2026-10-11T23:47:09.221218-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T23:47:09.445342-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses"}
+{"Time":"2026-10-11T23:47:09.445456-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"=== RUN   TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:09.447657-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"    destination_test.go:419: a session that saved nothing left [FairDrop 2026-10-10 14.05] behind\n","OutputType":"error"}
+{"Time":"2026-10-11T23:47:09.450825-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Output":"--- FAIL: TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:09.451287-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestAFirstFileFailureLeavesNoSubfolderOnceTheDestinationCloses","Elapsed":0}
+{"Time":"2026-10-11T23:47:09.451351-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:09.452535-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.231s\n","OutputType":"frame"}
+{"Time":"2026-10-11T23:47:09.452557-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.231}

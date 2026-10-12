@@ -337,3 +337,20 @@ The first CI run on Story A (run 38112199987) found a data race in `TestACancelR
 **The Windows writability refusal is unproven on CI.** The GitHub Windows runner's elevated `runneradmin` token creates folders inside a folder carrying an `Everyone:(DENY)(WD,AD)` entry. The ACL was logged in run 38128065621. The fixture now proves itself first and records a named capability skip, so no refusal assertion runs against a writable folder. The probe performs the same `Mkdir` a receive performs, so it refuses whenever the first save would fail. That reasoning stands in for an executed refusal on Windows, which remains open to a manual check on a standard-user account. The other Windows-only sink tests, including the MAX_PATH tests, ran and passed inside the package run.
 
 Still unobserved: the built app driven by hand, a real phone upload from iOS Safari or Android Chrome through the desktop UI, Show in Folder opening Finder or Explorer, screen readers, and WKWebView focus behaviour. All of these are optional under `docs/release-policy.md`. Every automated gate is green.
+
+## Defect fix: inactivity deadline re-armed before every read (2026-10-11)
+
+**Observed:** Windows CI on the 1.6.0 merge commit (run 38199503856) failed `TestAnUploadLongerThanTheWholeRequestDeadlineStillCompletes` with "terminal = failed … after 1.4049464s". The upload was healthy and bytes kept arriving.
+
+**Cause:** the deadline was re-armed only after a read delivered bytes, and again after `SaveFile` returned. A disk write that stalls *between two reads of the same file* left the next read facing a deadline that had already expired, with the phone's bytes waiting in the socket. Windows Defender scanning a freshly created file is enough to cause the stall, and so is a slow volume. In production the bound is 30 s, so this needs a long stall, but a large file onto a slow USB drive could hit it.
+
+**Failing test first:** `TestASlowWriteMidFileDoesNotConsumeTheInactivityBound` uses a 300 ms bound, a destination whose content reader sleeps 900 ms after its first read, and a 256 KiB file. It was red on macOS 3/3 runs (status 500, incomplete), so the bug is not specific to Windows.
+
+**Fix:** the deadline is re-armed in exactly one place, immediately before every body read. The after-bytes and after-`SaveFile` re-arms became redundant and were removed.
+
+**Mutation:** the before-read re-arm is now the anchor for three cases. Each is killed by a different named test:
+- `inactivity_refresh` by the whole-request-deadline test;
+- `deadline_refresh_after_save` by the between-parts slow-save test;
+- `deadline_refresh_mid_file` by the new test.
+
+`inactivity_deadline` still proves that a stalled phone is cut off. The server package passes three times under `-race`.

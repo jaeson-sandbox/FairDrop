@@ -296,13 +296,6 @@ func (r *run) savePartsAndDrain(ctx context.Context, body *uploadBody, multi *mu
 		if _, err := r.destination.SaveFile(ctx, part.name, part.part); err != nil {
 			return err
 		}
-		// The inactivity bound times the phone's silence, not the desktop's own
-		// disk: SaveFile ends with an fsync, marking and a rename that can
-		// outlast the bound on a slow volume (F_FULLFSYNC on macOS), during which
-		// no read of the body happens. Without a fresh deadline here the very
-		// next read would hit one that expired while the phone was waiting on us,
-		// and a healthy upload would be reported incomplete.
-		body.refreshDeadline()
 		// Each saved file is an event the desktop wants immediately, not at the
 		// next 4 Hz tick.
 		r.lane.publishProgress(receiveProgressEvent(r.sessionID, progress.snapshot(), r.destination.Snapshot().FilesSaved))
@@ -398,6 +391,14 @@ func (b *uploadBody) Read(p []byte) (int, error) {
 	if b.err != nil {
 		return 0, b.err
 	}
+	// The one place the inactivity deadline is re-armed: before every read,
+	// so the bound measures how long the phone leaves this read waiting and
+	// never how long the desktop spent on its own disk -- an fsync, marking or
+	// rename after a part, or a write stalled mid-file (antivirus scanning a
+	// fresh file, a slow volume). Re-arming only after a read had delivered
+	// bytes left the next read facing a deadline that expired while the
+	// phone's bytes sat waiting in the socket (Windows CI, run 38199503856).
+	b.refreshDeadline()
 	n, err := b.body.Read(p)
 	if n > 0 {
 		b.read += int64(n)
@@ -426,7 +427,6 @@ func (b *uploadBody) Read(p []byte) (int, error) {
 		}
 		if b.meter != nil {
 			b.meter.record(n)
-			b.refreshDeadline()
 		}
 	}
 	return n, err
