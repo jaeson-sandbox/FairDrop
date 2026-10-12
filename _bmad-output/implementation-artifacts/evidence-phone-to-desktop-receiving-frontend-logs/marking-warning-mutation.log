@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-marking-warning-j0_x5qdf/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-marking-warning-0koaewdm/frontend
 
- ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 1 failed | 30 skipped) 23ms
-     × appears when the backend says marking failed, and says the files were still saved 18ms
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 1 failed | 30 skipped) 25ms
+     × appears when the backend says marking failed, and says the files were still saved 20ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -21,6 +21,6 @@ TypeError: Cannot read properties of null (reading 'textContent')
 
  Test Files  1 failed (1)
       Tests  1 failed | 2 passed | 30 skipped (33)
-   Start at  05:01:16
-   Duration  496ms (transform 61ms, setup 0ms, import 119ms, tests 23ms, environment 276ms)
+   Start at  15:31:28
+   Duration  525ms (transform 63ms, setup 0ms, import 114ms, tests 25ms, environment 300ms)
 

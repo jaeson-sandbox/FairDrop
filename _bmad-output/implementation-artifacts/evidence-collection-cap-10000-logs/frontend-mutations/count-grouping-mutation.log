@@ -1,0 +1,227 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-count-grouping-qa1chyiz/frontend
+
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 327ms
+     × shows the count out of 10,000, grouped for large lists 326ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > shows the count out of 10,000, grouped for large lists
+TestingLibraryElementError: Unable to find an element with the text: 1,234 of 10,000 items. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div />[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"fd-region"[39m
+      [33mdata-phase-view[39m=[32m"draft"[39m
+    [36m>[39m
+      [36m<section[39m
+        [33maria-labelledby[39m=[32m"fd-draft-heading"[39m
+        [33mclass[39m=[32m"fd-draft fd-packet"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"fd-state-heading"[39m
+          [33mid[39m=[32m"fd-draft-heading"[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mSelected items[0m
+        [36m</h1>[39m
+        [36m<p[39m
+          [33maria-live[39m=[32m"polite"[39m
+          [33mclass[39m=[32m"fd-meta"[39m
+        [36m>[39m
+          [0m1234 of 10,000 items[0m
+        [36m</p>[39m
+        [36m<ol[39m
+          [33mclass[39m=[32m"fd-draft__list"[39m
+          [33mstyle[39m=[32m"--fd-ordinal-digits: 4;"[39m
+        [36m>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m1[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0mfile-0.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove 1. file-0.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m2[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0mfile-1.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove 2. file-1.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m3[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0mfile-2.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove 3. file-2.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m4[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0mfile-3.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove 4. file-3.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m5[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0mfile-4.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove 5. file-4.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"fd-draft__ordinal"[39m
+            [36m>[39m
+              [0m6[0m
+              [0m.[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"fd-draft__name"[39m
+            [36m>[39m
+              [36m<bdi[39m
+                [33mdir[39m=[32m"auto"[39m
+              [36m>[39m
+                [0mfile-5.txt[0m
+              [36m</bdi>[39m
+            [36m</span>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Remove 6. file-5.txt"[39m
+              [33mclass[39m=[32m"fd-button fd-button--quiet fd-target"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mRemove[0m
+            [36m</button>[39m
+          [36m</li>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"fd-draft__row"[39m
+          [36m>[39m
+            [36m<span[39m
+      ...
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/CollectionDraftView.test.tsx:31:23
+     29|         unmount()
+     30|         render(<Harness initial={Array.from({length: 1234}, (_, i) => …
+     31|         expect(screen.getByText('1,234 of 10,000 items')).toBeTruthy()
+       |                       ^
+     32|         expect(screen.getByRole('button', {name: 'Remove 1234. file-12…
+     33|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  15:24:39
+   Duration  804ms (transform 44ms, setup 0ms, import 90ms, tests 327ms, environment 301ms)
+

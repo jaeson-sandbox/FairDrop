@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-dismissal-focus-return-56lrr4xk/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-dismissal-focus-return-tb5je3p8/frontend
 
- ❯ src/ui/IdleView.receive.test.tsx (20 tests | 2 failed | 13 skipped) 131ms
-     × does not touch focus or the marker when the activation ends proceeded 11ms
-     × does not touch focus or the marker when the activation ends ignored 8ms
+ ❯ src/ui/IdleView.receive.test.tsx (20 tests | 2 failed | 13 skipped) 139ms
+     × does not touch focus or the marker when the activation ends proceeded 14ms
+     × does not touch focus or the marker when the activation ends ignored 12ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -23,6 +23,6 @@ AssertionError: expected <button type="button" …(3)></button> not to be <butto
 
  Test Files  1 failed (1)
       Tests  2 failed | 5 passed | 13 skipped (20)
-   Start at  04:59:49
-   Duration  609ms (transform 72ms, setup 0ms, import 123ms, tests 131ms, environment 275ms)
+   Start at  15:29:56
+   Duration  645ms (transform 72ms, setup 0ms, import 126ms, tests 139ms, environment 298ms)
 

@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -105,10 +106,10 @@ func New(source transfer.SourcePort) *Payloads {
 // response header is written, so every failure returns a coded error and
 // retains no descriptor.
 func (p *Payloads) Prepare(ctx context.Context, item transfer.StagedItem) (server.PreparedPayload, error) {
-	return p.prepareWithRetained(ctx, item, 0)
+	return p.prepareItem(ctx, item)
 }
 
-func (p *Payloads) prepareWithRetained(ctx context.Context, item transfer.StagedItem, otherPins int) (server.PreparedPayload, error) {
+func (p *Payloads) prepareItem(ctx context.Context, item transfer.StagedItem) (server.PreparedPayload, error) {
 	if ctx == nil {
 		return nil, transfer.NewError(
 			transfer.ErrTransferFailed,
@@ -136,22 +137,23 @@ func (p *Payloads) prepareWithRetained(ctx context.Context, item transfer.Staged
 	if item.Kind == transfer.ItemDirectory {
 		return p.prepareArchive(ctx, item)
 	}
+	file, err := p.prepareFile(ctx, item)
+	if err != nil {
+		// Never return the typed nil: a nil *payload in a PreparedPayload
+		// interface is not nil, and a caller would then Close it.
+		return nil, err
+	}
+	return file, nil
+}
 
+// prepareFile pins and opens one regular file. It is the singleton file path
+// and, unchanged, how a collection prepares each top-level file member.
+func (p *Payloads) prepareFile(ctx context.Context, item transfer.StagedItem) (*payload, error) {
 	// First layer: re-run the selection policy at claim time so a root that
 	// disappeared, changed kind, or became link-like is refused before anything
 	// is opened. Reusing the port keeps one implementation of the link,
 	// reparse, ancestor, and special-file rules.
-	var fresh transfer.StagedItem
-	var err error
-	if otherPins > 0 {
-		budgeted, ok := p.source.(transfer.CollectionSourcePort)
-		if !ok {
-			return nil, transfer.NewError(transfer.ErrSetupFailed, "collection source accounting is unavailable")
-		}
-		fresh, err = budgeted.InspectWithRetained(ctx, item.Path, otherPins)
-	} else {
-		fresh, err = p.source.Inspect(ctx, item.Path)
-	}
+	fresh, err := p.source.Inspect(ctx, item.Path)
 	if err != nil {
 		return nil, wrapUncodedSourceError(err)
 	}
@@ -260,83 +262,84 @@ func (p *Payloads) prepareArchive(ctx context.Context, item transfer.StagedItem)
 	}, nil
 }
 
+// prepareCollection does not prepare the collection; it prepares only its
+// first member. Members are opened lazily, one at a time in archive order:
+// the first here, before any response header, so that its failure is a clean
+// pre-stream refusal, and each later member only when the ZIP stream reaches
+// it, after the member before it has been closed. At most one top-level file
+// descriptor and one prepared directory pin are therefore held at any moment,
+// whatever the item count.
+//
+// Everything that needs no filesystem -- the count, the member kinds and
+// every archive name -- is still validated for the whole selection up front,
+// so a name that cannot be written safely never surfaces mid-stream.
 func (p *Payloads) prepareCollection(ctx context.Context, item transfer.StagedItem) (server.PreparedPayload, error) {
-	if p == nil || p.source == nil || item.Collection == nil || len(item.Collection.Members) < 2 || len(item.Collection.Members) > 16 {
+	if p == nil || p.source == nil || item.Collection == nil ||
+		len(item.Collection.Members) < 2 || len(item.Collection.Members) > transfer.MaxCollectionItems {
 		return nil, transfer.NewError(transfer.ErrSetupFailed, "collection payload is invalid")
 	}
 	members := slices.Clone(item.Collection.Members)
-	dirs := 0
-	for _, member := range members {
-		if member.Kind == transfer.ItemDirectory {
-			dirs++
-		} else if member.Kind != transfer.ItemFile {
+	width := ordinalWidth(len(members))
+	for index, member := range members {
+		if member.Kind != transfer.ItemDirectory && member.Kind != transfer.ItemFile {
 			return nil, transfer.NewError(transfer.ErrSetupFailed, "collection member is invalid")
 		}
-	}
-	var budgeted transfer.CollectionSourcePort
-	if dirs > 0 {
-		var ok bool
-		budgeted, ok = p.source.(transfer.CollectionSourcePort)
-		if !ok {
-			return nil, transfer.NewError(transfer.ErrSetupFailed, "collection source accounting is unavailable")
+		if !transfer.SafeArchiveSegment(collectionMemberName(member, index, width)) {
+			return nil, unsafeArchiveEntryName()
 		}
 	}
-	collection := &archive{name: "FairDrop.zip", root: "FairDrop", bufferSize: p.bufferLength()}
+	lazy := &lazyCollection{payloads: p, members: members, width: width}
+	collection := &archive{name: "FairDrop.zip", root: "FairDrop", bufferSize: p.bufferLength(), lazy: lazy}
 	cleanup := func(primary error) (server.PreparedPayload, error) {
 		if closeErr := collection.Close(); closeErr != nil {
 			return nil, transfer.WrapError(transfer.ErrTransferFailed, "collection cleanup failed", errors.Join(primary, closeErr))
 		}
 		return nil, primary
 	}
-	for index, member := range members {
-		if err := prepareContextError(ctx); err != nil {
-			return cleanup(err)
-		}
-		var prepared server.PreparedPayload
-		var err error
-		if member.Kind == transfer.ItemDirectory {
-			var pin transfer.PreparedDirectory
-			pin, err = budgeted.PrepareDirectoryWithRetained(ctx, member.Path, dirs-1)
-			if err == nil && pin == nil {
-				err = transfer.NewError(transfer.ErrSetupFailed, "prepared directory is unavailable")
-			}
-			if err == nil {
-				prepared = &archive{prepared: pin, modTime: member.ModTime, bufferSize: p.bufferLength()}
-			}
-		} else {
-			prepared, err = p.prepareWithRetained(ctx, member, dirs)
-		}
-		if err != nil {
-			return cleanup(wrapUncodedSourceError(err))
-		}
-		name := downloadName(member)
-		var bounded strings.Builder
-		count := 0
-		for _, char := range name {
-			if count >= maxDownloadNameRunes-3 || bounded.Len()+utf8.RuneLen(char) > 255-3 {
-				break
-			}
-			bounded.WriteRune(char)
-			count++
-		}
-		name = bounded.String()
-		name = strings.TrimRight(name, nameTrailingCutset)
-		if name == "" {
-			name = fallbackDownloadName
-		}
-		name = fmt.Sprintf("%02d-%s", index+1, name)
-		if !transfer.SafeArchiveSegment(name) {
-			if closeErr := prepared.Close(); closeErr != nil {
-				return cleanup(transfer.WrapError(transfer.ErrTransferFailed, "collection member cleanup failed", closeErr))
-			}
-			return cleanup(unsafeArchiveEntryName())
-		}
-		collection.members = append(collection.members, collectionMember{name: name, kind: member.Kind, modTime: member.ModTime, payload: prepared})
+	if err := prepareContextError(ctx); err != nil {
+		return cleanup(err)
+	}
+	if err := lazy.openFirst(ctx); err != nil {
+		return cleanup(wrapUncodedSourceError(err))
 	}
 	if err := prepareContextError(ctx); err != nil {
 		return cleanup(err)
 	}
 	return collection, nil
+}
+
+// ordinalWidth is how many digits every collection ordinal is zero-padded to:
+// the width of the item count, and never fewer than two, so names stay
+// distinct and sort in selection order (01-16, 001-100, 00001-10000).
+func ordinalWidth(count int) int {
+	return max(2, len(strconv.Itoa(count)))
+}
+
+// collectionMemberName is the single top-level name member index (zero-based)
+// takes inside the collection ZIP: its zero-padded one-based ordinal, a
+// dash, and the sanitized basename. The basename is clipped so the whole name,
+// ordinal included, stays within maxDownloadNameRunes runes and 255 UTF-8
+// bytes -- clipping only on rune boundaries, trimming any newly exposed
+// trailing dot or space, and falling back to the generic name if sanitation
+// leaves nothing. The ordinal is never the part that is cut.
+func collectionMemberName(member transfer.StagedItem, index, width int) string {
+	reserve := width + 1
+	name := downloadName(member)
+	var bounded strings.Builder
+	count := 0
+	for _, char := range name {
+		if count >= maxDownloadNameRunes-reserve || bounded.Len()+utf8.RuneLen(char) > 255-reserve {
+			break
+		}
+		bounded.WriteRune(char)
+		count++
+	}
+	name = bounded.String()
+	name = strings.TrimRight(name, nameTrailingCutset)
+	if name == "" {
+		name = fallbackDownloadName
+	}
+	return fmt.Sprintf("%0*d-%s", width, index+1, name)
 }
 
 // pinIdentity is the regular-file claim-time re-Lstat. It carries

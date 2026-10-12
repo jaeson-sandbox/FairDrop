@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-metadata-count-c4pv77gk/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 67 skipped (68)
+   Start at  15:24:26
+   Duration  640ms (transform 44ms, setup 0ms, import 54ms, tests 3ms, environment 492ms)
+

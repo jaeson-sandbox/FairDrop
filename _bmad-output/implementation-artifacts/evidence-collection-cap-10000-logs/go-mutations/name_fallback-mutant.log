@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T15:24:04.143664-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T15:24:04.403232-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit"}
+{"Time":"2026-10-11T15:24:04.403398-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Output":"=== RUN   TestCollectionRootNameFallbackAndPostPrefixLimit\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:04.407185-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Output":"    collection_test.go:450: empty sanitized name did not use basename fallback: \"FairDrop/01-download\"\n","OutputType":"error"}
+{"Time":"2026-10-11T15:24:04.40881-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Output":"--- FAIL: TestCollectionRootNameFallbackAndPostPrefixLimit (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:04.408821-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionRootNameFallbackAndPostPrefixLimit","Elapsed":0.01}
+{"Time":"2026-10-11T15:24:04.408838-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:04.410131-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.266s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:04.410171-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.267}

@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-id-issue-efhsr736/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 15ms
+     × gives every draft row a stable id that survives removal and append without exposing a path 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > gives every draft row a stable id that survives removal and append without exposing a path
+AssertionError: expected 1 to be 4 // Object.is equality
+
+- Expected
++ Received
+
+- 4
++ 1
+
+ ❯ src/transfer/useTransfer.test.tsx:240:37
+    238|         const first = [...hook.result.current.draftIds]
+    239|         expect(first).toHaveLength(4)
+    240|         expect(new Set(first).size).toBe(4)
+       |                                     ^
+    241|         act(() => hook.result.current.removeDraftItem(0))
+    242|         expect(hook.result.current.draft?.names).toEqual(['b.txt', 'c.…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 82 skipped (83)
+   Start at  15:24:59
+   Duration  586ms (transform 116ms, setup 0ms, import 172ms, tests 15ms, environment 311ms)
+

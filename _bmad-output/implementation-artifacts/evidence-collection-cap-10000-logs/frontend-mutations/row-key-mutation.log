@@ -1,0 +1,58 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-key-yn1giwc1/frontend
+
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 261ms
+     × keeps the remaining rows mounted when the first row is removed 260ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > keeps the remaining rows mounted when the first row is removed
+AssertionError: expected <li class="fd-draft__row">…(3)</li> to be <li class="fd-draft__row">…(3)</li> // Object.is equality
+
+- Expected
++ Received
+
+@@ -3,11 +3,11 @@
+  >
+    <span
+      aria-hidden="true"
+      class="fd-draft__ordinal"
+    >
+-     2
++     1
+      .
+    </span>
+    <span
+      class="fd-draft__name"
+    >
+@@ -16,11 +16,11 @@
+      >
+        photo-1.jpg
+      </bdi>
+    </span>
+    <button
+-     aria-label="Remove 2. photo-1.jpg"
++     aria-label="Remove 1. photo-1.jpg"
+      class="fd-button fd-button--quiet fd-target"
+      type="button"
+    >
+      Remove
+    </button>
+
+ ❯ src/ui/CollectionDraftView.test.tsx:61:54
+     59|         // Same element identity, not equal-looking replacements: a re…
+     60|         // every later row is what made removing from a 10,000-row lis…
+     61|         after.forEach((row, position) => expect(row).toBe(before[posit…
+       |                                                      ^
+     62|         expect(after[0]?.textContent).toContain('1.')
+     63|         expect(after[0]?.textContent).toContain('photo-1.jpg')
+ ❯ src/ui/CollectionDraftView.test.tsx:61:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  15:24:55
+   Duration  748ms (transform 41ms, setup 0ms, import 89ms, tests 261ms, environment 314ms)
+

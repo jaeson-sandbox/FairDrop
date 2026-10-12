@@ -1,10 +1,10 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-clipped-text-mvtg5pxz/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-clipped-text-3wgg2ot7/frontend
 
- ❯ |chromium| browser/receive.test.tsx (37 tests | 3 failed | 29 skipped) 5251ms
-     × receive waiting grows without horizontal scroll or a clipped container 699ms
-     × receive waiting after a refused upload grows without horizontal scroll or a clipped container 684ms
-     × receiving grows without horizontal scroll or a clipped container 633ms
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 3 failed | 29 skipped) 5227ms
+     × receive waiting grows without horizontal scroll or a clipped container 684ms
+     × receive waiting after a refused upload grows without horizontal scroll or a clipped container 686ms
+     × receiving grows without horizontal scroll or a clipped container 631ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -50,6 +50,6 @@ AssertionError: receiving: div.fd-hero__details "Phone PhotosEach upload is save
 
  Test Files  1 failed (1)
       Tests  3 failed | 5 passed | 29 skipped (37)
-   Start at  05:01:43
-   Duration  5.95s (transform 0ms, setup 0ms, import 171ms, tests 5.25s, environment 0ms)
+   Start at  15:31:55
+   Duration  6.01s (transform 0ms, setup 0ms, import 190ms, tests 5.23s, environment 0ms)
 

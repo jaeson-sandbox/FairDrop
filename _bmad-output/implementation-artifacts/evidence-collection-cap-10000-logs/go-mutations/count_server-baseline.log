@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T15:23:35.518638-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T15:23:35.808561-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly"}
+{"Time":"2026-10-11T15:23:35.808694-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Output":"=== RUN   TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:35.810784-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Output":"--- PASS: TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:35.810814-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestStartAdmitsCollectionsOfTwoThroughTenThousandMembersOnly","Elapsed":0}
+{"Time":"2026-10-11T15:23:35.810844-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:35.81222-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.293s\n"}
+{"Time":"2026-10-11T15:23:35.812244-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.294}

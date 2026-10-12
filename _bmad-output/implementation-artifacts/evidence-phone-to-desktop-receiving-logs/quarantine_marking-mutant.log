@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T04:59:39.125875-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T04:59:39.348129-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS"}
-{"Time":"2026-10-11T04:59:39.348234-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"=== RUN   TestSavedFilesCarryTheQuarantineAttributeOnMacOS\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:39.356175-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"    mark_darwin_test.go:24: Getxattr(com.apple.quarantine) = attribute not found, want the attribute present on a saved file\n","OutputType":"error"}
-{"Time":"2026-10-11T04:59:39.357857-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"--- FAIL: TestSavedFilesCarryTheQuarantineAttributeOnMacOS (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:39.35788-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Elapsed":0.01}
-{"Time":"2026-10-11T04:59:39.357918-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:39.358804-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.233s\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:39.358824-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.233}
+{"Time":"2026-10-11T15:26:48.996954-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T15:26:49.227408-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS"}
+{"Time":"2026-10-11T15:26:49.227517-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"=== RUN   TestSavedFilesCarryTheQuarantineAttributeOnMacOS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:49.233935-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"    mark_darwin_test.go:24: Getxattr(com.apple.quarantine) = attribute not found, want the attribute present on a saved file\n","OutputType":"error"}
+{"Time":"2026-10-11T15:26:49.236209-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"--- FAIL: TestSavedFilesCarryTheQuarantineAttributeOnMacOS (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:49.236266-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Elapsed":0.01}
+{"Time":"2026-10-11T15:26:49.236306-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:49.237025-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.240s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:49.237039-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.24}

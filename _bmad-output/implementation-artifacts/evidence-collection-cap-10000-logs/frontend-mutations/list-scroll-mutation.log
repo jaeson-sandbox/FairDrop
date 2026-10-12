@@ -1,0 +1,35 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-list-scroll-7yoxqvoq/frontend
+
+ ❯ src/ui/draftListStyles.test.ts (4 tests | 1 failed | 3 skipped) 4ms
+     × scrolls within the window instead of stretching the page 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/draftListStyles.test.ts > collection draft list at large counts > scrolls within the window instead of stretching the page
+AssertionError: expected ' list-style: decimal; padding-inline-…' to contain 'overflow-y: auto'
+
+- Expected
++ Received
+
+- overflow-y: auto
++  list-style: decimal; padding-inline-start: 1.5rem; padding-inline-end: .75rem; padding-block: .25rem; margin-block: 1rem;
++   max-height: min(24rem, 50vh); overflow-y: visible; overscroll-behavior: contain; scroll-padding-block: .5rem;
++   border: 1px solid var(--color-separator); border-radius: var(--radius-md); 
+
+ ❯ src/ui/draftListStyles.test.ts:21:22
+     19|     it('scrolls within the window instead of stretching the page', () …
+     20|         expect(rule).toContain('max-height: min(24rem, 50vh)')
+     21|         expect(rule).toContain('overflow-y: auto')
+       |                      ^
+     22|         expect(rule).toContain('overscroll-behavior: contain')
+     23|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  15:24:41
+   Duration  422ms (transform 17ms, setup 0ms, import 23ms, tests 4ms, environment 306ms)
+

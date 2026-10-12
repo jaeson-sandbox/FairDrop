@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-failure-note-1rr5grcu/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-failure-note-993u3jdo/frontend
 
  ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
      × records a failed Show in Folder beside the outcome and clears it on the next request 6ms
@@ -38,6 +38,6 @@ AssertionError: expected { phase: 'receive-outcome', …(4) } to match object { 
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  05:00:21
-   Duration  486ms (transform 48ms, setup 0ms, import 58ms, tests 7ms, environment 339ms)
+   Start at  15:30:30
+   Duration  447ms (transform 49ms, setup 0ms, import 61ms, tests 7ms, environment 294ms)
 

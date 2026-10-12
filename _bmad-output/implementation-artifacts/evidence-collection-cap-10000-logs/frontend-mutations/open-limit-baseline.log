@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-open-limit-pi1lbv4m/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 82 skipped (83)
+   Start at  15:24:32
+   Duration  563ms (transform 115ms, setup 0ms, import 171ms, tests 11ms, environment 297ms)
+

@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-rejects-send-events-l9w4naxd/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-rejects-send-events-cvs3o6dp/frontend
 
  ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 4ms
      × refuses progress with no receive payload and progress with an unknown total 3ms
@@ -25,6 +25,6 @@ TypeError: Cannot read properties of undefined (reading 'filesSaved')
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  05:00:54
-   Duration  411ms (transform 45ms, setup 0ms, import 55ms, tests 4ms, environment 273ms)
+   Start at  15:31:05
+   Duration  445ms (transform 47ms, setup 0ms, import 58ms, tests 4ms, environment 297ms)
 

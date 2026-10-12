@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-status-complete-result-i77zvf1c/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-status-complete-result-oib_ah45/frontend
 
- ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 79 skipped) 5ms
+ ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 79 skipped) 4ms
      × refuses error saying complete 4ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -33,6 +33,6 @@ null
 
  Test Files  1 failed (1)
       Tests  1 failed | 79 skipped (80)
-   Start at  05:00:10
-   Duration  406ms (transform 33ms, setup 0ms, import 42ms, tests 5ms, environment 281ms)
+   Start at  15:30:17
+   Duration  428ms (transform 36ms, setup 0ms, import 46ms, tests 4ms, environment 293ms)
 

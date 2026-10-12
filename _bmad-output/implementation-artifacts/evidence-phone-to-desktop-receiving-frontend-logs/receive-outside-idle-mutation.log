@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-outside-idle-mrpz3huh/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-outside-idle-0f84zxm8/frontend
 
- ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 12ms
-     × refuses Receive outside Idle 12ms
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 13ms
+     × refuses Receive outside Idle 13ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -25,6 +25,6 @@ Received: "proceeded"
 
  Test Files  1 failed (1)
       Tests  1 failed | 48 skipped (49)
-   Start at  04:59:59
-   Duration  489ms (transform 72ms, setup 0ms, import 123ms, tests 12ms, environment 277ms)
+   Start at  15:30:06
+   Duration  523ms (transform 84ms, setup 0ms, import 136ms, tests 13ms, environment 292ms)
 

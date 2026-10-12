@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T04:58:35.458326-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T04:58:35.725038-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage"}
-{"Time":"2026-10-11T04:58:35.725207-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"=== RUN   TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:35.866784-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"    upload_test.go:960: peak heap growth during a 64 MiB upload: 225 KiB\n"}
-{"Time":"2026-10-11T04:58:35.868028-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"--- PASS: TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage (0.14s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:35.868043-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Elapsed":0.14}
-{"Time":"2026-10-11T04:58:35.868067-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:35.868768-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.410s\n"}
-{"Time":"2026-10-11T04:58:35.868778-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.41}
+{"Time":"2026-10-11T15:25:41.933149-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T15:25:42.213137-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage"}
+{"Time":"2026-10-11T15:25:42.213266-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"=== RUN   TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:42.382394-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"    upload_test.go:989: peak heap growth during a 64 MiB upload: 226 KiB\n"}
+{"Time":"2026-10-11T15:25:42.385015-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Output":"--- PASS: TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage (0.17s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:42.385025-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestALargeUploadStreamsWithBoundedMemoryAndNothingInOSTempStorage","Elapsed":0.17}
+{"Time":"2026-10-11T15:25:42.385047-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:42.38578-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.452s\n"}
+{"Time":"2026-10-11T15:25:42.385788-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.453}

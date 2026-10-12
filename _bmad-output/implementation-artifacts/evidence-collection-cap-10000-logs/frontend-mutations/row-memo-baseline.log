@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-memo-ycw0zmdr/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 7 skipped (8)
+   Start at  15:24:56
+   Duration  564ms (transform 43ms, setup 0ms, import 91ms, tests 87ms, environment 303ms)
+

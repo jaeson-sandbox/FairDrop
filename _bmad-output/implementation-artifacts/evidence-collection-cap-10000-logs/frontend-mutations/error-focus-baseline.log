@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-error-focus-r_nvaeme/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 7 skipped (8)
+   Start at  15:25:12
+   Duration  554ms (transform 41ms, setup 0ms, import 88ms, tests 79ms, environment 304ms)
+

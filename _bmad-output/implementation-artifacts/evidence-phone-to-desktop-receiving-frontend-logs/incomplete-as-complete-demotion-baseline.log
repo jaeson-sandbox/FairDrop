@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-demotion-jlykusra/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-demotion-3ighucw0/frontend
 
 
  Test Files  1 passed (1)
       Tests  2 passed | 38 skipped (40)
-   Start at  05:00:30
-   Duration  412ms (transform 46ms, setup 0ms, import 56ms, tests 3ms, environment 278ms)
+   Start at  15:30:39
+   Duration  441ms (transform 48ms, setup 0ms, import 59ms, tests 3ms, environment 297ms)
 

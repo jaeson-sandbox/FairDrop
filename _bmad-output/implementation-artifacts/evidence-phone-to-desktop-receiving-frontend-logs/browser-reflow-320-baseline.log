@@ -1,10 +1,10 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-reflow-320-3b8wwu4r/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-reflow-320-qp1c88pk/frontend
 
-5:01:22 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+3:31:35 PM [vite] (client) Re-optimizing dependencies because vite config has changed
 
  Test Files  1 passed (1)
       Tests  9 passed | 28 skipped (37)
-   Start at  05:01:22
-   Duration  6.70s (transform 0ms, setup 0ms, import 171ms, tests 5.94s, environment 0ms)
+   Start at  15:31:35
+   Duration  6.71s (transform 0ms, setup 0ms, import 181ms, tests 5.94s, environment 0ms)
 

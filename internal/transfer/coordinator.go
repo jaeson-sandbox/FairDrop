@@ -227,11 +227,14 @@ func (c *Coordinator) Stage(ctx context.Context, absolutePath string) (FileMetad
 	return c.StageTransfers(ctx, []string{absolutePath})
 }
 
-// StageTransfers atomically admits one through sixteen selected roots. The
-// caller's slice is copied before any asynchronous or external work begins.
+// StageTransfers atomically admits one through MaxCollectionItems selected
+// roots. The caller's slice is copied before any asynchronous or external work
+// begins. The cap is a sanity bound against a broken or accidental selection,
+// not a resource budget: members are prepared one at a time while streaming,
+// so the item count never consumes the source's directory-handle budget.
 func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileMetadata, error) {
-	if len(paths) == 0 || len(paths) > 16 {
-		return FileMetadata{}, NewError(ErrInvalidSelection, "choose between one and sixteen items")
+	if len(paths) == 0 || len(paths) > MaxCollectionItems {
+		return FileMetadata{}, NewError(ErrInvalidSelection, "choose between one and 10,000 items")
 	}
 	paths = slices.Clone(paths)
 	for _, path := range paths {
@@ -285,8 +288,13 @@ func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileM
 		members := make([]StagedItem, 0, len(paths))
 		var total int64
 		var unportable int
-		var directories int
+		overlaps := newOverlapIndex()
 		for _, path := range paths {
+			// A plain Inspect reserves one future prepared-root pin per
+			// directory, exactly as the singleton path does. Members are
+			// prepared lazily and one at a time while streaming, so the
+			// number of selected folders never consumes the handle budget
+			// and no second, count-aware inspection pass exists.
 			member, inspectErr := c.source.Inspect(setupCtx, path)
 			if inspectErr != nil {
 				return c.failStage(live, inspectErr)
@@ -294,10 +302,8 @@ func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileM
 			if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
 				return c.failStage(live, err)
 			}
-			for _, previous := range members {
-				if selectionsOverlap(previous.Path, member.Path) {
-					return c.failStage(live, NewError(ErrInvalidSelection, "selected items overlap"))
-				}
+			if !overlaps.add(member.Path) {
+				return c.failStage(live, NewError(ErrInvalidSelection, "selected items overlap"))
 			}
 			if member.Kind != ItemFile && member.Kind != ItemDirectory {
 				return c.failStage(live, NewError(ErrSetupFailed, "selection kind is unsupported"))
@@ -309,34 +315,7 @@ func (c *Coordinator) StageTransfers(ctx context.Context, paths []string) (FileM
 			if member.UnportableNames > 0 {
 				unportable = 1
 			}
-			if member.Kind == ItemDirectory {
-				directories++
-			}
 			members = append(members, member)
-		}
-		// The first pass discovers the true directory count. Reinspect with
-		// every future pin reserved against the shared source handle budget.
-		if directories > 0 {
-			budgeted, ok := c.source.(CollectionSourcePort)
-			if !ok {
-				return c.failStage(live, NewError(ErrSetupFailed, "collection source accounting is unavailable"))
-			}
-			for _, member := range members {
-				reserved := directories
-				if member.Kind == ItemDirectory {
-					reserved--
-				}
-				checked, inspectErr := budgeted.InspectWithRetained(setupCtx, member.Path, reserved)
-				if inspectErr != nil {
-					return c.failStage(live, inspectErr)
-				}
-				if err := c.afterStep(ctx, setupCtx, id, generation); err != nil {
-					return c.failStage(live, err)
-				}
-				if checked.Kind != member.Kind || checked.LogicalSize != member.LogicalSize || !checked.ModTime.Equal(member.ModTime) {
-					return c.failStage(live, NewError(ErrSourceChanged, "selection changed during admission"))
-				}
-			}
 		}
 		item = StagedItem{Name: strconv.Itoa(len(members)) + " items", Kind: ItemCollection, LogicalSize: total, UnportableNames: unportable, Collection: &StagedCollection{Members: members}}
 	}
@@ -568,22 +547,71 @@ func cloneStagedItem(item StagedItem) StagedItem {
 	return item
 }
 
-func selectionsOverlap(a, b string) bool {
-	a, b = filepath.Clean(a), filepath.Clean(b)
+// overlapIndex answers "does this path equal, contain or sit inside any
+// previously added path" in time proportional to the path's depth rather than
+// to the number of earlier selections. With up to MaxCollectionItems roots a
+// pairwise scan would be tens of millions of comparisons. It stores one
+// normalized key per selected root plus that root's ancestors -- bounded by
+// the selected-root records, never by descendants -- and comparison is by
+// whole path component, so /a/b is not an ancestor of /a/b2.
+type overlapIndex struct {
+	selected  map[string]struct{}
+	ancestors map[string]struct{}
+}
+
+func newOverlapIndex() *overlapIndex {
+	return &overlapIndex{selected: map[string]struct{}{}, ancestors: map[string]struct{}{}}
+}
+
+// normalizeSelection lexically cleans path and folds case on Windows.
+func normalizeSelection(path string) string {
+	path = filepath.Clean(path)
 	if runtime.GOOS == "windows" {
-		a, b = strings.ToLower(a), strings.ToLower(b)
+		path = strings.ToLower(path)
 	}
-	if a == b {
-		return true
-	}
+	return path
+}
+
+// overlapKey drops a trailing separator so a directory and its spelling with
+// one compare equal; a bare POSIX filesystem root keeps its separator.
+func overlapKey(normalized string) string {
 	separator := string(filepath.Separator)
-	ancestor := func(parent, child string) bool {
-		if !strings.HasSuffix(parent, separator) {
-			parent += separator
-		}
-		return strings.HasPrefix(child, parent)
+	trimmed := strings.TrimRight(normalized, separator)
+	if trimmed == "" {
+		return separator
 	}
-	return ancestor(a, b) || ancestor(b, a)
+	return trimmed
+}
+
+// add records path and reports false, recording nothing, when it equals,
+// contains or sits inside an earlier selection.
+func (o *overlapIndex) add(path string) bool {
+	current := normalizeSelection(path)
+	key := overlapKey(current)
+	if _, duplicate := o.selected[key]; duplicate {
+		return false
+	}
+	if _, contains := o.ancestors[key]; contains {
+		return false
+	}
+	var ancestors []string
+	for {
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		parentKey := overlapKey(parent)
+		if _, inside := o.selected[parentKey]; inside {
+			return false
+		}
+		ancestors = append(ancestors, parentKey)
+		current = parent
+	}
+	o.selected[key] = struct{}{}
+	for _, ancestor := range ancestors {
+		o.ancestors[ancestor] = struct{}{}
+	}
+	return true
 }
 
 // AuthorizeClaim is the synchronous handshake between a reserved HTTP claim

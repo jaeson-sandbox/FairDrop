@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-append-limit-lower-c2u5kf3g/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 16ms
+     × accepts appends up to exactly 10,000 rows, including past the old sixteen 15ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > accepts appends up to exactly 10,000 rows, including past the old sixteen
+AssertionError: expected [ '0', '1', '2', '3', '4', '5', …(11) ] to have a length of 10000 but got 17
+
+- Expected
++ Received
+
+- 10000
++ 17
+
+ ❯ src/transfer/useTransfer.test.tsx:150:50
+    148|         expect(hook.result.current.draft?.error).toBeNull()
+    149|         act(() => hook.result.current.appendDraft(Array.from({length: …
+    150|         expect(hook.result.current.draft?.names).toHaveLength(10000)
+       |                                                  ^
+    151|         expect(hook.result.current.draft?.error).toBeNull()
+    152|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 82 skipped (83)
+   Start at  15:24:31
+   Duration  569ms (transform 115ms, setup 0ms, import 169ms, tests 16ms, environment 300ms)
+

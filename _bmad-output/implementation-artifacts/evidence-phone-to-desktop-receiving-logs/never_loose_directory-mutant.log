@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T04:59:33.076885-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T04:59:33.295544-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable"}
-{"Time":"2026-10-11T04:59:33.29571-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"=== RUN   TestFilesAndFoldersAreNeverExecutable\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:33.303214-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"    destination_test.go:373: the folder mode is 777, want no bit beyond 0755\n","OutputType":"error"}
-{"Time":"2026-10-11T04:59:33.304498-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"--- FAIL: TestFilesAndFoldersAreNeverExecutable (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:33.304559-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Elapsed":0.01}
-{"Time":"2026-10-11T04:59:33.304598-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:33.305462-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.228s\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:33.305501-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.229}
+{"Time":"2026-10-11T15:26:42.772789-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T15:26:43.014824-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable"}
+{"Time":"2026-10-11T15:26:43.014942-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"=== RUN   TestFilesAndFoldersAreNeverExecutable\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:43.022891-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"    destination_test.go:373: the folder mode is 777, want no bit beyond 0755\n","OutputType":"error"}
+{"Time":"2026-10-11T15:26:43.023947-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"--- FAIL: TestFilesAndFoldersAreNeverExecutable (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:43.023964-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Elapsed":0.01}
+{"Time":"2026-10-11T15:26:43.024005-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:43.024922-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.252s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:43.02495-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.252}

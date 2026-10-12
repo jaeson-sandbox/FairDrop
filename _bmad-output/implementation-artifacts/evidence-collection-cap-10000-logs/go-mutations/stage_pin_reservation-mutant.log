@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T15:23:55.004761-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-11T15:23:55.312439-04:00","Action":"run","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether"}
+{"Time":"2026-10-11T15:23:55.312567-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Output":"=== RUN   TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:55.405213-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Output":"    collection_native_test.go:184: collection download failed: status=200 body error=unexpected EOF\n","OutputType":"error"}
+{"Time":"2026-10-11T15:23:55.462653-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Output":"--- FAIL: TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether (0.15s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:55.46267-04:00","Action":"fail","Package":"fairdrop","Test":"TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether","Elapsed":0.15}
+{"Time":"2026-10-11T15:23:55.462706-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:55.463563-04:00","Action":"output","Package":"fairdrop","Output":"FAIL\tfairdrop\t0.459s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:55.463577-04:00","Action":"fail","Package":"fairdrop","Elapsed":0.459}

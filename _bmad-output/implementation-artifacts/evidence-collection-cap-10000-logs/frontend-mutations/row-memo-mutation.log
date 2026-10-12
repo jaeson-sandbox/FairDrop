@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-memo-ycw0zmdr/frontend
+
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 106ms
+     × re-renders only the new row when a row is appended to an unchanged list 106ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/CollectionDraftView.test.tsx > collection draft focus > re-renders only the new row when a row is appended to an unchanged list
+AssertionError: expected 301 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 301
+
+ ❯ src/ui/CollectionDraftView.test.tsx:91:31
+     89|         }
+     90|         expect(document.querySelectorAll('.fd-draft__row')).toHaveLeng…
+     91|         expect(registrations).toBe(1)
+       |                               ^
+     92|     })
+     93|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  15:24:57
+   Duration  588ms (transform 44ms, setup 0ms, import 94ms, tests 106ms, environment 300ms)
+

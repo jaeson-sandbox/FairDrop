@@ -1,0 +1,83 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-remove-resanitize-_i3k7gtk/frontend
+
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 16ms
+     × sanitizes each path once, not again on every append or removal 15ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/useTransfer.test.tsx > collection draft and immutable batch admission > sanitizes each path once, not again on every append or removal
+AssertionError: expected [ '/data/set-1/file-1.txt', …(49) ] to deeply equal [ '/data/set-new/file-new.txt' ]
+
+- Expected
++ Received
+
+  [
++   "/data/set-1/file-1.txt",
++   "/data/set-2/file-2.txt",
++   "/data/set-3/file-3.txt",
++   "/data/set-4/file-4.txt",
++   "/data/set-5/file-5.txt",
++   "/data/set-6/file-6.txt",
++   "/data/set-7/file-7.txt",
++   "/data/set-8/file-8.txt",
++   "/data/set-9/file-9.txt",
++   "/data/set-10/file-10.txt",
++   "/data/set-11/file-11.txt",
++   "/data/set-12/file-12.txt",
++   "/data/set-13/file-13.txt",
++   "/data/set-14/file-14.txt",
++   "/data/set-15/file-15.txt",
++   "/data/set-16/file-16.txt",
++   "/data/set-17/file-17.txt",
++   "/data/set-18/file-18.txt",
++   "/data/set-19/file-19.txt",
++   "/data/set-20/file-20.txt",
++   "/data/set-21/file-21.txt",
++   "/data/set-22/file-22.txt",
++   "/data/set-23/file-23.txt",
++   "/data/set-24/file-24.txt",
++   "/data/set-25/file-25.txt",
++   "/data/set-26/file-26.txt",
++   "/data/set-27/file-27.txt",
++   "/data/set-28/file-28.txt",
++   "/data/set-29/file-29.txt",
++   "/data/set-30/file-30.txt",
++   "/data/set-31/file-31.txt",
++   "/data/set-32/file-32.txt",
++   "/data/set-33/file-33.txt",
++   "/data/set-34/file-34.txt",
++   "/data/set-35/file-35.txt",
++   "/data/set-36/file-36.txt",
++   "/data/set-37/file-37.txt",
++   "/data/set-38/file-38.txt",
++   "/data/set-39/file-39.txt",
++   "/data/set-40/file-40.txt",
++   "/data/set-41/file-41.txt",
++   "/data/set-42/file-42.txt",
++   "/data/set-43/file-43.txt",
++   "/data/set-44/file-44.txt",
++   "/data/set-45/file-45.txt",
++   "/data/set-46/file-46.txt",
++   "/data/set-47/file-47.txt",
++   "/data/set-48/file-48.txt",
++   "/data/set-49/file-49.txt",
+    "/data/set-new/file-new.txt",
+  ]
+
+ ❯ src/transfer/useTransfer.test.tsx:273:26
+    271|             act(() => hook.result.current.rejectSelection())
+    272|             expect(hook.result.current.draft?.names).toHaveLength(50)
+    273|             expect(seen).toEqual([incoming])
+       |                          ^
+    274|         } finally {
+    275|             spy.mockRestore()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 82 skipped (83)
+   Start at  15:25:02
+   Duration  571ms (transform 115ms, setup 0ms, import 171ms, tests 16ms, environment 302ms)
+

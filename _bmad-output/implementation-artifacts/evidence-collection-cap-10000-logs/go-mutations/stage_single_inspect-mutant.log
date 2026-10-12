@@ -1,0 +1,9 @@
+{"Time":"2026-10-11T15:23:56.490908-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T15:23:56.713136-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionStageInspectsEachFolderOnceWithoutAccumulatedReservations"}
+{"Time":"2026-10-11T15:23:56.713254-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionStageInspectsEachFolderOnceWithoutAccumulatedReservations","Output":"=== RUN   TestCollectionStageInspectsEachFolderOnceWithoutAccumulatedReservations\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:56.713444-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionStageInspectsEachFolderOnceWithoutAccumulatedReservations","Output":"    coordinator_collection_test.go:75: three folders were inspected [/a/one /a/one /b/two /b/two /c/three /c/three]; want one Inspect each, in order\n","OutputType":"error"}
+{"Time":"2026-10-11T15:23:56.713491-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionStageInspectsEachFolderOnceWithoutAccumulatedReservations","Output":"--- FAIL: TestCollectionStageInspectsEachFolderOnceWithoutAccumulatedReservations (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:56.713505-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCollectionStageInspectsEachFolderOnceWithoutAccumulatedReservations","Elapsed":0}
+{"Time":"2026-10-11T15:23:56.713512-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:56.713996-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.223s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:56.714029-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.223}

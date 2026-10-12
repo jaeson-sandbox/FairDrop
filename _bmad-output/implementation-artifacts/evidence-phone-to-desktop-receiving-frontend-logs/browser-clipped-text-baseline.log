@@ -1,10 +1,10 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-clipped-text-mvtg5pxz/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-clipped-text-3wgg2ot7/frontend
 
-5:01:36 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+3:31:49 PM [vite] (client) Re-optimizing dependencies because vite config has changed
 
  Test Files  1 passed (1)
       Tests  8 passed | 29 skipped (37)
-   Start at  05:01:36
-   Duration  6.02s (transform 0ms, setup 0ms, import 177ms, tests 5.23s, environment 0ms)
+   Start at  15:31:49
+   Duration  6.06s (transform 0ms, setup 0ms, import 184ms, tests 5.27s, environment 0ms)
 

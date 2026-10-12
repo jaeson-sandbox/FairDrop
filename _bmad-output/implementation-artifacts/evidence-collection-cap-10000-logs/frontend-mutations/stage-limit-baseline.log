@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-stage-limit-ggpek0q0/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 82 skipped (83)
+   Start at  15:24:34
+   Duration  583ms (transform 115ms, setup 0ms, import 175ms, tests 15ms, environment 311ms)
+

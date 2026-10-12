@@ -161,7 +161,7 @@ CASES = (
 
     ("receive-draft-open", "Receive is refused while the collection draft is open",
      (("src/transfer/useTransfer.ts",
-       "if (draftPathsRef.current !== null || draftChooserRef.current !== null || draftAdmissionRef.current) return 'ignored'\n        return browse(SelectReceiveFolder",
+       "if (draftEntriesRef.current !== null || draftChooserRef.current !== null || draftAdmissionRef.current) return 'ignored'\n        return browse(SelectReceiveFolder",
        "return browse(SelectReceiveFolder"),),
      CONTROLLER_TEST, "send flows stay out of a receive session",
      "refuses Receive while the collection draft is open, without opening a chooser"),

@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-column-rendered-p8rea2ti/frontend
+
+ ❯ |chromium| browser/collection-draft.test.tsx (4 tests | 1 failed | 3 skipped) 537ms
+     × never lets a wide ordinal touch the name at 10,000 rows 536ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| browser/collection-draft.test.tsx > rendered collection controls > never lets a wide ordinal touch the name at 10,000 rows
+AssertionError: expected 3 to be 1 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 3[39m
+
+ ❯ browser/collection-draft.test.tsx:86:52
+     84|         // Every row's name starts at the same x, so the column reads …
+     85|         const lefts = [1, 100, 10000].map(n => rows[n - 1]!.querySelec…
+     86|         expect(new Set(lefts.map(Math.round)).size).toBe(1)
+       |                                                    ^
+     87|     })
+     88|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  15:25:11
+   Duration  1.20s (transform 0ms, setup 0ms, import 113ms, tests 537ms, environment 0ms)
+

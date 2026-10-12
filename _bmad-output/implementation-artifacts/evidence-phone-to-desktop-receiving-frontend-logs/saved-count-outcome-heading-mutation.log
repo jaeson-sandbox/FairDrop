@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-outcome-heading-t5wvjhsd/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-outcome-heading-bhht486u/frontend
 
- ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 29 skipped) 68ms
-     × heads it "Upload incomplete" with the exact count and no success wording 59ms
-     × says "1 file saved" for one 4ms
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 29 skipped) 73ms
+     × heads it "Upload incomplete" with the exact count and no success wording 63ms
+     × says "1 file saved" for one 5ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -42,6 +42,6 @@ Received: "Upload incomplete — no files saved"
 
  Test Files  1 failed (1)
       Tests  2 failed | 2 passed | 29 skipped (33)
-   Start at  05:00:27
-   Duration  529ms (transform 58ms, setup 0ms, import 106ms, tests 68ms, environment 276ms)
+   Start at  15:30:36
+   Duration  565ms (transform 57ms, setup 0ms, import 107ms, tests 73ms, environment 300ms)
 

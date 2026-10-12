@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-monotonic-ro92tsim/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-monotonic-n3052uz5/frontend
 
  ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
      × refuses progress that goes backwards, changes the declared total, or lowers the saved count 6ms
@@ -54,6 +54,6 @@ AssertionError: expected { phase: 'receive-receiving', …(6) } to be { phase: '
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  05:00:28
-   Duration  415ms (transform 44ms, setup 0ms, import 55ms, tests 7ms, environment 276ms)
+   Start at  15:30:37
+   Duration  445ms (transform 47ms, setup 0ms, import 57ms, tests 7ms, environment 298ms)
 

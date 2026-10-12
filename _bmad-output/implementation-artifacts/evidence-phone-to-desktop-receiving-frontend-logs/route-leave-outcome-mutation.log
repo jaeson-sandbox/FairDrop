@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-route-leave-outcome-l5tu4dn8/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-route-leave-outcome-_43o_840/frontend
 
  ❯ src/ui/announce.receive.test.ts (20 tests | 1 failed | 19 skipped) 4ms
      × focuses the Idle instruction when the outcome is left, because nothing stays mounted to hold focus 4ms
@@ -32,6 +32,6 @@ null
 
  Test Files  1 failed (1)
       Tests  1 failed | 19 skipped (20)
-   Start at  05:01:12
-   Duration  405ms (transform 36ms, setup 0ms, import 44ms, tests 4ms, environment 278ms)
+   Start at  15:31:24
+   Duration  433ms (transform 39ms, setup 0ms, import 47ms, tests 4ms, environment 298ms)
 

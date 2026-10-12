@@ -79,6 +79,7 @@ const commands: ControllerCommands = {
     canRetry: false,
     canSendAgain: false,
     draft: null,
+    draftIds: [],
     openDraft: mocks.noop,
     appendDraft: mocks.noop,
     selectDraftFiles: mocks.noop,

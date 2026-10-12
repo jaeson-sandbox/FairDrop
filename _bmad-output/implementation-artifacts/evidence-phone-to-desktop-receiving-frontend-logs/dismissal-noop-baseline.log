@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-dismissal-noop-clfe0j__/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-dismissal-noop-b4vacyjh/frontend
 
 
  Test Files  1 passed (1)
       Tests  1 passed | 48 skipped (49)
-   Start at  04:59:45
-   Duration  681ms (transform 77ms, setup 0ms, import 160ms, tests 8ms, environment 430ms)
+   Start at  15:29:52
+   Duration  740ms (transform 86ms, setup 0ms, import 168ms, tests 8ms, environment 475ms)
 

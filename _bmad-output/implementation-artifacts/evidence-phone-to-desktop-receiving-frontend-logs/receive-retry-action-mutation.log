@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-retry-action-hp39wuic/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-retry-action-87881jfr/frontend
 
- ❯ src/App.receive.test.tsx (39 tests | 2 failed | 34 skipped) 93ms
-     × shows receive wording and a folder-chooser action, never the send ones 71ms
-     × says Try Again for a failure that is worth another attempt, and reopens the Receive chooser 8ms
+ ❯ src/App.receive.test.tsx (39 tests | 2 failed | 34 skipped) 104ms
+     × shows receive wording and a folder-chooser action, never the send ones 77ms
+     × says Try Again for a failure that is worth another attempt, and reopens the Receive chooser 10ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -140,17 +140,17 @@ Ignored nodes: comments, script, style
     [36m</main>[39m
   [36m</div>[39m
 [36m</body>[39m
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
- ❯ src/App.receive.test.tsx:446:23
-    444|
-    445|         expect(screen.getByRole('heading', {name: 'Can’t save there'})…
-    446|         expect(screen.getByRole('button', {name: 'Choose Another Folde…
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/App.receive.test.tsx:447:23
+    445|
+    446|         expect(screen.getByRole('heading', {name: 'Can’t save there'})…
+    447|         expect(screen.getByRole('button', {name: 'Choose Another Folde…
        |                       ^
-    447|         expect(screen.queryByRole('button', {name: 'Choose Another'}))…
-    448|         expect(screen.queryByRole('menu')).toBeNull()
+    448|         expect(screen.queryByRole('button', {name: 'Choose Another'}))…
+    449|         expect(screen.queryByRole('menu')).toBeNull()
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -287,25 +287,25 @@ Ignored nodes: comments, script, style
     [36m</main>[39m
   [36m</div>[39m
 [36m</body>[39m
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
- ❯ src/App.receive.test.tsx:455:56
-    453|         mountWith(failed('setup_failed'))
-    454|
-    455|         await act(async () => { fireEvent.click(screen.getByRole('butt…
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/App.receive.test.tsx:456:56
+    454|         mountWith(failed('setup_failed'))
+    455|
+    456|         await act(async () => { fireEvent.click(screen.getByRole('butt…
        |                                                        ^
-    456|
-    457|         expect(mocks.receive).toHaveBeenCalledTimes(1)
- ❯ Proxy.process.env.NODE_ENV.exports.act ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/react/cjs/react.development.js:814:22
- ❯ src/App.receive.test.tsx:455:15
+    457|
+    458|         expect(mocks.receive).toHaveBeenCalledTimes(1)
+ ❯ Proxy.process.env.NODE_ENV.exports.act ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/react/cjs/react.development.js:814:22
+ ❯ src/App.receive.test.tsx:456:15
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 
 
  Test Files  1 failed (1)
       Tests  2 failed | 3 passed | 34 skipped (39)
-   Start at  05:01:00
-   Duration  647ms (transform 129ms, setup 0ms, import 195ms, tests 93ms, environment 278ms)
+   Start at  15:31:11
+   Duration  690ms (transform 137ms, setup 0ms, import 202ms, tests 104ms, environment 296ms)
 

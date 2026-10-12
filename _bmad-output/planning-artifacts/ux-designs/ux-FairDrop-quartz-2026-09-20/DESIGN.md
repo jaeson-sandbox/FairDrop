@@ -427,8 +427,10 @@ overrides; no fixed height may clip content.
 
 The bounded multiple-selection list uses the same Quartz surface, control-border,
 focus and text tokens as Idle controls. Basenames wrap and remain bidi-isolated;
-the visible order and count out of 16 remain readable at 320 CSS pixels and 200%
-text. Add Files, Add Folder, Send, Cancel and each Remove target stay at least
+the visible order and count out of 10,000 remain readable at 320 CSS pixels and 200%
+text. The list is a bounded scroller (at most half the window height) with a visible
+border so a long list never pushes the actions out of reach, and its padding leaves room
+for the focus ring. Add Files, Add Folder, Send, Cancel and each Remove target stay at least
 44px. Programmatic focus after removal uses `:focus` appearance, with a system
 outline in forced colors, so macOS WebKit's `:focus-visible` behavior does not
 hide the focus destination. The list inherits Wails' native drop target and

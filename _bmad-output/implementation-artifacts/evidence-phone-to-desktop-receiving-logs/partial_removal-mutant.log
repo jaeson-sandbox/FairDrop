@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T04:58:11.899975-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T04:58:12.129673-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile"}
-{"Time":"2026-10-11T04:58:12.129789-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Output":"=== RUN   TestAReadErrorMidFileRemovesOnlyThePartialFile\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:12.136668-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Output":"    destination_test.go:394: subfolder holds [.fairdrop-c39612cf9b2b2793.part first.txt], want only the completed file\n","OutputType":"error"}
-{"Time":"2026-10-11T04:58:12.139863-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Output":"--- FAIL: TestAReadErrorMidFileRemovesOnlyThePartialFile (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:12.139973-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Elapsed":0.01}
-{"Time":"2026-10-11T04:58:12.140009-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:12.141154-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.241s\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:12.141175-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.241}
+{"Time":"2026-10-11T15:25:18.295994-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T15:25:18.52547-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile"}
+{"Time":"2026-10-11T15:25:18.525541-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Output":"=== RUN   TestAReadErrorMidFileRemovesOnlyThePartialFile\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:18.530356-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Output":"    destination_test.go:394: subfolder holds [.fairdrop-1138b629aa873d8d.part first.txt], want only the completed file\n","OutputType":"error"}
+{"Time":"2026-10-11T15:25:18.531384-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Output":"--- FAIL: TestAReadErrorMidFileRemovesOnlyThePartialFile (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:18.531389-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestAReadErrorMidFileRemovesOnlyThePartialFile","Elapsed":0.01}
+{"Time":"2026-10-11T15:25:18.531408-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:18.531887-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.236s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:18.531909-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.236}

@@ -1,0 +1,8 @@
+{"Time":"2026-10-11T15:23:44.874493-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T15:23:45.104163-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership"}
+{"Time":"2026-10-11T15:23:45.104283-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"=== RUN   TestCollectionCheckedSumAndCallerSliceOwnership\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:45.104536-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Output":"--- PASS: TestCollectionCheckedSumAndCallerSliceOwnership (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:45.104574-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestCollectionCheckedSumAndCallerSliceOwnership","Elapsed":0}
+{"Time":"2026-10-11T15:23:45.104604-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:45.105482-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.231s\n"}
+{"Time":"2026-10-11T15:23:45.105499-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.231}

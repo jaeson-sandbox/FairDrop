@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T04:59:38.595082-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T04:59:38.796212-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS"}
-{"Time":"2026-10-11T04:59:38.796343-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"=== RUN   TestSavedFilesCarryTheQuarantineAttributeOnMacOS\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:38.806571-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"--- PASS: TestSavedFilesCarryTheQuarantineAttributeOnMacOS (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:38.80659-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Elapsed":0.01}
-{"Time":"2026-10-11T04:59:38.806631-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:38.807436-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.212s\n"}
-{"Time":"2026-10-11T04:59:38.807464-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.212}
+{"Time":"2026-10-11T15:26:48.471689-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T15:26:48.666018-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS"}
+{"Time":"2026-10-11T15:26:48.666069-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"=== RUN   TestSavedFilesCarryTheQuarantineAttributeOnMacOS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:48.676552-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Output":"--- PASS: TestSavedFilesCarryTheQuarantineAttributeOnMacOS (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:48.676565-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestSavedFilesCarryTheQuarantineAttributeOnMacOS","Elapsed":0.01}
+{"Time":"2026-10-11T15:26:48.676585-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:48.67711-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.205s\n"}
+{"Time":"2026-10-11T15:26:48.677118-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.205}

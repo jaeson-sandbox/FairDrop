@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -17,79 +18,19 @@ import (
 	"fairdrop/internal/transfer"
 )
 
-func TestNativeCollectionSharedDirectoryBoundaryAndHTTP(t *testing.T) {
-	base, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	shallow := filepath.Join(base, "shallow")
-	if err := os.Mkdir(shallow, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(shallow, "one.txt"), []byte("one"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	topFile := filepath.Join(base, "top.txt")
-	if err := os.WriteFile(topFile, []byte("top"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	inspector := source.New()
-	deep := base
-	var admitted, refused string
-	for depth := 0; depth < 64; depth++ {
-		deep = filepath.Join(deep, "d")
-		if err := os.Mkdir(deep, 0o700); err != nil {
-			t.Fatal(err)
-		}
-		_, aloneErr := inspector.InspectWithRetained(context.Background(), deep, 0)
-		_, sharedErr := inspector.InspectWithRetained(context.Background(), deep, 1)
-		if aloneErr == nil && transfer.ErrorCodeOf(sharedErr) == transfer.ErrPathUnsupported {
-			refused = deep
-			break
-		}
-		if sharedErr != nil {
-			t.Fatalf("unexpected pre-boundary refusal: %v", sharedErr)
-		}
-		admitted = deep
-	}
-	if admitted == "" || refused == "" {
-		t.Fatal("native fixture missed shared handle boundary")
-	}
-	if err := os.WriteFile(filepath.Join(admitted, "deep.txt"), []byte("deep"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(refused, "too-deep.txt"), []byte("too deep"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	failedApp, failedSource := nativeMatrixApp(t)
-	if _, err := failedApp.StageTransfers([]string{shallow, refused, topFile}); transfer.ErrorCodeOf(err) != transfer.ErrPathUnsupported {
-		t.Fatalf("unreservable third directory depth admitted: %v", err)
-	}
-	if failedSource.networkCalls.Load() != 0 {
-		t.Fatal("directory budget refusal reached network")
-	}
-	if err := os.RemoveAll(refused); err != nil {
-		t.Fatal(err)
-	}
-
-	app, observed := nativeMatrixApp(t)
-	metadata, err := app.StageTransfers([]string{shallow, admitted, topFile})
-	if err != nil {
-		t.Fatalf("unchanged collection at boundary refused: %v", err)
-	}
-	if !metadata.IsCollection || metadata.ItemCount != 3 || metadata.Name != "3 items" {
-		t.Fatalf("collection metadata = %+v", metadata)
-	}
-	client := &http.Client{Timeout: 15 * time.Second}
-	response, err := client.Post(metadata.URL, "", nil)
+// readCollectionZIP downloads a staged collection over real HTTP and returns
+// every file entry's exact content keyed by archive name.
+func readCollectionZIP(t *testing.T, observed *inspectedNativeSource, url string, wantEntries int) map[string]string {
+	t.Helper()
+	client := &http.Client{Timeout: 30 * time.Second}
+	response, err := client.Post(url, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)
 	if err != nil || response.StatusCode != http.StatusOK {
-		t.Fatalf("collection HTTP status=%d body error=%v", response.StatusCode, err)
+		t.Fatalf("collection download failed: status=%d body error=%v", response.StatusCode, err)
 	}
 	if response.Header.Get("Content-Length") != "" {
 		t.Fatal("collection ZIP claimed known wire length")
@@ -100,16 +41,12 @@ func TestNativeCollectionSharedDirectoryBoundaryAndHTTP(t *testing.T) {
 	}
 	archive, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("collection download failed: the ZIP is unreadable: %v", err)
 	}
-	want := map[string]string{"FairDrop/01-shallow/one.txt": "one", "FairDrop/02-d/deep.txt": "deep", "FairDrop/03-top.txt": "top"}
+	files := map[string]string{}
 	for _, entry := range archive.File {
 		if strings.HasSuffix(entry.Name, "/") {
 			continue
-		}
-		expected, ok := want[entry.Name]
-		if !ok {
-			t.Fatalf("unexpected ZIP entry %q", entry.Name)
 		}
 		opened, err := entry.Open()
 		if err != nil {
@@ -117,15 +54,15 @@ func TestNativeCollectionSharedDirectoryBoundaryAndHTTP(t *testing.T) {
 		}
 		content, err := io.ReadAll(opened)
 		_ = opened.Close()
-		if err != nil || string(content) != expected {
-			t.Fatalf("ZIP entry %q = %q, %v", entry.Name, content, err)
+		if err != nil {
+			t.Fatalf("ZIP entry %q: %v", entry.Name, err)
 		}
-		delete(want, entry.Name)
+		files[entry.Name] = string(content)
 	}
-	if len(want) != 0 {
-		t.Fatalf("missing collection entries: %v", want)
+	if len(files) != wantEntries {
+		t.Fatalf("collection ZIP holds %d files, want %d", len(files), wantEntries)
 	}
-	deadline := time.After(5 * time.Second)
+	deadline := time.After(10 * time.Second)
 	for {
 		select {
 		case event := <-observed.events:
@@ -136,11 +73,169 @@ func TestNativeCollectionSharedDirectoryBoundaryAndHTTP(t *testing.T) {
 				if event.Progress == nil || event.Progress.BytesSent != int64(len(body)) {
 					t.Fatalf("completion progress = %+v", event.Progress)
 				}
-				return
+				return files
 			}
 		case <-deadline:
 			t.Fatal("collection HTTP completion event missing")
 		}
+	}
+}
+
+// The directory-handle budget belongs to ONE folder at a time. A folder at the
+// deepest lexical depth the single-folder path admits must stream, and so must
+// a dozen of them in one collection, because members are prepared one after
+// another and the selected-item count never consumes the budget. A folder one
+// level deeper is still refused at Stage, exactly as when it is sent alone.
+func TestNativeCollectionManyFoldersAtTheSingleFolderBoundaryStreamTogether(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	inspector := source.New()
+	var components []string
+	var admittedDepth int
+	for depth := 1; depth <= 64; depth++ {
+		components = append(components, "d")
+		deep := filepath.Join(append([]string{base}, components...)...)
+		if err := os.MkdirAll(deep, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		_, inspectErr := inspector.Inspect(context.Background(), deep)
+		if transfer.ErrorCodeOf(inspectErr) == transfer.ErrPathUnsupported {
+			break
+		}
+		if inspectErr != nil {
+			t.Fatalf("unexpected pre-boundary refusal: %v", inspectErr)
+		}
+		admittedDepth = depth
+	}
+	if admittedDepth == 0 || admittedDepth >= 64 {
+		t.Fatal("native fixture missed the single-folder handle boundary")
+	}
+	refused := filepath.Join(append([]string{base}, components...)...)
+	if err := os.WriteFile(filepath.Join(refused, "too-deep.txt"), []byte("too deep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	topFile := filepath.Join(base, "top.txt")
+	if err := os.WriteFile(topFile, []byte("top"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	shallow := filepath.Join(base, "shallow")
+	if err := os.Mkdir(shallow, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(shallow, "one.txt"), []byte("one"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// A folder one level beyond the single-folder boundary is refused whether
+	// it is sent alone or inside a collection, and nothing reaches the network.
+	failedApp, failedSource := nativeMatrixApp(t)
+	if _, err := failedApp.StageTransfer(refused); transfer.ErrorCodeOf(err) != transfer.ErrPathUnsupported {
+		t.Fatalf("singleton folder beyond the boundary admitted: %v", err)
+	}
+	if _, err := failedApp.StageTransfers([]string{shallow, refused, topFile}); transfer.ErrorCodeOf(err) != transfer.ErrPathUnsupported {
+		t.Fatalf("collection folder beyond the boundary admitted: %v", err)
+	}
+	if failedSource.networkCalls.Load() != 0 {
+		t.Fatal("directory budget refusal reached network")
+	}
+
+	// The over-deep folder is the admitted one's only child; remove it so the
+	// admitted folder is an unchanged tree at exactly the boundary.
+	if err := os.RemoveAll(refused); err != nil {
+		t.Fatal(err)
+	}
+
+	// A dozen roots at exactly the admitted depth: the same number of path
+	// components, a different first component each.
+	const deepRoots = 12
+	admitted := filepath.Join(append([]string{base}, components[:admittedDepth]...)...)
+	if err := os.WriteFile(filepath.Join(admitted, "deep.txt"), []byte("deep-0"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	roots := []string{shallow, admitted}
+	want := map[string]string{
+		"FairDrop/01-shallow/one.txt": "one",
+		"FairDrop/02-d/deep.txt":      "deep-0",
+	}
+	for index := 1; index < deepRoots; index++ {
+		leaf := filepath.Join(append([]string{base, fmt.Sprintf("x%d", index)}, components[:admittedDepth-1]...)...)
+		if err := os.MkdirAll(leaf, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(leaf, "deep.txt"), []byte(fmt.Sprintf("deep-%d", index)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		roots = append(roots, leaf)
+		want[fmt.Sprintf("FairDrop/%02d-d/deep.txt", len(roots))] = fmt.Sprintf("deep-%d", index)
+	}
+	roots = append(roots, topFile)
+	want[fmt.Sprintf("FairDrop/%02d-top.txt", len(roots))] = "top"
+
+	app, observed := nativeMatrixApp(t)
+	metadata, err := app.StageTransfers(roots)
+	if err != nil {
+		t.Fatalf("unchanged collection of folders at the boundary refused: %v", err)
+	}
+	if !metadata.IsCollection || metadata.ItemCount != len(roots) || metadata.Name != fmt.Sprintf("%d items", len(roots)) {
+		t.Fatalf("collection metadata = %+v", metadata)
+	}
+	got := readCollectionZIP(t, observed, metadata.URL, len(want))
+	for name, content := range want {
+		if got[name] != content {
+			t.Fatalf("ZIP entry %q = %q, want %q", name, got[name], content)
+		}
+	}
+}
+
+// A collection far larger than the old 16-root cap goes through the real
+// bound command, coordinator, source, server and payload adapter, then HTTP.
+func TestNativeCollectionOfHundredsOfItemsStagesAndDownloads(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const files, folders = 120, 60
+	var roots []string
+	want := map[string]string{}
+	for index := 0; index < files; index++ {
+		path := filepath.Join(base, fmt.Sprintf("file-%03d.txt", index))
+		content := fmt.Sprintf("file %d", index)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		roots = append(roots, path)
+		want[fmt.Sprintf("FairDrop/%03d-file-%03d.txt", len(roots), index)] = content
+	}
+	for index := 0; index < folders; index++ {
+		path := filepath.Join(base, fmt.Sprintf("folder-%03d", index))
+		if err := os.MkdirAll(filepath.Join(path, "inner"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		content := fmt.Sprintf("folder %d", index)
+		if err := os.WriteFile(filepath.Join(path, "inner", "x.txt"), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		roots = append(roots, path)
+		want[fmt.Sprintf("FairDrop/%03d-folder-%03d/inner/x.txt", len(roots), index)] = content
+	}
+	app, observed := nativeMatrixApp(t)
+	metadata, err := app.StageTransfers(roots)
+	if err != nil {
+		t.Fatalf("180-item collection refused: %v", err)
+	}
+	if !metadata.IsCollection || metadata.ItemCount != 180 || metadata.Name != "180 items" {
+		t.Fatalf("collection metadata = %+v", metadata)
+	}
+	got := readCollectionZIP(t, observed, metadata.URL, len(want))
+	for name, content := range want {
+		if got[name] != content {
+			t.Fatalf("ZIP entry %q = %q, want %q", name, got[name], content)
+		}
+	}
+	if _, err := app.StageTransfers(make([]string, 10001)); transfer.ErrorCodeOf(err) != transfer.ErrInvalidSelection {
+		t.Fatalf("10,001 paths = %v, want invalid_selection", err)
 	}
 }
 
@@ -206,22 +301,30 @@ func TestNativeCollectionReplacedLaterRootAbortsAuthorizedHTTP(t *testing.T) {
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	response, err := client.Post(metadata.URL, "", nil)
+	// What the receiver saw is kept for the failure message: a claim that never
+	// reached the later member is otherwise indistinguishable from a hook that
+	// did not fire.
+	outcome := fmt.Sprintf("POST error %v", err)
 	if err == nil {
 		body, readErr := io.ReadAll(response.Body)
 		_ = response.Body.Close()
+		outcome = fmt.Sprintf("status %d, %d body bytes, read error %v", response.StatusCode, len(body), readErr)
 		if readErr == nil {
 			if _, zipErr := zip.NewReader(bytes.NewReader(body), int64(len(body))); zipErr == nil {
 				t.Fatal("replaced later root finalized a readable ZIP")
 			}
 		}
 	}
+	// The later member is prepared inside the streaming worker, so its hook has
+	// always run before the stream aborts; the bounded wait only absorbs
+	// scheduling, never a skipped preparation.
 	select {
 	case err := <-mutated:
 		if err != nil {
 			t.Fatal(err)
 		}
-	default:
-		t.Fatal("claim did not prepare and replace later directory")
+	case <-time.After(5 * time.Second):
+		t.Fatalf("claim did not prepare and replace later directory (receiver saw: %s)", outcome)
 	}
 	deadline := time.After(5 * time.Second)
 	for {

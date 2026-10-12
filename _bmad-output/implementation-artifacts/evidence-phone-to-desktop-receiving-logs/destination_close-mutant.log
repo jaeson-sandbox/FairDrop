@@ -1,10 +1,10 @@
-{"Time":"2026-10-11T04:58:59.159696-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T04:58:59.391347-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets"}
-{"Time":"2026-10-11T04:58:59.391462-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"=== RUN   TestCancellingAWaitingReceiveWritesNothingAndResets\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:59.392051-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"    coordinator_receive_test.go:292: the destination was closed 0 times, want 1\n","OutputType":"error"}
-{"Time":"2026-10-11T04:58:59.392778-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"    coordinator_receive_test.go:306: teardown order = [network.StopBeacon server.Stop], want beacon, server, destination\n","OutputType":"error"}
-{"Time":"2026-10-11T04:58:59.392815-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"--- FAIL: TestCancellingAWaitingReceiveWritesNothingAndResets (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:59.392832-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Elapsed":0}
-{"Time":"2026-10-11T04:58:59.392851-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:59.393108-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.233s\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:59.393134-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.233}
+{"Time":"2026-10-11T15:26:06.797863-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T15:26:07.037268-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets"}
+{"Time":"2026-10-11T15:26:07.037419-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"=== RUN   TestCancellingAWaitingReceiveWritesNothingAndResets\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:07.037913-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"    coordinator_receive_test.go:292: the destination was closed 0 times, want 1\n","OutputType":"error"}
+{"Time":"2026-10-11T15:26:07.037995-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"    coordinator_receive_test.go:306: teardown order = [network.StopBeacon server.Stop], want beacon, server, destination\n","OutputType":"error"}
+{"Time":"2026-10-11T15:26:07.038026-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Output":"--- FAIL: TestCancellingAWaitingReceiveWritesNothingAndResets (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:07.038041-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestCancellingAWaitingReceiveWritesNothingAndResets","Elapsed":0}
+{"Time":"2026-10-11T15:26:07.03806-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:07.038912-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.241s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:07.038925-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.241}

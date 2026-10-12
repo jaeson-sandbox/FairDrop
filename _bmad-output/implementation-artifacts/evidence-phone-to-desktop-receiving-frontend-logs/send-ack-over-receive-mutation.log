@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-send-ack-over-receive-zif36d3f/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-send-ack-over-receive-ydncldjg/frontend
 
  ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
      × refuses to commit a send acknowledgement over a pending receive 5ms
@@ -47,6 +47,6 @@ AssertionError: expected { phase: 'staged', …(4) } to be { phase: 'pending', �
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  05:00:55
-   Duration  416ms (transform 46ms, setup 0ms, import 56ms, tests 6ms, environment 276ms)
+   Start at  15:31:06
+   Duration  445ms (transform 52ms, setup 0ms, import 63ms, tests 6ms, environment 290ms)
 

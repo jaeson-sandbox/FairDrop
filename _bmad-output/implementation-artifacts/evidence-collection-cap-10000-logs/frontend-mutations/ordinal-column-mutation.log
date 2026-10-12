@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-column-z4p9kms_/frontend
+
+ ❯ src/ui/draftListStyles.test.ts (4 tests | 1 failed | 3 skipped) 5ms
+     × sizes the ordinal column to the widest ordinal, not a fixed three characters 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/draftListStyles.test.ts > collection draft list at large counts > sizes the ordinal column to the widest ordinal, not a fixed three characters
+AssertionError: expected ' flex: 0 0 3ch; font-variant-numeric:…' to contain 'flex: 0 0 calc((var(--fd-ordinal-digi…'
+
+Expected: "flex: 0 0 calc((var(--fd-ordinal-digits, 2) + 1) * 1ch)"
+Received: " flex: 0 0 3ch; font-variant-numeric: tabular-nums; "
+
+ ❯ src/ui/draftListStyles.test.ts:33:25
+     31|     it('sizes the ordinal column to the widest ordinal, not a fixed th…
+     32|         const ordinal = /\.fd-draft__ordinal \{([^}]*)\}/.exec(stylesh…
+     33|         expect(ordinal).toContain('flex: 0 0 calc((var(--fd-ordinal-di…
+       |                         ^
+     34|         expect(ordinal).not.toContain('3ch')
+     35|         expect(ordinal).toContain('font-variant-numeric: tabular-nums')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  15:25:08
+   Duration  421ms (transform 16ms, setup 0ms, import 26ms, tests 5ms, environment 303ms)
+
