@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-accepted-controller-i1l3e1f1/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-accepted-controller-zlyohws6/frontend
 
- ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 14ms
-     × ends a waiting session with an incomplete outcome when the backend closes it before any phone claimed it 13ms
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 15ms
+     × ends a waiting session with an incomplete outcome when the backend closes it before any phone claimed it 14ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -37,6 +37,6 @@ AssertionError: expected { phase: 'receive-waiting', …(5) } to match object { 
 
  Test Files  1 failed (1)
       Tests  1 failed | 48 skipped (49)
-   Start at  05:01:05
-   Duration  496ms (transform 73ms, setup 0ms, import 125ms, tests 14ms, environment 278ms)
+   Start at  15:31:16
+   Duration  534ms (transform 78ms, setup 0ms, import 135ms, tests 15ms, environment 296ms)
 

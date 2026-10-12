@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-plural-_rehwfe5/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-plural-c9qlg767/frontend
 
  ❯ src/ui/copy.receive.test.ts (35 tests | 5 failed | 18 skipped) 7ms
      × says 1 as "1 file saved" 3ms
@@ -96,6 +96,6 @@ AssertionError: expected '1 files saved' not to match /\b1 files\b/
 
  Test Files  1 failed (1)
       Tests  5 failed | 12 passed | 18 skipped (35)
-   Start at  05:00:23
-   Duration  408ms (transform 32ms, setup 0ms, import 41ms, tests 7ms, environment 277ms)
+   Start at  15:30:31
+   Duration  440ms (transform 34ms, setup 0ms, import 43ms, tests 7ms, environment 300ms)
 

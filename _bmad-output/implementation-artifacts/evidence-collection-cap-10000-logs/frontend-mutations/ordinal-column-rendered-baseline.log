@@ -1,10 +1,10 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-column-rendered-r8amm0m5/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-column-rendered-p8rea2ti/frontend
 
-2:18:11 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+3:25:09 PM [vite] (client) Re-optimizing dependencies because vite config has changed
 
  Test Files  1 passed (1)
       Tests  1 passed | 3 skipped (4)
-   Start at  14:18:11
-   Duration  1.46s (transform 0ms, setup 0ms, import 125ms, tests 542ms, environment 0ms)
+   Start at  15:25:09
+   Duration  1.50s (transform 0ms, setup 0ms, import 127ms, tests 556ms, environment 0ms)
 

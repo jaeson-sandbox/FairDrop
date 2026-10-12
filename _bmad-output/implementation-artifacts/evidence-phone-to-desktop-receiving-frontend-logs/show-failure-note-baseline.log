@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-failure-note-1rr5grcu/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-failure-note-993u3jdo/frontend
 
 
  Test Files  1 passed (1)
       Tests  1 passed | 39 skipped (40)
-   Start at  05:00:21
-   Duration  413ms (transform 46ms, setup 0ms, import 56ms, tests 2ms, environment 278ms)
+   Start at  15:30:29
+   Duration  438ms (transform 50ms, setup 0ms, import 61ms, tests 2ms, environment 294ms)
 

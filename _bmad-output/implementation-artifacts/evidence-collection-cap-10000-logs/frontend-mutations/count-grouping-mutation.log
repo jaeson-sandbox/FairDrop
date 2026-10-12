@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-count-grouping-4bw40ju_/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-count-grouping-qa1chyiz/frontend
 
- ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 344ms
-     × shows the count out of 10,000, grouped for large lists 343ms
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 327ms
+     × shows the count out of 10,000, grouped for large lists 326ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -205,10 +205,10 @@ Ignored nodes: comments, script, style
           [36m>[39m
             [36m<span[39m
       ...
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
  ❯ src/ui/CollectionDraftView.test.tsx:31:23
      29|         unmount()
      30|         render(<Harness initial={Array.from({length: 1234}, (_, i) => …
@@ -222,6 +222,6 @@ Ignored nodes: comments, script, style
 
  Test Files  1 failed (1)
       Tests  1 failed | 7 skipped (8)
-   Start at  14:17:41
-   Duration  830ms (transform 42ms, setup 0ms, import 91ms, tests 344ms, environment 307ms)
+   Start at  15:24:39
+   Duration  804ms (transform 44ms, setup 0ms, import 90ms, tests 327ms, environment 301ms)
 

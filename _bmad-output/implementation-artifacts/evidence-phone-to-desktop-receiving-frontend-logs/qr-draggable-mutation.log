@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-qr-draggable-v_ze00xs/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-qr-draggable-iksysvw_/frontend
 
- ❯ src/ui/ReceiveWaitingView.test.tsx (22 tests | 1 failed | 21 skipped) 65ms
-     × marks the QR image non-draggable (AGENTS.md, WebKit fact 6) 64ms
+ ❯ src/ui/ReceiveWaitingView.test.tsx (22 tests | 1 failed | 21 skipped) 69ms
+     × marks the QR image non-draggable (AGENTS.md, WebKit fact 6) 69ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -25,6 +25,6 @@ Received: "true"
 
  Test Files  1 failed (1)
       Tests  1 failed | 21 skipped (22)
-   Start at  05:01:15
-   Duration  548ms (transform 77ms, setup 0ms, import 127ms, tests 65ms, environment 279ms)
+   Start at  15:31:27
+   Duration  578ms (transform 76ms, setup 0ms, import 132ms, tests 69ms, environment 292ms)
 

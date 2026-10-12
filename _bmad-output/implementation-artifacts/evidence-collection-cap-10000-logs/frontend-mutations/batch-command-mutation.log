@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-batch-command-9uf3on5l/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-batch-command-nymqm_il/frontend
 
  ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 14ms
      × restores the editable batch after backend duplicate refusal 13ms
@@ -24,6 +24,6 @@ Number of calls: 0
 
  Test Files  1 failed (1)
       Tests  1 failed | 82 skipped (83)
-   Start at  14:17:45
-   Duration  550ms (transform 104ms, setup 0ms, import 161ms, tests 14ms, environment 299ms)
+   Start at  15:24:44
+   Duration  577ms (transform 118ms, setup 0ms, import 173ms, tests 14ms, environment 303ms)
 

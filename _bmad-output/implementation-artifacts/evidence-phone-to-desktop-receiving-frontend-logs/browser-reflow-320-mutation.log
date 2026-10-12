@@ -1,11 +1,11 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-reflow-320-3b8wwu4r/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-reflow-320-qp1c88pk/frontend
 
- ❯ |chromium| browser/receive.test.tsx (37 tests | 4 failed | 28 skipped) 5953ms
-     × receive waiting scrolls only vertically with nothing clipped 691ms
-     × receive waiting after a refused upload scrolls only vertically with nothing clipped 691ms
-     × receiving scrolls only vertically with nothing clipped 633ms
-     × keeps a long folder name inside the card instead of widening it 679ms
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 4 failed | 28 skipped) 5927ms
+     × receive waiting scrolls only vertically with nothing clipped 706ms
+     × receive waiting after a refused upload scrolls only vertically with nothing clipped 672ms
+     × receiving scrolls only vertically with nothing clipped 635ms
+     × keeps a long folder name inside the card instead of widening it 685ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -64,6 +64,6 @@ AssertionError: receive waiting with a long folder name: documentElement.scrollW
 
  Test Files  1 failed (1)
       Tests  4 failed | 5 passed | 28 skipped (37)
-   Start at  05:01:29
-   Duration  6.68s (transform 0ms, setup 0ms, import 183ms, tests 5.95s, environment 0ms)
+   Start at  15:31:42
+   Duration  6.70s (transform 0ms, setup 0ms, import 190ms, tests 5.93s, environment 0ms)
 

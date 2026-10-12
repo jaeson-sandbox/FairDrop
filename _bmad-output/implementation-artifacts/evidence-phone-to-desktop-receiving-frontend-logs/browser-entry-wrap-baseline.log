@@ -1,10 +1,10 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-entry-wrap-p0awx8cn/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-entry-wrap-n1ova8g4/frontend
 
-5:01:55 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+3:32:08 PM [vite] (client) Re-optimizing dependencies because vite config has changed
 
  Test Files  1 passed (1)
       Tests  9 passed | 28 skipped (37)
-   Start at  05:01:55
-   Duration  6.68s (transform 0ms, setup 0ms, import 167ms, tests 5.95s, environment 0ms)
+   Start at  15:32:08
+   Duration  6.71s (transform 0ms, setup 0ms, import 179ms, tests 5.92s, environment 0ms)
 

@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-column-7k7b9d7v/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-column-z4p9kms_/frontend
 
  ❯ src/ui/draftListStyles.test.ts (4 tests | 1 failed | 3 skipped) 5ms
      × sizes the ordinal column to the widest ordinal, not a fixed three characters 4ms
@@ -25,6 +25,6 @@ Received: " flex: 0 0 3ch; font-variant-numeric: tabular-nums; "
 
  Test Files  1 failed (1)
       Tests  1 failed | 3 skipped (4)
-   Start at  14:18:10
-   Duration  413ms (transform 15ms, setup 0ms, import 21ms, tests 5ms, environment 305ms)
+   Start at  15:25:08
+   Duration  421ms (transform 16ms, setup 0ms, import 26ms, tests 5ms, environment 303ms)
 

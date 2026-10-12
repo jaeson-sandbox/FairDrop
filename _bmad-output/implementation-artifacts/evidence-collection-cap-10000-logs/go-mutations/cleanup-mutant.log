@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T14:23:49.461858-04:00","Action":"start","Package":"fairdrop/internal/stream"}
-{"Time":"2026-10-11T14:23:49.746679-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt"}
-{"Time":"2026-10-11T14:23:49.74677-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt","Output":"=== RUN   TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:49.748854-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt","Output":"    collection_lazy_test.go:923: a cancelled Prepare left the first member held=1 acquired=1 closes=0; want 0, 1, 1\n","OutputType":"error"}
-{"Time":"2026-10-11T14:23:49.74957-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt","Output":"--- FAIL: TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:49.749624-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt","Elapsed":0}
-{"Time":"2026-10-11T14:23:49.74965-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:49.750974-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.289s\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:49.751008-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.289}
+{"Time":"2026-10-11T15:24:22.429754-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T15:24:22.677683-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt"}
+{"Time":"2026-10-11T15:24:22.67776-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt","Output":"=== RUN   TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:22.678975-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt","Output":"    collection_lazy_test.go:923: a cancelled Prepare left the first member held=1 acquired=1 closes=0; want 0, 1, 1\n","OutputType":"error"}
+{"Time":"2026-10-11T15:24:22.679364-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt","Output":"--- FAIL: TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:22.679378-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionPrepareCancelledAfterTheFirstMemberOpensReleasesIt","Elapsed":0}
+{"Time":"2026-10-11T15:24:22.679413-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:22.680082-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.250s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:22.680092-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.25}

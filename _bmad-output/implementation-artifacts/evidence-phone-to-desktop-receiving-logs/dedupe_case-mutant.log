@@ -1,13 +1,13 @@
-{"Time":"2026-10-11T04:58:16.133008-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T04:58:16.366253-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
-{"Time":"2026-10-11T04:58:16.366536-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== RUN   TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:16.366804-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== PAUSE TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:16.366818-04:00","Action":"pause","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
-{"Time":"2026-10-11T04:58:16.366827-04:00","Action":"cont","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
-{"Time":"2026-10-11T04:58:16.366835-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== CONT  TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:16.366845-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"    naming_test.go:138: claim(\"X.JPG\") = \"X (3).JPG\", want \"X (4).JPG\"\n","OutputType":"error"}
-{"Time":"2026-10-11T04:58:16.366901-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"--- FAIL: TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:16.366948-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Elapsed":0}
-{"Time":"2026-10-11T04:58:16.366991-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:16.368463-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.235s\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:58:16.368509-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.236}
+{"Time":"2026-10-11T15:25:22.442327-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T15:25:22.662708-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
+{"Time":"2026-10-11T15:25:22.662758-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== RUN   TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:22.662807-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== PAUSE TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:22.662809-04:00","Action":"pause","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
+{"Time":"2026-10-11T15:25:22.662812-04:00","Action":"cont","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively"}
+{"Time":"2026-10-11T15:25:22.662814-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"=== CONT  TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:22.662816-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"    naming_test.go:138: claim(\"X.JPG\") = \"X (3).JPG\", want \"X (4).JPG\"\n","OutputType":"error"}
+{"Time":"2026-10-11T15:25:22.662842-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Output":"--- FAIL: TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:22.662851-04:00","Action":"fail","Package":"fairdrop/internal/sink","Test":"TestDuplicateNamesAreNumberedBeforeTheExtensionCaseInsensitively","Elapsed":0}
+{"Time":"2026-10-11T15:25:22.662862-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:22.663436-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"FAIL\tfairdrop/internal/sink\t0.221s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:25:22.663449-04:00","Action":"fail","Package":"fairdrop/internal/sink","Elapsed":0.221}

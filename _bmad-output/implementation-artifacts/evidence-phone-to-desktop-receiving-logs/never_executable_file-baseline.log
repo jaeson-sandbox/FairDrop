@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T04:59:31.535206-04:00","Action":"start","Package":"fairdrop/internal/sink"}
-{"Time":"2026-10-11T04:59:31.74109-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable"}
-{"Time":"2026-10-11T04:59:31.741266-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"=== RUN   TestFilesAndFoldersAreNeverExecutable\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:31.753721-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"--- PASS: TestFilesAndFoldersAreNeverExecutable (0.01s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:31.753743-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Elapsed":0.01}
-{"Time":"2026-10-11T04:59:31.753782-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:31.754676-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.219s\n"}
-{"Time":"2026-10-11T04:59:31.754694-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.219}
+{"Time":"2026-10-11T15:26:41.145783-04:00","Action":"start","Package":"fairdrop/internal/sink"}
+{"Time":"2026-10-11T15:26:41.357988-04:00","Action":"run","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable"}
+{"Time":"2026-10-11T15:26:41.358214-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"=== RUN   TestFilesAndFoldersAreNeverExecutable\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:41.365276-04:00","Action":"output","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Output":"--- PASS: TestFilesAndFoldersAreNeverExecutable (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:41.365314-04:00","Action":"pass","Package":"fairdrop/internal/sink","Test":"TestFilesAndFoldersAreNeverExecutable","Elapsed":0.01}
+{"Time":"2026-10-11T15:26:41.365346-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:41.366217-04:00","Action":"output","Package":"fairdrop/internal/sink","Output":"ok  \tfairdrop/internal/sink\t0.220s\n"}
+{"Time":"2026-10-11T15:26:41.366249-04:00","Action":"pass","Package":"fairdrop/internal/sink","Elapsed":0.22}

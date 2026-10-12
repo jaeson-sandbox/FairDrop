@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-memo-0wozavci/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-memo-ycw0zmdr/frontend
 
- ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 111ms
-     × re-renders only the new row when a row is appended to an unchanged list 110ms
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 106ms
+     × re-renders only the new row when a row is appended to an unchanged list 106ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -28,6 +28,6 @@ AssertionError: expected 301 to be 1 // Object.is equality
 
  Test Files  1 failed (1)
       Tests  1 failed | 7 skipped (8)
-   Start at  14:17:59
-   Duration  612ms (transform 58ms, setup 0ms, import 111ms, tests 111ms, environment 306ms)
+   Start at  15:24:57
+   Duration  588ms (transform 44ms, setup 0ms, import 94ms, tests 106ms, environment 300ms)
 

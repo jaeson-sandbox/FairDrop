@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-append-resanitize-w8zp5ebg/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-append-resanitize-izs3tz1j/frontend
 
  ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 16ms
      × sanitizes each path once, not again on every append or removal 15ms
@@ -78,6 +78,6 @@ AssertionError: expected [ '/data/set-1/file-1.txt', …(49) ] to deeply equal [
 
  Test Files  1 failed (1)
       Tests  1 failed | 82 skipped (83)
-   Start at  14:18:03
-   Duration  619ms (transform 138ms, setup 0ms, import 202ms, tests 16ms, environment 309ms)
+   Start at  15:25:01
+   Duration  573ms (transform 113ms, setup 0ms, import 169ms, tests 16ms, environment 301ms)
 

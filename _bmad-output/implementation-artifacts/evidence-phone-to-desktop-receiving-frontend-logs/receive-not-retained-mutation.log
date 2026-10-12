@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-not-retained-2al37sts/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-not-retained-11btm__1/frontend
 
  ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
      × leaves to plain Idle on reset, retaining nothing a send outcome card could offer 5ms
@@ -39,6 +39,6 @@ AssertionError: expected { phase: 'idle', …(2) } to deeply equal { phase: 'idl
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  05:00:50
-   Duration  424ms (transform 48ms, setup 0ms, import 57ms, tests 6ms, environment 278ms)
+   Start at  15:31:00
+   Duration  449ms (transform 49ms, setup 0ms, import 58ms, tests 6ms, environment 299ms)
 

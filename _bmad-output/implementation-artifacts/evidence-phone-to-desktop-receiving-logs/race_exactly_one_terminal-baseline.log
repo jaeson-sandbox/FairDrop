@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T04:59:14.495095-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T04:59:14.697211-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome"}
-{"Time":"2026-10-11T04:59:14.697352-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"=== RUN   TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:14.701076-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"    coordinator_receive_test.go:628: race distribution over 40 rounds: complete=26 cancelled=14\n"}
-{"Time":"2026-10-11T04:59:14.701142-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"--- PASS: TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:14.701161-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Elapsed":0}
-{"Time":"2026-10-11T04:59:14.701187-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:14.702131-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.207s\n"}
-{"Time":"2026-10-11T04:59:14.702153-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.207}
+{"Time":"2026-10-11T15:26:23.183186-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T15:26:23.408029-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome"}
+{"Time":"2026-10-11T15:26:23.408154-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"=== RUN   TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:23.412073-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"    coordinator_receive_test.go:628: race distribution over 40 rounds: complete=19 cancelled=21\n"}
+{"Time":"2026-10-11T15:26:23.412147-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Output":"--- PASS: TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:23.412154-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestACancelRacingACompletionPublishesExactlyOneTerminalOutcome","Elapsed":0}
+{"Time":"2026-10-11T15:26:23.412201-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:23.413038-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.230s\n"}
+{"Time":"2026-10-11T15:26:23.413058-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.23}

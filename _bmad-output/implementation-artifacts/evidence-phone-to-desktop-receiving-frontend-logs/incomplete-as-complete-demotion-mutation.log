@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-demotion-jlykusra/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-incomplete-as-complete-demotion-3ighucw0/frontend
 
  ❯ src/transfer/state.receive.test.ts (40 tests | 2 failed | 38 skipped) 7ms
      × demotes a success whose snapshot does not follow the accepted progress to incomplete, never the reverse 6ms
@@ -62,6 +62,6 @@ AssertionError: expected { phase: 'receive-outcome', …(4) } to match object { 
 
  Test Files  1 failed (1)
       Tests  2 failed | 38 skipped (40)
-   Start at  05:00:31
-   Duration  422ms (transform 46ms, setup 0ms, import 55ms, tests 7ms, environment 276ms)
+   Start at  15:30:40
+   Duration  447ms (transform 46ms, setup 0ms, import 56ms, tests 7ms, environment 297ms)
 

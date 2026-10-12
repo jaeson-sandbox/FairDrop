@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-controller-guard-578dog6j/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-controller-guard-dp7c282w/frontend
 
  ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 13ms
      × never calls the command when the subfolder does not exist 12ms
@@ -31,6 +31,6 @@ Number of calls: 1
 
  Test Files  1 failed (1)
       Tests  1 failed | 48 skipped (49)
-   Start at  05:00:18
-   Duration  498ms (transform 74ms, setup 0ms, import 130ms, tests 13ms, environment 275ms)
+   Start at  15:30:27
+   Duration  530ms (transform 81ms, setup 0ms, import 133ms, tests 13ms, environment 298ms)
 

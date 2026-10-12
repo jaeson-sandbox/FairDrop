@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-coherence-44lbkio3/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-coherence-d6kok05s/frontend
 
  ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
      × still drops a waiting error whose receive payload is missing, unresolved or claims saved files 6ms
@@ -50,6 +50,6 @@ AssertionError: expected { phase: 'receive-outcome', …(4) } to be { phase: 're
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  05:01:06
-   Duration  412ms (transform 44ms, setup 0ms, import 55ms, tests 7ms, environment 273ms)
+   Start at  15:31:18
+   Duration  453ms (transform 50ms, setup 0ms, import 60ms, tests 7ms, environment 298ms)
 

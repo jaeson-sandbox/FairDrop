@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T14:23:11.001046-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
-{"Time":"2026-10-11T14:23:11.229621-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries"}
-{"Time":"2026-10-11T14:23:11.229729-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"=== RUN   TestSelectionOverlapRespectsRootAndComponentBoundaries\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:11.22981-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"--- PASS: TestSelectionOverlapRespectsRootAndComponentBoundaries (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:11.229816-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Elapsed":0}
-{"Time":"2026-10-11T14:23:11.229926-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:11.231085-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.230s\n"}
-{"Time":"2026-10-11T14:23:11.231113-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.23}
+{"Time":"2026-10-11T15:23:43.638438-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-11T15:23:43.863266-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries"}
+{"Time":"2026-10-11T15:23:43.863365-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"=== RUN   TestSelectionOverlapRespectsRootAndComponentBoundaries\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:43.863441-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Output":"--- PASS: TestSelectionOverlapRespectsRootAndComponentBoundaries (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:43.863449-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestSelectionOverlapRespectsRootAndComponentBoundaries","Elapsed":0}
+{"Time":"2026-10-11T15:23:43.863474-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:43.86443-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.226s\n"}
+{"Time":"2026-10-11T15:23:43.864455-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.226}

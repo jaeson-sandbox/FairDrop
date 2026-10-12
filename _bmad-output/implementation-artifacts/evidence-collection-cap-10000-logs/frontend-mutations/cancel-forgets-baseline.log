@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-cancel-forgets-v5erto_2/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-cancel-forgets-l28e40ib/frontend
 
 
  Test Files  1 passed (1)
       Tests  1 passed | 82 skipped (83)
-   Start at  14:17:48
-   Duration  566ms (transform 115ms, setup 0ms, import 175ms, tests 10ms, environment 301ms)
+   Start at  15:24:46
+   Duration  562ms (transform 113ms, setup 0ms, import 170ms, tests 11ms, environment 299ms)
 

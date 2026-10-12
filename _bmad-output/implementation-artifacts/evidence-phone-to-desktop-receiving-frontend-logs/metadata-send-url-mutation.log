@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-send-url-z7fozvkp/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-metadata-send-url-ed1rbart/frontend
 
  ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 79 skipped) 5ms
      × refuses a send (download) url 4ms
@@ -34,6 +34,6 @@ null
 
  Test Files  1 failed (1)
       Tests  1 failed | 79 skipped (80)
-   Start at  05:00:03
-   Duration  412ms (transform 36ms, setup 0ms, import 45ms, tests 5ms, environment 279ms)
+   Start at  15:30:10
+   Duration  450ms (transform 38ms, setup 0ms, import 52ms, tests 5ms, environment 305ms)
 

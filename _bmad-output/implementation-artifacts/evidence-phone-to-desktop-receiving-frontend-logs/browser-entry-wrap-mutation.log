@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-entry-wrap-p0awx8cn/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-browser-entry-wrap-n1ova8g4/frontend
 
- ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 28 skipped) 5924ms
-     × Idle with the Receive entry scrolls only vertically with nothing clipped 797ms
+ ❯ |chromium| browser/receive.test.tsx (37 tests | 1 failed | 28 skipped) 5939ms
+     × Idle with the Receive entry scrolls only vertically with nothing clipped 807ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -22,6 +22,6 @@ AssertionError: Idle with the Receive entry: documentElement.scrollWidth (339px)
 
  Test Files  1 failed (1)
       Tests  1 failed | 8 passed | 28 skipped (37)
-   Start at  05:02:02
-   Duration  6.62s (transform 0ms, setup 0ms, import 174ms, tests 5.92s, environment 0ms)
+   Start at  15:32:15
+   Duration  6.71s (transform 0ms, setup 0ms, import 183ms, tests 5.94s, environment 0ms)
 

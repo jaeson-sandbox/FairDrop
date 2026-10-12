@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-digits-xrvept7c/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-ordinal-digits-snde6q2b/frontend
 
 
  Test Files  1 passed (1)
       Tests  1 passed | 7 skipped (8)
-   Start at  14:18:07
-   Duration  1.39s (transform 48ms, setup 0ms, import 99ms, tests 900ms, environment 313ms)
+   Start at  15:25:05
+   Duration  1.47s (transform 42ms, setup 0ms, import 90ms, tests 992ms, environment 301ms)
 

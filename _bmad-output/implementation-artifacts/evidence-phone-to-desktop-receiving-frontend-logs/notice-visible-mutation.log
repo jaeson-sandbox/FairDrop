@@ -1,20 +1,20 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-visible-3e9nzrcr/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-notice-visible-nd_kleet/frontend
 
- ❯ src/ui/ReceiveWaitingView.test.tsx (22 tests | 3 failed | 17 skipped) 86ms
+ ❯ src/ui/ReceiveWaitingView.test.tsx (22 tests | 3 failed | 17 skipped) 95ms
      × keeps waiting and says what happened and what to do, as plain text beside the code 6ms
      × shows one note however many uploads were refused 5ms
-     × describes the heading by the note so the one focus move reads it too 46ms
+     × describes the heading by the note so the one focus move reads it too 50ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  src/ui/ReceiveWaitingView.test.tsx > a refused upload > keeps waiting and says what happened and what to do, as plain text beside the code
 TypeError: Expected container to be an Element, a Document or a DocumentFragment but got null.
- ❯ checkContainerType ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/helpers.js:61:11
- ❯ queryAllByText ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/queries/text.js:18:35
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:74:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ checkContainerType ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/helpers.js:61:11
+ ❯ queryAllByText ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/queries/text.js:18:35
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:74:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
  ❯ src/ui/ReceiveWaitingView.test.tsx:181:29
     179|
     180|         const note = document.querySelector('[data-receive-notice="rec…
@@ -66,6 +66,6 @@ null
 
  Test Files  1 failed (1)
       Tests  3 failed | 2 passed | 17 skipped (22)
-   Start at  05:00:48
-   Duration  566ms (transform 76ms, setup 0ms, import 126ms, tests 86ms, environment 275ms)
+   Start at  15:30:59
+   Duration  622ms (transform 81ms, setup 0ms, import 141ms, tests 95ms, environment 296ms)
 

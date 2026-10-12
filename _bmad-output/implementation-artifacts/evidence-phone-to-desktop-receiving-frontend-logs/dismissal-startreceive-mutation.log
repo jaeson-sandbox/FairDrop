@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-dismissal-startreceive-ix2anug6/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-dismissal-startreceive-6pv1xduh/frontend
 
- ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 12ms
-     × does nothing when the chooser is dismissed: no session, no command, no error 11ms
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 13ms
+     × does nothing when the chooser is dismissed: no session, no command, no error 12ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -25,6 +25,6 @@ Received: "proceeded"
 
  Test Files  1 failed (1)
       Tests  1 failed | 48 skipped (49)
-   Start at  04:59:47
-   Duration  485ms (transform 73ms, setup 0ms, import 124ms, tests 12ms, environment 273ms)
+   Start at  15:29:54
+   Duration  521ms (transform 81ms, setup 0ms, import 134ms, tests 13ms, environment 293ms)
 

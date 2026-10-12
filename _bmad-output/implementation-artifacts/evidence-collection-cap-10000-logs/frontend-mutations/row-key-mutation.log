@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-key-48y5terh/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-key-yn1giwc1/frontend
 
- ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 361ms
-     × keeps the remaining rows mounted when the first row is removed 360ms
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 261ms
+     × keeps the remaining rows mounted when the first row is removed 260ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -53,6 +53,6 @@ AssertionError: expected <li class="fd-draft__row">…(3)</li> to be <li class="
 
  Test Files  1 failed (1)
       Tests  1 failed | 7 skipped (8)
-   Start at  14:17:57
-   Duration  947ms (transform 45ms, setup 0ms, import 98ms, tests 361ms, environment 340ms)
+   Start at  15:24:55
+   Duration  748ms (transform 41ms, setup 0ms, import 89ms, tests 261ms, environment 314ms)
 

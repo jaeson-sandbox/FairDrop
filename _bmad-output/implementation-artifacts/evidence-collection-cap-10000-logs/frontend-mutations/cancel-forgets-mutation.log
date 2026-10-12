@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-cancel-forgets-v5erto_2/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-cancel-forgets-l28e40ib/frontend
 
- ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 14ms
-     × forgets retryable remembered paths when a restored draft is cancelled 13ms
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 15ms
+     × forgets retryable remembered paths when a restored draft is cancelled 14ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -28,6 +28,6 @@ AssertionError: expected true to be false // Object.is equality
 
  Test Files  1 failed (1)
       Tests  1 failed | 82 skipped (83)
-   Start at  14:17:48
-   Duration  572ms (transform 114ms, setup 0ms, import 173ms, tests 14ms, environment 304ms)
+   Start at  15:24:47
+   Duration  569ms (transform 117ms, setup 0ms, import 174ms, tests 15ms, environment 296ms)
 

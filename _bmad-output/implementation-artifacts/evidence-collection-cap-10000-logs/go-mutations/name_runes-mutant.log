@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T14:23:35.179797-04:00","Action":"start","Package":"fairdrop/internal/stream"}
-{"Time":"2026-10-11T14:23:35.460413-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound"}
-{"Time":"2026-10-11T14:23:35.460476-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Output":"=== RUN   TestCollectionWideOrdinalStaysWithinTheRootNameBound\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:35.460575-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Output":"    collection_lazy_test.go:810: long name = 206 runes \"10000-xxxxxx\"; want exactly 200 starting with the full ordinal\n","OutputType":"error"}
-{"Time":"2026-10-11T14:23:35.460714-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Output":"--- FAIL: TestCollectionWideOrdinalStaysWithinTheRootNameBound (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:35.460727-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Elapsed":0}
-{"Time":"2026-10-11T14:23:35.460759-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:35.461244-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.281s\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:35.461259-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.281}
+{"Time":"2026-10-11T15:24:08.360678-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T15:24:08.608106-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound"}
+{"Time":"2026-10-11T15:24:08.608161-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Output":"=== RUN   TestCollectionWideOrdinalStaysWithinTheRootNameBound\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:08.608275-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Output":"    collection_lazy_test.go:810: long name = 206 runes \"10000-xxxxxx\"; want exactly 200 starting with the full ordinal\n","OutputType":"error"}
+{"Time":"2026-10-11T15:24:08.608361-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Output":"--- FAIL: TestCollectionWideOrdinalStaysWithinTheRootNameBound (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:08.608366-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionWideOrdinalStaysWithinTheRootNameBound","Elapsed":0}
+{"Time":"2026-10-11T15:24:08.608374-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:08.608893-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.248s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:08.608906-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.248}

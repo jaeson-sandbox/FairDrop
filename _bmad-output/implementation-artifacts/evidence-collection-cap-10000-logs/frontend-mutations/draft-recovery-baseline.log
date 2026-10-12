@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-recovery-i0dmprvw/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-recovery-l8r56lu8/frontend
 
 
  Test Files  1 passed (1)
       Tests  1 passed | 82 skipped (83)
-   Start at  14:17:46
-   Duration  558ms (transform 112ms, setup 0ms, import 169ms, tests 15ms, environment 299ms)
+   Start at  15:24:45
+   Duration  569ms (transform 120ms, setup 0ms, import 176ms, tests 12ms, environment 297ms)
 

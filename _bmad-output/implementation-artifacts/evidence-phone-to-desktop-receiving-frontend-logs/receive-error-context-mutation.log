@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-error-context-sskwu68u/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-receive-error-context-n4frbo0z/frontend
 
- ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 5ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
      × marks a failed receive start so the failure card uses receive wording 5ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -34,6 +34,6 @@ AssertionError: expected { phase: 'idle', …(2) } to deeply equal { phase: 'idl
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  05:00:57
-   Duration  421ms (transform 46ms, setup 0ms, import 55ms, tests 5ms, environment 279ms)
+   Start at  15:31:08
+   Duration  452ms (transform 48ms, setup 0ms, import 58ms, tests 6ms, environment 294ms)
 

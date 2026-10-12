@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-id-issue-8w7la4nj/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-id-issue-efhsr736/frontend
 
- ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 14ms
-     × gives every draft row a stable id that survives removal and append without exposing a path 13ms
+ ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 15ms
+     × gives every draft row a stable id that survives removal and append without exposing a path 14ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -28,6 +28,6 @@ AssertionError: expected 1 to be 4 // Object.is equality
 
  Test Files  1 failed (1)
       Tests  1 failed | 82 skipped (83)
-   Start at  14:18:01
-   Duration  608ms (transform 125ms, setup 0ms, import 185ms, tests 14ms, environment 316ms)
+   Start at  15:24:59
+   Duration  586ms (transform 116ms, setup 0ms, import 172ms, tests 15ms, environment 311ms)
 

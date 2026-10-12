@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-hidden-without-subfolder-0t4oemy1/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-hidden-without-subfolder-m3c7qbyp/frontend
 
  ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 3 failed | 30 skipped) 76ms
      × is not rendered for a complete outcome with no subfolder 67ms
@@ -38,6 +38,6 @@ null
 
  Test Files  1 failed (1)
       Tests  3 failed | 30 skipped (33)
-   Start at  05:00:15
-   Duration  539ms (transform 57ms, setup 0ms, import 107ms, tests 76ms, environment 275ms)
+   Start at  15:30:24
+   Duration  563ms (transform 60ms, setup 0ms, import 110ms, tests 76ms, environment 290ms)
 

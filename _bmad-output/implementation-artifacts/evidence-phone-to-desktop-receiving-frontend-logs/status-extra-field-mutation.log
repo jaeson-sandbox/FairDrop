@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-status-extra-field-tog0af7q/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-status-extra-field-1amg3069/frontend
 
- ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 79 skipped) 4ms
-     × refuses an extra field naming a path 3ms
+ ❯ src/transfer/validation.receive.test.ts (80 tests | 1 failed | 79 skipped) 5ms
+     × refuses an extra field naming a path 4ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -33,6 +33,6 @@ null
 
  Test Files  1 failed (1)
       Tests  1 failed | 79 skipped (80)
-   Start at  05:00:08
-   Duration  403ms (transform 35ms, setup 0ms, import 44ms, tests 4ms, environment 276ms)
+   Start at  15:30:16
+   Duration  430ms (transform 36ms, setup 0ms, import 45ms, tests 5ms, environment 293ms)
 

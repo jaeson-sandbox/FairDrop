@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-error-focus-xgxp_nwl/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-error-focus-r_nvaeme/frontend
 
- ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 79ms
-     × describes a newly focused draft heading with its restored refusal 78ms
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 81ms
+     × describes a newly focused draft heading with its restored refusal 80ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -28,6 +28,6 @@ null
 
  Test Files  1 failed (1)
       Tests  1 failed | 7 skipped (8)
-   Start at  14:18:15
-   Duration  559ms (transform 42ms, setup 0ms, import 92ms, tests 79ms, environment 307ms)
+   Start at  15:25:13
+   Duration  573ms (transform 42ms, setup 0ms, import 90ms, tests 81ms, environment 316ms)
 

@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-accepted-nuh1q0q9/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-waiting-error-accepted-qsq0c68q/frontend
 
- ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 6ms
+ ❯ src/transfer/state.receive.test.ts (40 tests | 1 failed | 39 skipped) 7ms
      × accepts a terminal incomplete outcome with nothing saved while still waiting 6ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -50,6 +50,6 @@ AssertionError: expected { phase: 'receive-waiting', …(5) } to deeply equal { 
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  05:01:03
-   Duration  416ms (transform 45ms, setup 0ms, import 55ms, tests 6ms, environment 277ms)
+   Start at  15:31:14
+   Duration  449ms (transform 47ms, setup 0ms, import 58ms, tests 7ms, environment 299ms)
 

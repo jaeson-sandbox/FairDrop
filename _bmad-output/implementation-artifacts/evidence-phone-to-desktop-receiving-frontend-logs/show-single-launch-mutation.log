@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-single-launch-dqkg624_/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-single-launch-kuj3bsqo/frontend
 
- ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 12ms
-     × launches once for a double activation 11ms
+ ❯ src/transfer/useTransfer.receive.test.tsx (49 tests | 1 failed | 48 skipped) 13ms
+     × launches once for a double activation 12ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -21,6 +21,6 @@ AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
 
  Test Files  1 failed (1)
       Tests  1 failed | 48 skipped (49)
-   Start at  05:00:20
-   Duration  492ms (transform 73ms, setup 0ms, import 126ms, tests 12ms, environment 278ms)
+   Start at  15:30:28
+   Duration  521ms (transform 81ms, setup 0ms, import 135ms, tests 13ms, environment 293ms)
 

@@ -1,8 +1,8 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-remove-order-jm5e5odt/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-remove-order-tngtyzt5/frontend
 
- ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 107ms
-     × shows explicit one-based order for identical basenames 106ms
+ ❯ src/ui/CollectionDraftView.test.tsx (8 tests | 1 failed | 7 skipped) 104ms
+     × shows explicit one-based order for identical basenames 103ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -218,10 +218,10 @@ Ignored nodes: comments, script, style
     [36m</div>[39m
   [36m</div>[39m
 [36m</body>[39m
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-ad07c88c3522e443b/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
  ❯ src/ui/CollectionDraftView.test.tsx:22:23
      20|         expect(rows[0]?.textContent).toContain('1.')
      21|         expect(rows[1]?.textContent).toContain('2.')
@@ -235,6 +235,6 @@ Ignored nodes: comments, script, style
 
  Test Files  1 failed (1)
       Tests  1 failed | 7 skipped (8)
-   Start at  14:17:55
-   Duration  604ms (transform 49ms, setup 0ms, import 104ms, tests 107ms, environment 308ms)
+   Start at  15:24:54
+   Duration  584ms (transform 43ms, setup 0ms, import 93ms, tests 104ms, environment 303ms)
 

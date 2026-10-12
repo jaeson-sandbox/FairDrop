@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-key-48y5terh/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-row-key-yn1giwc1/frontend
 
 
  Test Files  1 passed (1)
       Tests  1 passed | 7 skipped (8)
-   Start at  14:17:56
-   Duration  911ms (transform 49ms, setup 0ms, import 100ms, tests 402ms, environment 316ms)
+   Start at  15:24:54
+   Duration  788ms (transform 43ms, setup 0ms, import 92ms, tests 313ms, environment 301ms)
 

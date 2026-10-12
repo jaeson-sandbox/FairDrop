@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T04:59:28.626355-04:00","Action":"start","Package":"fairdrop"}
-{"Time":"2026-10-11T04:59:28.911594-04:00","Action":"run","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource"}
-{"Time":"2026-10-11T04:59:28.911755-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Output":"=== RUN   TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:28.928444-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Output":"--- PASS: TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource (0.02s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:28.92847-04:00","Action":"pass","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Elapsed":0.02}
-{"Time":"2026-10-11T04:59:28.928499-04:00","Action":"output","Package":"fairdrop","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:28.930124-04:00","Action":"output","Package":"fairdrop","Output":"ok  \tfairdrop\t0.304s\n"}
-{"Time":"2026-10-11T04:59:28.930143-04:00","Action":"pass","Package":"fairdrop","Elapsed":0.304}
+{"Time":"2026-10-11T15:26:37.931323-04:00","Action":"start","Package":"fairdrop"}
+{"Time":"2026-10-11T15:26:38.227962-04:00","Action":"run","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource"}
+{"Time":"2026-10-11T15:26:38.228106-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Output":"=== RUN   TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:38.246686-04:00","Action":"output","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Output":"--- PASS: TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource (0.02s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:38.246723-04:00","Action":"pass","Package":"fairdrop","Test":"TestNativeReceiveRefusesAnUnwritableFolderBeforeAnyNetworkResource","Elapsed":0.02}
+{"Time":"2026-10-11T15:26:38.246747-04:00","Action":"output","Package":"fairdrop","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:38.248141-04:00","Action":"output","Package":"fairdrop","Output":"ok  \tfairdrop\t0.316s\n"}
+{"Time":"2026-10-11T15:26:38.248185-04:00","Action":"pass","Package":"fairdrop","Elapsed":0.317}

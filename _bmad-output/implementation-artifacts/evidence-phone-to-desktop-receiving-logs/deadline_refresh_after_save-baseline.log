@@ -1,8 +1,8 @@
-{"Time":"2026-10-11T04:59:09.105844-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T04:59:09.378887-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound"}
-{"Time":"2026-10-11T04:59:09.379016-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound","Output":"=== RUN   TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:10.312883-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound","Output":"--- PASS: TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound (0.93s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:10.312967-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound","Elapsed":0.93}
-{"Time":"2026-10-11T04:59:10.313028-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-10-11T04:59:10.315258-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t1.209s\n"}
-{"Time":"2026-10-11T04:59:10.315332-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":1.209}
+{"Time":"2026-10-11T15:26:17.652537-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T15:26:17.930683-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound"}
+{"Time":"2026-10-11T15:26:17.93095-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound","Output":"=== RUN   TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:18.857969-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound","Output":"--- PASS: TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound (0.93s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:18.858108-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestASlowSaveBetweenPartsDoesNotConsumeTheNextPartsInactivityBound","Elapsed":0.93}
+{"Time":"2026-10-11T15:26:18.858188-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:26:18.860551-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t1.208s\n"}
+{"Time":"2026-10-11T15:26:18.860621-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":1.208}

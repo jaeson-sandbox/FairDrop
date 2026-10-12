@@ -1,5 +1,5 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-refusal-resanitize-145kke3f/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-frontend-draft-refusal-resanitize-5_jyjni3/frontend
 
  ❯ src/transfer/useTransfer.test.tsx (83 tests | 1 failed | 82 skipped) 16ms
      × sanitizes each path once, not again on every append or removal 15ms
@@ -79,6 +79,6 @@ AssertionError: expected [ '/data/set-new/file-new.txt', …(50) ] to deeply equ
 
  Test Files  1 failed (1)
       Tests  1 failed | 82 skipped (83)
-   Start at  14:18:06
-   Duration  575ms (transform 112ms, setup 0ms, import 170ms, tests 16ms, environment 305ms)
+   Start at  15:25:04
+   Duration  580ms (transform 119ms, setup 0ms, import 180ms, tests 16ms, environment 299ms)
 

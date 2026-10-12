@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T14:23:36.660098-04:00","Action":"start","Package":"fairdrop/internal/stream"}
-{"Time":"2026-10-11T14:23:37.012877-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment"}
-{"Time":"2026-10-11T14:23:37.013103-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment","Output":"=== RUN   TestCollectionHoldsAtMostOneMemberAtAnyMoment\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:37.041757-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment","Output":"    collection_lazy_test.go:304: one-at-a-time collection streamed with error: transfer_failed: a previous collection member is still held\n","OutputType":"error"}
-{"Time":"2026-10-11T14:23:37.054497-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment","Output":"--- FAIL: TestCollectionHoldsAtMostOneMemberAtAnyMoment (0.04s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:37.054519-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment","Elapsed":0.04}
-{"Time":"2026-10-11T14:23:37.054561-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:37.055704-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.395s\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:37.055727-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.396}
+{"Time":"2026-10-11T15:24:09.751693-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T15:24:10.009134-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment"}
+{"Time":"2026-10-11T15:24:10.00925-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment","Output":"=== RUN   TestCollectionHoldsAtMostOneMemberAtAnyMoment\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:10.038469-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment","Output":"    collection_lazy_test.go:304: one-at-a-time collection streamed with error: transfer_failed: a previous collection member is still held\n","OutputType":"error"}
+{"Time":"2026-10-11T15:24:10.049887-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment","Output":"--- FAIL: TestCollectionHoldsAtMostOneMemberAtAnyMoment (0.04s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:10.049904-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestCollectionHoldsAtMostOneMemberAtAnyMoment","Elapsed":0.04}
+{"Time":"2026-10-11T15:24:10.049934-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:10.050818-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.299s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:10.050844-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.299}

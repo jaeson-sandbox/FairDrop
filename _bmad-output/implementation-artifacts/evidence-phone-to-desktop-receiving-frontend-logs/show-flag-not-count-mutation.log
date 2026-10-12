@@ -1,9 +1,9 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-flag-not-count-x27n5dti/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-show-flag-not-count-1zx47ttk/frontend
 
- ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 31 skipped) 77ms
-     × follows the backend flag, not the count: saved files with no subfolder get no button 66ms
-     × follows the backend flag, not the count: an existing subfolder with a zero count still gets the button 10ms
+ ❯ src/ui/ReceiveOutcomeView.test.tsx (33 tests | 2 failed | 31 skipped) 80ms
+     × follows the backend flag, not the count: saved files with no subfolder get no button 68ms
+     × follows the backend flag, not the count: an existing subfolder with a zero count still gets the button 11ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -129,10 +129,10 @@ Ignored nodes: comments, script, style
     [36m</section>[39m
   [36m</div>[39m
 [36m</body>[39m
- ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
- ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/.claude/worktrees/agent-a63687f34bb83b110/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ Object.getElementError ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ ../../../../../../../../Users/jaesonmartin/Projects/FairDrop/frontend/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
  ❯ src/ui/ReceiveOutcomeView.test.tsx:146:23
     144|     it('follows the backend flag, not the count: an existing subfolder…
     145|         renderOutcome(outcome('incomplete', {filesSaved: 0, subfolderE…
@@ -146,6 +146,6 @@ Ignored nodes: comments, script, style
 
  Test Files  1 failed (1)
       Tests  2 failed | 31 skipped (33)
-   Start at  05:00:17
-   Duration  549ms (transform 59ms, setup 0ms, import 111ms, tests 77ms, environment 278ms)
+   Start at  15:30:25
+   Duration  571ms (transform 60ms, setup 0ms, import 115ms, tests 80ms, environment 290ms)
 

@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T14:23:16.996315-04:00","Action":"start","Package":"fairdrop/internal/server"}
-{"Time":"2026-10-11T14:23:17.300631-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata"}
-{"Time":"2026-10-11T14:23:17.300742-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Output":"=== RUN   TestCollectionPayloadAdapterCannotMutateServerMetadata\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:17.303128-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Output":"    landing_test.go:211: payload adapter mutated server metadata: \"/mutated/by/payload\"\n","OutputType":"error"}
-{"Time":"2026-10-11T14:23:17.303213-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Output":"--- FAIL: TestCollectionPayloadAdapterCannotMutateServerMetadata (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:17.303234-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Elapsed":0}
-{"Time":"2026-10-11T14:23:17.30326-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:17.304558-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.308s\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:17.30458-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.308}
+{"Time":"2026-10-11T15:23:49.782954-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-11T15:23:50.086415-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata"}
+{"Time":"2026-10-11T15:23:50.08656-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Output":"=== RUN   TestCollectionPayloadAdapterCannotMutateServerMetadata\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:50.089064-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Output":"    landing_test.go:211: payload adapter mutated server metadata: \"/mutated/by/payload\"\n","OutputType":"error"}
+{"Time":"2026-10-11T15:23:50.089112-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Output":"--- FAIL: TestCollectionPayloadAdapterCannotMutateServerMetadata (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:50.089131-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestCollectionPayloadAdapterCannotMutateServerMetadata","Elapsed":0}
+{"Time":"2026-10-11T15:23:50.089156-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:50.090404-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.307s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:23:50.090421-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.307}

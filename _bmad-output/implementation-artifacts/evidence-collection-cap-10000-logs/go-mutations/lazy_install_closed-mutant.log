@@ -1,9 +1,9 @@
-{"Time":"2026-10-11T14:23:39.558392-04:00","Action":"start","Package":"fairdrop/internal/stream"}
-{"Time":"2026-10-11T14:23:39.820633-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown"}
-{"Time":"2026-10-11T14:23:39.820771-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Output":"=== RUN   TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:39.823088-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Output":"    collection_lazy_test.go:878: error = nil, want code \"transfer_failed\"\n","OutputType":"error"}
-{"Time":"2026-10-11T14:23:39.824055-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Output":"--- FAIL: TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:39.824078-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Elapsed":0}
-{"Time":"2026-10-11T14:23:39.824119-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:39.825411-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.267s\n","OutputType":"frame"}
-{"Time":"2026-10-11T14:23:39.825429-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.267}
+{"Time":"2026-10-11T15:24:12.551671-04:00","Action":"start","Package":"fairdrop/internal/stream"}
+{"Time":"2026-10-11T15:24:12.806358-04:00","Action":"run","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown"}
+{"Time":"2026-10-11T15:24:12.806496-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Output":"=== RUN   TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:12.808997-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Output":"    collection_lazy_test.go:878: error = nil, want code \"transfer_failed\"\n","OutputType":"error"}
+{"Time":"2026-10-11T15:24:12.809963-04:00","Action":"output","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Output":"--- FAIL: TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:12.809987-04:00","Action":"fail","Package":"fairdrop/internal/stream","Test":"TestLazyCollectionClosesAMemberThatFinishesPreparingAfterShutdown","Elapsed":0}
+{"Time":"2026-10-11T15:24:12.810005-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:12.81133-04:00","Action":"output","Package":"fairdrop/internal/stream","Output":"FAIL\tfairdrop/internal/stream\t0.259s\n","OutputType":"frame"}
+{"Time":"2026-10-11T15:24:12.811355-04:00","Action":"fail","Package":"fairdrop/internal/stream","Elapsed":0.26}

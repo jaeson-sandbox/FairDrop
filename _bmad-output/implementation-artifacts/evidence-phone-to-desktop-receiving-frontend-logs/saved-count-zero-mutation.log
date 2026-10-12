@@ -1,7 +1,7 @@
 
- RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-zero-izpht2ev/frontend
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-receive-saved-count-zero-x0_bhqv6/frontend
 
- ❯ src/ui/copy.receive.test.ts (35 tests | 3 failed | 18 skipped) 6ms
+ ❯ src/ui/copy.receive.test.ts (35 tests | 3 failed | 18 skipped) 7ms
      × says 0 as "no files saved" 4ms
      × heads an incomplete outcome of 0 as "Upload incomplete — no files saved" 0ms
      × heads a cancelled outcome of 0 as "Upload cancelled — no files saved" 0ms
@@ -59,6 +59,6 @@ Received: "Upload cancelled — 0 files saved"
 
  Test Files  1 failed (1)
       Tests  3 failed | 14 passed | 18 skipped (35)
-   Start at  05:00:24
-   Duration  401ms (transform 31ms, setup 0ms, import 39ms, tests 6ms, environment 274ms)
+   Start at  15:30:33
+   Duration  429ms (transform 34ms, setup 0ms, import 43ms, tests 7ms, environment 293ms)
 
