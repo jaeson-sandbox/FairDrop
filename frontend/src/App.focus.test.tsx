@@ -171,3 +171,22 @@ describe('the routing table is consulted once per transition', () => {
         expect(mocks.route).toHaveBeenCalledTimes(1)
     })
 })
+
+it('focuses the recovered receive heading whose description announces the new code', () => {
+    const oldID = '0123456789abcdef0123456789abcdef'
+    const nextID = '11111111111111111111111111111111'
+    const old = {sessionId: oldID, destination: 'Photos', url: `http://192.168.1.5:45678/upload/${oldID}`,
+        qrBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', warnings: []}
+    const recovering: TransferState = {phase: 'recovering', generation: 1, session: {sessionId: oldID, lastSeq: 0},
+        mode: 'receive', metadata: old, retired: true, cancelPending: false, refusals: 0}
+    const view = mountWith(recovering)
+    transitionTo(view, {phase: 'receive-waiting', session: {sessionId: nextID, lastSeq: 0},
+        metadata: {...old, sessionId: nextID, url: `http://192.168.1.5:45678/upload/${nextID}`},
+        cancelPending: false, commandError: null, refusals: 0, recovered: true},
+    {row: 'receive-ready', owner: 'focus', target: 'receive-waiting-heading'})
+    const heading = document.querySelector('[data-focus-target="receive-waiting-heading"]')
+    expect(document.activeElement).toBe(heading)
+    expect(heading?.getAttribute('aria-describedby')).toContain('fd-recovery-success')
+    expect(screen.getByText('New code ready. The old code no longer works.')).toBeTruthy()
+    expect(screen.getByRole('img', {name: 'Upload QR code for Photos'}).getAttribute('src')).toContain('data:image/png;base64,')
+})

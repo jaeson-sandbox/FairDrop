@@ -9,6 +9,7 @@ import {StagedHelpContent} from './RecoveryHelp'
 import {copy, errorHeadings, qrAltFor} from './copy'
 import {formatBytes} from './format'
 import {CollectionKindGlyph} from './CollectionKindGlyph'
+import {ConnectionRecoveryPanel} from './ConnectionRecoveryPanel'
 
 /**
  * Story 9.1's per-child stagger, duplicated from `IdleView.tsx` rather than
@@ -40,6 +41,7 @@ interface StagedViewProps {
      * the same reason `onAnnounce` is -- the view still renders standalone.
      */
     readonly onCopyFailed?: (sessionId: string) => void
+    readonly onRefreshConnection?: (sessionId: string, networkId: string) => Promise<void>
 }
 
 /**
@@ -62,7 +64,7 @@ interface StagedViewProps {
  * `data:image/png;base64,` is prepended here, at render, and nowhere else. The
  * reducer holds the bare base64 payload the backend produced.
  */
-export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedViewProps) {
+export function StagedView({state, onCancel, onAnnounce, onCopyFailed, onRefreshConnection}: StagedViewProps) {
     const {metadata} = state
     const warnings = selectWarnings(state)
     const commandError = selectCommandError(state)
@@ -72,6 +74,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
     // render that set it, and re-rendering on focus would buy nothing.
     const focusedRef = useRef(false)
     const [revealed, setRevealed] = useState(false)
+    const [helpOpen, setHelpOpen] = useState(false)
     const revealId = useId()
 
     const size = metadata.isDir || metadata.isCollection
@@ -92,6 +95,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
       banner keeps its place in the packet for the people who can see it.
     */
     const warningIds = warnings.map((_, index) => `fd-warning-${index}`)
+    if (state.recovered) warningIds.push('fd-recovery-success')
 
     /**
      * The copy goes through the bound Go command, not `navigator.clipboard`.
@@ -201,6 +205,7 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                     {copy.stage.heading}
                 </h1>
                 <p className="fd-meta">{copy.qr.instruction}</p>
+                {state.recovered ? <span id="fd-recovery-success" className="sr-only">{copy.recovery.success}</span> : null}
             </div>
 
             <section className="fd-packet">
@@ -413,8 +418,10 @@ export function StagedView({state, onCancel, onAnnounce, onCopyFailed}: StagedVi
                     className="fd-help"
                     headingId="fd-staged-help-heading"
                     summary={copy.help.heading}
+                    onOpenChange={setHelpOpen}
                 >
                     <StagedHelpContent/>
+                    {onRefreshConnection ? <ConnectionRecoveryPanel key={state.session.sessionId} active={helpOpen} sessionId={state.session.sessionId} currentAddress={new URL(metadata.url).hostname} onRefresh={onRefreshConnection}/> : null}
                 </Disclosure>
                 <button
                     type="button"

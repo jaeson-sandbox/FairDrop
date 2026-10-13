@@ -454,6 +454,14 @@ function phaseBody(
         case 'pending':
             return <StagePendingCard state={state} onCancel={() => void transfer.cancel()}/>
 
+        case 'recovering':
+            return <section className="fd-region fd-recovery-pending">
+                <h1 className="fd-state-heading" tabIndex={-1} data-focus-target="recovery-heading">{copy.recovery.pendingHeading}</h1>
+                <p className="fd-body">{copy.recovery.pendingBody}</p>
+                <button type="button" className="fd-button fd-button--quiet fd-target" onClick={() => void transfer.cancel()}
+                    disabled={state.cancelPending}>{state.cancelPending ? copy.cancel.pending : copy.cancel.action}</button>
+            </section>
+
         case 'staged':
             return (
                 <StagedView
@@ -461,6 +469,7 @@ function phaseBody(
                     onCancel={() => void transfer.cancel()}
                     onAnnounce={announce}
                     onCopyFailed={transfer.reportCopyFailure}
+                    onRefreshConnection={transfer.refreshConnection}
                 />
             )
 
@@ -474,6 +483,7 @@ function phaseBody(
                     onCancel={() => void transfer.cancel()}
                     onAnnounce={announce}
                     onCopyFailed={transfer.reportCopyFailure}
+                    onRefreshConnection={transfer.refreshConnection}
                 />
             )
 

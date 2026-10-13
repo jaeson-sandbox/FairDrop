@@ -364,14 +364,38 @@ func (f *fakeSource) inspected() []string {
 }
 
 type fakeNetwork struct {
-	h           *harness
-	getLocalIP  func(ctx context.Context) (netip.Addr, error)
-	startBeacon func(ctx context.Context, request BeaconRequest) error
-	stopBeacon  func() error
+	h              *harness
+	getLocalIP     func(ctx context.Context) (netip.Addr, error)
+	startBeacon    func(ctx context.Context, request BeaconRequest) error
+	stopBeacon     func() error
+	options        func(context.Context) ([]ConnectionOption, error)
+	selectEndpoint func(context.Context, string) (netip.Addr, error)
 
 	mu         sync.Mutex
 	requests   []BeaconRequest
 	addrChosen bool
+}
+
+func (f *fakeNetwork) Options(ctx context.Context) ([]ConnectionOption, error) {
+	f.h.enter("network.Options")
+	if f.options != nil {
+		return f.options(ctx)
+	}
+	return []ConnectionOption{{ID: "lan-1", Name: "Wi-Fi", Address: testAddress}}, nil
+}
+
+func (f *fakeNetwork) SelectEndpoint(ctx context.Context, id string) (netip.Addr, error) {
+	f.h.enter("network.SelectEndpoint")
+	if f.selectEndpoint != nil {
+		return f.selectEndpoint(ctx, id)
+	}
+	if id != "" && id != "lan-1" {
+		return netip.Addr{}, NewError(ErrNetworkUnavailable, "selected network disappeared")
+	}
+	f.mu.Lock()
+	f.addrChosen = true
+	f.mu.Unlock()
+	return testAddr(), nil
 }
 
 func (f *fakeNetwork) GetLocalIP(ctx context.Context) (netip.Addr, error) {

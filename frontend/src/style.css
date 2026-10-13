@@ -2932,3 +2932,11 @@ body {
   .fd-draft__row, .fd-draft__list { border-color: CanvasText; }
   .fd-draft .fd-button:focus, .fd-multiple-outcome:focus { outline: 2px solid Highlight; }
 }
+/* Waiting connection recovery shares the Quartz button and disclosure tokens. */
+.fd-connection-recovery { display: grid; gap: 0.75rem; min-width: 0; padding-top: 0.75rem; }
+.fd-recovery-select { min-height: 44px; width: 100%; max-width: 100%; padding: 0.6rem; border: 1px solid currentColor; border-radius: 0.5rem; background: var(--color-canvas); color: inherit; }
+.fd-recovery-select:focus { outline: 2px solid currentColor; outline-offset: 2px; }
+.fd-recovery-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.fd-recovery-actions > button { min-height: 44px; }
+@media (max-width: 420px) { .fd-recovery-actions { display: grid; grid-template-columns: minmax(0, 1fr); } }
+@media (forced-colors: active) { .fd-recovery-select:focus { outline: 2px solid Highlight; } }

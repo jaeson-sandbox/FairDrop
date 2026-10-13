@@ -47,6 +47,7 @@ export const focusTargets = [
     'receive-waiting-heading',
     'receive-receiving-heading',
     'receive-outcome',
+    'recovery-heading',
 ] as const
 
 export type FocusTarget = (typeof focusTargets)[number]
@@ -69,6 +70,7 @@ export type TransitionRow =
     | 'receive-started'
     | 'receive-outcome'
     | 'receive-leave'
+    | 'recovery-pending'
 
 export interface FocusAnnouncement {
     readonly row: TransitionRow
@@ -100,6 +102,8 @@ export function routeTransition(previous: TransferState, next: TransferState): A
     if (previous === next) return null
 
     switch (next.phase) {
+        case 'recovering':
+            return previous.phase === 'recovering' ? null : focusRow('recovery-pending', 'recovery-heading')
         case 'pending':
             return toPending(previous, next.cancelPending)
 
@@ -166,6 +170,7 @@ function toStaged(
     commandError: PublicError | null,
     warningCount: number,
 ): Announcement | null {
+    if (previous.phase === 'recovering' && commandError !== null) return focusRow('command-failure', 'command-error')
     if (previous.phase !== 'staged') return focusRow('stage-success', 'staged-heading')
     if (isNewCommandError(previous.commandError, commandError)) return focusRow('command-failure', 'command-error')
     if (!previous.cancelPending && cancelPending) return spokenRow('cancel-requested', copy.cancel.pending)
@@ -204,6 +209,7 @@ function toTransferring(
  * non-terminal warning: keep focus where it is).
  */
 function toReceiveWaiting(previous: TransferState, next: ReceiveWaitingTransferState): Announcement | null {
+    if (previous.phase === 'recovering' && next.commandError !== null) return focusRow('command-failure', 'command-error')
     if (previous.phase !== 'receive-waiting') return focusRow('receive-ready', 'receive-waiting-heading')
     if (isNewCommandError(previous.commandError, next.commandError)) return focusRow('command-failure', 'command-error')
     if (!previous.cancelPending && next.cancelPending) return spokenRow('cancel-requested', copy.cancel.pending)

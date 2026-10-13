@@ -10,6 +10,14 @@ export function CopyToClipboard(arg1) {
   return window['go']['main']['App']['CopyToClipboard'](arg1);
 }
 
+export function ListConnectionOptions(arg1) {
+  return window['go']['main']['App']['ListConnectionOptions'](arg1);
+}
+
+export function RefreshConnection(arg1, arg2) {
+  return window['go']['main']['App']['RefreshConnection'](arg1, arg2);
+}
+
 export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
 }

@@ -26,7 +26,7 @@ describe('the receive strings', () => {
             'A phone tried to upload more than this computer has room for. FairDrop is still waiting. Choose fewer files on the phone, or cancel and pick a folder with more free space.',
         )
         expect(copy.receive.helpDifferentLan).toBe(
-            'Phone can’t open the page? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and choose Receive again for a fresh link.',
+            'Phone can’t open the page? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Use Refresh connection below for a new code.',
         )
         expect(copy.receive.receiving).toBe('Receiving')
         expect(copy.receive.receivedCaption).toBe('Received')

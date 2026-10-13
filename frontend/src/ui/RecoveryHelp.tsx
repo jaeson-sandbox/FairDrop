@@ -13,27 +13,25 @@ import {copy} from './copy'
  *    cover every shape between them: a wrong or expired link, a competing
  *    opener, a changed source, and guest or client isolation on the network.
  *
- * Both `IdleView`'s "Troubleshooting" disclosure and `StagedView`'s "Trouble
- * connecting?" disclosure (Story 9.4) sink this same content into a
- * `Disclosure`, so it stays a plain fragment rather than an element of its
- * own -- two callers rendering it side by side would otherwise both carry
- * whatever class this component chose.
+ * Idle and waiting views render state-appropriate guidance through this same
+ * fragment: a waiting code can be refreshed in place, while Idle still
+ * describes preparing an item again.
  */
-export function RecoveryHelpContent() {
+export function RecoveryHelpContent({waiting = false}: {readonly waiting?: boolean}) {
     return (
         <>
             <dl className="fd-help__platforms">
                 <div>
                     <dt>{copy.label.windowsRecovery}</dt>
-                    <dd>{copy.firewall.windowsRecovery}</dd>
+                    <dd>{waiting ? copy.firewall.windowsRecoveryWaiting : copy.firewall.windowsRecovery}</dd>
                 </div>
                 <div>
                     <dt>{copy.label.macosRecovery}</dt>
-                    <dd>{copy.firewall.macosRecovery}</dd>
+                    <dd>{waiting ? copy.firewall.macosRecoveryWaiting : copy.firewall.macosRecovery}</dd>
                 </div>
             </dl>
-            <p className="fd-body">{copy.help.differentLan}</p>
-            <p className="fd-body">{copy.help.receiverHttp}</p>
+            <p className="fd-body">{waiting ? copy.help.differentLanWaiting : copy.help.differentLan}</p>
+            <p className="fd-body">{waiting ? copy.help.receiverHttpWaiting : copy.help.receiverHttp}</p>
         </>
     )
 }
@@ -53,7 +51,7 @@ export function StagedHelpContent() {
         <>
             <p className="fd-body">{copy.localCopy.disclosure}</p>
             <p className="fd-body">{copy.firstOpener.inspect}</p>
-            <RecoveryHelpContent/>
+            <RecoveryHelpContent waiting/>
         </>
     )
 }

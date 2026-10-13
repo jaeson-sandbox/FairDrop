@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react'
 import {
     CancelTransfer,
+    RefreshConnection,
     SelectDirectory,
     SelectFile,
     SelectFiles,
@@ -14,7 +15,7 @@ import {EventsOn} from '../../wailsjs/runtime/runtime'
 import {parseCommandError, publicError} from './errors'
 import {selectErrorAction} from './selectors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
-import {parseFileMetadata, parseReceiveMetadata} from './validation'
+import {parseConnectionRefresh, parseFileMetadata, parseLifecycleEvent, parseReceiveMetadata} from './validation'
 import {MAX_COLLECTION_ITEMS, type LifecycleEventName, type PendingItemKind, type PublicError} from './types'
 
 interface StageOperation {
@@ -62,6 +63,7 @@ export interface TransferController {
     /** Opens the held receive outcome's subfolder in the OS file manager. */
     readonly showReceivedFolder: () => Promise<void>
     readonly cancel: () => Promise<void>
+    readonly refreshConnection?: (sessionId: string, networkId: string) => Promise<void>
     readonly rejectSelection: () => void
     /** Reported by the staged view, which is the only thing that issues the command. */
     readonly reportCopyFailure: (sessionId: string) => void
@@ -134,6 +136,11 @@ export function useTransfer(): TransferController {
     const stateRef = useRef<TransferState>(state)
     const mountedRef = useRef(false)
     const stageGenerationRef = useRef(0)
+    const recoveryGenerationRef = useRef(0)
+    const recoveryRef = useRef<{generation: number; sessionId: string} | null>(null)
+    const recoveryCancelRef = useRef<Promise<void> | null>(null)
+    const earlyRecoveryEventsRef = useRef<Array<{eventName: LifecycleEventName; args: unknown[]}>>([])
+    const earlyRecoveryOverflowRef = useRef(false)
     const stageOperationRef = useRef<StageOperation | null>(null)
     const cancelGenerationRef = useRef(0)
     const activeCancelRef = useRef<ActiveCancelOperation | null>(null)
@@ -174,7 +181,14 @@ export function useTransfer(): TransferController {
                 stageOperation.cancelRequested = true
                 void Promise.resolve().then(() => CancelTransfer()).catch(() => undefined)
             }
+            if (recoveryRef.current !== null && recoveryCancelRef.current === null) {
+                void Promise.resolve().then(() => CancelTransfer()).catch(() => undefined)
+            }
             stageGenerationRef.current += 1
+            recoveryGenerationRef.current += 1
+            recoveryRef.current = null
+            earlyRecoveryEventsRef.current = []
+            earlyRecoveryOverflowRef.current = false
             cancelGenerationRef.current += 1
             stageOperationRef.current = null
             activeCancelRef.current = null
@@ -209,6 +223,13 @@ export function useTransfer(): TransferController {
 
         const subscribe = (eventName: LifecycleEventName) => EventsOn(eventName, (...args: unknown[]) => {
             if (subscriptionEpochRef.current !== epoch || !mountedRef.current) return
+            const recovery = recoveryRef.current
+            const parsed = recovery === null ? null : parseLifecycleEvent(eventName, args)
+            if (recovery !== null && parsed !== null && parsed.sessionId !== recovery.sessionId) {
+                if (earlyRecoveryEventsRef.current.length < 128) earlyRecoveryEventsRef.current.push({eventName, args})
+                else earlyRecoveryOverflowRef.current = true
+                return
+            }
             dispatch({type: 'lifecycle', eventName, args})
         })
 
@@ -469,7 +490,29 @@ export function useTransfer(): TransferController {
     }, [])
 
     const cancelImpl = useCallback(async (releaseForOutcome: boolean): Promise<boolean | void> => {
+        if (recoveryCancelRef.current !== null) return recoveryCancelRef.current
         const current = stateRef.current
+        if (current.phase === 'recovering') {
+            rememberedPathsRef.current = null
+            draftRecoveryRef.current = null
+            selectionEpochRef.current += 1
+            recoveryRef.current = null
+            recoveryGenerationRef.current += 1
+            earlyRecoveryEventsRef.current = []
+            earlyRecoveryOverflowRef.current = false
+            dispatch({type: 'cancel-requested'})
+            const cancellation = Promise.resolve().then(async () => {
+                let error = publicError('cancelled')
+                try { await CancelTransfer() } catch (rejection) { error = parseCommandError(rejection) }
+                if (mountedRef.current) dispatch({type: 'recovery-failed', generation: current.generation,
+                    sessionId: current.session.sessionId, retired: true, error})
+            })
+            recoveryCancelRef.current = cancellation
+            try { await cancellation } finally {
+                if (recoveryCancelRef.current === cancellation) recoveryCancelRef.current = null
+            }
+            return
+        }
         if (!releaseForOutcome) {
             rememberedPathsRef.current = null
             draftRecoveryRef.current = null
@@ -567,6 +610,47 @@ export function useTransfer(): TransferController {
         }
     }, [])
     const cancel = useCallback(async (): Promise<void> => { await cancelImpl(false) }, [cancelImpl])
+
+    const refreshConnection = useCallback(async (sessionId: string, networkId: string): Promise<void> => {
+        const current = stateRef.current
+        if (!mountedRef.current || recoveryRef.current !== null ||
+            (current.phase !== 'staged' && current.phase !== 'receive-waiting') ||
+            current.session.sessionId !== sessionId || current.cancelPending) return
+        const generation = ++recoveryGenerationRef.current
+        const operation = {generation, sessionId}
+        recoveryRef.current = operation
+        earlyRecoveryEventsRef.current = []
+        earlyRecoveryOverflowRef.current = false
+        dispatch({type: 'recovery-requested', generation, sessionId})
+        try {
+            const raw = await RefreshConnection(sessionId, networkId)
+            if (!mountedRef.current || recoveryRef.current !== operation) return
+            const result = parseConnectionRefresh(raw)
+            if (earlyRecoveryOverflowRef.current || result === null || result.mode !== (current.phase === 'staged' ? 'send' : 'receive') ||
+                (result.mode === 'send' ? result.send.sessionId : result.receive.sessionId) === sessionId) {
+                let quiesced = true
+                try { await CancelTransfer() } catch { quiesced = false }
+                if (recoveryRef.current !== operation || !mountedRef.current) return
+                dispatch({type: 'recovery-failed', generation, sessionId, retired: true,
+                    error: publicError(quiesced ? 'setup_failed' : 'cleanup_unconfirmed')})
+                return
+            }
+            dispatch({type: 'recovery-succeeded', generation, sessionId, result})
+            for (const event of earlyRecoveryEventsRef.current) dispatch({type: 'lifecycle', ...event})
+        } catch (rejection) {
+            if (!mountedRef.current || recoveryRef.current !== operation) return
+            const message = typeof rejection === 'string' ? rejection : rejection instanceof Error ? rejection.message : ''
+            let retired = false
+            try { retired = JSON.parse(message)?.retired === true } catch { /* ordinary command error */ }
+            dispatch({type: 'recovery-failed', generation, sessionId, retired, error: parseCommandError(rejection)})
+        } finally {
+            if (recoveryRef.current === operation) {
+                recoveryRef.current = null
+                earlyRecoveryEventsRef.current = []
+                earlyRecoveryOverflowRef.current = false
+            }
+        }
+    }, [])
 
     const rejectSelection = useCallback(() => {
         const current = draftEntriesRef.current
@@ -758,7 +842,7 @@ export function useTransfer(): TransferController {
     }
 
     return {
-        state, stage, selectFile, selectDirectory, receive, showReceivedFolder, cancel, rejectSelection, reportCopyFailure, dismissRetained,
+        state, stage, selectFile, selectDirectory, receive, showReceivedFolder, cancel, refreshConnection, rejectSelection, reportCopyFailure, dismissRetained,
         stageFromOutcome, selectFromOutcome, retry, sendAgain,
         canRetry: rememberedPathsRef.current !== null,
         canSendAgain: rememberedPathsRef.current !== null &&

@@ -10,6 +10,8 @@ import {NOTIFICATION_TEXT_ID, Notification} from '../src/ui/Notification'
 import {OutcomePanel} from '../src/ui/OutcomePanel'
 import {StagedView} from '../src/ui/StagedView'
 import {TransferringView} from '../src/ui/TransferringView'
+import {ListConnectionOptions} from '../wailsjs/go/main/App'
+import {transfer} from '../wailsjs/go/models'
 import '../src/style.css'
 
 /*
@@ -29,7 +31,7 @@ import '../src/style.css'
   measured open, not merely to its text in the stylesheet.
 */
 
-vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn().mockResolvedValue(undefined)}))
+vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn().mockResolvedValue(undefined), ListConnectionOptions: vi.fn()}))
 
 const sessionId = '0123456789abcdef0123456789abcdef'
 const capabilityURL = `http://192.0.2.1:34123/download/${'fedcba9876543210fedcba9876543210'}`
@@ -613,6 +615,23 @@ describe('reflow at 320 CSS pixels (D-068)', () => {
     it('keeps Staged scrolling only vertically, with nothing clipped', async () => {
         await page.viewport(320, 900)
         assertNoHorizontalOverflow(await renderStaged())
+    })
+
+    it('keeps the expanded recovery controls operable and unclipped at 320 pixels', async () => {
+        await page.viewport(320, 900)
+        vi.mocked(ListConnectionOptions).mockResolvedValue(transfer.ConnectionOptions.createFrom({sessionId, currentAddress: '192.0.2.1', choices: [
+            {id: 'network-a', name: 'Wi-Fi', address: '192.0.2.2'},
+        ]}))
+        const onRefresh = vi.fn().mockResolvedValue(undefined)
+        const {container} = render(<StagedView state={staged()} onCancel={() => undefined} onRefreshConnection={onRefresh}/>)
+        fireEvent.click(screen.getByRole('button', {name: 'Trouble connecting?'}))
+        await waitForEntranceToSettle(container)
+        await screen.findByRole('option', {name: /Wi-Fi/})
+        assertNoHorizontalOverflow(container)
+        const refresh = screen.getByRole('button', {name: 'Refresh connection'})
+        expect(refresh.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
+        fireEvent.click(refresh)
+        expect(onRefresh).toHaveBeenCalledWith(sessionId, '')
     })
 
     it('keeps Transferring scrolling only vertically, with nothing clipped', async () => {

@@ -65,6 +65,10 @@ Limits worth knowing before you rely on it:
 3. Scan the QR code from a browser on the same Wi-Fi, or use **Copy Link** or **Show Link** to
    open the direct link instead. The receiving browser shows the item first. Tap **Download** there;
    the first valid POST claims the one-shot transfer.
+   If the nearby device cannot open the page while FairDrop is waiting, open **Trouble connecting?**,
+   choose an eligible local network or Automatic, and select **Refresh connection**. Share the new
+   code; the old one stops working. The same control is available while waiting for a phone upload
+   and keeps the approved receive folder.
 4. A folder, or a selection of several items, arrives as a ZIP, streamed rather than staged, so
    nothing extra is written on the sending side.
 5. After a completed transfer, choose **Send Again** to offer the same file, folder or selection
@@ -108,6 +112,10 @@ cd frontend && npm test              # jsdom suite
 cd frontend && npm run test:browser  # real Chromium: reflow, 200% text, targets, forced colors
 cd frontend && npm run build
 ```
+
+`wails build` regenerates the `ListConnectionOptions` and `RefreshConnection` bindings before
+frontend type checks. Run it before `npm test` or `npm run build` after changing App commands,
+and do not run it concurrently with Vitest: Wails installs frontend packages and rebuilds assets.
 
 A live folder download that fails on a phone leaves no trail inside the app. Run the production
 staging-and-archive path over the same folder to rule the archive in or out:

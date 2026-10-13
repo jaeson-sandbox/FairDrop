@@ -413,6 +413,7 @@ describe('the focus selector', () => {
             'receive-waiting-heading',
             'receive-receiving-heading',
             'receive-outcome',
+            'recovery-heading',
         ])
     })
 })

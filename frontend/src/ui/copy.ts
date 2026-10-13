@@ -66,6 +66,8 @@ export const copy = {
         macos: 'Allow incoming connections for FairDrop.',
         windowsRecovery: 'Open Windows Firewall settings and allow FairDrop on Private networks only, then prepare the item again.',
         macosRecovery: 'Open System Settings → Network → Firewall → Options, allow incoming connections for FairDrop, then prepare the item again.',
+        windowsRecoveryWaiting: 'Open Windows Firewall settings and allow FairDrop on Private networks only, then use Refresh connection below for a new code.',
+        macosRecoveryWaiting: 'Open System Settings → Network → Firewall → Options, allow incoming connections for FairDrop, then use Refresh connection below for a new code.',
     },
     stage: {
         pending: {
@@ -196,7 +198,7 @@ export const copy = {
         discoveryWarning: 'Device discovery isn’t available. The QR code and upload link still work.',
         tooLargeTitle: 'Upload too large',
         tooLarge: 'A phone tried to upload more than this computer has room for. FairDrop is still waiting. Choose fewer files on the phone, or cancel and pick a folder with more free space.',
-        helpDifferentLan: 'Phone can’t open the page? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and choose Receive again for a fresh link.',
+        helpDifferentLan: 'Phone can’t open the page? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Use Refresh connection below for a new code.',
         receiving: 'Receiving',
         receivedCaption: 'Received',
         savedCaption: 'Saved',
@@ -222,7 +224,25 @@ export const copy = {
          */
         heading: 'Trouble connecting?',
         differentLan: 'Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Then cancel and prepare the item again for a fresh link.',
+        differentLanWaiting: 'Not downloading? Make sure both devices use the same local Wi-Fi. Guest or isolated networks may block device-to-device traffic. Use Refresh connection below for a new code.',
         receiverHttp: 'Browser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.',
+        receiverHttpWaiting: 'Browser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. If this code is still waiting, use Refresh connection below for a new code.',
+    },
+    recovery: {
+        pendingHeading: 'Refreshing connection',
+        pendingBody: 'The old code is being retired. Wait for a new code before sharing it.',
+        guidance: 'Choose a local network and refresh the code. Both devices need the same local network. Listed networks have not been tested for firewall or guest-network access.',
+        currentAddress: 'Current address:',
+        networkLabel: 'Local network',
+        automatic: 'Automatic',
+        unavailableChoice: 'Selected network unavailable',
+        loading: 'Loading networks…',
+        loadError: 'Couldn’t load local networks. Try again.',
+        empty: 'No eligible local networks found.',
+        unavailable: 'That network is no longer available. Choose Automatic or another network.',
+        reload: 'Reload networks',
+        refresh: 'Refresh connection',
+        success: 'New code ready. The old code no longer works.',
     },
 
     /** Functional words the spine names in prose rather than in the copy table. */

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"net/netip"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -387,11 +388,22 @@ func (c *Coordinator) activate(
 	live *session,
 	request ServerStartRequest,
 	pathPrefix string,
+	networkID ...string,
 ) (activated, error) {
 	id, generation := live.id, live.generation
 
 	// 2. Resolve the address the receiver will dial.
-	address, err := c.network.GetLocalIP(setupCtx)
+	var address netip.Addr
+	var err error
+	if len(networkID) > 0 {
+		capability, ok := c.network.(ConnectionNetwork)
+		if !ok {
+			return activated{}, NewError(ErrNetworkUnavailable, "network choices are unavailable")
+		}
+		address, err = capability.SelectEndpoint(setupCtx, networkID[0])
+	} else {
+		address, err = c.network.GetLocalIP(setupCtx)
+	}
 	if err != nil {
 		return activated{}, err
 	}
@@ -402,6 +414,7 @@ func (c *Coordinator) activate(
 	if !address.IsValid() || address.IsUnspecified() {
 		return activated{}, NewError(ErrNetworkUnavailable, "no usable local network address was selected")
 	}
+	live.address = address.String()
 
 	// 3. Start the server and its drainer together. A started server whose
 	//    event lane nobody reads could block its own teardown, so the reader

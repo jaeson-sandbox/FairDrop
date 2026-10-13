@@ -236,6 +236,45 @@ func (a *App) StageTransfers(paths []string) (*transfer.FileMetadata, error) {
 	return &metadata, nil
 }
 
+// ListConnectionOptions reads fresh eligible endpoints for one waiting session.
+func (a *App) ListConnectionOptions(sessionID string) (*transfer.ConnectionOptions, error) {
+	ctx, coordinator := a.delegate()
+	if ctx == nil || coordinator == nil {
+		return nil, errNotComposed()
+	}
+	recovery, ok := coordinator.(interface {
+		ListConnectionOptions(context.Context, transfer.SessionID) (transfer.ConnectionOptions, error)
+	})
+	if !ok {
+		return nil, transfer.NewError(transfer.ErrNetworkUnavailable, "network choices are unavailable")
+	}
+	options, err := recovery.ListConnectionOptions(ctx, transfer.SessionID(sessionID))
+	if err != nil {
+		return nil, err
+	}
+	return &options, nil
+}
+
+// RefreshConnection replaces a waiting capability after coordinator ownership
+// decides the race with a receiver's claim.
+func (a *App) RefreshConnection(sessionID, networkID string) (*transfer.ConnectionRefresh, error) {
+	ctx, coordinator := a.delegate()
+	if ctx == nil || coordinator == nil {
+		return nil, errNotComposed()
+	}
+	recovery, ok := coordinator.(interface {
+		RefreshConnection(context.Context, transfer.SessionID, string) (transfer.ConnectionRefresh, error)
+	})
+	if !ok {
+		return nil, transfer.NewError(transfer.ErrNetworkUnavailable, "connection recovery is unavailable")
+	}
+	result, err := recovery.RefreshConnection(ctx, transfer.SessionID(sessionID), networkID)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // CancelTransfer abandons whatever transfer is in flight.
 //
 // The bound Wails command still takes no parameter -- the contract fixes the

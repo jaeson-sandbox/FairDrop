@@ -1,13 +1,74 @@
 package network
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net"
 	"net/netip"
+	"slices"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"fairdrop/internal/transfer"
 )
+
+func eligibleCandidates(snapshots []interfaceSnapshot) []addressCandidate {
+	seen := make(map[string]bool)
+	var candidates []addressCandidate
+	for _, snapshot := range snapshots {
+		if !eligibleInterface(snapshot.iface) {
+			continue
+		}
+		for _, raw := range snapshot.addresses {
+			addr, prefix, ok := canonicalIPv4(raw)
+			if !ok || excludedAddress(addr, prefix) || addressRank(addr) < 0 {
+				continue
+			}
+			key := strconv.Itoa(snapshot.iface.Index) + "\x00" + snapshot.iface.Name + "\x00" + addr.String()
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			candidates = append(candidates, addressCandidate{iface: snapshot.iface, addr: addr, rank: addressRank(addr)})
+		}
+	}
+	slices.SortFunc(candidates, func(a, b addressCandidate) int {
+		if candidateLess(a, b) {
+			return -1
+		}
+		if candidateLess(b, a) {
+			return 1
+		}
+		return 0
+	})
+	return candidates
+}
+
+func candidateID(candidate addressCandidate) string {
+	value := strconv.Itoa(candidate.iface.Index) + "\x00" + candidate.iface.Name + "\x00" + candidate.addr.String()
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:16])
+}
+
+func candidateLabel(name string) string {
+	var builder strings.Builder
+	for _, r := range name {
+		if builder.Len() >= 64 {
+			break
+		}
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			continue
+		}
+		builder.WriteRune(r)
+	}
+	label := strings.TrimSpace(builder.String())
+	if label == "" {
+		return "Local network"
+	}
+	return label
+}
 
 type interfaceSnapshot struct {
 	iface     net.Interface
@@ -21,32 +82,11 @@ type addressCandidate struct {
 }
 
 func selectCandidate(snapshots []interfaceSnapshot) (addressCandidate, bool) {
-	var best addressCandidate
-	found := false
-	for _, snapshot := range snapshots {
-		if !eligibleInterface(snapshot.iface) {
-			continue
-		}
-		for _, raw := range snapshot.addresses {
-			addr, prefix, ok := canonicalIPv4(raw)
-			if !ok || excludedAddress(addr, prefix) {
-				continue
-			}
-			candidate := addressCandidate{
-				iface: snapshot.iface,
-				addr:  addr,
-				rank:  addressRank(addr),
-			}
-			if candidate.rank < 0 {
-				continue
-			}
-			if !found || candidateLess(candidate, best) {
-				best = candidate
-				found = true
-			}
-		}
+	candidates := eligibleCandidates(snapshots)
+	if len(candidates) == 0 {
+		return addressCandidate{}, false
 	}
-	return best, found
+	return candidates[0], true
 }
 
 func eligibleInterface(iface net.Interface) bool {

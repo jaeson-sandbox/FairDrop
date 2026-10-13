@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"log"
 
 	"fairdrop/internal/network"
@@ -85,7 +86,19 @@ func formatCommandError(err error) any {
 		return unknownCommandError
 	}
 
-	encoded, marshalErr := json.Marshal(transfer.PublicErrorOf(err))
+	var retired *transfer.RecoveryFailure
+	public := transfer.PublicErrorOf(err)
+	var encoded []byte
+	var marshalErr error
+	if errors.As(err, &retired) {
+		encoded, marshalErr = json.Marshal(struct {
+			Code    transfer.ErrorCode `json:"code"`
+			Message string             `json:"message"`
+			Retired bool               `json:"retired"`
+		}{public.Code, public.Message, true})
+	} else {
+		encoded, marshalErr = json.Marshal(public)
+	}
 	if marshalErr != nil {
 		// PublicError is two strings, so this cannot happen today. Falling
 		// back rather than reaching for err.Error() is what keeps the

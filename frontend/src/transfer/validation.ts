@@ -8,12 +8,45 @@ import {
     type ProgressSnapshot,
     type PublicError,
     type ReceiveMetadata,
+    type ConnectionOptions,
+    type ConnectionRefresh,
     type ReceiveResult,
     type ReceiveStatus,
     type Warning,
 } from './types'
 
 type UnknownRecord = Record<string, unknown>
+
+const ipv4 = (value: unknown): value is string => typeof value === 'string' &&
+    /^(?:\d{1,3}\.){3}\d{1,3}$/.test(value) && value.split('.').every(part => Number(part) <= 255)
+
+export function parseConnectionOptions(value: unknown): ConnectionOptions | null {
+    const record = asRecord(value)
+    if (record === null || !isSessionId(record.sessionId) || !ipv4(record.currentAddress) || !Array.isArray(record.choices)) return null
+    const choices: ConnectionOptions['choices'][number][] = []
+    for (const raw of record.choices) {
+        const choice = asRecord(raw)
+        if (choice === null || typeof choice.id !== 'string' || choice.id.length < 1 || choice.id.length > 128 ||
+            /[\u0000-\u001f\u007f]/.test(choice.id) ||
+            !isDestinationName(choice.name) || !ipv4(choice.address)) return null
+        choices.push({id: choice.id, name: choice.name, address: choice.address})
+    }
+    return {sessionId: record.sessionId, currentAddress: record.currentAddress, choices}
+}
+
+export function parseConnectionRefresh(value: unknown): ConnectionRefresh | null {
+    const record = asRecord(value)
+    if (record === null) return null
+    if (record.mode === 'send' && !('receive' in record)) {
+        const send = parseFileMetadata(record.send)
+        return send === null ? null : {mode: 'send', send}
+    }
+    if (record.mode === 'receive' && !('send' in record)) {
+        const receive = parseReceiveMetadata(record.receive)
+        return receive === null ? null : {mode: 'receive', receive}
+    }
+    return null
+}
 
 const terminalErrorCodes = new Set([
     'path_not_found',
