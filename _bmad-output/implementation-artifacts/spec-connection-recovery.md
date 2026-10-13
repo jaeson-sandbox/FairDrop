@@ -2,7 +2,7 @@
 title: 'Recover a waiting connection on another local network'
 type: 'feature'
 created: '2026-10-12'
-status: 'in-review'
+status: 'done'
 baseline_commit: '578a2910dc985bb89963d7719000e2a46808437d'
 review_loop_iteration: 0
 context:

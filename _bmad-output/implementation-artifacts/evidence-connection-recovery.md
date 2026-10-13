@@ -72,3 +72,9 @@ The reviewed source snapshot in `/private/tmp/fairdrop-recovery-gate-xaajfaer` p
 Two verification-copy issues were corrected without changing application behavior: a newly added Go test needed gofmt, and the frontend copy test initially arrived before its matching UX table update. The latter full failure is retained in `frontend-incomplete-snapshot.log`; the synchronized frontend/browser rerun passed. Author-written whitespace checks pass; Wails-generated tab-only blank lines match generator output and were not hand-edited. The user's unrelated `build/.DS_Store` remains untouched and outside the verification snapshot and commit.
 
 All review patches are complete. Native Windows/macOS and Linux CI remains the integration gate; no release/version change is included. Manual native interaction, nearby-device connectivity, and screen-reader behavior remain unobserved.
+
+## Native integration proof
+
+[Verify run 38328584931](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38328584931) completed successfully for exact implementation commit `3f9d70d02e0bb1ddafb40194db6f71c9cef4cc65`. The conclusions were read directly from `gh run view --json headSha,conclusion,jobs`: **verify (windows-latest): success; verify (macos-latest): success; Linux adapter verification: success**. No cancelled or skipped job is counted as a pass. This includes native Windows executable resource proof, macOS unusable-lock launch survival, full Go/race/frontend/browser gates and complete native mutation inventories.
+
+The story and roadmap are complete. This final documentation-only update changes no application, generated binding, test, dependency, asset or workflow file; its own exact-head CI must also finish before [PR #17](https://github.com/jaeson-sandbox/FairDrop/pull/17) merges. Text/link sharing remains the next separate roadmap slice. Published baseline remains 1.6.0; this feature story neither bumps a version nor claims a new release.
