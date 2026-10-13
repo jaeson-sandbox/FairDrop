@@ -248,6 +248,6 @@ describe('cancelling', () => {
         const toggle = screen.getByRole('button', {name: 'Trouble connecting?'})
         fireEvent.click(toggle)
         expect(screen.getByText(/Phone can’t open the page\? Make sure both devices use the same local Wi-Fi\./)).toBeTruthy()
-        expect(screen.getByText(/choose Receive again for a fresh link\./)).toBeTruthy()
+        expect(screen.getByText(/Use Refresh connection below for a new code\./)).toBeTruthy()
     })
 })

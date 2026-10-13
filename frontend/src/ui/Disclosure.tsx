@@ -20,6 +20,7 @@ interface DisclosureProps {
      * has to change to restore the fully-expanded reading.
      */
     readonly defaultOpen?: boolean
+    readonly onOpenChange?: (open: boolean) => void
 }
 
 /**
@@ -55,7 +56,7 @@ interface DisclosureProps {
  * already gave for free and keeping this component's own input handling
  * limited to the one key it must intercept, Escape.
  */
-export function Disclosure({className, headingId, summary, children, defaultOpen = false}: DisclosureProps) {
+export function Disclosure({className, headingId, summary, children, defaultOpen = false, onOpenChange}: DisclosureProps) {
     const [open, setOpen] = useState(defaultOpen)
     const regionId = useId()
 
@@ -83,7 +84,7 @@ export function Disclosure({className, headingId, summary, children, defaultOpen
                     className="fd-disclosure__summary"
                     aria-expanded={open}
                     aria-controls={regionId}
-                    onClick={() => setOpen((was) => !was)}
+                    onClick={() => { const next = !open; setOpen(next); onOpenChange?.(next) }}
                     onKeyDown={handleSummaryKeyDown}
                 >
                     {summary}

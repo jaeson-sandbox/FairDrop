@@ -79,6 +79,7 @@ type session struct {
 	// are guarded by Coordinator.mu.
 	receive  *receiveSession
 	url      string
+	address  string
 	qrBase64 string
 	warnings []Warning
 	acquired []resource

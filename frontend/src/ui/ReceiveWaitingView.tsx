@@ -6,6 +6,7 @@ import type {ReceiveWaitingTransferState} from '../transfer/state'
 import {Disclosure} from './Disclosure'
 import {OutcomePanel} from './OutcomePanel'
 import {copy, errorHeadings, receiveQrAltFor} from './copy'
+import {ConnectionRecoveryPanel} from './ConnectionRecoveryPanel'
 
 /** The per-child stagger, written once per view like its siblings (see `StagedView.tsx`). */
 function rise(step: number): CSSProperties {
@@ -19,6 +20,7 @@ interface ReceiveWaitingViewProps {
     readonly onAnnounce?: (sessionId: string, text: string) => void
     /** Reports a clipboard write that failed, which only this view can observe. */
     readonly onCopyFailed?: (sessionId: string) => void
+    readonly onRefreshConnection?: (sessionId: string, networkId: string) => Promise<void>
 }
 
 /**
@@ -40,7 +42,7 @@ interface ReceiveWaitingViewProps {
  * It leaves a visible note beside the code and is spoken once by the
  * announcer, which is the routing table's rule for a non-terminal fact.
  */
-export function ReceiveWaitingView({state, onCancel, onAnnounce, onCopyFailed}: ReceiveWaitingViewProps) {
+export function ReceiveWaitingView({state, onCancel, onAnnounce, onCopyFailed, onRefreshConnection}: ReceiveWaitingViewProps) {
     const {metadata} = state
     const warnings = selectWarnings(state)
     const commandError = selectCommandError(state)
@@ -49,12 +51,14 @@ export function ReceiveWaitingView({state, onCancel, onAnnounce, onCopyFailed}: 
     // this is a ref and why activation focuses the control explicitly.
     const focusedRef = useRef(false)
     const [revealed, setRevealed] = useState(false)
+    const [helpOpen, setHelpOpen] = useState(false)
     const revealId = useId()
 
     const noteIds = [
         ...warnings.map((_, index) => `fd-receive-warning-${index}`),
         ...(state.refusals > 0 ? ['fd-receive-refused'] : []),
     ]
+    if (state.recovered) noteIds.push('fd-recovery-success')
 
     /**
      * Copies the upload link through the bound Go command, never
@@ -92,6 +96,7 @@ export function ReceiveWaitingView({state, onCancel, onAnnounce, onCopyFailed}: 
                     {copy.receive.heading}
                 </h1>
                 <p className="fd-meta">{copy.receive.instruction}</p>
+                {state.recovered ? <span id="fd-recovery-success" className="sr-only">{copy.recovery.success}</span> : null}
             </div>
 
             <section className="fd-packet">
@@ -222,8 +227,10 @@ export function ReceiveWaitingView({state, onCancel, onAnnounce, onCopyFailed}: 
                     className="fd-help"
                     headingId="fd-receive-help-heading"
                     summary={copy.help.heading}
+                    onOpenChange={setHelpOpen}
                 >
                     <p className="fd-body">{copy.receive.helpDifferentLan}</p>
+                    {onRefreshConnection ? <ConnectionRecoveryPanel key={state.session.sessionId} active={helpOpen} sessionId={state.session.sessionId} currentAddress={new URL(state.metadata.url).hostname} onRefresh={onRefreshConnection}/> : null}
                 </Disclosure>
                 <button
                     type="button"

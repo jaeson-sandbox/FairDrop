@@ -428,9 +428,11 @@ func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 		"CopyToClipboard": true,
 		// Phone-to-desktop receiving: one chooser, one start, one Show in Folder.
 		// Cancel is the existing CancelTransfer.
-		"SelectReceiveFolder": true,
-		"StartReceive":        true,
-		"ShowReceivedFolder":  true,
+		"SelectReceiveFolder":   true,
+		"StartReceive":          true,
+		"ShowReceivedFolder":    true,
+		"ListConnectionOptions": true,
+		"RefreshConnection":     true,
 	}
 
 	appType := reflect.TypeOf(NewApp())
@@ -1545,6 +1547,54 @@ func TestNoCommandErrorOrEmittedEventDisclosesPathOrToken(t *testing.T) {
 				t.Errorf("event %q disclosed %q: %s", event.name, secret, encoded)
 			}
 		}
+	}
+}
+
+func TestRecoveryFailureWailsFormatterMarksRetirementWithoutLeakingCause(t *testing.T) {
+	secret := "private/source/path-and-token"
+	err := &transfer.RecoveryFailure{Cause: transfer.WrapError(transfer.ErrCleanupUnconfirmed, secret, errors.New(secret))}
+	encoded, ok := formatCommandError(err).(string)
+	if !ok {
+		t.Fatalf("formatter returned %T", formatCommandError(err))
+	}
+	var got struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Retired bool   `json:"retired"`
+	}
+	if decodeErr := json.Unmarshal([]byte(encoded), &got); decodeErr != nil {
+		t.Fatal(decodeErr)
+	}
+	if got.Code != "cleanup_unconfirmed" || got.Message == "" || !got.Retired || strings.Contains(encoded, secret) {
+		t.Fatalf("Wails error = %s", encoded)
+	}
+	ordinary, ok := formatCommandError(transfer.NewError(transfer.ErrNetworkUnavailable, secret)).(string)
+	if !ok || strings.Contains(ordinary, `"retired"`) || strings.Contains(ordinary, secret) {
+		t.Fatalf("ordinary Wails error = %q", ordinary)
+	}
+}
+
+type recoveryCommandSpy struct {
+	*fakeCoordinator
+	gotSession transfer.SessionID
+	gotNetwork string
+}
+
+func (s *recoveryCommandSpy) RefreshConnection(_ context.Context, session transfer.SessionID, network string) (transfer.ConnectionRefresh, error) {
+	s.gotSession, s.gotNetwork = session, network
+	return transfer.ConnectionRefresh{Mode: "send", Send: &transfer.FileMetadata{SessionID: "22222222222222222222222222222222"}}, nil
+}
+
+func TestAppForwardsExplicitConnectionChoiceUnchanged(t *testing.T) {
+	h := newHarness(t)
+	spy := &recoveryCommandSpy{fakeCoordinator: h.coordinator}
+	h.app.useCoordinator(spy)
+	result, err := h.app.RefreshConnection("11111111111111111111111111111111", "distinct-network-choice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spy.gotSession != "11111111111111111111111111111111" || spy.gotNetwork != "distinct-network-choice" || result.Send == nil {
+		t.Fatalf("forwarding = %q %q, result %+v", spy.gotSession, spy.gotNetwork, result)
 	}
 }
 

@@ -6,6 +6,10 @@ export function CancelTransfer():Promise<void>;
 
 export function CopyToClipboard(arg1:string):Promise<void>;
 
+export function ListConnectionOptions(arg1:string):Promise<transfer.ConnectionOptions>;
+
+export function RefreshConnection(arg1:string,arg2:string):Promise<transfer.ConnectionRefresh>;
+
 export function SelectDirectory():Promise<string>;
 
 export function SelectFile():Promise<string>;

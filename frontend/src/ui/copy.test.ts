@@ -177,15 +177,19 @@ describe('approved product copy', () => {
             'external.promise',
             'firewall.macos',
             'firewall.macosRecovery',
+            'firewall.macosRecoveryWaiting',
             'firewall.preflight',
             'firewall.windows',
             'firewall.windowsRecovery',
+            'firewall.windowsRecoveryWaiting',
             'firstOpener.inspect',
             'firstOpener.warning',
             'folder.note',
             'help.differentLan',
+            'help.differentLanWaiting',
             'help.heading',
             'help.receiverHttp',
+            'help.receiverHttpWaiting',
             'idle.instruction',
             'idle.promise',
             'label.chooseFileOrFolder',
@@ -238,6 +242,20 @@ describe('approved product copy', () => {
             'receive.showInFolder',
             'receive.tooLarge',
             'receive.tooLargeTitle',
+            'recovery.automatic',
+            'recovery.currentAddress',
+            'recovery.empty',
+            'recovery.guidance',
+            'recovery.loadError',
+            'recovery.loading',
+            'recovery.networkLabel',
+            'recovery.pendingBody',
+            'recovery.pendingHeading',
+            'recovery.refresh',
+            'recovery.reload',
+            'recovery.success',
+            'recovery.unavailable',
+            'recovery.unavailableChoice',
             'selection.addFiles',
             'selection.addFolder',
             'selection.cancel',
@@ -396,7 +414,8 @@ describe('banned vocabulary', () => {
     })
 
     it('keeps every banned term out of every registered string', () => {
-        const profileStrings: readonly string[] = [copy.firewall.windows, copy.firewall.windowsRecovery]
+        const profileStrings: readonly string[] = [copy.firewall.windows, copy.firewall.windowsRecovery,
+            copy.firewall.windowsRecoveryWaiting]
 
         for (const value of collectStrings(copy)) {
             for (const {term, pattern} of banned) {

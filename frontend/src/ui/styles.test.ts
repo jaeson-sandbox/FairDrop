@@ -82,6 +82,8 @@ describe('the stylesheet parser sees the whole file', () => {
             '@media (forced-colors: active) {',
             '@media (prefers-reduced-motion: reduce) {',
             '@media (forced-colors: active) {',
+            '@media (max-width: 420px) {',
+            '@media (forced-colors: active) {',
         ])
     })
 })

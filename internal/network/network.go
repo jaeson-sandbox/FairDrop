@@ -58,6 +58,63 @@ type Manager struct {
 }
 
 var _ transfer.NetworkPort = (*Manager)(nil)
+var _ transfer.ConnectionNetwork = (*Manager)(nil)
+
+// Options enumerates fresh eligible endpoints without touching selected or the beacon.
+func (m *Manager) Options(ctx context.Context) ([]transfer.ConnectionOption, error) {
+	if ctx == nil {
+		return nil, transfer.NewError(transfer.ErrNetworkUnavailable, "network discovery requires a context")
+	}
+	snapshots, causes, err := m.enumerate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	candidates := eligibleCandidates(snapshots)
+	if len(candidates) == 0 && len(causes) > 0 {
+		return nil, unavailableError(causes)
+	}
+	options := make([]transfer.ConnectionOption, 0, len(candidates))
+	for _, candidate := range candidates {
+		options = append(options, transfer.ConnectionOption{ID: candidateID(candidate), Name: candidateLabel(candidate.iface.Name), Address: candidate.addr.String()})
+	}
+	return options, nil
+}
+
+// SelectEndpoint re-enumerates at use time. Empty ID chooses the usual ranked
+// automatic endpoint; a vanished explicit pair is never substituted.
+func (m *Manager) SelectEndpoint(ctx context.Context, id string) (netip.Addr, error) {
+	if id == "" {
+		return m.GetLocalIP(ctx)
+	}
+	if ctx == nil {
+		return netip.Addr{}, transfer.NewError(transfer.ErrNetworkUnavailable, "network selection requires a context")
+	}
+	if err := m.acquireSelectionGate(ctx, contextError); err != nil {
+		return netip.Addr{}, err
+	}
+	defer m.releaseSelectionGate()
+	snapshots, _, err := m.enumerate(ctx)
+	if err != nil {
+		return netip.Addr{}, err
+	}
+	for _, candidate := range eligibleCandidates(snapshots) {
+		if candidateID(candidate) != id {
+			continue
+		}
+		if err := contextError(ctx); err != nil {
+			return netip.Addr{}, err
+		}
+		m.mu.Lock()
+		if beaconHandlePresent(m.beacon) {
+			m.mu.Unlock()
+			return netip.Addr{}, transfer.NewError(transfer.ErrBusy, "the previous network announcement is still active")
+		}
+		m.selected = &selection{iface: candidate.iface, addr: candidate.addr}
+		m.mu.Unlock()
+		return candidate.addr, nil
+	}
+	return netip.Addr{}, transfer.NewError(transfer.ErrNetworkUnavailable, "the selected local network is no longer available")
+}
 
 // NewManager constructs a network adapter with process-local, immutable OS and
 // mDNS dependencies.

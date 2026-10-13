@@ -45,6 +45,7 @@ export interface StagedTransferState {
     readonly metadata: FileMetadata
     readonly cancelPending: boolean
     readonly commandError: PublicError | null
+    readonly recovered?: boolean
 }
 
 export interface TransferringTransferState {
@@ -104,11 +105,23 @@ export interface ReceiveWaitingTransferState {
     readonly metadata: ReceiveMetadata
     readonly cancelPending: boolean
     readonly commandError: PublicError | null
+    readonly recovered?: boolean
     /**
      * How many times a phone's upload was refused for space while waiting. The
      * session keeps waiting; this only exists so each refusal is a new state
      * and is therefore announced, rather than the second one going unheard.
      */
+    readonly refusals: number
+}
+
+export interface RecoveringTransferState {
+    readonly phase: 'recovering'
+    readonly generation: number
+    readonly session: SessionCursor
+    readonly mode: 'send' | 'receive'
+    readonly metadata: FileMetadata | ReceiveMetadata
+    readonly retired: boolean
+    readonly cancelPending: boolean
     readonly refusals: number
 }
 
@@ -166,8 +179,12 @@ export type TransferState =
     | ReceiveWaitingTransferState
     | ReceiveReceivingTransferState
     | ReceiveOutcomeTransferState
+    | RecoveringTransferState
 
 export type TransferAction =
+    | {readonly type: 'recovery-requested'; readonly generation: number; readonly sessionId: string}
+    | {readonly type: 'recovery-succeeded'; readonly generation: number; readonly sessionId: string; readonly result: import('./types').ConnectionRefresh}
+    | {readonly type: 'recovery-failed'; readonly generation: number; readonly sessionId: string; readonly retired: boolean; readonly error: PublicError}
     | {readonly type: 'stage-requested'; readonly generation: number; readonly itemKind: PendingItemKind}
     | {readonly type: 'stage-succeeded'; readonly generation: number; readonly metadata: FileMetadata}
     | {readonly type: 'receive-started'; readonly generation: number; readonly metadata: ReceiveMetadata}
@@ -193,6 +210,35 @@ export function createInitialTransferState(): IdleTransferState {
 /** Pure state machine for local command state plus the authoritative event grammar. */
 export function transferReducer(state: TransferState, action: TransferAction): TransferState {
     switch (action.type) {
+        case 'recovery-requested':
+            if ((state.phase !== 'staged' && state.phase !== 'receive-waiting') ||
+                state.cancelPending || state.session.sessionId !== action.sessionId) return state
+            return {phase: 'recovering', generation: action.generation, session: state.session,
+                mode: state.phase === 'staged' ? 'send' : 'receive', metadata: state.metadata,
+                retired: false, cancelPending: false, refusals: state.phase === 'receive-waiting' ? state.refusals : 0}
+
+        case 'recovery-succeeded':
+            if (state.phase !== 'recovering' || state.generation !== action.generation ||
+                state.session.sessionId !== action.sessionId || state.cancelPending || state.mode !== action.result.mode) return state
+            if (action.result.mode === 'send') {
+                const metadata = action.result.send
+                if (metadata.sessionId === action.sessionId) return state
+                return {phase: 'staged', session: {sessionId: metadata.sessionId, lastSeq: 0}, metadata,
+                    cancelPending: false, commandError: null, recovered: true}
+            }
+            if (action.result.receive.sessionId === action.sessionId) return state
+            return {phase: 'receive-waiting', session: {sessionId: action.result.receive.sessionId, lastSeq: 0},
+                metadata: action.result.receive, cancelPending: false, commandError: null, refusals: 0, recovered: true}
+
+        case 'recovery-failed':
+            if (state.phase !== 'recovering' || state.generation !== action.generation ||
+                state.session.sessionId !== action.sessionId) return state
+            if (state.retired || action.retired) return idleWithError(action.error.code === 'cancelled' ? null : action.error, state.mode === 'receive')
+            return state.mode === 'send'
+                ? {phase: 'staged', session: state.session, metadata: state.metadata as FileMetadata,
+                    cancelPending: false, commandError: action.error}
+                : {phase: 'receive-waiting', session: state.session, metadata: state.metadata as ReceiveMetadata,
+                    cancelPending: false, commandError: action.error, refusals: state.refusals}
         case 'stage-requested':
             if (state.phase !== 'idle' || !Number.isSafeInteger(action.generation) || action.generation <= 0) {
                 return state
@@ -258,6 +304,7 @@ export function transferReducer(state: TransferState, action: TransferAction): T
             }
 
         case 'cancel-requested':
+            if (state.phase === 'recovering') return {...state, cancelPending: true}
             if (state.phase === 'pending') {
                 return state.cancelPending ? state : {...state, cancelPending: true}
             }
@@ -373,6 +420,16 @@ function reduceLifecycle(state: TransferState, event: LifecycleEvent): TransferS
     }
 
     switch (state.phase) {
+        case 'recovering':
+            if (event.kind === 'transfer-reset') return {...state, session, retired: true}
+            if (event.kind === 'transfer-started' && !state.retired) {
+                return state.mode === 'send'
+                    ? {phase: 'transferring', session, metadata: state.metadata as FileMetadata,
+                        progress: null, cancelPending: false, commandError: null}
+                    : {phase: 'receive-receiving', session, metadata: state.metadata as ReceiveMetadata,
+                        progress: null, filesSaved: 0, cancelPending: false, commandError: null}
+            }
+            return state
         case 'receive-waiting':
             return reduceReceiveWaiting(state, event, session)
 
@@ -577,7 +634,7 @@ function receiveOutcomeState(
 
 function hasSession(state: TransferState): state is Exclude<TransferState, IdleTransferState | PendingTransferState> {
     return state.phase === 'staged' || state.phase === 'transferring' || state.phase === 'done' || state.phase === 'error' ||
-        state.phase === 'receive-waiting' || state.phase === 'receive-receiving' || state.phase === 'receive-outcome'
+        state.phase === 'receive-waiting' || state.phase === 'receive-receiving' || state.phase === 'receive-outcome' || state.phase === 'recovering'
 }
 
 function progressCanFollow(previous: ProgressSnapshot | null, next: ProgressSnapshot): boolean {

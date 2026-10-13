@@ -28,7 +28,7 @@ import '../src/style.css'
 const sessionId = '0123456789abcdef0123456789abcdef'
 const token = '94adac272a8fee62a4436c58a4d4bac6'
 
-vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn().mockResolvedValue(undefined)}))
+vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn().mockResolvedValue(undefined), ListConnectionOptions: vi.fn()}))
 
 function metadata(url: string): FileMetadata {
     return {

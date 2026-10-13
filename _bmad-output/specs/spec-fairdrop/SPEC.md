@@ -1,6 +1,7 @@
 ---
 id: SPEC-fairdrop
 companions:
+  - ../spec-connection-recovery/recovery-contract.md
   - ../spec-multiple-selected-items/selection-contract.md
   - ../spec-phone-to-desktop-receiving/receive-contract.md
   - ../../planning-artifacts/architecture/architecture-FairDrop-2026-08-22/ARCHITECTURE-SPINE.md
@@ -64,6 +65,10 @@ People need a quick way to move a local file or directory from a Windows or macO
   - **intent:** A desktop user can receive files uploaded once from a nearby browser into a folder they choose for that session.
   - **success:** No listener exists until a folder is chosen. One upload streams into a fresh time-named subfolder. Space is checked before writing, with a 3 GiB reserve. Names are sanitized and deduplicated, and no existing file is overwritten. Failure keeps completed files and removes the partial one. The outcome states the exact saved count, offers Show in Folder, and received files carry the OS download marking.
 
+- **CAP-10**
+  - **intent:** A user can inspect eligible network endpoints and refresh a waiting send or receive connection without reselecting its subject.
+  - **success:** Only the matching unclaimed session can be replaced. Confirmed retirement precedes a fresh session, capability URL and QR; a winning claim is untouched. Failed replacement removes the retired code, and diagnostics never mistake local eligibility for counterpart reachability.
+
 ## Constraints
 
 - FairDrop permits one process, one live send or receive session, one through 10,000 selected roots, and one counterpart browser; only IDLE accepts Stage. Collection admission validates all members, canonical overlap and checked aggregate logical size before networking; the selection-contract companion defines the extension.
@@ -79,13 +84,14 @@ People need a quick way to move a local file or directory from a Windows or macO
 - Preserve the proven Wails v2 native drop boundary, standard OS chrome, application-lifetime Wails context, single-instance restoration, and accessibility rules defined by the architecture companions.
 - Preserve ordinary spaces/Unicode, long Windows paths, and UNC paths wherever native Go APIs permit, subject to the portable archive-segment refusals in the contracts. Never shell-interpolate paths; reject symlinks, reparse traversal, and non-regular files with typed errors.
 - Directory preparation pins one search-only root identity until Close, revalidated before walking; this protects Prepare-to-WriteTo replacement, not original Stage or unsnapshotted contents. Traversal retains at most 64 directory handles including ancestors and the current pin, plus three transient handles; Stage reserves the future pin. A collection prepares its members one at a time in archive order, the first before headers and each later one when the stream reaches it, so at most one top-level file descriptor and one directory pin are held at any moment, and a later member that fails aborts the ZIP without finalization. Borrowed reader revocation joins admitted native reads before owned close. Unsafe archive segments are refused at source and ZIP boundaries, with explicit 0755 directory/0644 file modes; numbered collection roots prevent cross-root collisions, but no within-folder collision or permission-preserving backup promise is made. Consecutive empty reads fail at 101 and reset on progress; native blocking I/O remains non-interruptible.
+- Waiting-session network choice and recovery follow the recovery-contract companion: read-only enumeration, fresh explicit-choice validation, atomic claim/recovery ownership, confirmed old-run quiescence and exact receive-destination capability ownership. Network preferences remain ephemeral.
 - Implementation follows the final architecture spine and contracts. Evidence-driven divergence updates this spec, the architecture decision log and documents, the relevant phase artifact, tests, and managed agent context together.
 
 ## Non-goals
 
 - More than 10,000 selected roots, collisions within a selected folder, and multiple receivers.
 - TLS, authenticated discovery, hostile-network security, cloud relay, or a native receiver application.
-- IPv6, an interface-selection UI, transfer resume or ranges, transfer history, or persistent preferences.
+- IPv6, background connection monitoring/probes, active-transfer migration, transfer resume or ranges, transfer history, or persistent preferences.
 - Linux packaging, installers, signing, notarization, auto-update, or default UPX compression.
 
 ## Success signal

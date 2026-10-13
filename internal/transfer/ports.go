@@ -98,6 +98,33 @@ type NetworkPort interface {
 	StopBeacon() error
 }
 
+// ConnectionOption identifies one currently eligible interface/address pair.
+// ID is opaque to callers and must be checked against fresh enumeration.
+type ConnectionOption struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Address string `json:"address"`
+}
+
+// ConnectionNetwork is an optional extension for waiting-session recovery.
+// Options is read-only; SelectEndpoint must refuse stale explicit IDs.
+type ConnectionNetwork interface {
+	Options(context.Context) ([]ConnectionOption, error)
+	SelectEndpoint(context.Context, string) (netip.Addr, error)
+}
+
+type ConnectionOptions struct {
+	SessionID      SessionID          `json:"sessionId"`
+	CurrentAddress string             `json:"currentAddress"`
+	Choices        []ConnectionOption `json:"choices"`
+}
+
+type ConnectionRefresh struct {
+	Mode    string           `json:"mode"`
+	Send    *FileMetadata    `json:"send,omitempty"`
+	Receive *ReceiveMetadata `json:"receive,omitempty"`
+}
+
 // ServerStartRequest is the immutable description of the one transfer an
 // ephemeral server exists to serve. Token authorizes exactly one download;
 // SessionID only correlates events and is never put on the wire.

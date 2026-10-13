@@ -59,6 +59,22 @@ export interface ReceiveMetadata {
     readonly warnings: readonly Warning[]
 }
 
+export interface ConnectionOption {
+    readonly id: string
+    readonly name: string
+    readonly address: string
+}
+
+export interface ConnectionOptions {
+    readonly sessionId: string
+    readonly currentAddress: string
+    readonly choices: readonly ConnectionOption[]
+}
+
+export type ConnectionRefresh =
+    | {readonly mode: 'send'; readonly send: FileMetadata}
+    | {readonly mode: 'receive'; readonly receive: ReceiveMetadata}
+
 /** How a receive session ended. `complete` is the only one that may be shown as success. */
 export type ReceiveResult = 'complete' | 'incomplete' | 'cancelled'
 

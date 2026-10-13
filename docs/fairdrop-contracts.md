@@ -185,6 +185,13 @@ type NetworkPort interface {
     StopBeacon() error
 }
 
+// Optional waiting-session recovery extension. Options never changes the
+// selected beacon identity; SelectEndpoint re-enumerates an explicit ID.
+type ConnectionNetwork interface {
+    Options(ctx context.Context) ([]ConnectionOption, error)
+    SelectEndpoint(ctx context.Context, id string) (netip.Addr, error)
+}
+
 type QRPort interface {
     EncodePNG(ctx context.Context, content string) ([]byte, error)
 }
@@ -409,9 +416,15 @@ func (a *App) CopyToClipboard(text string) error
 func (a *App) SelectReceiveFolder() (string, error)
 func (a *App) StartReceive(folder string) (*transfer.ReceiveMetadata, error)
 func (a *App) ShowReceivedFolder() error
+func (a *App) ListConnectionOptions(sessionID string) (*transfer.ConnectionOptions, error)
+func (a *App) RefreshConnection(sessionID, networkID string) (*transfer.ConnectionRefresh, error)
 ```
 
-The last three are the receive commands described under "Receive session contracts" above.
+`SelectReceiveFolder`, `StartReceive` and `ShowReceivedFolder` are the receive commands described above. The last two commands recover a waiting send or receive connection.
+
+`ListConnectionOptions` requires the exact nonempty current STAGED session ID. It returns `{sessionId,currentAddress,choices}` with a non-null choices array, using a fresh read-only enumeration of eligible interface/address pairs. `networkID == ""` in `RefreshConnection` selects Automatic; any nonempty ID is revalidated against fresh enumeration before retirement and again when selected. A vanished pair fails with `network_unavailable` and never silently falls back. Interface labels are bounded display text; IDs are opaque and the frontend cannot supply an arbitrary IP address.
+
+`RefreshConnection` reserves STAGED under the coordinator mutex and operation lease, excluding CLAIMING and duplicate recovery. It stops the old beacon/server and joins the drainer under bounds before any new listener. The old token becomes invalid and an authoritative reset is emitted before the new acknowledgment. A post-retirement command error includes a safe `retired: true` flag beside the fixed public code/message so the frontend removes the old QR even when event delivery lags. A pre-retirement refusal leaves the original waiting or winning active session intact. The response is `{mode:'send',send:FileMetadata}` or `{mode:'receive',receive:ReceiveMetadata}`. A receive refresh transfers its existing `ReceiveDestination` after HTTP quiescence and closes it on final failure or exit; it never reopens the chosen folder or writes before a claim.
 
 `SelectFile`, `SelectFiles`, and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. `SelectFiles` selects files only. A cancelled native dialog returns an empty selection without emitting a transfer error. A dialog that fails to open returns `chooser_failed`. One dropped path stages immediately; two through 10,000 enter an editable in-memory list and stage only on Send. Zero or more than 10,000 never silently discard members.
 

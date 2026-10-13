@@ -188,7 +188,9 @@ Phase 2 owns the exact scoring algorithm. It must be deterministic and testable 
 - use stable interface/address ordering when candidates tie;
 - return a typed error when no suitable address exists.
 
-IPv6 and an interface-selection UI are deferred until real multi-homed failures justify the product complexity.
+IPv6 remains deferred. Waiting send and receive sessions now expose the same eligible IPv4 pairs in a Trouble connecting choice. The list is pure and never changes a live beacon. Explicit selection re-enumerates before retiring the old capability and again before listener activation; Automatic preserves the ranking above.
+
+**Decision (connection recovery):** Refresh reserves the exact STAGED generation under the coordinator mutex and operation lease, the same boundary that decides a receiver claim. CLAIMING wins by excluding refresh; refresh wins by fencing authorization before adapter teardown. The old beacon, listener and drainer must confirm quiescence before a replacement can start. The old session emits reset before the new acknowledgment; post-retirement errors carry a safe `retired` marker so the UI cannot redisplay an invalid code if an event arrives late. A receive refresh hands the same destination capability to the new session only after HTTP work has ended, closing it on failure. Cancel and Shutdown keep the lease and generation fence across that handoff, including the interval before the new session is installed.
 
 The DNS-SD service type is the fixed protocol constant `_fairdrop._tcp`. The human-readable instance name includes hostname plus a process-unique suffix so separate hosts with the same name do not collide, without writing a persistent device identifier.
 

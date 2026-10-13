@@ -711,15 +711,14 @@ describe('recovery help behind "Trouble connecting?"', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Trouble connecting?'}))
 
         expect(screen.getByText('Open Windows Firewall settings and allow FairDrop on Private networks only, ' +
-            'then prepare the item again.')).toBeTruthy()
+            'then use Refresh connection below for a new code.')).toBeTruthy()
         expect(screen.getByText('Open System Settings → Network → Firewall → Options, allow incoming ' +
-            'connections for FairDrop, then prepare the item again.')).toBeTruthy()
+            'connections for FairDrop, then use Refresh connection below for a new code.')).toBeTruthy()
         expect(screen.getByText('Not downloading? Make sure both devices use the same local Wi-Fi. Guest or ' +
-            'isolated networks may block device-to-device traffic. Then cancel and prepare the item again for ' +
-            'a fresh link.')).toBeTruthy()
+            'isolated networks may block device-to-device traffic. Use Refresh connection below for a new code.')).toBeTruthy()
         expect(screen.getByText('Browser says Not Found: the link may be wrong or expired. Locked: another ' +
-            'downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a ' +
-            'fresh link.')).toBeTruthy()
+            'downloader claimed it. Gone: the selected item changed. If this code is still waiting, use Refresh ' +
+            'connection below for a new code.')).toBeTruthy()
     })
 
     it('keeps every one of these strings in the DOM regardless of open state (mutation: drop one -> fails, naming it)', () => {

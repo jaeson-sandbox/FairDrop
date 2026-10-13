@@ -34,7 +34,7 @@ import '../src/style.css'
   confirms on the built binary.
 */
 
-vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn().mockResolvedValue(undefined)}))
+vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn().mockResolvedValue(undefined), ListConnectionOptions: vi.fn()}))
 
 const sessionId = '0123456789abcdef0123456789abcdef'
 const uploadURL = `http://192.0.2.1:34123/upload/${'fedcba9876543210fedcba9876543210'}`
