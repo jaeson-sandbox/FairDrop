@@ -279,12 +279,31 @@ func (c *Coordinator) forwardNotice(live *session, event ServerEvent) {
 		c.mu.Unlock()
 		return
 	}
+	noticeDone := make(chan struct{})
+	live.noticeDone = noticeDone
 	live.seq++
 	published := Event{SessionID: live.id, Seq: live.seq, Kind: TransferNotice, Notice: event.Notice}
 	c.mu.Unlock()
 
 	c.publish(published)
 	c.releaseLease()
+	c.mu.Lock()
+	if live.noticeDone == noticeDone {
+		live.noticeDone = nil
+	}
+	claimFailure := live.noticeClaimFailure
+	close(noticeDone)
+	c.mu.Unlock()
+	if claimFailure != nil {
+		// This drainer may settle its own session without joining itself.
+		// Cancel, Shutdown or recovery can still take the lease first; the
+		// ordinary terminal admission check decides that race.
+		c.acceptTerminal(live, ServerEvent{
+			SessionID: live.id,
+			Kind:      ServerFailed,
+			Err:       claimFailure,
+		}, stateStaged)
+	}
 }
 
 // settleCancelledReceive ends a receive session the desktop cancelled while an

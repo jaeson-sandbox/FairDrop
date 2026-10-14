@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -437,6 +438,65 @@ func TestAnUploadTooLargeForTheDiskIsRefusedNotedAndLeavesTheSessionWaiting(t *t
 	again, text := rig.post(body)
 	if again.StatusCode != http.StatusOK || !strings.Contains(string(text), "1 file saved to this computer.") {
 		t.Fatalf("the retry with room = %d %q", again.StatusCode, text)
+	}
+}
+
+func TestRefusalNoticeDoesNotSpendAWaitingHTTPUploadReservation(t *testing.T) {
+	var refuse atomic.Bool
+	refuse.Store(true)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	authorizer := &stubAuthorizer{authorize: func(context.Context, transfer.SessionID) error {
+		close(entered)
+		<-release
+		return nil
+	}}
+	rig := startReceiveRig(t, withAuthorizer(authorizer), withDestination(func(real transfer.ReceiveDestination) transfer.ReceiveDestination {
+		return &spyDestination{ReceiveDestination: real, checkSpace: func(int64) error {
+			if refuse.Load() {
+				return transfer.ErrInsufficientSpace
+			}
+			return nil
+		}}
+	}))
+	body := multipartBody(uploadFile("saved.txt", "exact bytes"))
+	response, _ := rig.post(body)
+	if response.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("refused upload = %d, want 413", response.StatusCode)
+	}
+	awaitNotice(t, rig.handle.Events)
+	refuse.Store(false)
+	type result struct {
+		response *http.Response
+		page     []byte
+	}
+	first := make(chan result, 1)
+	go func() {
+		response, page := rig.post(body)
+		first <- result{response, page}
+	}()
+	<-entered // HTTP has reserved the capability before authorization returns.
+	second, _ := rig.post(body)
+	if second.StatusCode != http.StatusLocked {
+		t.Fatalf("another upload during authorization = %d, want 423", second.StatusCode)
+	}
+	close(release)
+	got := <-first
+	if got.response.StatusCode != http.StatusOK {
+		t.Fatalf("the same link after its refusal = %d %q, want 200", got.response.StatusCode, got.page)
+	}
+	if content := readText(t, filepath.Join(rig.subfolder(), "saved.txt")); content != "exact bytes" {
+		t.Fatalf("saved content = %q, want exact bytes", content)
+	}
+	if authorizer.calls.Load() != 1 {
+		t.Fatalf("authorizer ran %d times, want one", authorizer.calls.Load())
 	}
 }
 

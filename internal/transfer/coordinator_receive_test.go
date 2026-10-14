@@ -6,9 +6,26 @@ import (
 	"encoding/json"
 	"net/netip"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// cancelOnSecondErrContext uses a real derived Context. Its Err stays nil
+// until cancel closes Done, including when the second authorization check
+// triggers cancellation at the post-notice revalidation boundary.
+type cancelOnSecondErrContext struct {
+	context.Context
+	cancel context.CancelFunc
+	calls  atomic.Int32
+}
+
+func (c *cancelOnSecondErrContext) Err() error {
+	if c.calls.Add(1) == 2 {
+		c.cancel()
+	}
+	return c.Context.Err()
+}
 
 // Covers the coordinator half of the I/O & Edge-Case Matrix in
 // _bmad-output/implementation-artifacts/spec-phone-to-desktop-receiving.md:
@@ -695,6 +712,408 @@ func TestShutdownFromAHeldReceiveOutcomeIsQuietAndIdempotent(t *testing.T) {
 }
 
 // --- Notices ---------------------------------------------------------------
+
+func TestClaimWaitsForRefusalNoticePublication(t *testing.T) {
+	h := newReceiveHarness(t)
+	metadata := h.receiveWaiting()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferNotice {
+			close(entered)
+			<-release
+		}
+	}
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-entered // the notice owns the operation lease through publication
+
+	baseline := h.bounds.armed() // the observer's own publication bound is already armed
+	claim := make(chan error, 1)
+	go func() { claim <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
+	h.awaitBoundPending(baseline)
+	close(release)
+	if err := <-claim; err != nil {
+		t.Fatalf("AuthorizeClaim while a refusal notice publishes = %v, want a claimable session", err)
+	}
+	events := h.awaitEvents(2)
+	if events[0].Kind != TransferNotice || events[1].Kind != TransferStarted || events[0].Seq != 1 || events[1].Seq != 2 {
+		t.Fatalf("events = %+v, want notice seq 1 before started seq 2", events)
+	}
+}
+
+func TestBoundedNoticePublicationReleasesClaimWithoutPromisingLateDelivery(t *testing.T) {
+	h := newReceiveHarness(t)
+	metadata := h.receiveWaiting()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferNotice {
+			close(entered)
+			<-release
+		}
+	}
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-entered
+	h.bounds.fire() // observerPublishBound, not the claim's wait bound
+	h.eventually("timed-out notice publication released its lease", func() bool {
+		h.coordinator.mu.Lock()
+		defer h.coordinator.mu.Unlock()
+		return h.coordinator.session.noticeDone == nil
+	})
+	if err := h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID); err != nil {
+		t.Fatalf("claim after bounded notice publication = %v", err)
+	}
+	if got := h.state(); got != stateTransferring {
+		t.Fatalf("state = %q, want TRANSFERRING", got)
+	}
+	found := false
+	for _, diagnostic := range h.diagnosed.snapshot() {
+		if diagnostic.code == ErrTransferFailed && strings.Contains(diagnostic.message, "observer did not return") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("timed-out observer publication left no truthful diagnostic")
+	}
+}
+
+func TestCompetingClaimsWaitingForOneNoticeStartOnce(t *testing.T) {
+	h := newReceiveHarness(t)
+	metadata := h.receiveWaiting()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferNotice {
+			close(entered)
+			<-release
+		}
+	}
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-entered
+	baseline := h.bounds.armed()
+	claims := make(chan error, 2)
+	for range 2 {
+		go func() { claims <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
+	}
+	h.awaitBoundPending(baseline + 1)
+	close(release)
+	first, second := <-claims, <-claims
+	if (first == nil) == (second == nil) {
+		t.Fatalf("competing claims = %v and %v, want exactly one success", first, second)
+	}
+	if first != nil && ErrorCodeOf(first) != ErrCancelled || second != nil && ErrorCodeOf(second) != ErrCancelled {
+		t.Fatalf("losing claim errors = %v and %v, want cancelled", first, second)
+	}
+	events := h.awaitEvents(2)
+	if events[0].Kind != TransferNotice || events[1].Kind != TransferStarted || len(events) != 2 {
+		t.Fatalf("competing claim events = %+v, want one notice and one started", events)
+	}
+}
+
+func TestSuccessiveNoticePublicationsShareOneClaimDeadline(t *testing.T) {
+	h := newReceiveHarness(t)
+	metadata := h.receiveWaiting()
+	firstEntered := make(chan struct{})
+	secondEntered := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	releaseSecond := make(chan struct{})
+	resumeFirstWait := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(func() {
+		cancel()
+		for _, ch := range []chan struct{}{releaseFirst, releaseSecond, resumeFirstWait} {
+			select {
+			case <-ch:
+			default:
+				close(ch)
+			}
+		}
+	})
+	var notices atomic.Int32
+	h.observer.publish = func(event Event) {
+		if event.Kind != TransferNotice {
+			return
+		}
+		if notices.Add(1) == 1 {
+			close(firstEntered)
+			<-releaseFirst
+		} else {
+			close(secondEntered)
+			<-releaseSecond
+		}
+	}
+	waits := make(chan struct{}, 2)
+	var waitCount atomic.Int32
+	h.coordinator.afterNoticeWait = func() {
+		waits <- struct{}{}
+		if waitCount.Add(1) == 1 {
+			<-resumeFirstWait
+		}
+	}
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-firstEntered
+	baseline := h.bounds.armed()
+	claim := make(chan error, 1)
+	go func() { claim <- h.coordinator.AuthorizeClaim(ctx, metadata.SessionID) }()
+	<-waits // first publication owns the lease
+	firstClaimTimer := h.bounds.calls()[baseline]
+	close(releaseFirst)
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-secondEntered // the same drainer now publishes the second notice
+	close(resumeFirstWait)
+	<-waits // the first completion woke the claim into the second publication
+	claimTimers := 0
+	for _, call := range h.bounds.calls()[baseline:] {
+		if call.delay == 15*time.Second {
+			claimTimers++
+		}
+	}
+	if claimTimers != 1 {
+		t.Fatalf("claim reset deadline after second notice: %d claim timers, want one", claimTimers)
+	}
+	firstClaimTimer.mu.Lock()
+	firstClaimTimer.fired = true
+	firstClaimTimer.mu.Unlock()
+	firstClaimTimer.run()
+	if err := <-claim; ErrorCodeOf(err) != ErrTransferFailed || !strings.Contains(err.Error(), "refusal notice") {
+		t.Fatalf("claim after successive notices = %v, want one bounded refusal", err)
+	}
+	close(releaseSecond)
+	events := h.awaitEvents(3)
+	if events[0].Kind != TransferNotice || events[1].Kind != TransferNotice || events[2].Kind != TransferError {
+		t.Fatalf("successive notice outcome = %+v, want two notices then terminal error", events)
+	}
+}
+
+func TestClaimWaitingForNoticeHonorsCallerCancellation(t *testing.T) {
+	h := newReceiveHarness(t)
+	metadata := h.receiveWaiting()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferNotice {
+			close(entered)
+			<-release
+		}
+	}
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-entered
+	baseline := h.bounds.armed()
+	ctx, cancel := context.WithCancel(context.Background())
+	claim := make(chan error, 1)
+	go func() { claim <- h.coordinator.AuthorizeClaim(ctx, metadata.SessionID) }()
+	h.awaitBoundPending(baseline)
+	cancel()
+	if err := <-claim; ErrorCodeOf(err) != ErrCancelled {
+		t.Fatalf("cancelled notice claim = %v, want cancelled", err)
+	}
+	close(release)
+	events := h.awaitEvents(2)
+	if events[0].Kind != TransferNotice || events[1].Kind != TransferError {
+		t.Fatalf("caller-abandoned claim events = %+v, want notice then terminal error", events)
+	}
+	if got := h.state(); got != stateError {
+		t.Fatalf("state = %q, want ERROR after spent caller claim", got)
+	}
+	for _, event := range events {
+		if event.Kind == TransferStarted {
+			t.Fatal("an abandoned claim published started")
+		}
+	}
+}
+
+func TestPostNoticeRevalidationAbandonsACancelledCallerClaim(t *testing.T) {
+	h := newReceiveHarness(t)
+	metadata := h.receiveWaiting()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferNotice {
+			close(entered)
+			<-release
+		}
+	}
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-entered
+	base, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := &cancelOnSecondErrContext{Context: base, cancel: cancel}
+	baseline := h.bounds.armed()
+	claim := make(chan error, 1)
+	go func() { claim <- h.coordinator.AuthorizeClaim(ctx, metadata.SessionID) }()
+	h.awaitBoundPending(baseline)
+	close(release)
+	if err := <-claim; ErrorCodeOf(err) != ErrCancelled {
+		t.Fatalf("post-notice caller cancellation = %v, want cancelled", err)
+	}
+	h.eventually("post-notice cancellation retires the spent waiting link", func() bool {
+		return len(h.observer.published()) >= 2
+	})
+	events := h.observer.published()
+	if events[0].Kind != TransferNotice || events[1].Kind != TransferError {
+		t.Fatalf("post-notice cancellation left a spent waiting link: %+v", events)
+	}
+	if got := h.state(); got != stateError {
+		t.Fatalf("post-notice cancellation state = %q, want ERROR", got)
+	}
+}
+
+func TestCallerAbortAtNoticeCompletionStillSettlesSpentLink(t *testing.T) {
+	h := newReceiveHarness(t)
+	metadata := h.receiveWaiting()
+	live := h.liveSession()
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	h.awaitEvents(1)
+	h.eventually("notice publication released its lease", func() bool {
+		h.coordinator.mu.Lock()
+		defer h.coordinator.mu.Unlock()
+		return live.noticeDone == nil
+	})
+	// This drives the branch where notice completion won the mutex just
+	// before a waiting caller observed cancellation. The asynchronous
+	// terminal owner must still retire its spent HTTP reservation.
+	h.coordinator.abandonNoticeClaim(metadata.SessionID, live.generation)
+	events := h.awaitEvents(2)
+	if events[1].Kind != TransferError || events[1].Error == nil {
+		t.Fatalf("caller abort after notice completion = %+v, want terminal error", events)
+	}
+	if got := h.state(); got != stateError {
+		t.Fatalf("state = %q, want ERROR", got)
+	}
+	if err := h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID); ErrorCodeOf(err) != ErrCancelled {
+		t.Fatalf("abandoned waiting link claim = %v, want cancelled", err)
+	}
+}
+
+func TestClaimWaitingForNoticeCannotClaimReplacementAfterCancel(t *testing.T) {
+	h := newReceiveHarness(t)
+	old := h.receiveWaiting()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferNotice {
+			close(entered)
+			<-release
+		}
+	}
+	h.emit(ServerEvent{SessionID: old.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-entered
+	baseline := h.bounds.armed()
+	claim := make(chan error, 1)
+	go func() { claim <- h.coordinator.AuthorizeClaim(context.Background(), old.SessionID) }()
+	h.awaitBoundPending(baseline)
+	cancelled := make(chan error, 1)
+	go func() { cancelled <- h.coordinator.Cancel(context.Background()) }()
+	if err := <-claim; ErrorCodeOf(err) != ErrCancelled {
+		t.Fatalf("claim after session cancellation = %v, want cancelled", err)
+	}
+	close(release)
+	if err := <-cancelled; err != nil {
+		t.Fatalf("Cancel = %v", err)
+	}
+	newSession := h.receiveWaiting()
+	if newSession.SessionID == old.SessionID {
+		t.Fatal("replacement reused the old session ID")
+	}
+	if err := h.coordinator.AuthorizeClaim(context.Background(), old.SessionID); ErrorCodeOf(err) != ErrCancelled {
+		t.Fatalf("old claim against replacement = %v, want cancelled", err)
+	}
+	if got := h.state(); got != stateStaged {
+		t.Fatalf("replacement state = %q, want STAGED", got)
+	}
+}
+
+func TestClaimWaitingForNoticeHasOneBound(t *testing.T) {
+	h := newReceiveHarness(t)
+	metadata := h.receiveWaiting()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h.observer.publish = func(event Event) {
+		if event.Kind == TransferNotice {
+			close(entered)
+			<-release
+		}
+	}
+	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
+	<-entered
+	baseline := h.bounds.armed()
+	claim := make(chan error, 1)
+	go func() { claim <- h.coordinator.AuthorizeClaim(context.Background(), metadata.SessionID) }()
+	h.awaitBoundPending(baseline)
+	calls := h.bounds.calls()
+	if got := calls[len(calls)-1].delay; got != 15*time.Second {
+		t.Fatalf("claim wait bound = %v, want 15s", got)
+	}
+	h.bounds.fire()
+	if err := <-claim; ErrorCodeOf(err) != ErrTransferFailed || !strings.Contains(err.Error(), "refusal notice") {
+		t.Fatalf("timed-out notice claim = %v, want a named transfer_failed", err)
+	}
+	close(release)
+	events := h.awaitEvents(2)
+	if events[0].Kind != TransferNotice || events[1].Kind != TransferError || events[1].Error == nil {
+		t.Fatalf("events after timed-out claim = %+v, want notice then terminal error", events)
+	}
+	if got := h.state(); got != stateError {
+		t.Fatalf("state after timed-out claim = %q, want ERROR", got)
+	}
+	for _, event := range events {
+		if event.Kind == TransferStarted {
+			t.Fatal("a timed-out claim published started")
+		}
+	}
+	if got := h.calls.count("destination.SaveFile"); got != 0 {
+		t.Fatalf("timed-out claim wrote %d files, want none", got)
+	}
+}
 
 func TestARefusedUploadNoticeReachesTheDesktopWhileTheSessionKeepsWaiting(t *testing.T) {
 	h := newReceiveHarness(t)

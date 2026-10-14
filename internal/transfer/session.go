@@ -49,8 +49,8 @@ const (
 //
 //   - id, token, generation, ctx and cancel are set before the session is
 //     installed and never change, so any goroutine may read them.
-//   - cancelled, terminal, stopReset, seq, stagedAt and startedAt are guarded
-//     by Coordinator.mu.
+//   - cancelled, terminal, stopReset, seq, stagedAt, startedAt, noticeDone and
+//     noticeClaimFailure are guarded by Coordinator.mu.
 //   - everything else belongs to whichever operation holds the lease. The
 //     lease is a channel handoff, so it carries the happens-before edge that
 //     lets the claim path read what Stage wrote.
@@ -73,6 +73,14 @@ type session struct {
 	seq       uint64
 	stagedAt  time.Time
 	startedAt time.Time
+	// noticeDone is set only while a receive refusal notice owns the operation
+	// lease. Coordinator.mu guards the field; closing the channel wakes claims
+	// after publication has released its lease.
+	noticeDone chan struct{}
+	// noticeClaimFailure records why a reserved HTTP upload abandoned its
+	// notice wait. The drainer settles this failure after the notice releases
+	// the lease, so the HTTP handler never stops its own server synchronously.
+	noticeClaimFailure error
 
 	item StagedItem
 	// receive is non-nil exactly for a receive session. Its fields beyond dest
