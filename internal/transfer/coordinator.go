@@ -64,6 +64,10 @@ const (
 	// no longer hold the operation lease hostage and stall the next command
 	// (D-034).
 	observerPublishBound = 5 * time.Second
+	// A claim may wait for one or more refusal notices, but all of those
+	// publications share this one deadline. It exceeds a single observer's
+	// publication bound while remaining finite if notices keep arriving.
+	claimNoticeBound = 15 * time.Second
 )
 
 // StopTimer cancels a scheduled callback. Like time.Timer.Stop it reports
@@ -143,6 +147,9 @@ type Coordinator struct {
 	// D-037 identifies. It exists to force a Cancel into that window
 	// deterministically rather than relying on goroutine scheduling.
 	afterArm func()
+	// afterNoticeWait is a test-only hook that pauses a claim just before it
+	// waits for a notice. It is nil in production and runs without mu held.
+	afterNoticeWait func()
 
 	// lease holds exactly one token. Whoever receives it may call adapter
 	// Start/Stop/unwind methods; nobody else may.
@@ -639,22 +646,93 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 		return err
 	}
 
-	c.mu.Lock()
-	if err := c.revalidateLocked(ctx, sessionID, 0, stateStaged); err != nil {
+	var live *session
+	var generation uint64
+	var timedOut chan struct{}
+	var stopNoticeBound StopTimer
+	defer func() {
+		if stopNoticeBound != nil {
+			stopNoticeBound()
+		}
+	}()
+	for {
+		c.mu.Lock()
+		if err := c.revalidateLocked(ctx, sessionID, generation, stateStaged); err != nil {
+			c.mu.Unlock()
+			if timedOut != nil && ctx.Err() != nil {
+				c.abandonNoticeClaim(sessionID, generation)
+			}
+			return err
+		}
+		live = c.session
+		generation = live.generation
+		if live.noticeClaimFailure != nil {
+			failure := live.noticeClaimFailure
+			c.mu.Unlock()
+			return failure
+		}
+		if timedOut != nil {
+			select {
+			case <-timedOut:
+				if live.noticeDone != nil {
+					failure := NewError(ErrTransferFailed, "a receive refusal notice did not finish before the claim bound")
+					live.noticeClaimFailure = failure
+					c.mu.Unlock()
+					return failure
+				}
+			default:
+			}
+		}
+		if c.acquireLease() {
+			c.state = stateClaiming
+			c.mu.Unlock()
+			break
+		}
+		noticeDone := live.noticeDone
+		if noticeDone == nil {
+			// Setup, another claim, recovery or teardown owns the lease.
+			// In particular, a claim must never join the server Stop that
+			// may itself be waiting for this HTTP handler to return.
+			c.mu.Unlock()
+			return NewError(ErrCancelled, "the transfer was cancelled")
+		}
 		c.mu.Unlock()
-		return err
+
+		if timedOut == nil {
+			timedOut = make(chan struct{})
+			stopNoticeBound = c.boundTimer(claimNoticeBound, func() { close(timedOut) })
+		}
+		if c.afterNoticeWait != nil {
+			c.afterNoticeWait()
+		}
+		select {
+		case <-noticeDone:
+		case <-ctx.Done():
+			c.abandonNoticeClaim(sessionID, generation)
+			return WrapError(ErrCancelled, "the transfer was cancelled", ctx.Err())
+		case <-live.ctx.Done():
+			return NewError(ErrCancelled, "the transfer was cancelled")
+		case <-timedOut:
+			// The notice may have finished at the same instant as the
+			// deadline. If so, retry admission; otherwise mark this
+			// reserved link spent so its drainer retires the stale QR.
+			c.mu.Lock()
+			if err := c.revalidateLocked(ctx, sessionID, generation, stateStaged); err != nil {
+				c.mu.Unlock()
+				if ctx.Err() != nil {
+					c.abandonNoticeClaim(sessionID, generation)
+				}
+				return err
+			}
+			if c.session.noticeDone != nil {
+				failure := NewError(ErrTransferFailed, "a receive refusal notice did not finish before the claim bound")
+				c.session.noticeClaimFailure = failure
+				c.mu.Unlock()
+				return failure
+			}
+			c.mu.Unlock()
+		}
 	}
-	if !c.acquireLease() {
-		// Someone else owns this session's adapters, which can only be a
-		// teardown. The claim has lost, and it never waits: the teardown it
-		// would wait for is the one stopping this very server.
-		c.mu.Unlock()
-		return NewError(ErrCancelled, "the transfer was cancelled")
-	}
-	live := c.session
-	generation := live.generation
-	c.state = stateClaiming
-	c.mu.Unlock()
 
 	startedAt := c.now()
 
@@ -708,6 +786,28 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 
 	c.releaseLease()
 	return nil
+}
+
+// abandonNoticeClaim accounts for a caller that leaves after the HTTP server
+// has reserved its one-shot capability. If the notice still owns publication,
+// its drainer owns the terminal path. If publication has just completed, a
+// separate goroutine settles it: the HTTP handler must never stop the server
+// synchronously while that server may be joining the handler itself.
+func (c *Coordinator) abandonNoticeClaim(id SessionID, generation uint64) {
+	c.mu.Lock()
+	if c.revalidateLocked(context.Background(), id, generation, stateStaged) != nil {
+		c.mu.Unlock()
+		return
+	}
+	live := c.session
+	failure := NewError(ErrTransferFailed, "a reserved receive claim was abandoned during notice publication")
+	live.noticeClaimFailure = failure
+	if live.noticeDone != nil {
+		c.mu.Unlock()
+		return
+	}
+	c.mu.Unlock()
+	go c.acceptTerminal(live, ServerEvent{SessionID: live.id, Kind: ServerFailed, Err: failure}, stateStaged)
 }
 
 // failStage unwinds everything the attempt acquired, returns the coordinator

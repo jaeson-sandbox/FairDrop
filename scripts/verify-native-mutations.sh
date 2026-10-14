@@ -327,3 +327,7 @@ expect_named_failure 'detach real connection quiescence waiter' TestInitQuiescen
 
 perl -0pi -e 's/err = a\.prepared\.Close\(\)/_ = a.prepared.Close()/ or die "archive close error mutation did not match\n"' internal/stream/archive.go
 expect_named_failure 'drop prepared directory close error' TestArchiveCloseDelegatesOnceAndPreservesThePreparedCause ./internal/stream 'want the prepared close cause and transfer_failed code preserved'
+
+# The scoped runner is the canonical inventory for the receive notice/claim
+# overlap, and is also executable directly during focused development.
+bash scripts/verify-receive-notice-claim-mutations.sh

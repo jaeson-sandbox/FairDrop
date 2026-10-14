@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -29,7 +30,7 @@ import (
 
 const nativeBoundary = "nativeboundary61c2"
 
-func nativeReceiveApp(t *testing.T) (*App, chan transfer.Event, *[]string) {
+func nativeReceiveApp(t *testing.T, boundTimer ...func(time.Duration, func()) transfer.StopTimer) (*App, chan transfer.Event, *[]string) {
 	t.Helper()
 	app := NewApp()
 	app.logf = func(string, ...any) {}
@@ -42,9 +43,13 @@ func nativeReceiveApp(t *testing.T) (*App, chan transfer.Event, *[]string) {
 	}
 	app.startup(context.Background())
 	inspector := source.New()
+	var timer func(time.Duration, func()) transfer.StopTimer
+	if len(boundTimer) != 0 {
+		timer = boundTimer[0]
+	}
 	coordinator := transfer.NewCoordinator(transfer.Dependencies{
 		Source: inspector, Network: nativeMatrixNetwork{}, Server: server.New(stream.New(inspector)),
-		QR: qr.New(), Sink: sink.New(), Observer: appObserver{app: app},
+		QR: qr.New(), Sink: sink.New(), Observer: appObserver{app: app}, BoundTimer: timer,
 	})
 	app.useCoordinator(coordinator)
 	t.Cleanup(func() {
@@ -100,6 +105,124 @@ func nativeFixture(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+func TestNativeRefusalNoticeAndReservedUploadUseTheSameLink(t *testing.T) {
+	app, events, _ := nativeReceiveApp(t, func(time.Duration, func()) transfer.StopTimer {
+		return func() bool { return true }
+	})
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	app.emit = func(_ context.Context, _ string, args ...any) {
+		event := args[0].(transfer.Event)
+		if event.Kind == transfer.TransferNotice {
+			close(entered)
+			<-release
+		}
+		events <- event
+	}
+	dir := nativeFixture(t)
+	metadata, err := app.StartReceive(dir)
+	if err != nil {
+		t.Fatalf("StartReceive = %v", err)
+	}
+	client := &http.Client{Timeout: 15 * time.Second}
+	// The declared length is deliberately impossible to reserve. The server
+	// refuses it from headers, before reading the empty body or spending the
+	// one-shot capability.
+	parsed, err := url.Parse(metadata.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := net.DialTimeout("tcp", parsed.Host, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	_, err = fmt.Fprintf(conn, "POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: multipart/form-data; boundary=%s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", parsed.Path, parsed.Host, nativeBoundary, int64(1<<60))
+	if err != nil {
+		t.Fatal(err)
+	}
+	refusal, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		t.Fatalf("reading oversized refusal = %v", err)
+	}
+	_ = refusal.Body.Close()
+	if refusal.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized upload = %d, want 413", refusal.StatusCode)
+	}
+	<-entered
+
+	type uploadResult struct {
+		status int
+		body   []byte
+		err    error
+	}
+	completed := make(chan uploadResult, 1)
+	body := nativeMultipart([2]string{"saved.txt", "native exact bytes"})
+	go func() {
+		response, err := client.Post(metadata.URL, "multipart/form-data; boundary="+nativeBoundary, bytes.NewReader(body))
+		if err != nil {
+			completed <- uploadResult{err: err}
+			return
+		}
+		page, readErr := io.ReadAll(response.Body)
+		_ = response.Body.Close()
+		completed <- uploadResult{status: response.StatusCode, body: page, err: readErr}
+	}()
+
+	// GET becomes 423 only after the valid POST has reserved the one-shot
+	// capability. This proves it reached coordinator authorization while the
+	// notice observer still holds publication open.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		probe, err := client.Get(metadata.URL)
+		if err != nil {
+			t.Fatalf("claim probe = %v", err)
+		}
+		_ = probe.Body.Close()
+		if probe.StatusCode == http.StatusLocked {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("valid upload never reserved link; GET stayed %d", probe.StatusCode)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	close(release)
+	result := <-completed
+	if result.err != nil || result.status != http.StatusOK {
+		t.Fatalf("reserved upload after notice = status %d, err %v, page %q", result.status, result.err, result.body)
+	}
+	if notice := nativeNextEvent(t, events); notice.Kind != transfer.TransferNotice || notice.Seq != 1 {
+		t.Fatalf("first event = %+v, want notice seq 1", notice)
+	}
+	if started := nativeNextEvent(t, events); started.Kind != transfer.TransferStarted || started.Seq != 2 {
+		t.Fatalf("second event = %+v, want started seq 2", started)
+	}
+	for event := nativeNextEvent(t, events); event.Kind != transfer.TransferComplete; event = nativeNextEvent(t, events) {
+		if event.Kind != transfer.TransferProgress {
+			t.Fatalf("upload event = %+v, want progress or complete", event)
+		}
+	}
+	subfolders := nativeListing(t, dir)
+	if len(subfolders) != 1 {
+		t.Fatalf("receive folders = %v, want one", subfolders)
+	}
+	saved, err := os.ReadFile(filepath.Join(dir, subfolders[0], "saved.txt"))
+	if err != nil || string(saved) != "native exact bytes" {
+		t.Fatalf("saved file = %q, err %v", saved, err)
+	}
 }
 
 func TestNativeReceiveSavesFilesReportsTheExactCountAndShowsTheFolder(t *testing.T) {
