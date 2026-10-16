@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-send-again-retention-ov7b3_2l/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 20 skipped (21)
+   Start at  13:03:15
+   Duration  719ms (transform 91ms, setup 0ms, import 180ms, tests 12ms, environment 441ms)
+

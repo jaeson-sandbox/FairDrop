@@ -106,6 +106,7 @@ describe('the receive failure card action table', () => {
     // this is the literal that proves the derivation lands where intended.
     const expected: Record<string, 'again' | 'choose' | 'dismiss' | null> = {
         invalid_selection: 'choose',
+        invalid_text: 'again',
         busy: 'again',
         cancelled: null,
         path_not_found: 'choose',

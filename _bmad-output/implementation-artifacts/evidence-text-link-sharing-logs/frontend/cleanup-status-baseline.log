@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-cleanup-status-bwzkeyaj/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 20 skipped (21)
+   Start at  13:03:25
+   Duration  510ms (transform 85ms, setup 0ms, import 142ms, tests 10ms, environment 281ms)
+

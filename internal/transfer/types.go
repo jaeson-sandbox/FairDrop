@@ -154,6 +154,16 @@ type FileMetadata struct {
 	Warnings     []Warning `json:"warnings"`
 }
 
+// TextMetadata contains only bounded display length and capability material.
+// The text itself never crosses this acknowledgement boundary.
+type TextMetadata struct {
+	SessionID  SessionID `json:"sessionId"`
+	ByteLength int       `json:"byteLength"`
+	URL        string    `json:"url"`
+	QR         string    `json:"qrBase64"`
+	Warnings   []Warning `json:"warnings"`
+}
+
 // ReceiveMetadata is the acknowledgement of a receive session: what the
 // desktop needs to show the waiting view, and nothing more.
 //

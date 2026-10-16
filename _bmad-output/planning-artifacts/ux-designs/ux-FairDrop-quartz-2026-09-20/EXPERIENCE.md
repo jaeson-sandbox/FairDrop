@@ -117,6 +117,25 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.stage.pending.folder` | Folder Stage pending | “Preparing your folder…” |
 | `copy.stage.pending.item` | Native-drop Stage pending before kind is known | “Preparing your item…” |
 | `copy.stage.pending.collection` | Collection Stage pending | “Preparing your items…” |
+| `copy.stage.pending.text` | Text Stage pending | “Preparing your text…” |
+| `copy.text.open` | Outbound text | “Send text” |
+| `copy.text.intro` | Outbound text | “Paste or type a short note or link. The receiver chooses when to read it.” |
+| `copy.text.label` | Outbound text | “Text to send” |
+| `copy.text.limit` | Outbound text | “Up to 65,536 UTF-8 bytes.” |
+| `copy.text.blank` | Outbound text | “Enter some text to send.” |
+| `copy.text.too_long` | Outbound text | “Text is too long (65,536 UTF-8 bytes maximum).” |
+| `copy.text.unsupported` | Outbound text | “Text contains an unsupported character.” |
+| `copy.text.selection_blocked` | Outbound text | “Finish or cancel this text before selecting files.” |
+| `copy.text.staged_heading` | Outbound text | “Text ready to send” |
+| `copy.text.staged_instruction` | Outbound text | “Scan the code, then choose Read text in the receiving browser.” |
+| `copy.text.qr_alt` | Outbound text | “QR code for text” |
+| `copy.text.kind` | Outbound text | “Text” |
+| `copy.text.once` | Outbound text | “Works once. The first device to choose Read text receives it.” |
+| `copy.text.link_label` | Outbound text | “Text link” |
+| `copy.text.sending_heading` | Outbound text | “Sending text” |
+| `copy.text.sending_body` | Outbound text | “FairDrop is sending the text to the receiving browser.” |
+| `copy.text.sent_heading` | Outbound text | “Text sent” |
+| `copy.text.sent_body` | Outbound text | “The text was sent to the receiving browser.” |
 | `copy.selection.open` | Secondary Idle action | “Send multiple items” |
 | `copy.selection.heading` | Collection list heading | “Selected items” |
 | `copy.selection.add_files` | Files-only native multi-picker action | “Add Files” |
@@ -196,6 +215,8 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.receive.show_in_folder` | Receive outcome primary action, only when the subfolder exists | “Show in Folder” |
 | `copy.receive.show_failed` | Receive outcome note when Show in Folder fails | “FairDrop couldn’t open that folder. It may have been moved or renamed.” |
 
+**Text composed copy.** `copy.text.byteLength(count)` shows the locale-formatted count followed by “ UTF-8 bytes” on the waiting card. The function and a literal example are pinned in `copy.test.ts`.
+
 **Receive composed copy (spec-phone-to-desktop-receiving, Story B).** The `copy.receive.*` entries above are whole strings. The ones below are composed from a count or a folder name, so they are functions in the registry, not table rows, and are pinned literal-for-literal in `copy.test.ts`. A count is the backend's own number and is never derived or rounded. `N` is a decimal integer; `{folder}` is the destination's display name wrapped in Unicode isolates (U+2068..U+2069) so a right-to-left name cannot reorder the sentence.
 
 | Composed key | Use | Literal copy |
@@ -253,6 +274,7 @@ The codes come from the binding contract. `PublicErrorOf` and the malformed/unkn
 | Code | Visible heading | Exact `PublicError.message` | Sole announcement owner | Recovery |
 |---|---|---|---|---|
 | `invalid_selection` | Choose 1 to 10,000 items | “Choose 1 to 10,000 separate files or folders.” | Focused inline Error Panel | Remove duplicates or overlapping roots and keep the list within 10,000 items. |
+| `invalid_text` | Enter supported text | “Enter text up to 65,536 bytes using supported characters.” | Focused composer error | Correct the text and send again. |
 | `busy` | FairDrop is still busy | “FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.” | Focused current-state heading with the message as description | Wait for it to finish, or restart FairDrop. The clause “or cancel it” was removed on 2026-09-13: cancelling cannot stop an uninterruptible filesystem call, and the outstanding work is not always a transfer (D-111). |
 | `cancelled` | Transfer canceled | “Transfer canceled.” | Polite status during pending; focused Idle heading, described by the cancellation notification, when reset wins (Story 10.2) | Return to Idle; never render as Error. |
 | `path_not_found` | Item not found | “That file or folder is no longer available. Choose it again.” | Focused Error Panel | Choose the item again. |
@@ -426,6 +448,8 @@ Recovery remains available from Idle and Staged:
 - If the app cannot observe denial directly, the `copy.help.different_lan` guidance tells users to check the same local Wi-Fi, guest or client isolation, and firewall permission, then Cancel and create a fresh link.
 
 ## Trusted-LAN & Privacy
+
+**Outbound text.** Send text opens a composer from Idle. It accepts a bounded note or URL, normalizes only CRLF/CR to LF, and does not read the clipboard. The waiting page and QR expose only fixed text metadata; a browser GET reveals byte length but never content or a claim. Read text is an explicit POST, after which a readonly field supports native selection and Copy without scripting or Clipboard API permission. URLs remain inert. Sender completion says “Text sent” after the full local response is finalized; it does not confirm receiver reading or copying. Send Again and waiting Refresh connection reuse bounded in-memory text under a fresh code. Explicit Cancel, Done, dismissal, replacement and unmount forget it.
 
 - V1 uses plain HTTP on a trusted LAN. The capability URL reduces blind discovery but does not provide confidentiality, receiver identity, or protection from a LAN observer.
 - QR is primary. `copy.direct_link.action` is for direct opening in the receiving browser, not a promise of cross-device clipboard transfer. Once copied into another app, FairDrop cannot control storage, forwarding, or previews.

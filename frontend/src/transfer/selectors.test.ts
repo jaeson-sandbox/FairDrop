@@ -486,6 +486,7 @@ describe('selectErrorAction (Story 9.2 AC2)', () => {
         transfer_failed: 'retry',
         name_unsupported: 'retry',
         invalid_selection: 'choose',
+        invalid_text: 'retry',
         path_not_found: 'choose',
         path_unsupported: 'choose',
         chooser_failed: 'choose',

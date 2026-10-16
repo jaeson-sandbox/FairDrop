@@ -14,6 +14,7 @@ import type {PublicError} from './types'
 /** The literal cross-language registry pinned by main_test.go. */
 export const transferErrorCodes = [
     'invalid_selection',
+    'invalid_text',
     'busy',
     'cancelled',
     'path_not_found',
@@ -40,6 +41,7 @@ export type {PublicError}
 /** The only public copy allowed to enter frontend state for each stable code. */
 export const fixedErrorMessages: Readonly<Record<TransferErrorCode, string>> = {
     invalid_selection: 'Choose 1 to 10,000 separate files or folders.',
+    invalid_text: 'Enter text up to 65,536 bytes using supported characters.',
     busy: 'FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.',
     cancelled: 'Transfer canceled.',
     path_not_found: 'That file or folder is no longer available. Choose it again.',

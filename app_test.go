@@ -76,6 +76,7 @@ type fakeCoordinator struct {
 	stageErr      error
 	stagePath     string
 	stageCtx      context.Context
+	textRaw       string
 
 	cancelErr             error
 	cancelCtx             context.Context
@@ -95,6 +96,15 @@ func (f *fakeCoordinator) Stage(ctx context.Context, absolutePath string) (trans
 	f.stageCtx = ctx
 	f.mu.Unlock()
 	return f.stageMetadata, f.stageErr
+}
+
+func (f *fakeCoordinator) StageText(_ context.Context, raw string) (transfer.TextMetadata, error) {
+	f.record("StageText")
+	f.mu.Lock()
+	f.textRaw = raw
+	f.mu.Unlock()
+	_, err := transfer.NormalizeText(raw)
+	return transfer.TextMetadata{}, err
 }
 
 func (f *fakeCoordinator) Cancel(ctx context.Context) error {
@@ -420,6 +430,7 @@ func TestComposeClosesTheAppCoordinatorCycle(t *testing.T) {
 func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 	want := map[string]bool{
 		"StageTransfer":   true,
+		"StageText":       true,
 		"StageTransfers":  true,
 		"CancelTransfer":  true,
 		"SelectFile":      true,
@@ -449,6 +460,19 @@ func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 	for name := range got {
 		if !want[name] {
 			t.Errorf("the App exports unexpected command %s", name)
+		}
+	}
+}
+
+func TestAppStageTextPreservesRawBoundaryAndRefusesMalformedInput(t *testing.T) {
+	h := newHarness(t)
+	for _, raw := range []string{string([]byte{0xff}), "a\x00b", strings.Repeat("a", 131073), strings.Repeat("a", 65537), "\u2003\r\n"} {
+		metadata, err := h.app.StageText(raw)
+		if metadata != nil || transfer.ErrorCodeOf(err) != transfer.ErrInvalidText {
+			t.Fatalf("StageText invalid input returned metadata=%#v error=%v", metadata, err)
+		}
+		if h.coordinator.textRaw != raw {
+			t.Fatal("App changed input before coordinator validation")
 		}
 	}
 }

@@ -9,13 +9,15 @@ import {
     ShowReceivedFolder,
     StageTransfer,
     StageTransfers,
+    StageText,
     StartReceive,
 } from '../../wailsjs/go/main/App'
 import {EventsOn} from '../../wailsjs/runtime/runtime'
 import {parseCommandError, publicError} from './errors'
+import {copy} from '../ui/copy'
 import {selectErrorAction} from './selectors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
-import {parseConnectionRefresh, parseFileMetadata, parseLifecycleEvent, parseReceiveMetadata} from './validation'
+import {parseConnectionRefresh, parseFileMetadata, parseLifecycleEvent, parseReceiveMetadata, parseTextMetadata, validateText} from './validation'
 import {MAX_COLLECTION_ITEMS, type LifecycleEventName, type PendingItemKind, type PublicError} from './types'
 
 interface StageOperation {
@@ -50,6 +52,11 @@ export type ReceiveActivation = 'dismissed' | 'proceeded' | 'ignored'
 export interface TransferController {
     readonly state: TransferState
     readonly stage: (absolutePath: string, itemKind?: PendingItemKind) => Promise<void>
+    readonly composer: {readonly text: string; readonly error: string | null} | null
+    readonly openText: () => void
+    readonly editText: (text: string) => void
+    readonly cancelText: () => void
+    readonly sendText: () => Promise<void>
     readonly selectFile: () => Promise<void>
     readonly selectDirectory: () => Promise<void>
     /**
@@ -155,6 +162,9 @@ export function useTransfer(): TransferController {
     // `dispatchStageFailed`, and `dismissRetained`
     // for where it is replaced or cleared.
     const rememberedPathsRef = useRef<readonly string[] | null>(null)
+    const rememberedTextRef = useRef<string | null>(null)
+    const composerRef = useRef<string | null>(null)
+    const [composer, setComposer] = useState<{text: string; error: string | null} | null>(null)
     // The editable draft: each entry keeps its private path beside the display
     // name derived from it once, when the entry is appended, and an id that is
     // assigned then and never reused. The ids and names are all a view ever sees.
@@ -179,10 +189,19 @@ export function useTransfer(): TransferController {
             const stageOperation = stageOperationRef.current
             if (stageOperation !== null && !stageOperation.cancelRequested) {
                 stageOperation.cancelRequested = true
-                void Promise.resolve().then(() => CancelTransfer()).catch(() => undefined)
+                void Promise.resolve().then(() => { if (!mountedRef.current) return CancelTransfer() }).catch(() => undefined)
             }
             if (recoveryRef.current !== null && recoveryCancelRef.current === null) {
-                void Promise.resolve().then(() => CancelTransfer()).catch(() => undefined)
+                void Promise.resolve().then(() => { if (!mountedRef.current) return CancelTransfer() }).catch(() => undefined)
+            }
+            const live = stateRef.current
+            if ((live.phase === 'text-staged' || live.phase === 'text-transferring') && !live.cancelPending) {
+                const sessionId = live.session.sessionId
+                void Promise.resolve().then(() => {
+                    const now = stateRef.current
+                    if (!mountedRef.current && (now.phase === 'text-staged' || now.phase === 'text-transferring') &&
+                        now.session.sessionId === sessionId) return CancelTransfer()
+                }).catch(() => undefined)
             }
             stageGenerationRef.current += 1
             recoveryGenerationRef.current += 1
@@ -194,6 +213,8 @@ export function useTransfer(): TransferController {
             activeCancelRef.current = null
             browseOperationRef.current = null
             rememberedPathsRef.current = null
+            rememberedTextRef.current = null
+            composerRef.current = null
             draftEntriesRef.current = null
             draftRecoveryRef.current = null
             draftChooserRef.current = null
@@ -260,6 +281,11 @@ export function useTransfer(): TransferController {
         itemKind: PendingItemKind = 'unknown',
     ): Promise<void> => {
         if (!mountedRef.current || stateRef.current.phase !== 'idle') return
+        if (composerRef.current !== null) {
+            dispatch({type: 'clear-idle-command-error'})
+            setComposer(current => current === null ? null : {...current, error: copy.text.selectionBlocked})
+            return
+        }
         if (stageOperationRef.current !== null || browseOperationRef.current !== null) return
         if (selectedPaths.length < 1 || selectedPaths.length > MAX_COLLECTION_ITEMS ||
             selectedPaths.some(path => typeof path !== 'string' || path.trim() === '')) {
@@ -278,6 +304,7 @@ export function useTransfer(): TransferController {
         // user cancellation, and a non-retryable Stage failure.
         selectionEpochRef.current += 1
         rememberedPathsRef.current = [...paths]
+        rememberedTextRef.current = null
         const promise = Promise.resolve().then(() => paths.length === 1
             ? StageTransfer(paths[0]) as Promise<unknown>
             : StageTransfers([...paths]) as Promise<unknown>)
@@ -344,6 +371,84 @@ export function useTransfer(): TransferController {
     const stage = useCallback((absolutePath: string, itemKind: PendingItemKind = 'unknown') =>
         stagePaths([absolutePath], itemKind), [stagePaths])
 
+    const openText = useCallback(() => {
+        if (!mountedRef.current || stateRef.current.phase !== 'idle' || composerRef.current !== null ||
+            stageOperationRef.current !== null || browseOperationRef.current !== null || draftEntriesRef.current !== null) return
+        rememberedPathsRef.current = null
+        rememberedTextRef.current = null
+        selectionEpochRef.current += 1
+        composerRef.current = ''
+        setComposer({text: '', error: null})
+        dispatch({type: 'dismiss-retained'})
+    }, [])
+    const editText = useCallback((value: string) => {
+        if (composerRef.current === null || stateRef.current.phase !== 'idle') return
+        const checked = validateText(value)
+        if (!checked.ok && checked.reason === 'too-large') {
+            dispatch({type: 'clear-idle-command-error'})
+            setComposer(current => current === null ? null : {...current, error: copy.text.tooLong})
+            return
+        }
+        composerRef.current = value
+        setComposer({text: value, error: null})
+        dispatch({type: 'clear-idle-command-error'})
+    }, [])
+    const cancelText = useCallback(() => {
+        if (composerRef.current === null) return
+        composerRef.current = null
+        rememberedTextRef.current = null
+        selectionEpochRef.current += 1
+        setComposer(null)
+        dispatch({type: 'dismiss-retained'})
+    }, [])
+    const sendText = useCallback(async () => {
+        const draft = composerRef.current
+        if (!mountedRef.current || draft === null || stateRef.current.phase !== 'idle' ||
+            stageOperationRef.current !== null || browseOperationRef.current !== null) return
+        const checked = validateText(draft)
+        if (!checked.ok) {
+            const error = checked.reason === 'blank' ? copy.text.blank :
+                checked.reason === 'too-large' ? copy.text.tooLong :
+                    copy.text.unsupported
+            dispatch({type: 'clear-idle-command-error'})
+            setComposer({text: draft, error})
+            return
+        }
+        const generation = ++stageGenerationRef.current
+        const promise = Promise.resolve().then(() => StageText(checked.text) as Promise<unknown>)
+        const operation: StageOperation = {generation, promise, cancelRequested: false}
+        stageOperationRef.current = operation
+        rememberedTextRef.current = checked.text
+        dispatch({type: 'stage-requested', generation, itemKind: 'text'})
+        try {
+            const raw = await promise
+            if (!stageMayCommit(operation)) return
+            const metadata = parseTextMetadata(raw)
+            if (metadata === null || metadata.byteLength !== checked.byteLength) {
+                operation.cancelRequested = true
+                let quiesced = true
+                try { await CancelTransfer() } catch { quiesced = false }
+                if (mountedRef.current && stageOperationRef.current === operation) {
+                    const error = publicError(quiesced ? 'setup_failed' : 'cleanup_unconfirmed')
+                    dispatchStageFailed(generation, error)
+                    setComposer(current => current === null ? null : {...current, error: error.message})
+                }
+                if (stageOperationRef.current === operation) stageOperationRef.current = null
+                return
+            }
+            composerRef.current = null
+            setComposer(null)
+            dispatch({type: 'text-started', generation, metadata})
+        } catch (rejection) {
+            if (!stageMayCommit(operation)) return
+            const error = parseCommandError(rejection)
+            dispatchStageFailed(generation, error)
+            setComposer(current => current === null ? null : {...current, error: error.message})
+        } finally {
+            if (stageOperationRef.current === operation && !operation.cancelRequested) stageOperationRef.current = null
+        }
+    }, [])
+
     /**
      * Runs one native chooser and hands its result to the same Stage path a
      * native drop uses.
@@ -360,6 +465,11 @@ export function useTransfer(): TransferController {
         receive = false,
     ): Promise<ReceiveActivation> => {
         if (!mountedRef.current || stateRef.current.phase !== 'idle') return 'ignored'
+        if (composerRef.current !== null) {
+            dispatch({type: 'clear-idle-command-error'})
+            setComposer(current => current === null ? null : {...current, error: copy.text.selectionBlocked})
+            return 'ignored'
+        }
         if (stageOperationRef.current !== null || browseOperationRef.current !== null) return 'ignored'
 
         const generation = stageGenerationRef.current + 1
@@ -415,12 +525,13 @@ export function useTransfer(): TransferController {
      */
     const startReceiveAt = useCallback(async (folder: string): Promise<void> => {
         if (!mountedRef.current || stateRef.current.phase !== 'idle') return
-        if (stageOperationRef.current !== null || browseOperationRef.current !== null) return
+        if (stageOperationRef.current !== null || browseOperationRef.current !== null || composerRef.current !== null) return
 
         const generation = stageGenerationRef.current + 1
         stageGenerationRef.current = generation
         selectionEpochRef.current += 1
         rememberedPathsRef.current = null
+        rememberedTextRef.current = null
         const promise = Promise.resolve().then(() => StartReceive(folder) as Promise<unknown>)
         const operation: StageOperation = {generation, promise, cancelRequested: false}
         stageOperationRef.current = operation
@@ -494,6 +605,7 @@ export function useTransfer(): TransferController {
         const current = stateRef.current
         if (current.phase === 'recovering') {
             rememberedPathsRef.current = null
+            rememberedTextRef.current = null
             draftRecoveryRef.current = null
             selectionEpochRef.current += 1
             recoveryRef.current = null
@@ -515,6 +627,9 @@ export function useTransfer(): TransferController {
         }
         if (!releaseForOutcome) {
             rememberedPathsRef.current = null
+            rememberedTextRef.current = null
+            composerRef.current = null
+            setComposer(null)
             draftRecoveryRef.current = null
             selectionEpochRef.current += 1
             // A folder chooser still open when Cancel lands belongs to a
@@ -584,6 +699,7 @@ export function useTransfer(): TransferController {
         }
 
         if (current.phase !== 'staged' && current.phase !== 'transferring' &&
+            current.phase !== 'text-staged' && current.phase !== 'text-transferring' &&
             current.phase !== 'receive-waiting' && current.phase !== 'receive-receiving') return
         if (current.cancelPending) return
         const outstandingCancel = activeCancelRef.current
@@ -614,7 +730,7 @@ export function useTransfer(): TransferController {
     const refreshConnection = useCallback(async (sessionId: string, networkId: string): Promise<void> => {
         const current = stateRef.current
         if (!mountedRef.current || recoveryRef.current !== null ||
-            (current.phase !== 'staged' && current.phase !== 'receive-waiting') ||
+            (current.phase !== 'staged' && current.phase !== 'receive-waiting' && current.phase !== 'text-staged') ||
             current.session.sessionId !== sessionId || current.cancelPending) return
         const generation = ++recoveryGenerationRef.current
         const operation = {generation, sessionId}
@@ -626,8 +742,8 @@ export function useTransfer(): TransferController {
             const raw = await RefreshConnection(sessionId, networkId)
             if (!mountedRef.current || recoveryRef.current !== operation) return
             const result = parseConnectionRefresh(raw)
-            if (earlyRecoveryOverflowRef.current || result === null || result.mode !== (current.phase === 'staged' ? 'send' : 'receive') ||
-                (result.mode === 'send' ? result.send.sessionId : result.receive.sessionId) === sessionId) {
+            if (earlyRecoveryOverflowRef.current || result === null || result.mode !== (current.phase === 'staged' ? 'send' : current.phase === 'text-staged' ? 'text' : 'receive') ||
+                (result.mode === 'send' ? result.send.sessionId : result.mode === 'text' ? result.text.sessionId : result.receive.sessionId) === sessionId) {
                 let quiesced = true
                 try { await CancelTransfer() } catch { quiesced = false }
                 if (recoveryRef.current !== operation || !mountedRef.current) return
@@ -653,6 +769,11 @@ export function useTransfer(): TransferController {
     }, [])
 
     const rejectSelection = useCallback(() => {
+        if (composerRef.current !== null) {
+            dispatch({type: 'clear-idle-command-error'})
+            setComposer(current => current === null ? null : {...current, error: copy.text.selectionBlocked})
+            return
+        }
         const current = draftEntriesRef.current
         if (current !== null) showDraftEntries(current, publicError('invalid_selection'))
         else dispatch({type: 'invalid-selection'})
@@ -664,6 +785,9 @@ export function useTransfer(): TransferController {
         // simply returns the same state, and clearing an already-null ref a
         // second time is a no-op.
         rememberedPathsRef.current = null
+        rememberedTextRef.current = null
+        composerRef.current = null
+        setComposer(null)
         selectionEpochRef.current += 1
         dispatch({type: 'dismiss-retained'})
     }, [])
@@ -712,12 +836,13 @@ export function useTransfer(): TransferController {
         const isDone = current.phase === 'done' ||
             (current.phase === 'idle' && current.retainedOutcome?.kind === 'done')
         const paths = rememberedPathsRef.current
+        const text = rememberedTextRef.current
         const itemKind: PendingItemKind = current.phase === 'done'
             ? (current.outcome.receipt.isCollection ? 'collection' : current.outcome.receipt.isDir ? 'directory' : 'file')
             : current.phase === 'idle' && current.retainedOutcome?.kind === 'done'
                 ? (current.retainedOutcome.receipt.isCollection ? 'collection' : current.retainedOutcome.receipt.isDir ? 'directory' : 'file')
                 : 'unknown'
-        if (!mountedRef.current || !isDone || paths === null || sendAgainPendingRef.current) return
+        if (!mountedRef.current || !isDone || (paths === null && text === null) || sendAgainPendingRef.current) return
         sendAgainPendingRef.current = true
         const epoch = selectionEpochRef.current
         try {
@@ -726,20 +851,36 @@ export function useTransfer(): TransferController {
                 await waitForIdle()
             }
             if (!mountedRef.current || selectionEpochRef.current !== epoch ||
-                rememberedPathsRef.current !== paths || stateRef.current.phase !== 'idle') return
-            await stagePaths([...paths], itemKind)
+                rememberedPathsRef.current !== paths || rememberedTextRef.current !== text || stateRef.current.phase !== 'idle') return
+            if (text !== null) {
+                composerRef.current = text
+                setComposer({text, error: null})
+                await sendText()
+            } else if (paths !== null) await stagePaths([...paths], itemKind)
         } finally {
             sendAgainPendingRef.current = false
         }
-    }, [cancelImpl, stagePaths])
+    }, [cancelImpl, stagePaths, sendText])
 
     const retry = useCallback(async (): Promise<void> => {
         const paths = rememberedPathsRef.current
-        if (paths === null) return
+        const text = rememberedTextRef.current
+        const epoch = selectionEpochRef.current
+        if (paths === null && text === null) return
         const error = currentRetryableError(stateRef.current)
         if (error === null || selectErrorAction(error.code) !== 'retry') return
-        await stagePathsFromOutcome([...paths], paths.length > 1 ? 'collection' : 'unknown')
-    }, [stagePathsFromOutcome])
+        if (text !== null) {
+            if (stateRef.current.phase === 'done' || stateRef.current.phase === 'error') {
+                if (await cancelImpl(true) === false) return
+                await waitForIdle()
+            }
+            if (!mountedRef.current || stateRef.current.phase !== 'idle' ||
+                selectionEpochRef.current !== epoch || rememberedTextRef.current !== text) return
+            composerRef.current = text
+            setComposer({text, error: null})
+            await sendText()
+        } else if (paths !== null) await stagePathsFromOutcome([...paths], paths.length > 1 ? 'collection' : 'unknown')
+    }, [stagePathsFromOutcome, cancelImpl, sendText])
 
     /** Builds entries for paths new to the draft: the only place a name is derived or an id issued. */
     function newDraftEntries(paths: readonly string[]): DraftEntry[] {
@@ -758,7 +899,7 @@ export function useTransfer(): TransferController {
 
     const openDraft = async (paths: readonly string[] = []): Promise<void> => {
         const proposed = [...paths]
-        if (!mountedRef.current || draftAdmissionRef.current || stageOperationRef.current || browseOperationRef.current) return
+        if (!mountedRef.current || draftAdmissionRef.current || stageOperationRef.current || browseOperationRef.current || composerRef.current !== null) return
         if (draftEntriesRef.current !== null) {
             appendDraft(paths)
             return
@@ -773,6 +914,7 @@ export function useTransfer(): TransferController {
             }
             if (!mountedRef.current || selectionEpochRef.current !== epoch || stateRef.current.phase !== 'idle') return
             rememberedPathsRef.current = null
+            rememberedTextRef.current = null
             const invalid = proposed.length > MAX_COLLECTION_ITEMS ||
                 proposed.some(path => typeof path !== 'string' || path.trim() === '')
             showDraft(invalid ? [] : proposed, invalid ? publicError('invalid_selection') : null)
@@ -842,10 +984,10 @@ export function useTransfer(): TransferController {
     }
 
     return {
-        state, stage, selectFile, selectDirectory, receive, showReceivedFolder, cancel, refreshConnection, rejectSelection, reportCopyFailure, dismissRetained,
+        state, stage, composer, openText, editText, cancelText, sendText, selectFile, selectDirectory, receive, showReceivedFolder, cancel, refreshConnection, rejectSelection, reportCopyFailure, dismissRetained,
         stageFromOutcome, selectFromOutcome, retry, sendAgain,
-        canRetry: rememberedPathsRef.current !== null,
-        canSendAgain: rememberedPathsRef.current !== null &&
+        canRetry: rememberedPathsRef.current !== null || rememberedTextRef.current !== null,
+        canSendAgain: (rememberedPathsRef.current !== null || rememberedTextRef.current !== null) &&
             (state.phase === 'done' || (state.phase === 'idle' && state.retainedOutcome?.kind === 'done')),
         draft, draftIds, openDraft, appendDraft, selectDraftFiles, selectDraftFolder, removeDraftItem, cancelDraft, sendDraft,
     }
@@ -864,7 +1006,10 @@ export function useTransfer(): TransferController {
      * in `browse()`, so the rule holds regardless of which command failed.
      */
     function dispatchStageFailed(generation: number, error: PublicError): void {
-        if (selectErrorAction(error.code) !== 'retry') rememberedPathsRef.current = null
+        if (selectErrorAction(error.code) !== 'retry') {
+            rememberedPathsRef.current = null
+            rememberedTextRef.current = null
+        }
         dispatch({type: 'stage-failed', generation, error})
     }
 
@@ -882,6 +1027,7 @@ export function useTransfer(): TransferController {
 
         const latest = stateRef.current
         return (latest.phase === 'staged' || latest.phase === 'transferring' ||
+            latest.phase === 'text-staged' || latest.phase === 'text-transferring' ||
             latest.phase === 'receive-waiting' || latest.phase === 'receive-receiving') &&
             latest.session.sessionId === operation.sessionId
     }

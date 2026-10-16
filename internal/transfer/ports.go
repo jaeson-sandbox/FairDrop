@@ -123,21 +123,24 @@ type ConnectionRefresh struct {
 	Mode    string           `json:"mode"`
 	Send    *FileMetadata    `json:"send,omitempty"`
 	Receive *ReceiveMetadata `json:"receive,omitempty"`
+	Text    *TextMetadata    `json:"text,omitempty"`
 }
 
 // ServerStartRequest is the immutable description of the one transfer an
 // ephemeral server exists to serve. Token authorizes exactly one download;
 // SessionID only correlates events and is never put on the wire.
 //
-// Destination is non-nil exactly for a receive session. A receive request has no
-// Item -- there is nothing staged to send -- and the server serves the upload
-// route instead of the download route. The server only calls the destination;
-// the coordinator opened it and is the one that closes it.
+// Exactly one of Item, Destination, or Text describes a run. Text is copied
+// and validated by the server before it binds, so later caller mutation cannot
+// alter the offered payload. A text run never invokes the source payload port.
+// The server only calls a receive destination; the coordinator opened it and
+// is the one that closes it.
 type ServerStartRequest struct {
 	SessionID   SessionID
 	Token       CapabilityToken
 	Item        StagedItem
 	Destination ReceiveDestination
+	Text        *string
 }
 
 // ClaimAuthorizer is the coordinator handshake a reserved claim must clear

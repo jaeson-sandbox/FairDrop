@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-unmount-cancel-t1eei2pu/frontend
+
+ ❯ src/transfer/text.test.tsx (21 tests | 1 failed | 20 skipped) 12ms
+     × cancels a pending text stage on unmount and ignores its later acknowledgement 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/text.test.tsx > outbound text controller > cancels a pending text stage on unmount and ignores its later acknowledgement
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ src/transfer/text.test.tsx:302:30
+    300|         hook.unmount()
+    301|         await act(async () => { await Promise.resolve(); await Promise…
+    302|         expect(mocks.cancel).toHaveBeenCalledTimes(1)
+       |                              ^
+    303|         resolve(metadata())
+    304|         await act(async () => { await Promise.resolve(); await Promise…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:03:20
+   Duration  539ms (transform 90ms, setup 0ms, import 151ms, tests 12ms, environment 294ms)
+

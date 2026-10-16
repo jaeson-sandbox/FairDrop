@@ -21,6 +21,7 @@ func TestPublicErrorOfExactRegistryCopy(t *testing.T) {
 		message string
 	}{
 		{ErrInvalidSelection, "Choose 1 to 10,000 separate files or folders."},
+		{ErrInvalidText, "Enter text up to 65,536 bytes using supported characters."},
 		{ErrBusy, "FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it."},
 		{ErrCancelled, "Transfer canceled."},
 		{ErrPathNotFound, "That file or folder is no longer available. Choose it again."},
@@ -231,6 +232,7 @@ func TestTheCodeRegistryIsExactlyThisSet(t *testing.T) {
 
 	want := map[ErrorCode]bool{
 		ErrInvalidSelection:   true,
+		ErrInvalidText:        true,
 		ErrBusy:               true,
 		ErrCancelled:          true,
 		ErrPathNotFound:       true,

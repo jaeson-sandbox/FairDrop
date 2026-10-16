@@ -1,0 +1,8 @@
+{"Time":"2026-10-14T12:57:50.627052-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-14T12:57:50.842642-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation"}
+{"Time":"2026-10-14T12:57:50.843081-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation","Output":"=== RUN   TestRawTextLimitPrecedesValidationAndAllocation\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:50.843133-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation","Output":"--- PASS: TestRawTextLimitPrecedesValidationAndAllocation (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:50.843144-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation","Elapsed":0}
+{"Time":"2026-10-14T12:57:50.843154-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:50.84319-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.216s\n"}
+{"Time":"2026-10-14T12:57:50.843205-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.216}

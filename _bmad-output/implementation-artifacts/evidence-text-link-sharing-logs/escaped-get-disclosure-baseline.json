@@ -1,0 +1,8 @@
+{"Time":"2026-10-14T12:57:57.105993-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-14T12:57:57.371732-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM"}
+{"Time":"2026-10-14T12:57:57.371851-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM","Output":"=== RUN   TestTextPreviewAndOneShotRevealExactDOM\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:57.376753-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM","Output":"--- PASS: TestTextPreviewAndOneShotRevealExactDOM (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:57.376784-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM","Elapsed":0.01}
+{"Time":"2026-10-14T12:57:57.376818-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:57.377721-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.271s\n"}
+{"Time":"2026-10-14T12:57:57.377741-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.272}

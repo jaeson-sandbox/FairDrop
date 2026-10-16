@@ -19,6 +19,7 @@ function rejectionCarrying(formatted: string): Error {
 // let both ends drift together.
 const backendCodes = [
     'invalid_selection',
+    'invalid_text',
     'busy',
     'cancelled',
     'path_not_found',

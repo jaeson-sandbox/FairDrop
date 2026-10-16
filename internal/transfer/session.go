@@ -83,6 +83,9 @@ type session struct {
 	noticeClaimFailure error
 
 	item StagedItem
+	// text is the bounded normalized text retained for waiting recovery. The
+	// operation lease owns it; no event or metadata copies its contents.
+	text *string
 	// receive is non-nil exactly for a receive session. Its fields beyond dest
 	// are guarded by Coordinator.mu.
 	receive  *receiveSession

@@ -10,6 +10,7 @@ type ErrorCode string
 
 const (
 	ErrInvalidSelection   ErrorCode = "invalid_selection"
+	ErrInvalidText        ErrorCode = "invalid_text"
 	ErrBusy               ErrorCode = "busy"
 	ErrCancelled          ErrorCode = "cancelled"
 	ErrPathNotFound       ErrorCode = "path_not_found"
@@ -145,6 +146,7 @@ func nilInterface(value any) bool {
 
 var publicMessages = map[ErrorCode]string{
 	ErrInvalidSelection:   "Choose 1 to 10,000 separate files or folders.",
+	ErrInvalidText:        "Enter text up to 65,536 bytes using supported characters.",
 	ErrBusy:               "FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it.",
 	ErrCancelled:          "Transfer canceled.",
 	ErrPathNotFound:       "That file or folder is no longer available. Choose it again.",

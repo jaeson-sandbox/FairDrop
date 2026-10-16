@@ -53,6 +53,7 @@ interface IdleViewProps {
     readonly onSelectFile: () => void
     readonly onSelectDirectory: () => void
     readonly onOpenMultiple?: () => void
+    readonly onSendText?: () => void
     /**
      * Receive: opens the folder chooser and starts a receive session. Resolves
      * `dismissed` when the chooser was closed without a folder, in which case
@@ -113,6 +114,7 @@ export function IdleView({
     onSelectFile,
     onSelectDirectory,
     onOpenMultiple,
+    onSendText,
     onReceive,
     commandErrorPanelProps,
 }: IdleViewProps) {
@@ -237,6 +239,7 @@ export function IdleView({
                             />
                         </div>
                         {onOpenMultiple ? <button type="button" data-draft-entry className="fd-button fd-button--secondary fd-target" onClick={onOpenMultiple}>{copy.selection.open}</button> : null}
+                        {onSendText ? <button type="button" className="fd-button fd-button--secondary fd-target" onClick={onSendText}>{copy.text.open}</button> : null}
                     </div>
                 </div>
 

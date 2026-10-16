@@ -20,6 +20,8 @@ export function SelectReceiveFolder():Promise<string>;
 
 export function ShowReceivedFolder():Promise<void>;
 
+export function StageText(arg1:string):Promise<transfer.TextMetadata>;
+
 export function StageTransfer(arg1:string):Promise<transfer.FileMetadata>;
 
 export function StageTransfers(arg1:Array<string>):Promise<transfer.FileMetadata>;

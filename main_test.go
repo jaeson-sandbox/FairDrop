@@ -315,6 +315,7 @@ var registryEntries = []struct {
 	message string
 }{
 	{"invalid_selection", "Choose 1 to 10,000 separate files or folders."},
+	{"invalid_text", "Enter text up to 65,536 bytes using supported characters."},
 	{"busy", "FairDrop is still finishing the last item. If it doesn’t finish, close FairDrop and reopen it."},
 	{"cancelled", "Transfer canceled."},
 	{"path_not_found", "That file or folder is no longer available. Choose it again."},

@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-browse-conflict-local-alert-r4hnb4av/frontend
+
+ ❯ src/transfer/text.test.tsx (21 tests | 1 failed | 20 skipped) 14ms
+     × clears stale Stage errors for oversized edits and all selection conflicts 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/text.test.tsx > outbound text controller > clears stale Stage errors for oversized edits and all selection conflicts
+AssertionError: expected { code: 'setup_failed', …(1) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "code": "setup_failed",
+  "message": "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.",
+}
+
+ ❯ expectLocal src/transfer/text.test.tsx:234:106
+    232|         }
+    233|         function expectLocal(message: string) {
+    234|             expect(hook.result.current.state.phase === 'idle' && hook.…
+       |                                                                                                          ^
+    235|             expect(hook.result.current.composer?.error).toBe(message)
+    236|         }
+ ❯ src/transfer/text.test.tsx:246:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:03:34
+   Duration  525ms (transform 86ms, setup 0ms, import 147ms, tests 14ms, environment 284ms)
+

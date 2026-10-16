@@ -38,6 +38,10 @@ export function ShowReceivedFolder() {
   return window['go']['main']['App']['ShowReceivedFolder']();
 }
 
+export function StageText(arg1) {
+  return window['go']['main']['App']['StageText'](arg1);
+}
+
 export function StageTransfer(arg1) {
   return window['go']['main']['App']['StageTransfer'](arg1);
 }

@@ -1,0 +1,9 @@
+{"Time":"2026-10-14T12:58:02.568896-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-14T12:58:02.777276-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestTextWaitingRefreshKeepsValueWithoutSourceAndRotatesIdentity"}
+{"Time":"2026-10-14T12:58:02.777603-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestTextWaitingRefreshKeepsValueWithoutSourceAndRotatesIdentity","Output":"=== RUN   TestTextWaitingRefreshKeepsValueWithoutSourceAndRotatesIdentity\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:02.77764-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestTextWaitingRefreshKeepsValueWithoutSourceAndRotatesIdentity","Output":"    text_test.go:92: identity was not rotated: \u0026transfer.TextMetadata{SessionID:\"0102030405060708090a0b0c0d0e0f10\", ByteLength:9, URL:\"http://192.168.1.50:45678/text/3132333435363738393a3b3c3d3e3f40\", QR:\"iVBORw0KGgoAAQI=\", Warnings:[]transfer.Warning{}}\n","OutputType":"error"}
+{"Time":"2026-10-14T12:58:02.777655-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestTextWaitingRefreshKeepsValueWithoutSourceAndRotatesIdentity","Output":"--- FAIL: TestTextWaitingRefreshKeepsValueWithoutSourceAndRotatesIdentity (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:02.777664-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestTextWaitingRefreshKeepsValueWithoutSourceAndRotatesIdentity","Elapsed":0}
+{"Time":"2026-10-14T12:58:02.777678-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:02.77853-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.209s\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:02.778549-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.21}

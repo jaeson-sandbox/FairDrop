@@ -181,6 +181,16 @@ func (c *Coordinator) RefreshConnection(ctx context.Context, id SessionID, netwo
 		}
 		return ConnectionRefresh{Mode: "receive", Receive: &ReceiveMetadata{SessionID: newID, Destination: dest.Name(), URL: ready.url, QR: ready.qr, Warnings: ready.warnings}}, nil
 	}
+	if old.text != nil {
+		value := *old.text
+		live.text = &value
+		ready, err := c.activate(ctx, setupCtx, live, ServerStartRequest{SessionID: newID, Token: token, Text: &value}, textPathPrefix, networkID)
+		if err != nil {
+			_, failure := c.failStage(live, err)
+			return ConnectionRefresh{}, &RecoveryFailure{failure}
+		}
+		return ConnectionRefresh{Mode: "text", Text: &TextMetadata{SessionID: newID, ByteLength: len(value), URL: ready.url, QR: ready.qr, Warnings: ready.warnings}}, nil
+	}
 	item, paths, err := c.reinspectForRecovery(setupCtx, old.item)
 	if err != nil {
 		_, failure := c.failStage(live, err)
