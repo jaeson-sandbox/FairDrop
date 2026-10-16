@@ -1,0 +1,8 @@
+{"Time":"2026-10-14T12:58:04.8816-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-14T12:58:05.138497-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTextRequestDisconnectAfterAuthorizationSettlesFailure"}
+{"Time":"2026-10-14T12:58:05.138607-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextRequestDisconnectAfterAuthorizationSettlesFailure","Output":"=== RUN   TestTextRequestDisconnectAfterAuthorizationSettlesFailure\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:05.140067-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextRequestDisconnectAfterAuthorizationSettlesFailure","Output":"--- PASS: TestTextRequestDisconnectAfterAuthorizationSettlesFailure (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:05.140092-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestTextRequestDisconnectAfterAuthorizationSettlesFailure","Elapsed":0}
+{"Time":"2026-10-14T12:58:05.140122-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:05.141137-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.259s\n"}
+{"Time":"2026-10-14T12:58:05.141166-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.26}

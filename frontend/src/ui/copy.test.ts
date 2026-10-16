@@ -46,6 +46,26 @@ describe('approved product copy', () => {
         expect(copy.stage.pending.item, 'copy.stage.pending.item').toBe(
             'Preparing your item…',
         )
+        expect(copy.stage.pending.text, 'copy.stage.pending.text').toBe('Preparing your text…')
+        expect(copy.text.open, 'copy.text.open').toBe('Send text')
+        expect(copy.text.intro, 'copy.text.intro').toBe('Paste or type a short note or link. The receiver chooses when to read it.')
+        expect(copy.text.label, 'copy.text.label').toBe('Text to send')
+        expect(copy.text.limit, 'copy.text.limit').toBe('Up to 65,536 UTF-8 bytes.')
+        expect(copy.text.blank, 'copy.text.blank').toBe('Enter some text to send.')
+        expect(copy.text.tooLong, 'copy.text.too_long').toBe('Text is too long (65,536 UTF-8 bytes maximum).')
+        expect(copy.text.unsupported, 'copy.text.unsupported').toBe('Text contains an unsupported character.')
+        expect(copy.text.selectionBlocked, 'copy.text.selection_blocked').toBe('Finish or cancel this text before selecting files.')
+        expect(copy.text.stagedHeading, 'copy.text.staged_heading').toBe('Text ready to send')
+        expect(copy.text.stagedInstruction, 'copy.text.staged_instruction').toBe('Scan the code, then choose Read text in the receiving browser.')
+        expect(copy.text.qrAlt, 'copy.text.qr_alt').toBe('QR code for text')
+        expect(copy.text.kind, 'copy.text.kind').toBe('Text')
+        expect(copy.text.once, 'copy.text.once').toBe('Works once. The first device to choose Read text receives it.')
+        expect(copy.text.linkLabel, 'copy.text.link_label').toBe('Text link')
+        expect(copy.text.sendingHeading, 'copy.text.sending_heading').toBe('Sending text')
+        expect(copy.text.sendingBody, 'copy.text.sending_body').toBe('FairDrop is sending the text to the receiving browser.')
+        expect(copy.text.sentHeading, 'copy.text.sent_heading').toBe('Text sent')
+        expect(copy.text.sentBody, 'copy.text.sent_body').toBe('The text was sent to the receiving browser.')
+        expect(copy.text.byteLength(1234)).toBe('1,234 UTF-8 bytes')
         expect(copy.stage.heading, 'copy.stage.heading').toBe(
             'Ready to send',
         )
@@ -268,6 +288,25 @@ describe('approved product copy', () => {
             'stage.pending.file',
             'stage.pending.folder',
             'stage.pending.item',
+            'stage.pending.text',
+            'text.blank',
+            'text.intro',
+            'text.kind',
+            'text.label',
+            'text.limit',
+            'text.linkLabel',
+            'text.once',
+            'text.open',
+            'text.qrAlt',
+            'text.selectionBlocked',
+            'text.sendingBody',
+            'text.sendingHeading',
+            'text.sentBody',
+            'text.sentHeading',
+            'text.stagedHeading',
+            'text.stagedInstruction',
+            'text.tooLong',
+            'text.unsupported',
             'unit.byte',
             'unit.bytes',
             'unit.gigabytes',
@@ -315,6 +354,7 @@ describe('fixed error surface', () => {
     it('pairs every stable code with its exact visible heading', () => {
         expect(errorHeadings).toEqual({
             invalid_selection: 'Choose 1 to 10,000 items',
+            invalid_text: 'Check your text',
             busy: 'FairDrop is still busy',
             cancelled: 'Transfer canceled',
             path_not_found: 'Item not found',

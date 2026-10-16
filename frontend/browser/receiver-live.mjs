@@ -26,7 +26,7 @@ async function within(promise, milliseconds, label) {
     }
 }
 
-async function checkPage({url, longUrl}) {
+async function checkPage({url, longUrl, textUrl}) {
     browser = await chromium.launch({headless: true})
     const context = await browser.newContext({viewport: {width: 320, height: 700}, acceptDownloads: true})
     const page = await context.newPage()
@@ -66,7 +66,26 @@ async function checkPage({url, longUrl}) {
     if (download.suggestedFilename() !== 'quarterly report.pdf') throw new Error(`attachment filename = ${download.suggestedFilename()}`)
     const saved = await download.path()
     if (await download.failure() !== null || readFileSync(saved, 'utf8') !== 'hello world!') throw new Error('browser download bytes differ from 12-byte staged fixture')
-    console.log('receiver live browser: real GET page, headers, 320px layout, keyboard POST and exact attachment bytes passed')
+    const textContext = await browser.newContext({viewport: {width: 320, height: 700}, javaScriptEnabled: false})
+    const textPage = await textContext.newPage()
+    const textPreview = await textPage.goto(textUrl)
+    if (textPreview?.status() !== 200 || await textPage.locator('textarea').count() !== 0) throw new Error('text GET disclosed payload or failed')
+    if ((await textPage.locator('body').textContent()).includes('A <b>literal</b> URL')) throw new Error('text GET disclosed content')
+    if (await textPage.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('text preview scrolls horizontally at 320px')
+    await textPage.getByRole('button', {name: 'Read text'}).click()
+    if (await textPage.locator('h1').textContent() !== 'Text from FairDrop') throw new Error('text reveal failed without scripting')
+    const textField = textPage.getByRole('textbox', {name: 'Shared text'})
+    if (await textField.inputValue() !== '\nA <b>literal</b> URL: https://example.test/?a=1&b=2') throw new Error('text reveal DOM value changed')
+    if (await textField.getAttribute('readonly') === null || await textPage.locator('script,a[href]').count() !== 0) throw new Error('text reveal is active or editable')
+    if (await textPage.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('text reveal scrolls horizontally at 320px')
+    await textField.focus()
+    await textPage.keyboard.press('ControlOrMeta+A')
+    const selection = await textField.evaluate((element) => ({start: element.selectionStart, end: element.selectionEnd, length: element.value.length}))
+    if (selection.start !== 0 || selection.end !== selection.length) throw new Error(`native text selection failed without scripting: ${JSON.stringify(selection)}`)
+    await textPage.emulateMedia({forcedColors: 'active'})
+    if (await textField.evaluate((element) => getComputedStyle(element).outlineStyle) === 'none') throw new Error('text reveal focus has no forced-colors outline')
+    await textContext.close()
+    console.log('receiver live browser: file download and script-free text reveal, exact DOM value, native selection, 320px layout passed')
 }
 
 try {
@@ -86,7 +105,8 @@ try {
             fixtureOutput += chunk.toString()
             const found = fixtureOutput.match(/FAIRDROP_RECEIVER_URL=(http:\/\/[^\s]+)/)
             const long = fixtureOutput.match(/FAIRDROP_RECEIVER_LONG_URL=(http:\/\/[^\s]+)/)
-            if (found && long) accept({url: found[1], longUrl: long[1]})
+            const text = fixtureOutput.match(/FAIRDROP_RECEIVER_TEXT_URL=(http:\/\/[^\s]+)/)
+            if (found && long && text) accept({url: found[1], longUrl: long[1], textUrl: text[1]})
         })
     })
     const unexpectedExit = fixtureExited.then(({code, signal, error}) => { throw new Error(`receiver fixture exited before browser check completed: code=${code} signal=${signal} error=${error}\n${fixtureOutput}\n${fixtureErrors}`) })

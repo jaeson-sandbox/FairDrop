@@ -34,6 +34,15 @@ export interface FileMetadata {
     readonly warnings: readonly Warning[]
 }
 
+/** Text content never travels back with this session acknowledgement. */
+export interface TextMetadata {
+    readonly sessionId: string
+    readonly byteLength: number
+    readonly url: string
+    readonly qrBase64: string
+    readonly warnings: readonly Warning[]
+}
+
 export interface ProgressSnapshot {
     readonly bytesSent: number
     readonly totalBytes: number
@@ -73,6 +82,7 @@ export interface ConnectionOptions {
 
 export type ConnectionRefresh =
     | {readonly mode: 'send'; readonly send: FileMetadata}
+    | {readonly mode: 'text'; readonly text: TextMetadata}
     | {readonly mode: 'receive'; readonly receive: ReceiveMetadata}
 
 /** How a receive session ended. `complete` is the only one that may be shown as success. */
@@ -159,7 +169,7 @@ export type LifecycleEvent =
     | TransferResetEvent
     | TransferNoticeEvent
 
-export type PendingItemKind = 'file' | 'directory' | 'collection' | 'unknown' | 'receive'
+export type PendingItemKind = 'file' | 'directory' | 'collection' | 'unknown' | 'receive' | 'text'
 
 /**
  * What the completion receipt needs, and nothing else `FileMetadata` carries.
@@ -179,6 +189,7 @@ export interface CompletionReceipt {
     readonly isCollection?: boolean
     readonly itemCount?: number
     readonly bytesSent: number
+    readonly text?: true
 }
 
 export interface RetainedDoneOutcome {
@@ -200,6 +211,7 @@ export interface RetainedErrorOutcome {
     readonly itemName?: string
     readonly isCollection?: boolean
     readonly itemCount?: number
+    readonly text?: true
 }
 
 /** A terminal result after every session/capability field has been scrubbed. */

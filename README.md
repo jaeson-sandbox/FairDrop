@@ -75,6 +75,11 @@ Limits worth knowing before you rely on it:
    with a fresh QR code. FairDrop checks every item again; if that check fails, choose them again.
    **Send Another** opens the file or folder chooser, and **Done** dismisses the result.
 
+To share a short note or URL, choose **Send text**, type or paste up to 65,536 UTF-8 bytes, and
+select **Send**. The receiving browser previews the byte length; **Read text** reveals it in a
+selectable field for the browser or device’s ordinary Copy command. Links remain plain text.
+**Send Again** and **Refresh connection** create a new code for the same in-memory text.
+
 Cancel at any point. The window returns to idle and forgets the selection. Send Again remembers
 only the path or paths of the completed item in memory until it is dismissed or replaced; there is
 no persistent history or staged copy.

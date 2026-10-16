@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-cleanup-status-bwzkeyaj/frontend
+
+ ❯ src/transfer/text.test.tsx (21 tests | 1 failed | 20 skipped) 14ms
+     × reports cleanup uncertainty when malformed StageText metadata cannot be quiesced 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/text.test.tsx > outbound text controller > reports cleanup uncertainty when malformed StageText metadata cannot be quiesced
+AssertionError: expected 'FairDrop couldn’t prepare that item. …' to be 'FairDrop couldn’t confirm it released…' // Object.is equality
+
+Expected: "FairDrop couldn’t confirm it released the connection. Nothing was sent. Close FairDrop and reopen it before sending again."
+Received: "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again."
+
+ ❯ src/transfer/text.test.tsx:209:53
+    207|         await act(async () => hook.result.current.sendText())
+    208|         expect(hook.result.current.state.phase).toBe('idle')
+    209|         expect(hook.result.current.composer?.error).toBe('FairDrop cou…
+       |                                                     ^
+    210|         expect(hook.result.current.composer?.error).not.toContain('pri…
+    211|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:03:26
+   Duration  522ms (transform 87ms, setup 0ms, import 147ms, tests 14ms, environment 282ms)
+

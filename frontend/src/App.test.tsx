@@ -257,6 +257,11 @@ const doneReceipt = {name: metadata.name, isDir: metadata.isDir, bytesSent: fina
 // whatever controller it is handed, typed so a new TransferController member
 // is a type error in that one shared place rather than a silent gap here.
 const commands: ControllerCommands = {
+    composer: null,
+    openText: vi.fn(),
+    editText: vi.fn(),
+    cancelText: vi.fn(),
+    sendText: vi.fn(),
     stage: mocks.stage,
     selectFile: mocks.selectFile,
     selectDirectory: mocks.selectDirectory,
@@ -286,6 +291,19 @@ const commands: ControllerCommands = {
 function mountWith(state: TransferState) {
     return harnessMountWith(mocks.useTransfer, state, commands)
 }
+
+it('offers Send multiple items on live and retained file errors, but not text errors', () => {
+    const session = {sessionId: '0'.repeat(32), lastSeq: 1}
+    const error = {code: 'transfer_failed' as const, message: 'ignored'}
+    const live = mountWith({phase: 'error', session, outcome: {kind: 'error', error}})
+    expect(screen.getByRole('button', {name: 'Send multiple items'})).toBeTruthy()
+    live.unmount()
+    const retained = mountWith({phase: 'idle', retainedOutcome: {kind: 'error', error}, commandError: null})
+    expect(screen.getByRole('button', {name: 'Send multiple items'})).toBeTruthy()
+    retained.unmount()
+    mountWith({phase: 'error', session, outcome: {kind: 'error', error, text: true}})
+    expect(screen.queryByRole('button', {name: 'Send multiple items'})).toBeNull()
+})
 
 function phaseViews(): string[] {
     return [...document.querySelectorAll('[data-phase-view]')]

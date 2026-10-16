@@ -25,6 +25,7 @@ import {ReceivingView} from './ui/ReceivingView'
 import {StagedView} from './ui/StagedView'
 import {TransferringView} from './ui/TransferringView'
 import {CollectionDraftView} from './ui/CollectionDraftView'
+import {TextComposer, TextStagedView, TextTransferringView} from './ui/TextViews'
 
 // Wails gates native file drops on a CSS custom property rather than a class.
 // The property inherits, so every descendant of the zone is a valid drop point.
@@ -66,6 +67,17 @@ function App() {
     // Requested here, performed by the effect below -- after the render that
     // this transition's own view (the cancellation summary, for one) is part of.
     const [focusRequest, setFocusRequest] = useState<{readonly target: FocusTarget} | null>(null)
+    const composerWasOpen = useRef(false)
+
+    useEffect(() => {
+        const open = transfer.composer != null
+        if (open && !composerWasOpen.current && transfer.state.phase === 'idle') {
+            rootRef.current?.querySelector<HTMLElement>('[data-focus-target="text-composer-heading"]')?.focus()
+        } else if (!open && composerWasOpen.current && transfer.state.phase === 'idle') {
+            rootRef.current?.querySelector<HTMLElement>('[data-focus-target="idle-instruction"]')?.focus()
+        }
+        composerWasOpen.current = open
+    }, [transfer.composer != null])
 
     /*
       Story 9.6: true from the moment an outcome card's own action --
@@ -172,12 +184,12 @@ function App() {
     }
 
     /** Done's card is always offered "Send Another" -- live or retained (Story 9.6 AC1). */
-    function doneCardProps(dismiss: () => void): OutcomeCardProps {
+    function doneCardProps(dismiss: () => void, text: boolean): OutcomeCardProps {
         return {
             dropTargetStyle,
             onDismiss: dismiss,
             onSendAgain: transfer.canSendAgain ? sendAgainOutcome : undefined,
-            browse: outcomeBrowseAction(copy.done.sendAnother),
+            browse: text ? undefined : outcomeBrowseAction(copy.done.sendAnother),
             busy: outcomeActionPending,
         }
     }
@@ -202,6 +214,10 @@ function App() {
     useEffect(() => {
         // useDropTarget=true: only fire when the drop lands inside the zone.
         OnFileDrop((_x, _y, dropped) => {
+            if (transfer.composer != null) {
+                transfer.rejectSelection()
+                return
+            }
             if (!Array.isArray(dropped) || dropped.length === 0 ||
                 dropped.some(path => typeof path !== 'string' || path.trim() === '')) {
                 transfer.rejectSelection()
@@ -218,7 +234,7 @@ function App() {
             void stageDroppedPath(dropped[0])
         }, true)
         return () => OnFileDropOff()
-    }, [transfer.rejectSelection, transfer.stageFromOutcome, transfer.draft, transfer.appendDraft, transfer.openDraft])
+    }, [transfer.rejectSelection, transfer.stageFromOutcome, transfer.draft, transfer.composer, transfer.appendDraft, transfer.openDraft])
 
     /*
       One transition in, one owner out.
@@ -328,7 +344,7 @@ function App() {
         // The session, not just the phase: a staged -> transferring -> staged
         // round trip returns to the same phase under a different session, and
         // an in-flight command belongs to the session that started it.
-        if ((current.phase !== 'staged' && current.phase !== 'receive-waiting') ||
+        if ((current.phase !== 'staged' && current.phase !== 'receive-waiting' && current.phase !== 'text-staged') ||
             current.session.sessionId !== sessionId) return
         // A retiring session has already been announced. `cancel-requested` is a
         // spoken row -- "Canceling" -- and a copy that resolves a moment later
@@ -403,7 +419,7 @@ function App() {
                     phaseView={terminal}
                     focusTarget="outcome"
                     {...(outcome.kind === 'done'
-                        ? doneCardProps(outcome.retained ? transfer.dismissRetained : () => void transfer.cancel())
+                        ? doneCardProps(outcome.retained ? transfer.dismissRetained : () => void transfer.cancel(), outcome.receipt.text === true)
                         : errorCardProps(
                             outcome.error,
                             outcome.retained ? transfer.dismissRetained : () => void transfer.cancel(),
@@ -412,7 +428,9 @@ function App() {
             )}
             {transfer.draft === null ? phaseBody(transfer, cancelWon, announceFromStaged, errorCardProps,
                 () => void openMultiple(), {onReceive: () => transfer.receive(), errorCardProps: receiveErrorCardProps}) : null}
-            {transfer.draft === null && outcome !== null && (transfer.state.phase === 'idle' || terminal) ? (
+            {transfer.draft === null && transfer.composer == null && outcome !== null &&
+                (outcome.kind === 'done' ? outcome.receipt.text !== true : outcome.text !== true) &&
+                (transfer.state.phase === 'idle' || terminal) ? (
                 <button type="button" data-draft-entry className="fd-button fd-button--secondary fd-target fd-multiple-outcome"
                     onClick={() => void openMultiple()}>{copy.selection.open}</button>
             ) : null}
@@ -449,7 +467,11 @@ function phaseBody(
             // rather than stacking above it -- App's top-level OutcomePanel
             // slot already renders it; IdleView (the drop zone, the pill, the
             // grouped disclosures) is not rendered at all while it shows.
-            return state.retainedOutcome === null ? idleView(transfer, state, cancelWon, errorCardProps, onOpenMultiple, receive) : null
+            return transfer.composer != null
+                ? <TextComposer text={transfer.composer.text} error={transfer.composer.error}
+                    alertError={state.commandError === null} onEdit={transfer.editText}
+                    onSend={() => void transfer.sendText()} onCancel={transfer.cancelText}/>
+                : state.retainedOutcome === null ? idleView(transfer, state, cancelWon, errorCardProps, onOpenMultiple, receive) : null
 
         case 'pending':
             return <StagePendingCard state={state} onCancel={() => void transfer.cancel()}/>
@@ -472,6 +494,14 @@ function phaseBody(
                     onRefreshConnection={transfer.refreshConnection}
                 />
             )
+
+        case 'text-staged':
+            return <TextStagedView state={state} onCancel={() => void transfer.cancel()}
+                onAnnounce={announce} onCopyFailed={transfer.reportCopyFailure}
+                onRefreshConnection={transfer.refreshConnection ?? (async () => undefined)}/>
+
+        case 'text-transferring':
+            return <TextTransferringView state={state} onCancel={() => void transfer.cancel()}/>
 
         case 'transferring':
             return <TransferringView state={state} onCancel={() => void transfer.cancel()}/>
@@ -543,6 +573,7 @@ function idleView(
             onSelectDirectory={() => void transfer.selectDirectory()}
             onOpenMultiple={onOpenMultiple}
             onReceive={receive.onReceive}
+            onSendText={transfer.openText}
             commandErrorPanelProps={
                 commandError === null
                     ? EMPTY_OUTCOME_CARD_PROPS

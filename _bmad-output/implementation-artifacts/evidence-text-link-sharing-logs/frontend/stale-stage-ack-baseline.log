@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-stale-stage-ack-6f8ytrge/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 20 skipped (21)
+   Start at  13:03:20
+   Duration  538ms (transform 86ms, setup 0ms, import 148ms, tests 10ms, environment 301ms)
+

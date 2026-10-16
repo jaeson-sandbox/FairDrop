@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-explicit-cancel-forget-jwe8au8b/frontend
+
+ ❯ src/transfer/text.test.tsx (21 tests | 1 failed | 20 skipped) 14ms
+     × forgets remembered text on explicit Cancel 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/text.test.tsx > outbound text controller > forgets remembered text on explicit Cancel
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/transfer/text.test.tsx:142:46
+    140|         await act(async () => hook.result.current.sendText())
+    141|         await act(async () => hook.result.current.cancel())
+    142|         expect(hook.result.current.canRetry).toBe(false)
+       |                                              ^
+    143|         emit('transfer-reset', {sessionId: first, seq: 1})
+    144|         await act(async () => hook.result.current.sendAgain())
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:03:18
+   Duration  538ms (transform 93ms, setup 0ms, import 152ms, tests 14ms, environment 293ms)
+

@@ -236,6 +236,25 @@ func (a *App) StageTransfers(paths []string) (*transfer.FileMetadata, error) {
 	return &metadata, nil
 }
 
+// StageText validates and stages an in-memory text handoff.
+func (a *App) StageText(text string) (*transfer.TextMetadata, error) {
+	ctx, coordinator := a.delegate()
+	if ctx == nil || coordinator == nil {
+		return nil, errNotComposed()
+	}
+	stage, ok := coordinator.(interface {
+		StageText(context.Context, string) (transfer.TextMetadata, error)
+	})
+	if !ok {
+		return nil, transfer.NewError(transfer.ErrSetupFailed, "text staging is unavailable")
+	}
+	metadata, err := stage.StageText(ctx, text)
+	if err != nil {
+		return nil, err
+	}
+	return &metadata, nil
+}
+
 // ListConnectionOptions reads fresh eligible endpoints for one waiting session.
 func (a *App) ListConnectionOptions(sessionID string) (*transfer.ConnectionOptions, error) {
 	ctx, coordinator := a.delegate()

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"fairdrop/internal/transfer"
 )
 
 // TestBrowserLiveFixture holds a real production HTTP handler open for the
@@ -32,6 +34,14 @@ func TestBrowserLiveFixture(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = longServer.Stop() })
 	fmt.Println("FAIRDROP_RECEIVER_LONG_URL=" + downloadURL(longHandle.Port, string(testToken)))
+	textValue := "\nA <b>literal</b> URL: https://example.test/?a=1&b=2"
+	textServer := newTestServer(t, nil)
+	textHandle, err := textServer.Start(context.Background(), transfer.ServerStartRequest{SessionID: testSession, Token: testToken, Text: &textValue}, &stubAuthorizer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = textServer.Stop() })
+	fmt.Println("FAIRDROP_RECEIVER_TEXT_URL=" + baseURL(textHandle.Port) + "/text/" + string(testToken))
 	finished := make(chan struct{})
 	go func() {
 		_, _ = io.Copy(io.Discard, os.Stdin)

@@ -8,6 +8,7 @@ import {
     type ProgressSnapshot,
     type PublicError,
     type ReceiveMetadata,
+    type TextMetadata,
     type ConnectionOptions,
     type ConnectionRefresh,
     type ReceiveResult,
@@ -37,15 +38,64 @@ export function parseConnectionOptions(value: unknown): ConnectionOptions | null
 export function parseConnectionRefresh(value: unknown): ConnectionRefresh | null {
     const record = asRecord(value)
     if (record === null) return null
-    if (record.mode === 'send' && !('receive' in record)) {
+    if (record.mode === 'send' && !('receive' in record) && !('text' in record)) {
         const send = parseFileMetadata(record.send)
         return send === null ? null : {mode: 'send', send}
     }
-    if (record.mode === 'receive' && !('send' in record)) {
+    if (record.mode === 'receive' && !('send' in record) && !('text' in record)) {
         const receive = parseReceiveMetadata(record.receive)
         return receive === null ? null : {mode: 'receive', receive}
     }
+    if (record.mode === 'text' && !('send' in record) && !('receive' in record)) {
+        const text = parseTextMetadata(record.text)
+        return text === null ? null : {mode: 'text', text}
+    }
     return null
+}
+
+export type TextValidation =
+    | {readonly ok: true; readonly text: string; readonly byteLength: number}
+    | {readonly ok: false; readonly reason: 'blank' | 'unsupported' | 'too-large'}
+
+/** Mirror the Go boundary without replacing malformed UTF-16 during serialization. */
+export function validateText(value: string): TextValidation {
+    if (value.length > 131072) return {ok: false, reason: 'too-large'}
+    let rawBytes = 0
+    let malformed = false
+    for (let index = 0; index < value.length; index++) {
+        const unit = value.charCodeAt(index)
+        if (unit >= 0xd800 && unit <= 0xdbff) {
+            const low = value.charCodeAt(index + 1)
+            if (low >= 0xdc00 && low <= 0xdfff) { index++; rawBytes += 4 }
+            else { malformed = true; rawBytes += 3 }
+        } else if (unit >= 0xdc00 && unit <= 0xdfff) { malformed = true; rawBytes += 3 }
+        else rawBytes += unit < 0x80 ? 1 : unit < 0x800 ? 2 : 3
+        if (rawBytes > 131072) return {ok: false, reason: 'too-large'}
+    }
+    const text = value.replace(/\r\n?/g, '\n')
+    const byteLength = new TextEncoder().encode(text).length
+    if (byteLength > 65536) return {ok: false, reason: 'too-large'}
+    if (malformed || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(text)) return {ok: false, reason: 'unsupported'}
+    if (/^[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$/u.test(text)) {
+        return {ok: false, reason: 'blank'}
+    }
+    return {ok: true, text, byteLength}
+}
+
+export function parseTextMetadata(value: unknown): TextMetadata | null {
+    try {
+        const record = asRecord(value)
+        if (record === null || !ownsExactly(record, ['sessionId', 'byteLength', 'url', 'qrBase64', 'warnings'])) return null
+        if (!isSessionId(record.sessionId) || !isNonNegativeSafeInteger(record.byteLength) || record.byteLength < 1 || record.byteLength > 65536 ||
+            !isTextURL(record.url) || !isCompletePNGBase64(record.qrBase64) || !Array.isArray(record.warnings)) return null
+        const warnings: Warning[] = []
+        for (const warning of record.warnings) {
+            const parsed = parseWarning(warning)
+            if (parsed === null || parsed.code !== 'beacon_warning') return null
+            warnings.push(parsed)
+        }
+        return {sessionId: record.sessionId, byteLength: record.byteLength, url: record.url, qrBase64: record.qrBase64, warnings}
+    } catch { return null }
 }
 
 const terminalErrorCodes = new Set([
@@ -376,6 +426,7 @@ function isNonEmptyString(value: unknown): value is string {
 const sessionIdPattern = /^[0-9a-f]{32}$/
 const capabilityURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/download\/[0-9a-f]{32})$/
 const uploadURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/upload\/[0-9a-f]{32})$/
+const textURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/text\/[0-9a-f]{32})$/
 const maximumDestinationLength = 1024
 const maximumQRBase64Length = 2 * 1024 * 1024
 const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10] as const
@@ -401,6 +452,15 @@ function isUploadURL(value: unknown): value is string {
     const octets = match[1].split('.').map(Number)
     const port = Number(match[2])
     return !octets.some((octet) => octet > 255) && Number.isInteger(port) && port >= 1 && port <= 65535
+}
+
+function isTextURL(value: unknown): value is string {
+    if (typeof value !== 'string') return false
+    const match = textURLPattern.exec(value)
+    if (match === null) return false
+    const octets = match[1].split('.').map(Number)
+    const port = Number(match[2])
+    return !octets.some(octet => octet > 255) && Number.isInteger(port) && port >= 1 && port <= 65535
 }
 
 /** A name to display: present, bounded, and free of control characters. */

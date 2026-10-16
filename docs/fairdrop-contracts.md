@@ -48,6 +48,7 @@ type ErrorCode string
 
 const (
     ErrInvalidSelection   ErrorCode = "invalid_selection"
+    ErrInvalidText        ErrorCode = "invalid_text"
     ErrBusy               ErrorCode = "busy"
     ErrCancelled          ErrorCode = "cancelled"
     ErrPathNotFound       ErrorCode = "path_not_found"
@@ -122,6 +123,7 @@ Stable domain error codes are:
 | Code | Meaning |
 | --- | --- |
 | `invalid_selection` | zero or more than 10,000 paths, empty path, duplicate canonical path, or parent/descendant overlap |
+| `invalid_text` | blank, malformed, unsupported controls, or text beyond the raw or normalized byte limit |
 | `busy` | Stage requested outside IDLE, or while an uninterruptible filesystem call from a previous selection is still outstanding |
 | `cancelled` | Stage/claim/transfer lost to Cancel or Shutdown |
 | `path_not_found` | selected root or nested entry disappears during inspection or preparation |
@@ -410,6 +412,7 @@ Result and refusal pages render before any header is sent, carry the receiver pa
 ```go
 func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
 func (a *App) StageTransfers(paths []string) (*transfer.FileMetadata, error)
+func (a *App) StageText(text string) (*transfer.TextMetadata, error)
 func (a *App) CancelTransfer() error
 func (a *App) SelectFile() (string, error)
 func (a *App) SelectFiles() ([]string, error)
@@ -422,11 +425,15 @@ func (a *App) ListConnectionOptions(sessionID string) (*transfer.ConnectionOptio
 func (a *App) RefreshConnection(sessionID, networkID string) (*transfer.ConnectionRefresh, error)
 ```
 
-`SelectReceiveFolder`, `StartReceive` and `ShowReceivedFolder` are the receive commands described above. The last two commands recover a waiting send or receive connection.
+`SelectReceiveFolder`, `StartReceive` and `ShowReceivedFolder` are the receive commands described above. The last two commands recover a waiting send, text, or receive connection.
+
+`StageText` accepts only explicit input. It checks the 131,072-byte raw UTF-8 bound before normalizing CRLF/CR to LF, then checks the 65,536-byte normalized bound. Invalid UTF-8, blank Unicode White_Space-only input, C0 controls except TAB/LF, and DEL return fixed `invalid_text`. Accepted spaces, tabs, and line endings remain exact after newline normalization. `TextMetadata` exposes only session ID, byte length, URL, QR and warnings; payload content remains bounded in memory and never enters events, logs, discovery, or a file.
+
+Text uses a distinct `ServerStartRequest.Text` and `/text/{token}` route. Exact-token GET shows byte length and a Read text form without payload or claim. The first authorized POST returns an escaped, readonly textarea with native selection and copy; URLs are inert. The server sets exact `Content-Length`, verifies the full write, and waits for HTTP finalization before reporting completion. The page uses the same no-store, no-referrer, nosniff and script-free policy as other receiver pages. Waiting recovery returns `{mode:'text',text:TextMetadata}` with fresh identity and no source inspection. Explicit cancellation retires the capability and text; Send Again and retry retain only the bounded in-memory value until the fresh attempt.
 
 `ListConnectionOptions` requires the exact nonempty current STAGED session ID. It returns `{sessionId,currentAddress,choices}` with a non-null choices array, using a fresh read-only enumeration of eligible interface/address pairs. `networkID == ""` in `RefreshConnection` selects Automatic; any nonempty ID is revalidated against fresh enumeration before retirement and again when selected. A vanished pair fails with `network_unavailable` and never silently falls back. Interface labels are bounded display text; IDs are opaque and the frontend cannot supply an arbitrary IP address.
 
-`RefreshConnection` reserves STAGED under the coordinator mutex and operation lease, excluding CLAIMING and duplicate recovery. It stops the old beacon/server and joins the drainer under bounds before any new listener. The old token becomes invalid and an authoritative reset is emitted before the new acknowledgment. A post-retirement command error includes a safe `retired: true` flag beside the fixed public code/message so the frontend removes the old QR even when event delivery lags. A pre-retirement refusal leaves the original waiting or winning active session intact. The response is `{mode:'send',send:FileMetadata}` or `{mode:'receive',receive:ReceiveMetadata}`. A receive refresh transfers its existing `ReceiveDestination` after HTTP quiescence and closes it on final failure or exit; it never reopens the chosen folder or writes before a claim.
+`RefreshConnection` reserves STAGED under the coordinator mutex and operation lease, excluding CLAIMING and duplicate recovery. It stops the old beacon/server and joins the drainer under bounds before any new listener. The old token becomes invalid and an authoritative reset is emitted before the new acknowledgment. A post-retirement command error includes a safe `retired: true` flag beside the fixed public code/message so the frontend removes the old QR even when event delivery lags. A pre-retirement refusal leaves the original waiting or winning active session intact. The response discriminates send, text, or receive metadata and carries only the matching member. A receive refresh transfers its existing `ReceiveDestination` after HTTP quiescence and closes it on final failure or exit; it never reopens the chosen folder or writes before a claim.
 
 `SelectFile`, `SelectFiles`, and `SelectDirectory` use Wails native runtime dialogs with the application-lifetime `App.ctx`; they do not stage automatically. `SelectFiles` selects files only. A cancelled native dialog returns an empty selection without emitting a transfer error. A dialog that fails to open returns `chooser_failed`. One dropped path stages immediately; two through 10,000 enter an editable in-memory list and stage only on Send. Zero or more than 10,000 never silently discard members.
 

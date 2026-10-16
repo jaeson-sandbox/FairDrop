@@ -6,6 +6,7 @@ import {
     type ControllerCommands,
 } from './App.harness'
 import type {TransferState} from './transfer/state'
+import {publicError} from './transfer/errors'
 import type {Announcement} from './ui/announce'
 
 /*
@@ -63,6 +64,11 @@ const doneReceipt = {name: 'report.pdf', isDir: false, bytesSent: 100}
 // whatever controller it is handed, typed so a new TransferController member
 // is a type error in that one shared place rather than a silent gap here.
 const commands: ControllerCommands = {
+    composer: null,
+    openText: mocks.noop,
+    editText: mocks.noop,
+    cancelText: mocks.noop,
+    sendText: mocks.noop,
     stage: mocks.noop,
     selectFile: mocks.noop,
     selectDirectory: mocks.noop,
@@ -105,6 +111,28 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('a focus target the screen does not carry', () => {
+    it('gives a fresh local composer refusal one alert after a setup failure', () => {
+        const failed = {...idle(), commandError: publicError('setup_failed')} as TransferState
+        const view = harnessMountWith(mocks.useTransfer, failed,
+            {...commands, composer: {text: 'note', error: publicError('setup_failed').message}})
+        expect(screen.queryByRole('alert')).toBeNull()
+        harnessTransitionTo(mocks.useTransfer, view, idle(),
+            {...commands, composer: {text: 'note', error: 'Text is too long (65,536 UTF-8 bytes maximum).'}})
+        expect(screen.getAllByRole('alert')).toHaveLength(1)
+        expect(screen.getByRole('alert').textContent).toBe('Text is too long (65,536 UTF-8 bytes maximum).')
+        expect(document.querySelector('[role="status"]')?.textContent).toBe('')
+    })
+    it('focuses the text composer heading and returns focus to Idle when Cancel closes it', () => {
+        const view = mountWith(idle())
+        harnessTransitionTo(mocks.useTransfer, view, idle(), {...commands, composer: {text: '', error: null}})
+        expect(document.activeElement).toBe(screen.getByRole('heading', {name: 'Send text'}))
+        const field = screen.getByRole('textbox', {name: 'Text to send'})
+        expect(field.getAttribute('aria-describedby')).toBeTruthy()
+        expect(document.getElementById(field.getAttribute('aria-describedby')!)?.textContent).toBe('Up to 65,536 UTF-8 bytes.')
+        harnessTransitionTo(mocks.useTransfer, view, idle(), commands)
+        expect(document.activeElement).toBe(screen.getByRole('heading', {name: 'Drop one file or folder'}))
+    })
+
     it('never calls focus, and lets the transition complete anyway', () => {
         const view = mountWith(idle())
         // Story 9.3 renamed this control's label ('Choose a file or folder' ->

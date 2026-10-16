@@ -223,6 +223,7 @@ type run struct {
 	// destination is non-nil exactly for a receive run, which serves the upload
 	// route and never the download route.
 	destination transfer.ReceiveDestination
+	text        *string
 	authorizer  transfer.ClaimAuthorizer
 	now         clock
 	// timeouts carries the teardown bound from the Server that started this
@@ -287,17 +288,29 @@ func (s *Server) Start(
 		return transfer.ServerHandle{}, startError("transfer server start requires a capability token", nil)
 	}
 	receiving := request.Destination != nil
+	texting := request.Text != nil
+	if receiving && texting || texting && request.Item != (transfer.StagedItem{}) {
+		return transfer.ServerHandle{}, startError("a text session has no staged item or destination", nil)
+	}
 	if receiving && request.Item.Path != "" {
 		return transfer.ServerHandle{}, startError("a receive session has no staged item", nil)
 	}
-	if !receiving && request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > transfer.MaxCollectionItems) {
+	if !receiving && !texting && request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > transfer.MaxCollectionItems) {
 		return transfer.ServerHandle{}, startError("transfer server start requires a staged item", nil)
 	}
 	if authorizer == nil {
 		return transfer.ServerHandle{}, startError("transfer server start requires a claim authorizer", nil)
 	}
-	if !receiving && s.payloads == nil {
+	if !receiving && !texting && s.payloads == nil {
 		return transfer.ServerHandle{}, startError("transfer server start requires a payload port", nil)
+	}
+	var textValue *string
+	if texting {
+		normalized, validationErr := transfer.NormalizeText(*request.Text)
+		if validationErr != nil {
+			return transfer.ServerHandle{}, validationErr
+		}
+		textValue = &normalized
 	}
 
 	s.mu.Lock()
@@ -337,6 +350,7 @@ func (s *Server) Start(
 		item:         cloneServerItem(request.Item),
 		payloads:     s.payloads,
 		destination:  request.Destination,
+		text:         textValue,
 		authorizer:   authorizer,
 		now:          s.clock(),
 		timeouts:     s.timeouts,
@@ -361,6 +375,8 @@ func (s *Server) Start(
 	// one, so the route a URL carries is the kind of session it belongs to.
 	if receiving {
 		active.mux.HandleFunc(uploadPattern, active.upload)
+	} else if texting {
+		active.mux.HandleFunc(textPattern, active.textRoute)
 	} else {
 		active.mux.HandleFunc(downloadPattern, active.download)
 	}

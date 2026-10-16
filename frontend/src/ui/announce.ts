@@ -110,6 +110,19 @@ export function routeTransition(previous: TransferState, next: TransferState): A
         case 'staged':
             return toStaged(previous, next.cancelPending, next.commandError, next.metadata.warnings.length)
 
+        case 'text-staged':
+            if (previous.phase === 'recovering' && next.commandError !== null) return focusRow('command-failure', 'command-error')
+            if (previous.phase !== 'text-staged') return focusRow('stage-success', 'staged-heading')
+            if (isNewCommandError(previous.commandError, next.commandError)) return focusRow('command-failure', 'command-error')
+            if (!previous.cancelPending && next.cancelPending) return spokenRow('cancel-requested', copy.cancel.pending)
+            return null
+
+        case 'text-transferring':
+            if (previous.phase !== 'text-transferring') return focusRow('transfer-started', 'transferring-heading')
+            if (isNewCommandError(previous.commandError, next.commandError)) return focusRow('command-failure', 'command-error')
+            if (!previous.cancelPending && next.cancelPending) return spokenRow('cancel-requested', copy.cancel.pending)
+            return null
+
         case 'transferring':
             return toTransferring(previous, next.cancelPending, next.commandError)
 

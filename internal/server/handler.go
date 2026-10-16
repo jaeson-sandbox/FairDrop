@@ -17,6 +17,7 @@ import (
 // the token is a wildcard rather than anything this package parses out of the
 // path itself.
 const downloadPattern = "/download/{token}"
+const textPattern = "/text/{token}"
 
 // fallbackDownloadName stands in when a payload offers a name that cannot
 // survive a header, so the receiver is never handed an empty filename.
@@ -57,6 +58,9 @@ func (r *run) route(writer http.ResponseWriter, request *http.Request) {
 func (r *run) routePattern() string {
 	if r.destination != nil {
 		return uploadPattern
+	}
+	if r.text != nil {
+		return textPattern
 	}
 	return downloadPattern
 }

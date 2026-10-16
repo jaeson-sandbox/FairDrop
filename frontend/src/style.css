@@ -2940,3 +2940,42 @@ body {
 .fd-recovery-actions > button { min-height: 44px; }
 @media (max-width: 420px) { .fd-recovery-actions { display: grid; grid-template-columns: minmax(0, 1fr); } }
 @media (forced-colors: active) { .fd-recovery-select:focus { outline: 2px solid Highlight; } }
+.fd-text-composer {
+  display: grid;
+  gap: 1rem;
+  max-width: 44rem;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.fd-text-field {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 0.75rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid currentColor;
+  border-radius: 0.75rem;
+  font: inherit;
+}
+
+.fd-text-field:focus,
+.fd-text-composer [data-focus-target]:focus,
+.fd-text-error:focus {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.fd-text-error { color: var(--color-text); }
+.fd-text-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.fd-text-packet { display: flex; flex-wrap: wrap; align-items: start; gap: 1.5rem; }
+.fd-text-packet .fd-hero__details { min-width: min(100%, 16rem); flex: 1; }
+
+@media (forced-colors: active) {
+  .fd-text-field:focus,
+  .fd-text-composer [data-focus-target]:focus,
+  .fd-text-error:focus { outline: 3px solid Highlight; }
+}

@@ -1,0 +1,9 @@
+{"Time":"2026-10-14T12:57:51.687064-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-14T12:57:51.906429-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation"}
+{"Time":"2026-10-14T12:57:51.906504-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation","Output":"=== RUN   TestRawTextLimitPrecedesValidationAndAllocation\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:51.906548-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation","Output":"    text_test.go:45: raw text guard missing before UTF-8 processing and allocation\n","OutputType":"error"}
+{"Time":"2026-10-14T12:57:51.906601-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation","Output":"--- FAIL: TestRawTextLimitPrecedesValidationAndAllocation (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:51.906609-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Test":"TestRawTextLimitPrecedesValidationAndAllocation","Elapsed":0}
+{"Time":"2026-10-14T12:57:51.90662-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:51.90716-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"FAIL\tfairdrop/internal/transfer\t0.220s\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:51.907202-04:00","Action":"fail","Package":"fairdrop/internal/transfer","Elapsed":0.22}

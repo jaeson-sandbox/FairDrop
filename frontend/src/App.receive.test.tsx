@@ -51,6 +51,11 @@ const receiveMetadata: ReceiveMetadata = {
 }
 
 const commands: ControllerCommands = {
+    composer: null,
+    openText: mocks.noop,
+    editText: mocks.noop,
+    cancelText: mocks.noop,
+    sendText: mocks.noop,
     stage: mocks.noop,
     selectFile: mocks.noop,
     selectDirectory: mocks.noop,

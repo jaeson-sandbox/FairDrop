@@ -1,0 +1,9 @@
+{"Time":"2026-10-14T12:58:04.204769-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-14T12:58:04.477854-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute"}
+{"Time":"2026-10-14T12:58:04.47792-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute","Output":"=== RUN   TestTextRefreshRetiresActualHTTPRoute\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:04.48006-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute","Output":"    text_integration_test.go:72: retired token authorized at new endpoint: 200\n","OutputType":"error"}
+{"Time":"2026-10-14T12:58:04.480146-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute","Output":"--- FAIL: TestTextRefreshRetiresActualHTTPRoute (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:04.480155-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute","Elapsed":0}
+{"Time":"2026-10-14T12:58:04.480168-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:04.481138-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.276s\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:04.481167-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.276}

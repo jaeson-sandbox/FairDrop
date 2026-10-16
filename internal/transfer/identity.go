@@ -30,6 +30,7 @@ const (
 	// it. A receive session never serves the download route and a send session
 	// never serves this one, so the prefix a URL carries is the session kind.
 	uploadPathPrefix = "/upload/"
+	textPathPrefix   = "/text/"
 )
 
 // newIdentity draws the session ID and the capability token as two independent

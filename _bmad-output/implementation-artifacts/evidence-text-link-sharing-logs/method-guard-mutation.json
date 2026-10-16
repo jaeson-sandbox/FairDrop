@@ -1,0 +1,9 @@
+{"Time":"2026-10-14T12:57:59.66429-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-14T12:57:59.942335-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim"}
+{"Time":"2026-10-14T12:57:59.942445-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim","Output":"=== RUN   TestTextWrongMethodsAndRoutesDoNotReserveClaim\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:59.945489-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim","Output":"    text_test.go:114: HEAD refusal status=200\n","OutputType":"error"}
+{"Time":"2026-10-14T12:57:59.945569-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim","Output":"--- FAIL: TestTextWrongMethodsAndRoutesDoNotReserveClaim (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:59.945583-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim","Elapsed":0}
+{"Time":"2026-10-14T12:57:59.945607-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:59.946816-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.282s\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:59.946858-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.283}

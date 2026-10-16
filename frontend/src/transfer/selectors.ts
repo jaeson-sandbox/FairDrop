@@ -126,6 +126,7 @@ export type OutcomePresentation =
         readonly error: PublicError
         /** The failed item's display name, when Story 9.2 retained one. */
         readonly itemName?: string
+        readonly text?: true
     }
 
 /**
@@ -187,21 +188,21 @@ export function selectOutcome(state: TransferState): OutcomePresentation | null 
         case 'done':
             return {kind: 'done', retained: false, receipt: state.outcome.receipt}
         case 'error':
-            return outcomeError(state.outcome.error, false, state.outcome.itemName)
+            return outcomeError(state.outcome.error, false, state.outcome.itemName, state.outcome.text)
         case 'idle': {
             const retained = state.retainedOutcome
             if (retained === null) return null
             return retained.kind === 'done'
                 ? {kind: 'done', retained: true, receipt: retained.receipt}
-                : outcomeError(retained.error, true, retained.itemName)
+                : outcomeError(retained.error, true, retained.itemName, retained.text)
         }
         default:
             return null
     }
 }
 
-function outcomeError(error: PublicError, retained: boolean, itemName?: string): OutcomePresentation | null {
-    return error.code === 'cancelled' ? null : {kind: 'error', retained, error, itemName}
+function outcomeError(error: PublicError, retained: boolean, itemName?: string, text?: true): OutcomePresentation | null {
+    return error.code === 'cancelled' ? null : {kind: 'error', retained, error, itemName, text}
 }
 
 const emptyWarnings: readonly Warning[] = Object.freeze([])
@@ -230,6 +231,7 @@ const errorActionByCode: Readonly<Record<TransferErrorCode, ErrorAction | null>>
     transfer_failed: 'retry',
     name_unsupported: 'retry',
     invalid_selection: 'choose',
+    invalid_text: 'retry',
     path_not_found: 'choose',
     path_unsupported: 'choose',
     chooser_failed: 'choose',

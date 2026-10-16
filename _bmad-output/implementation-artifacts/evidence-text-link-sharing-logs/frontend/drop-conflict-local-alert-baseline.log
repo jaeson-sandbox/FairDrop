@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-drop-conflict-local-alert-e4g3pfpy/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 20 skipped (21)
+   Start at  13:03:35
+   Duration  520ms (transform 84ms, setup 0ms, import 143ms, tests 12ms, environment 286ms)
+

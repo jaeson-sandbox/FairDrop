@@ -1,0 +1,8 @@
+{"Time":"2026-10-14T12:58:03.177047-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-14T12:58:03.442397-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute"}
+{"Time":"2026-10-14T12:58:03.442491-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute","Output":"=== RUN   TestTextRefreshRetiresActualHTTPRoute\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:03.447096-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute","Output":"--- PASS: TestTextRefreshRetiresActualHTTPRoute (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:03.44713-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestTextRefreshRetiresActualHTTPRoute","Elapsed":0}
+{"Time":"2026-10-14T12:58:03.447162-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:03.448238-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.271s\n"}
+{"Time":"2026-10-14T12:58:03.448304-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.271}

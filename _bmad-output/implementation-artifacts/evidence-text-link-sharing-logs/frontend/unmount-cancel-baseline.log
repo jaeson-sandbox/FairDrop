@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-unmount-cancel-t1eei2pu/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 20 skipped (21)
+   Start at  13:03:19
+   Duration  545ms (transform 91ms, setup 0ms, import 150ms, tests 10ms, environment 304ms)
+

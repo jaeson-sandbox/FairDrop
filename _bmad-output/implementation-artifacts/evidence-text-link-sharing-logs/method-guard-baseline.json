@@ -1,0 +1,8 @@
+{"Time":"2026-10-14T12:57:58.733374-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-14T12:57:59.017299-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim"}
+{"Time":"2026-10-14T12:57:59.01746-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim","Output":"=== RUN   TestTextWrongMethodsAndRoutesDoNotReserveClaim\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:59.02185-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim","Output":"--- PASS: TestTextWrongMethodsAndRoutesDoNotReserveClaim (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:59.021869-04:00","Action":"pass","Package":"fairdrop/internal/server","Test":"TestTextWrongMethodsAndRoutesDoNotReserveClaim","Elapsed":0}
+{"Time":"2026-10-14T12:57:59.021892-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:59.022506-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"ok  \tfairdrop/internal/server\t0.289s\n"}
+{"Time":"2026-10-14T12:57:59.022524-04:00","Action":"pass","Package":"fairdrop/internal/server","Elapsed":0.289}

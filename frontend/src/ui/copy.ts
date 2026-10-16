@@ -60,6 +60,27 @@ export const copy = {
          */
         promise: 'Sends to one browser on the same local network. No account or receiver app.',
     },
+    text: {
+        open: 'Send text',
+        intro: 'Paste or type a short note or link. The receiver chooses when to read it.',
+        label: 'Text to send',
+        limit: 'Up to 65,536 UTF-8 bytes.',
+        blank: 'Enter some text to send.',
+        tooLong: 'Text is too long (65,536 UTF-8 bytes maximum).',
+        unsupported: 'Text contains an unsupported character.',
+        selectionBlocked: 'Finish or cancel this text before selecting files.',
+        stagedHeading: 'Text ready to send',
+        stagedInstruction: 'Scan the code, then choose Read text in the receiving browser.',
+        qrAlt: 'QR code for text',
+        kind: 'Text',
+        byteLength: (count: number) => `${count.toLocaleString('en-US')} UTF-8 bytes`,
+        once: 'Works once. The first device to choose Read text receives it.',
+        linkLabel: 'Text link',
+        sendingHeading: 'Sending text',
+        sendingBody: 'FairDrop is sending the text to the receiving browser.',
+        sentHeading: 'Text sent',
+        sentBody: 'The text was sent to the receiving browser.',
+    },
     firewall: {
         preflight: 'Your first transfer may ask to allow FairDrop on this local network.',
         windows: 'Allow FairDrop on Private networks only. Leave Public networks off.',
@@ -75,6 +96,7 @@ export const copy = {
             folder: 'Preparing your folder…',
         item: 'Preparing your item…',
             collection: 'Preparing your items…',
+            text: 'Preparing your text…',
         },
         heading: 'Ready to send',
     },
@@ -321,6 +343,7 @@ export const copy = {
 /** The visible heading for each stable failure code. */
 export const errorHeadings: Readonly<Record<TransferErrorCode, string>> = {
     invalid_selection: 'Choose 1 to 10,000 items',
+    invalid_text: 'Check your text',
     busy: 'FairDrop is still busy',
     cancelled: 'Transfer canceled',
     path_not_found: 'Item not found',

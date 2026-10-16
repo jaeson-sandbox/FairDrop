@@ -1,0 +1,9 @@
+{"Time":"2026-10-14T12:58:01.26089-04:00","Action":"start","Package":"fairdrop/internal/server"}
+{"Time":"2026-10-14T12:58:01.529114-04:00","Action":"run","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM"}
+{"Time":"2026-10-14T12:58:01.529211-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM","Output":"=== RUN   TestTextPreviewAndOneShotRevealExactDOM\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:01.533586-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM","Output":"    text_test.go:89: text became active markup\n","OutputType":"error"}
+{"Time":"2026-10-14T12:58:01.533643-04:00","Action":"output","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM","Output":"--- FAIL: TestTextPreviewAndOneShotRevealExactDOM (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:01.533655-04:00","Action":"fail","Package":"fairdrop/internal/server","Test":"TestTextPreviewAndOneShotRevealExactDOM","Elapsed":0}
+{"Time":"2026-10-14T12:58:01.533677-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:01.534492-04:00","Action":"output","Package":"fairdrop/internal/server","Output":"FAIL\tfairdrop/internal/server\t0.273s\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:58:01.534508-04:00","Action":"fail","Package":"fairdrop/internal/server","Elapsed":0.274}

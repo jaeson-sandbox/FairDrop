@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-oversize-before-unsupported-rgj1b8vf/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 20 skipped (21)
+   Start at  13:03:24
+   Duration  517ms (transform 87ms, setup 0ms, import 144ms, tests 10ms, environment 284ms)
+

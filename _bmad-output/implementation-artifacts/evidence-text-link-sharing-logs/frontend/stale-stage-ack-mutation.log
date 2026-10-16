@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-stale-stage-ack-6f8ytrge/frontend
+
+ ❯ src/transfer/text.test.tsx (21 tests | 1 failed | 20 skipped) 14ms
+     × cancels an in-flight text stage and ignores its late acknowledgement 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/text.test.tsx > outbound text controller > cancels an in-flight text stage and ignores its late acknowledgement
+AssertionError: expected 'text-staged' to be 'idle' // Object.is equality
+
+Expected: "idle"
+Received: "text-staged"
+
+ ❯ src/transfer/text.test.tsx:184:49
+    182|         act(() => { cancellation = hook.result.current.cancel() })
+    183|         await act(async () => { resolve(metadata()); await Promise.all…
+    184|         expect(hook.result.current.state.phase).toBe('idle')
+       |                                                 ^
+    185|         expect(hook.result.current.composer).toBeNull()
+    186|         expect(hook.result.current.canRetry).toBe(false)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:03:21
+   Duration  529ms (transform 87ms, setup 0ms, import 147ms, tests 14ms, environment 289ms)
+

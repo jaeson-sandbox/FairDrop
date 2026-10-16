@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-send-again-retention-ov7b3_2l/frontend
+
+ ❯ src/transfer/text.test.tsx (21 tests | 1 failed | 20 skipped) 13ms
+     × keeps text across the internal live-outcome cancel used by Send Again 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/text.test.tsx > outbound text controller > keeps text across the internal live-outcome cancel used by Send Again
+AssertionError: expected "vi.fn()" to be called 2 times, but got 1 times
+ ❯ src/transfer/text.test.tsx:132:33
+    130|         await act(async () => again)
+    131|         expect(mocks.cancel).toHaveBeenCalledTimes(1)
+    132|         expect(mocks.stageText).toHaveBeenCalledTimes(2)
+       |                                 ^
+    133|         expect(mocks.stageText).toHaveBeenLastCalledWith('note')
+    134|         expect(hook.result.current.state.phase).toBe('text-staged')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:03:16
+   Duration  542ms (transform 94ms, setup 0ms, import 164ms, tests 13ms, environment 286ms)
+

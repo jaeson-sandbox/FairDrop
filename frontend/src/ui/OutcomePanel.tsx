@@ -169,10 +169,11 @@ export function OutcomePanel({
         >
             <OutcomeIcon done={done}/>
             <Heading className="fd-state-heading fd-rise" id={headingId} style={rise(headingStep)}>
-                {done ? copy.done.heading : errorHeadingFor(outcome.error.code, receive)}
+                {done ? outcome.receipt.text ? copy.text.sentHeading : copy.done.heading : errorHeadingFor(outcome.error.code, receive)}
             </Heading>
             {receiptStep === null ? null : done
-                ? <DoneReceipt receipt={outcome.receipt} rise={rise(receiptStep)}/>
+                ? outcome.receipt.text ? <p className="fd-body fd-rise" style={rise(receiptStep)}>{copy.text.sentBody}</p>
+                    : <DoneReceipt receipt={outcome.receipt} rise={rise(receiptStep)}/>
                 : <ErrorReceipt name={itemName ?? ''} rise={rise(receiptStep)}/>}
             {messageStep === null || done ? null : (
                 <p className="fd-outcome__body fd-rise" style={rise(messageStep)}>
@@ -191,7 +192,7 @@ export function OutcomePanel({
                         {copy.done.sendAgain}
                     </button>
                 ) : null}
-                {done ? (
+                {done && (browse !== undefined || outcome.receipt.text !== true) ? (
                     <BrowseControl
                         label={copy.done.sendAnother}
                         onSelectFile={browse?.onSelectFile ?? noop}

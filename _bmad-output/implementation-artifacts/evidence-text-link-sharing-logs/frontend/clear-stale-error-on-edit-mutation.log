@@ -1,0 +1,36 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-clear-stale-error-on-edit-3r8m5icd/frontend
+
+ ❯ src/transfer/text.test.tsx (21 tests | 1 failed | 20 skipped) 13ms
+     × clears a stale Stage failure on edit so a new invalid submission owns the alert 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/text.test.tsx > outbound text controller > clears a stale Stage failure on edit so a new invalid submission owns the alert
+AssertionError: expected { code: 'setup_failed', …(1) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "code": "setup_failed",
+  "message": "FairDrop couldn’t prepare that item. Nothing was sent. Choose it again.",
+}
+
+ ❯ src/transfer/text.test.tsx:220:102
+    218|         expect(hook.result.current.state.phase).toBe('idle')
+    219|         act(() => hook.result.current.editText(''))
+    220|         expect(hook.result.current.state.phase === 'idle' && hook.resu…
+       |                                                                                                      ^
+    221|         await act(async () => hook.result.current.sendText())
+    222|         expect(hook.result.current.composer?.error).toBe('Enter some t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:03:29
+   Duration  521ms (transform 92ms, setup 0ms, import 148ms, tests 13ms, environment 281ms)
+

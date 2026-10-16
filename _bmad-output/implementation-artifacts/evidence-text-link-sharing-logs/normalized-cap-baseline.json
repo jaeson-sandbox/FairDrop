@@ -1,0 +1,8 @@
+{"Time":"2026-10-14T12:57:52.34508-04:00","Action":"start","Package":"fairdrop/internal/transfer"}
+{"Time":"2026-10-14T12:57:52.531233-04:00","Action":"run","Package":"fairdrop/internal/transfer","Test":"TestNormalizeTextExactAndBoundary"}
+{"Time":"2026-10-14T12:57:52.531303-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestNormalizeTextExactAndBoundary","Output":"=== RUN   TestNormalizeTextExactAndBoundary\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:52.532007-04:00","Action":"output","Package":"fairdrop/internal/transfer","Test":"TestNormalizeTextExactAndBoundary","Output":"--- PASS: TestNormalizeTextExactAndBoundary (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:52.532046-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Test":"TestNormalizeTextExactAndBoundary","Elapsed":0}
+{"Time":"2026-10-14T12:57:52.532061-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T12:57:52.532453-04:00","Action":"output","Package":"fairdrop/internal/transfer","Output":"ok  \tfairdrop/internal/transfer\t0.187s\n"}
+{"Time":"2026-10-14T12:57:52.532476-04:00","Action":"pass","Package":"fairdrop/internal/transfer","Elapsed":0.187}

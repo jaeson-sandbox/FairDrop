@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/fairdrop-text-frontend-stale-recovery-ack-db17uu37/frontend
+
+ ❯ src/transfer/text.test.tsx (21 tests | 1 failed | 20 skipped) 14ms
+     × ignores a late text recovery acknowledgement after Cancel 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/transfer/text.test.tsx > outbound text controller > ignores a late text recovery acknowledgement after Cancel
+AssertionError: expected 'text-staged' to be 'idle' // Object.is equality
+
+Expected: "idle"
+Received: "text-staged"
+
+ ❯ src/transfer/text.test.tsx:169:49
+    167|         await act(async () => hook.result.current.cancel())
+    168|         await act(async () => { resolve({mode: 'text', text: metadata(…
+    169|         expect(hook.result.current.state.phase).toBe('idle')
+       |                                                 ^
+    170|         expect(hook.result.current.canRetry).toBe(false)
+    171|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:03:23
+   Duration  535ms (transform 89ms, setup 0ms, import 153ms, tests 14ms, environment 287ms)
+

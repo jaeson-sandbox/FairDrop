@@ -595,6 +595,10 @@ and a careless one.
 
 ## Components
 
+### Text handoff
+
+The Idle Send text action opens one labelled multiline composer with a byte-limit explanation, Send and Cancel controls at least 44px high. Its active draft excludes drop, browse, collection and receive actions. A text waiting card uses the same Quartz QR/link structure and connection-recovery disclosure as a file, with a fixed Text label and byte length in place of a filename. Text sent, error and reset use the established focus and announcement ownership. Programmatically focused controls use `:focus` or an explicit focus marker so macOS WebKit shows their indicator; forced-colors uses a real outline. The browser reveal uses a labelled readonly textarea and ordinary selection/copy, with no script or custom clipboard control.
+
 Visual specs pair with behavioral rows of the same names in `EXPERIENCE.md`.
 
 | Component | Visual contract |
