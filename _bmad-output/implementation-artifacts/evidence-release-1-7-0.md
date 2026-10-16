@@ -6,11 +6,11 @@ Spec: [spec-release-1-7-0.md](spec-release-1-7-0.md). Baseline: `954d91813b0d6b1
 
 | Matrix row | Evidence or pending check |
 | --- | --- |
-| Product version | `wails.json` and `frontend/package.json` declare 1.7.0. Structured JSON inspection confirms both `frontend/package-lock.json` product fields are 1.7.0 and every other lock record equals the baseline. `TestTheVersionIsStatedOnceAndFollowedEverywhere` and release template tests passed. Native bundle inspection remains pending. |
-| Release contents | `docs/release-notes-1.7.0.md` describes connection recovery, bounded outbound text, the receive-notice claim fix, receive safety and trust/platform limits. Claims were checked against the active connection and text contracts and implementation evidence. Publication of the notes remains pending. |
-| Tag/artifacts | Pending: the main orchestrator will verify the tag, native assets, checksum sidecars and macOS bundle version after the release run. |
-| CI | Pending: exact-head branch, main and tag job conclusions. |
-| Publication | Pending: draft review, public release body/assets and latest-release identity. |
+| Product version | `wails.json` and `frontend/package.json` declare 1.7.0. Structured JSON inspection confirms both `frontend/package-lock.json` product fields are 1.7.0 and every other lock record equals the baseline. `TestTheVersionIsStatedOnceAndFollowedEverywhere` and release template tests passed. Native bundle inspection passed; see downloaded-artifact evidence below. |
+| Release contents | `docs/release-notes-1.7.0.md` describes connection recovery, bounded outbound text, the receive-notice claim fix, receive safety and trust/platform limits. Claims were checked against the active connection and text contracts and implementation evidence. The published notes exactly match this file; see publication proof below. |
+| Tag/artifacts | Passed: immutable tag, both downloads, hashes and native version/signature metadata verified below. |
+| CI | Passed: exact release-preparation branch/main, corrected-test branch and release-tag conclusions recorded below. |
+| Publication | Published: public non-prerelease v1.7.0, exact notes and four assets, confirmed latest. |
 
 ## Focused implementation verification
 
@@ -37,21 +37,44 @@ The existing v1.7.0 tag and release were both absent at preflight. Local built m
 
 The isolated snapshot `/private/tmp/fairdrop-release17-d1praye1` passed the complete ordered gate; full logs are in `/private/tmp/fairdrop-release17-logs-d1praye1`: Wails build, binding/build-asset drift, formatting, vet, pinned staticcheck, full Go suite, native matrix, cgo proof, full race suite, 1,319 frontend tests, 128 browser tests plus live receiver/upload fixtures, line endings, Darwin/Linux build preflight, Darwin staticcheck, canonical native mutations, 10 text Go mutations and 13 text frontend mutations. Later review edits were documentation only; all product metadata matches the verified snapshot. The CI-only macOS unusable-lock smoke remains for CI.
 
-Exact-head remote checks and publication are still pending.
+The following sections record subsequent remote checks and publication.
 
 ## Remote integration and tag
 
 - PR #20 head `f43131686f460cb54c46bc9e6130159e9cea7ba1`: [run 38841855773](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38841855773), Windows/macOS/Linux jobs all success.
 - Main merge `b05e5d7c66a9c138c8f75340e8587508dcd31793`: [run 38843340172](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38843340172), Windows/macOS/Linux jobs all success. The merged tree exactly matches the PR head. Conclusions were read job by job, not inferred from watch exit status.
 - Rechecked remote tag/release absence, then created annotated `v1.7.0` pointing to that verified main commit. No existing tag or published release was replaced.
-- [Release run 38844946025](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38844946025) is building that exact tag/head. Asset verification and publication remain pending.
+- [Release run 38844946025](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38844946025) built that exact tag/head; original failure, diagnosed retry and final publication evidence follow.
 
 ## Tagged race-gate test synchronization correction
 
 The tagged run's Linux and macOS `go test -race ./...` jobs both failed `TestClaimWaitingForNoticeHonorsCallerCancellation` at the same assertion: `state = "STAGED", want ERROR after spent caller claim` (`coordinator_receive_test.go:944`). The full original transcripts are preserved at `/private/tmp/fairdrop-release17-linux-failure.log` and `/private/tmp/fairdrop-release17-macos-failure.log` (macOS job 116793242420). The preceding exact event assertion passed. `acceptTerminal` publishes `TransferError` before committing `stateError`, so observing the event alone did not prove terminal processing had finished. The local test-only correction now blocks the fake observer after it records `TransferError`, confirms that `STAGED` is the expected intermediate state, retains the notice/error ordering and absence-of-started checks, releases the observer, and joins `drainerDone` before asserting `ERROR`. Runtime code is unchanged.
 
-The corrected focused test passed `go test -race -count=1000 -run '^TestClaimWaitingForNoticeHonorsCallerCancellation$' ./internal/transfer`; full output is `/private/tmp/fairdrop-release17-cancel-fixed-race.log`. In isolated copy `/private/tmp/fairdrop-release17-notice-proof.2XO1N4`, removing the release-and-drainer-completion barrier made the test fail deterministically at the retained state assertion with `state = "STAGED", want ERROR` (`/private/tmp/fairdrop-release17-no-completion-barrier.log`). The canonical `scripts/verify-receive-notice-claim-mutations.sh` passed all eight baselines and killed all seven defined mutations in that isolated copy. Its full console output is `/private/tmp/fairdrop-release17-notice-canonical-mutations.log`; individual JSON test logs are under `/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/tmp.6f0fLV42wy/`. Exact-head native release gates and publication remain pending.
+The corrected focused test passed `go test -race -count=1000 -run '^TestClaimWaitingForNoticeHonorsCallerCancellation$' ./internal/transfer`; full output is `/private/tmp/fairdrop-release17-cancel-fixed-race.log`. In isolated copy `/private/tmp/fairdrop-release17-notice-proof.2XO1N4`, removing the release-and-drainer-completion barrier made the test fail deterministically at the retained state assertion with `state = "STAGED", want ERROR` (`/private/tmp/fairdrop-release17-no-completion-barrier.log`). The canonical `scripts/verify-receive-notice-claim-mutations.sh` passed all eight baselines and killed all seven defined mutations in that isolated copy. Its full console output is `/private/tmp/fairdrop-release17-notice-canonical-mutations.log`; individual JSON test logs are under `/var/folders/kh/sg9n272s6lqgyt2yc7jgdvj40000gn/T/tmp.6f0fLV42wy/`. Subsequent exact-head gate and publication results are recorded below.
 
 Independent review found no actionable issues in the test correction. The tag remains immutable at `b05e5d7`; the correction is absent from that tag. The only differences from it are this test and release spec/evidence documents, so the shipped runtime/build/version tree is unchanged. After deterministic diagnosis and mutation proof, main deliberately reran only failed jobs of release run 38844946025. Corrected-branch CI must validate the harness repair and exact-tag CI must independently pass before publication; neither substitutes for the other. The original attempt ended with Linux/macOS race assertion failures, Windows success, and build/release jobs skipped.
 
 The corrected test passed the complete ordered local gate in `/private/tmp/fairdrop-release17-testfix-tu2n0arn`, with full logs in `/private/tmp/fairdrop-release17-testfix-logs`: Wails, drift/formatting/static checks, full Go/native/race suites, frontend/browser/live fixtures, platform build preflight, canonical native mutations, and all text Go/frontend mutations. The test file matches that verified snapshot; later edits are release records only. No manual UI observation is claimed.
+
+## Successful tag gate and downloaded artifacts
+
+Release run [38844946025, attempt 2](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38844946025/attempts/2) completed successfully at immutable tag head `b05e5d7c66a9c138c8f75340e8587508dcd31793`. Read job conclusions confirm all six required jobs succeeded: Linux adapter gate, native Windows/macOS gates, both native builds, and draft release creation. The failed original attempt remains documented above.
+
+Downloaded all four draft assets to `/private/tmp/fairdrop-v1.7.0-assets.96JC2v`; `shasum -a 256 -c` passed for both binaries:
+
+| Asset | SHA-256 |
+| --- | --- |
+| fairdrop-macos.zip | `0243588caabdb66ee9e82a93742122eaf1ef21b34265e50002704f2ab8767aa6` |
+| fairdrop.exe | `52238400218bd622f0357e7d72c8f11fbedb4557f6411a914e8839d464ec88c1` |
+
+The extracted macOS bundle is arm64; both CFBundleVersion and CFBundleShortVersionString are 1.7.0. `codesign --verify --deep --strict` passed and `codesign -dv --verbose=4` identifies an ad-hoc signature with no TeamIdentifier. This does not establish Developer ID signing or notarization.
+
+The Windows PE is x86_64, Windows GUI subsystem, ProductName FairDrop. Its FileVersion and ProductVersion strings both equal 1.7.0; numeric FileVersion is 1.7.0.0. Numeric ProductVersion is 0.0.0.0 because the existing template omits fixed `product_version`. The first ad hoc helper incorrectly expected that unset field to be 1.7.0.0; review traced the output to the template and winres defaults, and confirmed the Story 6.2 contract and native built-resource test require the version string table. The corrected helper passed that established contract and recorded the numeric field accurately. No project test, runtime or build template was weakened or modified.
+
+The workflow-generated draft body was explicitly replaced with `docs/release-notes-1.7.0.md`, then compared byte-for-byte successfully. The draft has exactly the Windows executable, macOS ZIP and their two checksum sidecars. No manual native UI, phone, Photos, screen-reader or firewall pass is claimed.
+
+## Publication and correction integration
+
+Correction PR [#21](https://github.com/jaeson-sandbox/FairDrop/pull/21), head `b96fcef490a46c93a3710b1248b7d9b3a89602d2`, passed all three jobs in [run 38846892770](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38846892770), then merged with a merge commit `83ee2c91c889c37350900c462f725f307ffe61bc`. Its merged tree exactly matches the verified PR head. The tag remains `b05e5d7`, and runtime/build/version files are unchanged by the test correction.
+
+Published [FairDrop v1.7.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.7.0) at `2026-10-16T04:03:45Z`. The public latest-release API confirms tag v1.7.0, draft false, prerelease false, all four uploaded assets with the verified digests, and a body byte-for-byte equal to the checked-in notes. Publication records are documentation only; no release asset or tag was replaced. Photo improvements remain on hold pending owner discussion.
