@@ -53,7 +53,7 @@ Publish FairDrop 1.7.0 with the completed connection recovery and text/link shar
 - [x] Bump only product metadata to 1.7.0 and update release-facing README/roadmap references.
 - [x] Add accurate release notes for all changes since v1.6.0, retaining trust/platform limitations and explaining text retention without overstating delivery or photo support.
 - [x] Run focused release identity tests and inspect version-only package-lock diff. Record results and matrix coverage in evidence; leave full ordered gate and remote work to main.
-- [ ] Main: complete three review layers and full local gate, commit/push verified milestone, open PR, read exact-head CI conclusions and merge with no-ff.
+- [x] Main: complete three review layers and full local gate, commit/push verified milestone, open PR, read exact-head CI conclusions and merge with no-ff.
 - [ ] Main: verify merged head CI, tag v1.7.0, await all release jobs, download assets and validate hashes, macOS plist versions/ad-hoc signature, Windows PE architecture and embedded FileVersion/ProductVersion, and notes equality; explicitly replace the workflow-generated draft body with docs/release-notes-1.7.0.md before checking equality, then publish and confirm public release/latest identity.
 
 Given consistent 1.7.0 metadata and passing automated gates, when the owner-authorized release is published, then both downloadable artifacts identify the intended release and have matching SHA-256 sidecars. Given any failed or cancelled required job or mismatched artifact, publication remains blocked until corrected. Given a browser-side photo selection question, notes do not claim unobserved native behavior or original-photo conversion guarantees.
@@ -86,3 +86,7 @@ Release preflight must confirm v1.7.0 tag and release do not exist before creati
 
 - Trace checks, review outcomes and publication proof.
   [evidence-release-1-7-0.md:1](evidence-release-1-7-0.md#L1)
+
+## Release-gate test synchronization correction
+
+The tagged Linux race gate failed TestClaimWaitingForNoticeHonorsCallerCancellation: its terminal-event observation preceded the internal ERROR commit. This release-related test-only correction is in scope; runtime code remains unchanged. In `internal/transfer/coordinator_receive_test.go`, force the observer to pause after recording TransferError, demonstrate the permitted STAGED intermediate state, then release it and await the actual drainer completion before asserting ERROR. Keep the exact event assertions and absence of TransferStarted. Preserve the original failing CI transcript in the release evidence. Prove that removing the new completion barrier fails the named state assertion under the forced schedule. Run focused race repetitions and the existing receive-notice canonical mutation inventory in an isolated copy; main owns the full gate and integration. No production, version, tag or workflow edits; no CI retries by the subagent.
