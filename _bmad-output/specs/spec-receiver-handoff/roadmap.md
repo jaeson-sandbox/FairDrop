@@ -11,4 +11,4 @@ Owner direction, 2026-10-04: implement all proposed additions one by one, highes
 | 5 | Connection recovery | Recover when the selected network is wrong or changes | Implemented: spec-connection-recovery/SPEC.md and recovery-contract.md; eligible interface choice, explicit refresh of waiting send/receive sessions, retirement of stale codes and truthful diagnostics |
 | 6 | Text/link sharing | Move short text or a URL without creating a file | Implemented: spec-text-link-sharing/SPEC.md, text-contract.md and spec-text-link-sharing.md; bounded outbound text, intentional browser reveal, native selection/copy, fresh-code reuse and waiting recovery |
 
-Each slice is independently reviewable. Current published baseline is 1.6.0. Version bumps and publication belong to a separately verified release step; this roadmap does not claim later slices are implemented.
+Each slice is independently reviewable. Current published baseline is 1.7.0. Version bumps and publication belong to separately verified release steps; this roadmap does not claim later slices are implemented.

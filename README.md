@@ -1,14 +1,14 @@
 # FairDrop
 
-Ephemeral, trusted-LAN file and folder handoff from a Windows or macOS desktop to a nearby
-browser, and from a nearby phone browser back to the desktop. Drop a file, a folder, or up to
-10,000 of them together, scan the QR code on the receiving device, download once.
+Ephemeral, trusted-LAN file, folder, and text handoff from a Windows or macOS desktop to a nearby
+browser, and file receiving from a nearby phone browser back to the desktop. Drop a file, a folder,
+or up to 10,000 of them together, scan the QR code on the receiving device, download once.
 No accounts, no cloud, no settings, no logs, no staged copies. The only thing FairDrop ever
 writes is files you choose to receive, into a folder you pick.
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: [v1.6.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.6.0).**
+**Current release: [v1.7.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.7.0).**
 A receiver can open a link to see the offered item, then press **Download** to claim the
 one-shot transfer. After a completed transfer, **Send Again**
 revalidates the same selection and offers it with a fresh link and QR code. FairDrop still sends
@@ -80,9 +80,10 @@ select **Send**. The receiving browser previews the byte length; **Read text** r
 selectable field for the browser or device’s ordinary Copy command. Links remain plain text.
 **Send Again** and **Refresh connection** create a new code for the same in-memory text.
 
-Cancel at any point. The window returns to idle and forgets the selection. Send Again remembers
-only the path or paths of the completed item in memory until it is dismissed or replaced; there is
-no persistent history or staged copy.
+Cancel at any point. The window returns to idle and forgets the selection or text. For a completed
+file handoff, **Send Again** retains only the selected path or paths in memory and checks them again.
+For text, it retains the bounded value in memory until dismissal or replacement. There is no
+persistent history or staged copy.
 
 ## Trust model
 
