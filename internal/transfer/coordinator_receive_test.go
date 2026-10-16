@@ -911,17 +911,25 @@ func TestClaimWaitingForNoticeHonorsCallerCancellation(t *testing.T) {
 	metadata := h.receiveWaiting()
 	entered := make(chan struct{})
 	release := make(chan struct{})
+	terminalEntered := make(chan struct{})
+	terminalRelease := make(chan struct{})
 	t.Cleanup(func() {
-		select {
-		case <-release:
-		default:
-			close(release)
+		for _, ch := range []chan struct{}{release, terminalRelease} {
+			select {
+			case <-ch:
+			default:
+				close(ch)
+			}
 		}
 	})
 	h.observer.publish = func(event Event) {
-		if event.Kind == TransferNotice {
+		switch event.Kind {
+		case TransferNotice:
 			close(entered)
 			<-release
+		case TransferError:
+			close(terminalEntered)
+			<-terminalRelease
 		}
 	}
 	h.emit(ServerEvent{SessionID: metadata.SessionID, Kind: ServerNotice, Notice: NoticeReceiveTooLarge})
@@ -940,13 +948,23 @@ func TestClaimWaitingForNoticeHonorsCallerCancellation(t *testing.T) {
 	if events[0].Kind != TransferNotice || events[1].Kind != TransferError {
 		t.Fatalf("caller-abandoned claim events = %+v, want notice then terminal error", events)
 	}
-	if got := h.state(); got != stateError {
-		t.Fatalf("state = %q, want ERROR after spent caller claim", got)
+	select {
+	case <-terminalEntered: // the observer recorded error, but terminal processing has not returned
+	case <-time.After(mutexProbeTimeout):
+		t.Fatal("terminal observer did not pause after recording error")
+	}
+	if got := h.state(); got != stateStaged {
+		t.Fatalf("state while error publication is paused = %q, want STAGED until terminal processing finishes", got)
 	}
 	for _, event := range events {
 		if event.Kind == TransferStarted {
 			t.Fatal("an abandoned claim published started")
 		}
+	}
+	close(terminalRelease)
+	h.awaitDrainer()
+	if got := h.state(); got != stateError {
+		t.Fatalf("state = %q, want ERROR after spent caller claim", got)
 	}
 }
 
