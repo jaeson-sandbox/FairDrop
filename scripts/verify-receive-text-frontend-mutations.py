@@ -9,6 +9,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+ANSI_ESCAPE = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
+BUILD_FAILURE = re.compile(r'Failed to import|SyntaxError|TS\d{4}|Error: Transform failed')
 CASES = (
     ('copy-owned-by-session', 'src/transfer/useTransfer.ts', 'src/transfer/receiveText.test.tsx',
      "receiveTextEpochRef.current += 1\n                receiveTextCopyPendingRef.current = null\n                receiveTextFetchPendingRef.current = null\n                dispatch({type: 'receive-text-done-requested'",
@@ -48,18 +50,47 @@ CASES = (
 )
 
 
+def verify_result(status: int, raw_output: str, name: str, log_name: str, mutation: bool) -> None:
+    # Vitest colors redirected output on some CI runners. Keep the original
+    # bytes in the log, but inspect a plain copy so escape sequences cannot
+    # split FAIL, the test path, its name, or an assertion diagnostic.
+    output = ANSI_ESCAPE.sub('', raw_output).replace('\r', '')
+    if mutation:
+        if BUILD_FAILURE.search(output):
+            raise RuntimeError(f'{log_name}: compiler/import failure is not a kill')
+        named = re.search(r'(?m)^[ \t]*FAIL[ \t]+[^\n]*>[ \t]*' + re.escape(name) + r'[ \t]*$', output)
+        assertion = named is not None and re.search(r'(?m)^[ \t]*AssertionError\b', output[named.end():])
+        if status != 1 or named is None or assertion is None or not re.search(r'\bTests[ \t]+1 failed\b', output):
+            raise RuntimeError(f'{log_name}: mutation did not fail its named assertion')
+    elif status != 0 or not re.search(r'\bTest Files[ \t]+1 passed\b', output) or not re.search(r'\bTests[ \t]+1 passed\b', output):
+        raise RuntimeError(f'{log_name}: named baseline did not pass')
+
+
 def run(frontend: Path, test: str, name: str, log: Path, mutation: bool) -> None:
     command = ['node', str(frontend / 'node_modules/vitest/vitest.mjs'), 'run', test, '-t', name]
-    completed = subprocess.run(command, cwd=frontend, text=True, stdout=subprocess.PIPE,
-                               stderr=subprocess.STDOUT, timeout=120, check=False)
+    try:
+        completed = subprocess.run(command, cwd=frontend, text=True, encoding='utf-8', errors='replace',
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120, check=False)
+    except subprocess.TimeoutExpired as error:
+        partial = error.stdout or b''
+        if isinstance(partial, bytes):
+            partial = partial.decode('utf-8', errors='replace')
+        log.write_text(f'{partial}\nTimeoutExpired: {error}\n', encoding='utf-8')
+        raise
+    except OSError as error:
+        log.write_text(f'{type(error).__name__}: {error}\n', encoding='utf-8')
+        raise
     log.write_text(completed.stdout, encoding='utf-8')
-    if mutation:
-        if completed.returncode != 1 or not re.search(r'FAIL\s+.*>\s+' + re.escape(name), completed.stdout) or 'AssertionError' not in completed.stdout:
-            raise RuntimeError(f'{log.name}: mutation did not fail its named assertion')
-        if re.search(r'Failed to import|SyntaxError|TS\d{4}|Error: Transform failed', completed.stdout):
-            raise RuntimeError(f'{log.name}: compiler/import failure is not a kill')
-    elif completed.returncode != 0 or '1 passed' not in completed.stdout:
-        raise RuntimeError(f'{log.name}: named baseline did not pass')
+    verify_result(completed.returncode, completed.stdout, name, log.name, mutation)
+
+
+def prepare_dependencies(frontend: Path, source: Path) -> None:
+    dependencies = frontend / 'node_modules'
+    try:
+        dependencies.symlink_to(source, target_is_directory=True)
+    except OSError:
+        # Windows hosted runners may refuse unprivileged symlinks.
+        shutil.copytree(source, dependencies)
 
 
 def main() -> None:
@@ -70,8 +101,13 @@ def main() -> None:
     for label, filename, test, before, after, name in CASES:
         with tempfile.TemporaryDirectory(prefix=f'fairdrop-receive-text-{label}-') as directory:
             frontend = Path(directory) / 'frontend'
-            shutil.copytree(ROOT / 'frontend', frontend, ignore=shutil.ignore_patterns('node_modules', 'dist', 'captures'))
-            frontend.joinpath('node_modules').symlink_to(ROOT / 'frontend/node_modules', target_is_directory=True)
+            try:
+                shutil.copytree(ROOT / 'frontend', frontend, ignore=shutil.ignore_patterns('node_modules', 'dist', 'captures'))
+                prepare_dependencies(frontend, ROOT / 'frontend/node_modules')
+            except (OSError, shutil.Error) as error:
+                (args.log_dir / f'{label}-setup-error.log').write_text(
+                    f'{type(error).__name__}: {error}\n', encoding='utf-8')
+                raise
             run(frontend, test, name, args.log_dir / f'{label}-baseline.log', False)
             target = frontend / filename
             source = target.read_text(encoding='utf-8').replace('\r\n', '\n')

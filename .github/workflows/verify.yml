@@ -255,7 +255,9 @@ jobs:
         run: npm test
 
       - name: Prove receive-text frontend guards
-        run: python scripts/verify-receive-text-frontend-mutations.py --log-dir "$RUNNER_TEMP/receive-text-frontend-mutations"
+        run: |
+          python -m unittest discover -s scripts -p 'verify_receive_text_frontend_mutations_test.py'
+          python scripts/verify-receive-text-frontend-mutations.py --log-dir "$RUNNER_TEMP/receive-text-frontend-mutations"
 
       - name: Retain receive-text frontend mutation logs
         if: always()
