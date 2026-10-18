@@ -2,6 +2,7 @@
 """Canonical scoped receive-text UI mutation inventory with per-case logs."""
 
 import argparse
+from contextlib import contextmanager
 from pathlib import Path
 import re
 import shutil
@@ -10,7 +11,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 ANSI_ESCAPE = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
-BUILD_FAILURE = re.compile(r'Failed to import|SyntaxError|TS\d{4}|Error: Transform failed')
+BUILD_FAILURE = re.compile(r'Cannot find module|Failed to resolve import|Failed to import|SyntaxError|TS\d{4}|Error: Transform failed')
 CASES = (
     ('copy-owned-by-session', 'src/transfer/useTransfer.ts', 'src/transfer/receiveText.test.tsx',
      "receiveTextEpochRef.current += 1\n                receiveTextCopyPendingRef.current = null\n                receiveTextFetchPendingRef.current = null\n                dispatch({type: 'receive-text-done-requested'",
@@ -93,14 +94,23 @@ def prepare_dependencies(frontend: Path, source: Path) -> None:
         shutil.copytree(source, dependencies)
 
 
+@contextmanager
+def mutation_workspace(label: str):
+    # Windows TEMP may use an 8.3 profile alias (RUNNER~1) while Vitest
+    # imports through the long profile path. Keep both paths under the same
+    # resolved repository root so Vite's module IDs and cwd agree.
+    with tempfile.TemporaryDirectory(prefix=f'fairdrop-receive-text-{label}-', dir=ROOT) as directory:
+        yield Path(directory).resolve()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--log-dir', type=Path, required=True)
     args = parser.parse_args()
     args.log_dir.mkdir(parents=True, exist_ok=True)
     for label, filename, test, before, after, name in CASES:
-        with tempfile.TemporaryDirectory(prefix=f'fairdrop-receive-text-{label}-') as directory:
-            frontend = Path(directory) / 'frontend'
+        with mutation_workspace(label) as workspace:
+            frontend = workspace / 'frontend'
             try:
                 shutil.copytree(ROOT / 'frontend', frontend, ignore=shutil.ignore_patterns('node_modules', 'dist', 'captures'))
                 prepare_dependencies(frontend, ROOT / 'frontend/node_modules')

@@ -43,8 +43,17 @@ class VerdictTest(unittest.TestCase):
             runner.verify_result(1, other, NAME, 'mutation.log', True)
 
     def test_compiler_failure_is_not_a_kill_even_with_named_assertion(self):
-        with self.assertRaisesRegex(RuntimeError, 'compiler/import'):
-            runner.verify_result(1, COLORED + 'Error: Transform failed\n', NAME, 'mutation.log', True)
+        for diagnostic in ('Error: Transform failed', "Cannot find module '/@fs/C:/Users/runneradmin/...'"):
+            with self.subTest(diagnostic=diagnostic):
+                with self.assertRaisesRegex(RuntimeError, 'compiler/import'):
+                    runner.verify_result(1, COLORED + diagnostic + '\n', NAME, 'mutation.log', True)
+
+    def test_import_failure_from_windows_artifact_is_not_a_baseline(self):
+        output = ("FAIL src/transfer/receiveText.test.tsx [ src/transfer/receiveText.test.tsx ]\n"
+                  "Error: Cannot find module '/@fs/C:/Users/runneradmin/AppData/Local/Temp/frontend/src/transfer/receiveText.test.tsx'\n"
+                  'Test Files  1 failed (1)\nTests  no tests\n')
+        with self.assertRaisesRegex(RuntimeError, 'baseline did not pass'):
+            runner.verify_result(1, output, NAME, 'baseline.log', False)
 
     def test_failed_status_or_missing_assertion_is_not_a_kill(self):
         for status, output in ((0, PLAIN), (1, PLAIN.replace('AssertionError:', 'Error:'))):
@@ -91,6 +100,19 @@ class VerdictTest(unittest.TestCase):
                 runner.run(root, 'test.tsx', NAME, log, False)
             self.assertEqual(process.call_args.kwargs['encoding'], 'utf-8')
             self.assertEqual(process.call_args.kwargs['errors'], 'replace')
+
+    def test_workspace_and_vitest_cwd_share_the_resolved_repository_root(self):
+        with runner.mutation_workspace('path-identity') as workspace:
+            self.assertEqual(workspace.parent, runner.ROOT)
+            self.assertEqual(workspace, workspace.resolve())
+            frontend = workspace / 'frontend'
+            frontend.mkdir()
+            log = workspace / 'baseline.log'
+            completed = SimpleNamespace(returncode=0, stdout='Test Files  1 passed\nTests  1 passed\n')
+            with mock.patch.object(runner.subprocess, 'run', return_value=completed) as process:
+                runner.run(frontend, 'src/transfer/receiveText.test.tsx', NAME, log, False)
+            self.assertEqual(process.call_args.kwargs['cwd'], frontend)
+            self.assertEqual(process.call_args.kwargs['cwd'].parent.parent, runner.ROOT)
 
 
 if __name__ == '__main__':
