@@ -1,14 +1,14 @@
 # FairDrop
 
 Ephemeral, trusted-LAN file, folder, and text handoff from a Windows or macOS desktop to a nearby
-browser, and file receiving from a nearby phone browser back to the desktop. Drop a file, a folder,
+browser, and file or text receiving from a nearby phone browser back to the desktop. Drop a file, a folder,
 or up to 10,000 of them together, scan the QR code on the receiving device, download once.
 No accounts, no cloud, no settings, no logs, no staged copies. The only thing FairDrop ever
 writes is files you choose to receive, into a folder you pick.
 
 Go + Wails v2 on the desktop side; React 19 / TypeScript / Tailwind v4 in the window.
 
-**Current release: [v1.7.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.7.0).**
+**Current release: [v1.8.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.8.0).**
 A receiver can open a link to see the offered item, then press **Download** to claim the
 one-shot transfer. After a completed transfer, **Send Again**
 revalidates the same selection and offers it with a fresh link and QR code. FairDrop still sends
