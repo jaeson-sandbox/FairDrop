@@ -738,6 +738,12 @@ func (c *Coordinator) AuthorizeClaim(ctx context.Context, sessionID SessionID) e
 
 	c.mu.Lock()
 	if err := c.revalidateLocked(ctx, sessionID, generation, stateClaiming); err != nil {
+		// A caller can cancel just after claiming the lease. If the live
+		// session still owns it, return to Staged so another submission can
+		// claim; otherwise the teardown owns the state transition.
+		if ctx.Err() != nil && c.session == live && c.state == stateClaiming && !live.cancelled && !c.closing && live.ctx.Err() == nil {
+			c.state = stateStaged
+		}
 		// Cancellation linearized first. Hand the lease back so the teardown
 		// that owns this outcome can take it, and publish nothing at all.
 		c.releaseLease()

@@ -4,7 +4,11 @@ import {transfer} from '../models';
 
 export function CancelTransfer():Promise<void>;
 
+export function CopyReceivedText(arg1:string):Promise<void>;
+
 export function CopyToClipboard(arg1:string):Promise<void>;
+
+export function GetReceivedText(arg1:string):Promise<string>;
 
 export function ListConnectionOptions(arg1:string):Promise<transfer.ConnectionOptions>;
 
@@ -27,3 +31,5 @@ export function StageTransfer(arg1:string):Promise<transfer.FileMetadata>;
 export function StageTransfers(arg1:Array<string>):Promise<transfer.FileMetadata>;
 
 export function StartReceive(arg1:string):Promise<transfer.ReceiveMetadata>;
+
+export function StartReceiveText():Promise<transfer.ReceiveTextMetadata>;

@@ -26,6 +26,7 @@ import {StagedView} from './ui/StagedView'
 import {TransferringView} from './ui/TransferringView'
 import {CollectionDraftView} from './ui/CollectionDraftView'
 import {TextComposer, TextStagedView, TextTransferringView} from './ui/TextViews'
+import {ReceiveTextWaitingView, ReceiveTextReceivingView, ReceiveTextOutcomeView} from './ui/ReceiveTextViews'
 
 // Wails gates native file drops on a CSS custom property rather than a class.
 // The property inherits, so every descendant of the zone is a valid drop point.
@@ -150,6 +151,15 @@ function App() {
      */
     async function receiveAgain(): Promise<void> {
         await runOutcomeAction(async () => { await transfer.receive() })
+    }
+
+    async function receiveTextAgain(): Promise<void> {
+        await runOutcomeAction(transfer.receiveText)
+    }
+
+    function receiveTextErrorCardProps(_error: PublicError, dismiss: () => void): OutcomeCardProps {
+        return {dropTargetStyle, onDismiss: dismiss, onRetry: receiveTextAgain,
+            retryLabel: copy.receiveText.retry, busy: outcomeActionPending}
     }
 
     /** A Receive failure card's actions: the receive wording, and never a send affordance. */
@@ -344,7 +354,7 @@ function App() {
         // The session, not just the phase: a staged -> transferring -> staged
         // round trip returns to the same phase under a different session, and
         // an in-flight command belongs to the session that started it.
-        if ((current.phase !== 'staged' && current.phase !== 'receive-waiting' && current.phase !== 'text-staged') ||
+        if ((current.phase !== 'staged' && current.phase !== 'receive-waiting' && current.phase !== 'text-staged' && current.phase !== 'receive-text-waiting') ||
             current.session.sessionId !== sessionId) return
         // A retiring session has already been announced. `cancel-requested` is a
         // spoken row -- "Canceling" -- and a copy that resolves a moment later
@@ -352,6 +362,12 @@ function App() {
         // answer to a question they stopped asking.
         if (current.cancelPending) return
         announce(text)
+    }
+
+    function announceFromReceivedText(sessionId: string, text: string): void {
+        const current = previousStateRef.current
+        if (current.phase === 'receive-text-outcome' && current.kind === 'complete' &&
+            current.value !== null && !current.donePending && current.session.sessionId === sessionId) announce(text)
     }
 
     /*
@@ -426,8 +442,9 @@ function App() {
                         ))}
                 />
             )}
-            {transfer.draft === null ? phaseBody(transfer, cancelWon, announceFromStaged, errorCardProps,
-                () => void openMultiple(), {onReceive: () => transfer.receive(), errorCardProps: receiveErrorCardProps}) : null}
+            {transfer.draft === null ? phaseBody(transfer, cancelWon, announceFromStaged, announceFromReceivedText, errorCardProps,
+                () => void openMultiple(), {onReceive: () => transfer.receive(), errorCardProps: receiveErrorCardProps,
+                    textErrorCardProps: receiveTextErrorCardProps}) : null}
             {transfer.draft === null && transfer.composer == null && outcome !== null &&
                 (outcome.kind === 'done' ? outcome.receipt.text !== true : outcome.text !== true) &&
                 (transfer.state.phase === 'idle' || terminal) ? (
@@ -455,6 +472,7 @@ function phaseBody(
     transfer: TransferController,
     cancelWon: boolean,
     announce: (sessionId: string, text: string) => void,
+    announceReceived: (sessionId: string, text: string) => void,
     errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps,
     onOpenMultiple: () => void,
     receive: ReceiveHandlers,
@@ -531,6 +549,18 @@ function phaseBody(
                 />
             )
 
+        case 'receive-text-waiting':
+            return <ReceiveTextWaitingView state={state} onCancel={() => void transfer.cancel()}
+                onRefresh={transfer.refreshConnection ?? (async () => undefined)} onAnnounce={announce}
+                onCopyFailed={transfer.reportCopyFailure}/>
+
+        case 'receive-text-receiving':
+            return <ReceiveTextReceivingView state={state} onCancel={() => void transfer.cancel()}/>
+
+        case 'receive-text-outcome':
+            return <ReceiveTextOutcomeView state={state} onDone={() => void transfer.cancel()}
+                onRetryFetch={transfer.fetchReceivedText} onCopy={transfer.copyReceivedText} onAnnounce={announceReceived}/>
+
         case 'done':
         case 'error':
             // The selector, not this switch, decides an outcome is renderable:
@@ -550,6 +580,7 @@ function phaseBody(
 interface ReceiveHandlers {
     readonly onReceive: () => Promise<ReceiveActivation>
     readonly errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps
+    readonly textErrorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps
 }
 
 function idleView(
@@ -563,7 +594,9 @@ function idleView(
     const commandError = selectCommandError(state)
     // A failure that came from Receive keeps its own wording and its own
     // actions; every other failure is a send failure, exactly as before.
-    const cardProps = selectCommandContext(state) === 'receive' ? receive.errorCardProps : errorCardProps
+    const context = selectCommandContext(state)
+    const cardProps = context === 'receive' ? receive.errorCardProps :
+        context === 'receive-text' ? receive.textErrorCardProps : errorCardProps
     return (
         <IdleView
             state={state}
@@ -573,6 +606,7 @@ function idleView(
             onSelectDirectory={() => void transfer.selectDirectory()}
             onOpenMultiple={onOpenMultiple}
             onReceive={receive.onReceive}
+            onReceiveText={() => void transfer.receiveText()}
             onSendText={transfer.openText}
             commandErrorPanelProps={
                 commandError === null

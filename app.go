@@ -376,6 +376,64 @@ func (a *App) StartReceive(folder string) (*transfer.ReceiveMetadata, error) {
 	return &metadata, nil
 }
 
+// StartReceiveText opens an empty, memory-only receiver.
+func (a *App) StartReceiveText() (*transfer.ReceiveTextMetadata, error) {
+	ctx, coordinator := a.delegate()
+	if ctx == nil || coordinator == nil {
+		return nil, errNotComposed()
+	}
+	receiver, ok := coordinator.(interface {
+		StartReceiveText(context.Context) (transfer.ReceiveTextMetadata, error)
+	})
+	if !ok {
+		return nil, transfer.NewError(transfer.ErrNotReady, "text receiving is unavailable")
+	}
+	metadata, err := receiver.StartReceiveText(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &metadata, nil
+}
+
+// GetReceivedText returns only the successful current text receiver's value.
+func (a *App) GetReceivedText(sessionID string) (string, error) {
+	_, coordinator := a.delegate()
+	if coordinator == nil {
+		return "", errNotComposed()
+	}
+	reader, ok := coordinator.(interface {
+		GetReceivedText(transfer.SessionID) (string, error)
+	})
+	if !ok {
+		return "", transfer.NewError(transfer.ErrNotReady, "received text is unavailable")
+	}
+	return reader.GetReceivedText(transfer.SessionID(sessionID))
+}
+
+// CopyReceivedText reads the currently committed value from the coordinator
+// and writes it through the native clipboard adapter. The frontend provides
+// only a session ID, never arbitrary text.
+func (a *App) CopyReceivedText(sessionID string) error {
+	ctx, coordinator := a.delegate()
+	if ctx == nil || coordinator == nil {
+		return errNotComposed()
+	}
+	reader, ok := coordinator.(interface {
+		GetReceivedText(transfer.SessionID) (string, error)
+	})
+	if !ok {
+		return transfer.NewError(transfer.ErrNotReady, "received text is unavailable")
+	}
+	value, err := reader.GetReceivedText(transfer.SessionID(sessionID))
+	if err != nil {
+		return err
+	}
+	if err := a.setClipboard(ctx, value); err != nil {
+		return transfer.WrapError(transfer.ErrClipboardFailed, "the clipboard could not be written", err)
+	}
+	return nil
+}
+
 // ShowReceivedFolder opens the session's subfolder in the OS file manager. The
 // coordinator refuses when the session has no subfolder. The path goes to the OS
 // as one argument of an argument vector and never through a shell, so a folder

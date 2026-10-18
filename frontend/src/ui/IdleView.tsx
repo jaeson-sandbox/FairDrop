@@ -54,6 +54,7 @@ interface IdleViewProps {
     readonly onSelectDirectory: () => void
     readonly onOpenMultiple?: () => void
     readonly onSendText?: () => void
+    readonly onReceiveText?: () => void
     /**
      * Receive: opens the folder chooser and starts a receive session. Resolves
      * `dismissed` when the chooser was closed without a folder, in which case
@@ -115,6 +116,7 @@ export function IdleView({
     onSelectDirectory,
     onOpenMultiple,
     onSendText,
+    onReceiveText,
     onReceive,
     commandErrorPanelProps,
 }: IdleViewProps) {
@@ -276,8 +278,13 @@ export function IdleView({
                         </button>
                     </div>
                 )}
+                {onReceiveText ? <div className="fd-receive-entry fd-rise" style={rise(5)} data-receive-text-entry>
+                    <p className="fd-meta">{copy.receiveText.hint}</p>
+                    <button type="button" className="fd-button fd-button--secondary fd-target"
+                        onClick={event => { event.currentTarget.focus(); onReceiveText() }}>{copy.receiveText.open}</button>
+                </div> : null}
 
-                <div className="fd-idle-disclosures fd-rise" style={rise(5)}>
+                <div className="fd-idle-disclosures fd-rise" style={rise(6)}>
                     {/*
                       FR23 amendment (Story 7.3, reordered by Story 7.8):
                       still present on first paint, but collapsed by default

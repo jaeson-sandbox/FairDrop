@@ -120,10 +120,11 @@ type ConnectionOptions struct {
 }
 
 type ConnectionRefresh struct {
-	Mode    string           `json:"mode"`
-	Send    *FileMetadata    `json:"send,omitempty"`
-	Receive *ReceiveMetadata `json:"receive,omitempty"`
-	Text    *TextMetadata    `json:"text,omitempty"`
+	Mode        string               `json:"mode"`
+	Send        *FileMetadata        `json:"send,omitempty"`
+	Receive     *ReceiveMetadata     `json:"receive,omitempty"`
+	Text        *TextMetadata        `json:"text,omitempty"`
+	ReceiveText *ReceiveTextMetadata `json:"receiveText,omitempty"`
 }
 
 // ServerStartRequest is the immutable description of the one transfer an
@@ -141,6 +142,13 @@ type ServerStartRequest struct {
 	Item        StagedItem
 	Destination ReceiveDestination
 	Text        *string
+	ReceiveText bool
+}
+
+// ReceiveTextCommitter is the receiver-owned memory commit operation. A server
+// presents a fully validated value only after it has reserved the one claim.
+type ReceiveTextCommitter interface {
+	CommitReceivedText(context.Context, SessionID, string) error
 }
 
 // ClaimAuthorizer is the coordinator handshake a reserved claim must clear

@@ -101,6 +101,10 @@ func (c *Coordinator) RefreshConnection(ctx context.Context, id SessionID, netwo
 	}
 	old := c.session
 	c.state = stateStaging // Claiming is excluded before any external work.
+	if old.receiveText != nil {
+		old.receiveText.value = nil
+		old.receiveText.success = false
+	}
 	c.mu.Unlock()
 
 	// The receive destination remains in one ledger until HTTP and the drainer
@@ -180,6 +184,15 @@ func (c *Coordinator) RefreshConnection(ctx context.Context, id SessionID, netwo
 			return ConnectionRefresh{}, &RecoveryFailure{failure}
 		}
 		return ConnectionRefresh{Mode: "receive", Receive: &ReceiveMetadata{SessionID: newID, Destination: dest.Name(), URL: ready.url, QR: ready.qr, Warnings: ready.warnings}}, nil
+	}
+	if old.receiveText != nil {
+		live.receiveText = &receivedTextSession{}
+		ready, err := c.activate(ctx, setupCtx, live, ServerStartRequest{SessionID: newID, Token: token, ReceiveText: true}, receiveTextPathPrefix, networkID)
+		if err != nil {
+			_, failure := c.failStage(live, err)
+			return ConnectionRefresh{}, &RecoveryFailure{failure}
+		}
+		return ConnectionRefresh{Mode: "receive-text", ReceiveText: &ReceiveTextMetadata{SessionID: newID, URL: ready.url, QR: ready.qr, Warnings: ready.warnings}}, nil
 	}
 	if old.text != nil {
 		value := *old.text

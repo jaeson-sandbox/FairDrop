@@ -174,6 +174,10 @@ func (c *Coordinator) retire(live *session, announce bool) error {
 	}
 	c.session = nil
 	c.state = stateIdle
+	if live.receiveText != nil {
+		live.receiveText.value = nil
+		live.receiveText.success = false
+	}
 	c.mu.Unlock()
 
 	if reset != nil {

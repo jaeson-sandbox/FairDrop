@@ -441,6 +441,9 @@ func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 		// Cancel is the existing CancelTransfer.
 		"SelectReceiveFolder":   true,
 		"StartReceive":          true,
+		"StartReceiveText":      true,
+		"GetReceivedText":       true,
+		"CopyReceivedText":      true,
 		"ShowReceivedFolder":    true,
 		"ListConnectionOptions": true,
 		"RefreshConnection":     true,

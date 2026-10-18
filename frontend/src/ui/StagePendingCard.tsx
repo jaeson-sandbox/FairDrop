@@ -28,6 +28,7 @@ export function StagePendingCard({state, onCancel}: StagePendingCardProps) {
     const itemKind = selectPendingItemKind(state)
     const folder = itemKind === 'directory'
     const pendingCopy = itemKind === 'receive' ? copy.receive.pending
+        : itemKind === 'receive-text' ? copy.receiveText.pending
         : itemKind === 'text' ? copy.stage.pending.text
         : itemKind === 'collection' ? copy.stage.pending.collection : itemKind === 'unknown'
             ? copy.stage.pending.item
@@ -36,7 +37,7 @@ export function StagePendingCard({state, onCancel}: StagePendingCardProps) {
     return (
         <div className="fd-region" data-phase-view="pending" data-item-kind={itemKind ?? 'none'}>
             <div>
-                {itemKind === 'unknown' || itemKind === 'receive' || itemKind === 'text' ? null : (
+                {itemKind === 'unknown' || itemKind === 'receive' || itemKind === 'receive-text' || itemKind === 'text' ? null : (
                     <span className="fd-packet-tab">{itemKind === 'collection' ? copy.label.items : folder ? copy.label.folder : copy.label.file}</span>
                 )}
                 <section className="fd-pending-card">

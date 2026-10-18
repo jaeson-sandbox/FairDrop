@@ -8,6 +8,7 @@ import {
     type ProgressSnapshot,
     type PublicError,
     type ReceiveMetadata,
+    type ReceiveTextMetadata,
     type TextMetadata,
     type ConnectionOptions,
     type ConnectionRefresh,
@@ -38,19 +39,39 @@ export function parseConnectionOptions(value: unknown): ConnectionOptions | null
 export function parseConnectionRefresh(value: unknown): ConnectionRefresh | null {
     const record = asRecord(value)
     if (record === null) return null
-    if (record.mode === 'send' && !('receive' in record) && !('text' in record)) {
+    if (record.mode === 'receive-text' && !('send' in record) && !('receive' in record) && !('text' in record)) {
+        const receiveText = parseReceiveTextMetadata(record.receiveText)
+        return receiveText === null ? null : {mode: 'receive-text', receiveText}
+    }
+    if (record.mode === 'send' && !('receive' in record) && !('text' in record) && !('receiveText' in record)) {
         const send = parseFileMetadata(record.send)
         return send === null ? null : {mode: 'send', send}
     }
-    if (record.mode === 'receive' && !('send' in record) && !('text' in record)) {
+    if (record.mode === 'receive' && !('send' in record) && !('text' in record) && !('receiveText' in record)) {
         const receive = parseReceiveMetadata(record.receive)
         return receive === null ? null : {mode: 'receive', receive}
     }
-    if (record.mode === 'text' && !('send' in record) && !('receive' in record)) {
+    if (record.mode === 'text' && !('send' in record) && !('receive' in record) && !('receiveText' in record)) {
         const text = parseTextMetadata(record.text)
         return text === null ? null : {mode: 'text', text}
     }
     return null
+}
+
+export function parseReceiveTextMetadata(value: unknown): ReceiveTextMetadata | null {
+    try {
+        const record = asRecord(value)
+        if (record === null || !ownsExactly(record, ['sessionId', 'url', 'qrBase64', 'warnings']) ||
+            !isSessionId(record.sessionId) || !isReceiveTextURL(record.url) ||
+            !isCompletePNGBase64(record.qrBase64) || !Array.isArray(record.warnings)) return null
+        const warnings: Warning[] = []
+        for (const warning of record.warnings) {
+            const parsed = parseWarning(warning)
+            if (parsed === null || parsed.code !== 'beacon_warning') return null
+            warnings.push(parsed)
+        }
+        return {sessionId: record.sessionId, url: record.url, qrBase64: record.qrBase64, warnings}
+    } catch { return null }
 }
 
 export type TextValidation =
@@ -427,6 +448,7 @@ const sessionIdPattern = /^[0-9a-f]{32}$/
 const capabilityURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/download\/[0-9a-f]{32})$/
 const uploadURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/upload\/[0-9a-f]{32})$/
 const textURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/text\/[0-9a-f]{32})$/
+const receiveTextURLPattern = /^http:\/\/((?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}):([1-9]\d{0,4})(\/receive-text\/[0-9a-f]{32})$/
 const maximumDestinationLength = 1024
 const maximumQRBase64Length = 2 * 1024 * 1024
 const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10] as const
@@ -457,6 +479,15 @@ function isUploadURL(value: unknown): value is string {
 function isTextURL(value: unknown): value is string {
     if (typeof value !== 'string') return false
     const match = textURLPattern.exec(value)
+    if (match === null) return false
+    const octets = match[1].split('.').map(Number)
+    const port = Number(match[2])
+    return !octets.some(octet => octet > 255) && Number.isInteger(port) && port >= 1 && port <= 65535
+}
+
+function isReceiveTextURL(value: unknown): value is string {
+    if (typeof value !== 'string') return false
+    const match = receiveTextURLPattern.exec(value)
     if (match === null) return false
     const octets = match[1].split('.').map(Number)
     const port = Number(match[2])

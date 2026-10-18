@@ -149,6 +149,7 @@ export function selectPendingItemKind(state: TransferState): PendingItemKind | n
  */
 export function selectWarnings(state: TransferState): readonly Warning[] {
     if (state.phase === 'receive-waiting') return state.metadata.warnings
+    if (state.phase === 'receive-text-waiting') return state.metadata.warnings
     const metadata = selectMetadata(state)
     return metadata === null ? emptyWarnings : metadata.warnings
 }
@@ -158,8 +159,8 @@ export function selectWarnings(state: TransferState): readonly Warning[] {
  * Idle failure carries the context; a failure beside a live receive session
  * (a clipboard write, a Show in Folder) is described by the session's own view.
  */
-export function selectCommandContext(state: TransferState): 'receive' | null {
-    return state.phase === 'idle' && state.commandContext === 'receive' ? 'receive' : null
+export function selectCommandContext(state: TransferState): 'receive' | 'receive-text' | null {
+    return state.phase === 'idle' ? state.commandContext ?? null : null
 }
 
 /**
@@ -172,7 +173,8 @@ export function selectCommandContext(state: TransferState): 'receive' | null {
 export function selectCommandError(state: TransferState): PublicError | null {
     if (state.phase !== 'idle' && state.phase !== 'staged' && state.phase !== 'transferring' &&
         state.phase !== 'receive-waiting' && state.phase !== 'receive-receiving' &&
-        state.phase !== 'receive-outcome') return null
+        state.phase !== 'receive-outcome' && state.phase !== 'receive-text-waiting' &&
+        state.phase !== 'receive-text-receiving') return null
     const error = state.commandError
     if (error === null || error.code === 'cancelled') return null
     return error

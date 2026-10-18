@@ -26,7 +26,7 @@ async function within(promise, milliseconds, label) {
     }
 }
 
-async function checkPage({url, longUrl, textUrl}) {
+async function checkPage({url, longUrl, textUrl, receiveTextUrl}) {
     browser = await chromium.launch({headless: true})
     const context = await browser.newContext({viewport: {width: 320, height: 700}, acceptDownloads: true})
     const page = await context.newPage()
@@ -85,7 +85,48 @@ async function checkPage({url, longUrl, textUrl}) {
     await textPage.emulateMedia({forcedColors: 'active'})
     if (await textField.evaluate((element) => getComputedStyle(element).outlineStyle) === 'none') throw new Error('text reveal focus has no forced-colors outline')
     await textContext.close()
-    console.log('receiver live browser: file download and script-free text reveal, exact DOM value, native selection, 320px layout passed')
+    const inboundContext = await browser.newContext({viewport: {width: 320, height: 700}, javaScriptEnabled: false})
+    const inbound = await inboundContext.newPage()
+    const inboundResponse = await inbound.goto(receiveTextUrl)
+    if (inboundResponse?.status() !== 200) throw new Error(`receive-text GET status=${inboundResponse?.status()}`)
+    const inboundHeaders = inboundResponse.headers()
+    if (inboundHeaders['cache-control'] !== 'no-store' || inboundHeaders['referrer-policy'] !== 'no-referrer' ||
+        inboundHeaders['content-security-policy'] !== "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'") {
+        throw new Error('receive-text privacy headers missing')
+    }
+    if (await inbound.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('receive-text form scrolls at 320px')
+    if (await inbound.locator('script').count() !== 0 || await inbound.locator('form').count() !== 1 ||
+        await inbound.locator('form textarea[name="text"]').count() !== 1) throw new Error('production phone form is missing or duplicated')
+    const form = inbound.locator('form')
+    if (await form.getAttribute('method') !== 'post' || await form.getAttribute('action') !== '' ||
+        await form.getAttribute('enctype') !== 'application/x-www-form-urlencoded') throw new Error('phone form submission contract changed')
+    const input = inbound.getByRole('textbox', {name: 'Text to send'})
+    const send = inbound.getByRole('button', {name: 'Send text'})
+    if (await send.evaluate((element) => element.getBoundingClientRect().height) < 44) throw new Error('phone submit target is below 44px')
+    await inbound.keyboard.press('Tab')
+    if (!(await input.evaluate((element) => element === document.activeElement))) throw new Error('phone text field is not keyboard reachable')
+    if (await input.evaluate((element) => getComputedStyle(element).outlineStyle) === 'none') throw new Error('phone input has no focus outline')
+    await inbound.emulateMedia({colorScheme: 'dark'})
+    if (await inbound.evaluate(() => getComputedStyle(document.documentElement).backgroundColor) !== 'rgb(22, 22, 24)') throw new Error('phone dark canvas missing')
+    await inbound.emulateMedia({forcedColors: 'active'})
+    if (await input.evaluate((element) => getComputedStyle(element).outlineStyle) === 'none') throw new Error('phone input has no forced-colors outline')
+    await inbound.emulateMedia({forcedColors: 'none'})
+    const value = 'First line\n雪 & <tag> https://example.test/?a=1&b=2'
+    await input.fill(value)
+    await input.press('ControlOrMeta+A')
+    if (await input.evaluate((element) => element.selectionStart !== 0 || element.selectionEnd !== element.value.length)) {
+        throw new Error('phone form does not support native selection')
+    }
+    const submitted = inbound.waitForRequest(request => request.url() === receiveTextUrl && request.method() === 'POST')
+    await send.click()
+    const post = await submitted
+    if (post.headers()['content-type'] !== 'application/x-www-form-urlencoded') throw new Error('phone form content type changed')
+    const body = post.postData() ?? ''
+    if (!body.includes('%0D%0A') || new URLSearchParams(body).getAll('text').length !== 1 ||
+        new URLSearchParams(body).get('text') !== value.replaceAll('\n', '\r\n')) throw new Error(`phone browser form encoding changed: ${body}`)
+    if (await inbound.locator('h1').textContent() !== 'Text received by this computer') throw new Error('phone submission acknowledgement missing')
+    await inboundContext.close()
+    console.log('receiver live browser: file download, script-free text reveal and production receive-text form at 320px passed')
 }
 
 try {
@@ -106,7 +147,8 @@ try {
             const found = fixtureOutput.match(/FAIRDROP_RECEIVER_URL=(http:\/\/[^\s]+)/)
             const long = fixtureOutput.match(/FAIRDROP_RECEIVER_LONG_URL=(http:\/\/[^\s]+)/)
             const text = fixtureOutput.match(/FAIRDROP_RECEIVER_TEXT_URL=(http:\/\/[^\s]+)/)
-            if (found && long && text) accept({url: found[1], longUrl: long[1], textUrl: text[1]})
+            const receiveText = fixtureOutput.match(/FAIRDROP_RECEIVER_RECEIVE_TEXT_URL=(http:\/\/[^\s]+)/)
+            if (found && long && text && receiveText) accept({url: found[1], longUrl: long[1], textUrl: text[1], receiveTextUrl: receiveText[1]})
         })
     })
     const unexpectedExit = fixtureExited.then(({code, signal, error}) => { throw new Error(`receiver fixture exited before browser check completed: code=${code} signal=${signal} error=${error}\n${fixtureOutput}\n${fixtureErrors}`) })
@@ -117,12 +159,14 @@ try {
     if (fixture) {
         if (fixture.pid && fixture.exitCode === null && fixture.signalCode === null) {
             fixture.stdin.end()
+            let result
             try {
-                await within(fixtureExited, 3000, 'receiver fixture cleanup')
+                result = await within(fixtureExited, 3000, 'receiver fixture cleanup')
             } catch {
                 fixture.kill()
-                await within(fixtureExited, 3000, 'receiver fixture forced cleanup')
+                result = await within(fixtureExited, 3000, 'receiver fixture forced cleanup')
             }
+            if (result.code !== 0) throw new Error(`receiver fixture failed: ${fixtureOutput}\n${fixtureErrors}`)
         }
     }
     rmSync(temp, {recursive: true, force: true})

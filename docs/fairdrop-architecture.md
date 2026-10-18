@@ -182,6 +182,18 @@ Buffer size and per-entry ZIP compression are Phase 3 benchmark choices. They ma
 
 **Persistence wording.** FairDrop still keeps no settings, history, logs or staged copies. A receive session saves the received files into the chosen folder and nothing else is written; the folder choice and the outcome are held in memory for the session only. Copy says files were "saved to this computer" only after the rename, and claims nothing beyond the filesystem's own durability.
 
+**Decision (phone-to-desktop text): accept into session-owned bounded RAM.**
+`StartReceiveText` uses the existing admission, listener, QR and recovery transaction
+with an explicit receive-text server mode. The `/receive-text/{token}` form validates
+one bounded URL-encoded UTF-8 field before reserving the permanent claim. The server
+authorizes that claim and commits the normalized value through the coordinator's
+consumer-owned `ReceiveTextCommitter`, without a source, sink, directory or payload
+event. Only a committed receipt may complete; a failed phone acknowledgement after
+commit leaves the desktop result truthful. The held result has a session-guarded read
+and native copy command. Done, cancellation, failure and refresh clear the owned RAM
+reference; refresh rotates the identity and starts an empty receiver. The OS clipboard
+is intentionally outside that lifecycle.
+
 ## Network selection
 
 Phase 2 owns the exact scoring algorithm. It must be deterministic and testable from injected interface data:

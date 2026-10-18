@@ -68,6 +68,13 @@ export interface ReceiveMetadata {
     readonly warnings: readonly Warning[]
 }
 
+export interface ReceiveTextMetadata {
+    readonly sessionId: string
+    readonly url: string
+    readonly qrBase64: string
+    readonly warnings: readonly Warning[]
+}
+
 export interface ConnectionOption {
     readonly id: string
     readonly name: string
@@ -84,6 +91,7 @@ export type ConnectionRefresh =
     | {readonly mode: 'send'; readonly send: FileMetadata}
     | {readonly mode: 'text'; readonly text: TextMetadata}
     | {readonly mode: 'receive'; readonly receive: ReceiveMetadata}
+    | {readonly mode: 'receive-text'; readonly receiveText: ReceiveTextMetadata}
 
 /** How a receive session ended. `complete` is the only one that may be shown as success. */
 export type ReceiveResult = 'complete' | 'incomplete' | 'cancelled'
@@ -169,7 +177,7 @@ export type LifecycleEvent =
     | TransferResetEvent
     | TransferNoticeEvent
 
-export type PendingItemKind = 'file' | 'directory' | 'collection' | 'unknown' | 'receive' | 'text'
+export type PendingItemKind = 'file' | 'directory' | 'collection' | 'unknown' | 'receive' | 'text' | 'receive-text'
 
 /**
  * What the completion receipt needs, and nothing else `FileMetadata` carries.

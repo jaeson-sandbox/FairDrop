@@ -29,8 +29,9 @@ const (
 	// internal/server registers "/upload/{token}" and nothing here can import
 	// it. A receive session never serves the download route and a send session
 	// never serves this one, so the prefix a URL carries is the session kind.
-	uploadPathPrefix = "/upload/"
-	textPathPrefix   = "/text/"
+	uploadPathPrefix      = "/upload/"
+	textPathPrefix        = "/text/"
+	receiveTextPathPrefix = "/receive-text/"
 )
 
 // newIdentity draws the session ID and the capability token as two independent

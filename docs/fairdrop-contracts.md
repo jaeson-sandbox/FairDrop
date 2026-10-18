@@ -407,12 +407,38 @@ Result and refusal pages render before any header is sent, carry the receiver pa
 
 `OpenDestination` and `Close` are called through `callBounded` with `AdapterCleanupBound`. An open that does not return is a coded `setup_failed`, and whatever it later returns is closed. A close that does not return is a coded `transfer_failed` naming the destination, recorded as a diagnostic, and the outcome uses the destination's non-blocking snapshot -- which is final because `Close` marks the destination closed first. The snapshot is the one thing not taken verbatim: a destination that saved nothing is about to remove its subfolder yet still reports it, so the outcome claims the subfolder exists only when files were saved. The coordinator still reaches IDLE with the lease freed. Teardown order is the reverse of acquisition: beacon, server, destination.
 
+### Phone-to-desktop text extension
+
+`StartReceiveText` opens one empty, exclusive receiver without a folder, `SourcePort`
+or `SinkPort`. The server accepts only exact-token GET/POST on `/receive-text/{token}`.
+GET does not claim. POST accepts exactly one URL-encoded `text` body field with an
+optional UTF-8 charset, reads at most `3 * MaxRawTextBytes + 1025` encoded bytes,
+and rejects malformed, duplicate, extra, blank, invalid UTF-8 or unsupported control
+input before claim. Declared or observed encoded oversize is 413; invalid input is
+400 and leaves the code reusable. One POST may read/decode at a time. Authorized
+commit stores only the existing `NormalizeText` result in the current coordinator
+session, at most 65,536 UTF-8 bytes. The response never echoes the value.
+
+`GetReceivedText(sessionID)` reads only the current committed successful session.
+`CopyReceivedText(sessionID)` reads that same owned value and writes it through the
+native clipboard; no frontend payload argument is accepted and the generic link
+copy cap remains 2,048 bytes. A complete event is published only for committed
+receipt. The held result survives an acknowledgement write failure but is cleared
+on Done, Cancel, failure, shutdown or replacement. Waiting recovery retires the
+old token/ID and starts an empty receive-text session. Metadata, lifecycle events,
+diagnostics, discovery and logs contain no received value. See
+`_bmad-output/specs/spec-phone-to-desktop-text/receive-text-contract.md` for the
+canonical transport and ownership contract.
+
 ## Public Wails API
 
 ```go
 func (a *App) StageTransfer(absolutePath string) (*transfer.FileMetadata, error)
 func (a *App) StageTransfers(paths []string) (*transfer.FileMetadata, error)
 func (a *App) StageText(text string) (*transfer.TextMetadata, error)
+func (a *App) StartReceiveText() (*transfer.ReceiveTextMetadata, error)
+func (a *App) GetReceivedText(sessionID string) (string, error)
+func (a *App) CopyReceivedText(sessionID string) error
 func (a *App) CancelTransfer() error
 func (a *App) SelectFile() (string, error)
 func (a *App) SelectFiles() ([]string, error)

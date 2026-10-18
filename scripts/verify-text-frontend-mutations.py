@@ -55,8 +55,8 @@ CASES = (
     ), 'reports cleanup uncertainty when malformed StageText metadata cannot be quiesced'),
     ('live-unmount-cancel', (
         ('src/transfer/useTransfer.ts',
-         "if ((live.phase === 'text-staged' || live.phase === 'text-transferring') && !live.cancelPending) {",
-         "if (false && (live.phase === 'text-staged' || live.phase === 'text-transferring') && !live.cancelPending) {"),
+         "if ((live.phase === 'text-staged' || live.phase === 'text-transferring' ||\n                live.phase === 'receive-text-waiting' || live.phase === 'receive-text-receiving' ||\n                live.phase === 'receive-text-outcome') && !('cancelPending' in live && live.cancelPending)) {",
+         "if (false && (live.phase === 'text-staged' || live.phase === 'text-transferring' ||\n                live.phase === 'receive-text-waiting' || live.phase === 'receive-text-receiving' ||\n                live.phase === 'receive-text-outcome') && !('cancelPending' in live && live.cancelPending)) {"),
     ), 'cancels and forgets a live text session on unmount'),
     ('clear-stale-error-on-edit', (
         ('src/transfer/useTransfer.ts',
