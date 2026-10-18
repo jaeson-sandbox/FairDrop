@@ -142,10 +142,20 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent, allowed .
 		c.mu.Unlock()
 		return
 	}
+	if live.receiveText != nil && event.Kind == ServerComplete && live.receiveText.value == nil {
+		event = ServerEvent{SessionID: live.id, Kind: ServerFailed, Err: NewError(ErrTransferFailed, "text was not committed")}
+	}
+	if live.receiveText != nil && event.Kind != ServerComplete {
+		live.receiveText.value = nil
+		live.receiveText.success = false
+	}
 	// Marked before the lease is ever handed back, so the second terminal
 	// event of a session cannot be accepted even in the window where this one
 	// is still quiescing and the state still reads TRANSFERRING.
 	live.terminal = true
+	if live.receiveText != nil && event.Kind == ServerComplete && live.receiveText.value != nil {
+		live.receiveText.success = true
+	}
 	c.mu.Unlock()
 
 	// Resources go first. The UI must never be told a transfer finished while
@@ -219,7 +229,7 @@ func (c *Coordinator) acceptTerminal(live *session, event ServerEvent, allowed .
 	c.mu.Unlock()
 
 	c.releaseLease()
-	if live.receive == nil {
+	if live.receive == nil && live.receiveText == nil {
 		// A receive outcome is held until the user leaves it (Cancel, or
 		// Shutdown): Show in Folder is offered from it, and the three-second
 		// lease a send outcome gets is not long enough to reach a button.

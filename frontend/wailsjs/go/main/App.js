@@ -6,8 +6,16 @@ export function CancelTransfer() {
   return window['go']['main']['App']['CancelTransfer']();
 }
 
+export function CopyReceivedText(arg1) {
+  return window['go']['main']['App']['CopyReceivedText'](arg1);
+}
+
 export function CopyToClipboard(arg1) {
   return window['go']['main']['App']['CopyToClipboard'](arg1);
+}
+
+export function GetReceivedText(arg1) {
+  return window['go']['main']['App']['GetReceivedText'](arg1);
 }
 
 export function ListConnectionOptions(arg1) {
@@ -52,4 +60,8 @@ export function StageTransfers(arg1) {
 
 export function StartReceive(arg1) {
   return window['go']['main']['App']['StartReceive'](arg1);
+}
+
+export function StartReceiveText() {
+  return window['go']['main']['App']['StartReceiveText']();
 }

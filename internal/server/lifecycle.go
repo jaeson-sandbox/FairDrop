@@ -224,6 +224,7 @@ type run struct {
 	// route and never the download route.
 	destination transfer.ReceiveDestination
 	text        *string
+	receiveText bool
 	authorizer  transfer.ClaimAuthorizer
 	now         clock
 	// timeouts carries the teardown bound from the Server that started this
@@ -247,7 +248,8 @@ type run struct {
 	// claimed is the linearization point of the claim race. Two receivers can
 	// hit the same URL at the same instant; the compare-and-swap decides which
 	// of them ever reaches the coordinator.
-	claimed atomic.Bool
+	claimed    atomic.Bool
+	processing atomic.Bool
 
 	mu        sync.Mutex
 	stopping  bool
@@ -289,19 +291,25 @@ func (s *Server) Start(
 	}
 	receiving := request.Destination != nil
 	texting := request.Text != nil
-	if receiving && texting || texting && request.Item != (transfer.StagedItem{}) {
+	receivingText := request.ReceiveText
+	if receivingText && (receiving || texting || request.Item != (transfer.StagedItem{})) || receiving && texting || texting && request.Item != (transfer.StagedItem{}) {
 		return transfer.ServerHandle{}, startError("a text session has no staged item or destination", nil)
 	}
 	if receiving && request.Item.Path != "" {
 		return transfer.ServerHandle{}, startError("a receive session has no staged item", nil)
 	}
-	if !receiving && !texting && request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > transfer.MaxCollectionItems) {
+	if !receiving && !texting && !receivingText && request.Item.Path == "" && (request.Item.Kind != transfer.ItemCollection || request.Item.Collection == nil || len(request.Item.Collection.Members) < 2 || len(request.Item.Collection.Members) > transfer.MaxCollectionItems) {
 		return transfer.ServerHandle{}, startError("transfer server start requires a staged item", nil)
 	}
 	if authorizer == nil {
 		return transfer.ServerHandle{}, startError("transfer server start requires a claim authorizer", nil)
 	}
-	if !receiving && !texting && s.payloads == nil {
+	if receivingText {
+		if _, ok := authorizer.(transfer.ReceiveTextCommitter); !ok {
+			return transfer.ServerHandle{}, startError("a text receiver requires a commit owner", nil)
+		}
+	}
+	if !receiving && !texting && !receivingText && s.payloads == nil {
 		return transfer.ServerHandle{}, startError("transfer server start requires a payload port", nil)
 	}
 	var textValue *string
@@ -351,6 +359,7 @@ func (s *Server) Start(
 		payloads:     s.payloads,
 		destination:  request.Destination,
 		text:         textValue,
+		receiveText:  receivingText,
 		authorizer:   authorizer,
 		now:          s.clock(),
 		timeouts:     s.timeouts,
@@ -375,6 +384,8 @@ func (s *Server) Start(
 	// one, so the route a URL carries is the kind of session it belongs to.
 	if receiving {
 		active.mux.HandleFunc(uploadPattern, active.upload)
+	} else if receivingText {
+		active.mux.HandleFunc(receiveTextPattern, active.receiveTextRoute)
 	} else if texting {
 		active.mux.HandleFunc(textPattern, active.textRoute)
 	} else {
@@ -713,7 +724,7 @@ func (r *run) trackConnection(conn net.Conn, state http.ConnState) {
 			// phone has read the result page, so a failed page write does not
 			// demote it: the desktop would otherwise report an upload whose
 			// files are all on disk as failed.
-			if tracked.writeErr != nil && event.Kind == transfer.ServerComplete && r.destination == nil {
+			if tracked.writeErr != nil && event.Kind == transfer.ServerComplete && r.destination == nil && !r.receiveText {
 				event = failedEvent(r.sessionID, *event.Progress, transfer.WrapError(
 					transfer.ErrTransferFailed, "the HTTP response could not be finalized", tracked.writeErr))
 			}

@@ -1,6 +1,8 @@
 import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react'
 import {
     CancelTransfer,
+    CopyReceivedText,
+    GetReceivedText,
     RefreshConnection,
     SelectDirectory,
     SelectFile,
@@ -11,13 +13,14 @@ import {
     StageTransfers,
     StageText,
     StartReceive,
+    StartReceiveText,
 } from '../../wailsjs/go/main/App'
 import {EventsOn} from '../../wailsjs/runtime/runtime'
 import {parseCommandError, publicError} from './errors'
 import {copy} from '../ui/copy'
 import {selectErrorAction} from './selectors'
 import {createInitialTransferState, transferReducer, type TransferState} from './state'
-import {parseConnectionRefresh, parseFileMetadata, parseLifecycleEvent, parseReceiveMetadata, parseTextMetadata, validateText} from './validation'
+import {parseConnectionRefresh, parseFileMetadata, parseLifecycleEvent, parseReceiveMetadata, parseReceiveTextMetadata, parseTextMetadata, validateText} from './validation'
 import {MAX_COLLECTION_ITEMS, type LifecycleEventName, type PendingItemKind, type PublicError} from './types'
 
 interface StageOperation {
@@ -67,6 +70,9 @@ export interface TransferController {
      * result that arrives late.
      */
     readonly receive: () => Promise<ReceiveActivation>
+    readonly receiveText: () => Promise<void>
+    readonly fetchReceivedText: (sessionId: string) => Promise<void>
+    readonly copyReceivedText: (sessionId: string) => Promise<boolean>
     /** Opens the held receive outcome's subfolder in the OS file manager. */
     readonly showReceivedFolder: () => Promise<void>
     readonly cancel: () => Promise<void>
@@ -177,6 +183,10 @@ export function useTransfer(): TransferController {
     const draftChooserRef = useRef<object | null>(null)
     const draftAdmissionRef = useRef(false)
     const selectionEpochRef = useRef(0)
+    const receiveTextEpochRef = useRef(0)
+    const receiveTextFetchStartedRef = useRef<string | null>(null)
+    const receiveTextFetchPendingRef = useRef<{readonly sessionId: string; readonly epoch: number} | null>(null)
+    const receiveTextCopyPendingRef = useRef<{readonly sessionId: string; readonly epoch: number} | null>(null)
     const sendAgainPendingRef = useRef(false)
     const showFolderPendingRef = useRef(false)
     const idleWaitersRef = useRef<Set<() => void>>(new Set())
@@ -195,11 +205,15 @@ export function useTransfer(): TransferController {
                 void Promise.resolve().then(() => { if (!mountedRef.current) return CancelTransfer() }).catch(() => undefined)
             }
             const live = stateRef.current
-            if ((live.phase === 'text-staged' || live.phase === 'text-transferring') && !live.cancelPending) {
+            if ((live.phase === 'text-staged' || live.phase === 'text-transferring' ||
+                live.phase === 'receive-text-waiting' || live.phase === 'receive-text-receiving' ||
+                live.phase === 'receive-text-outcome') && !('cancelPending' in live && live.cancelPending)) {
                 const sessionId = live.session.sessionId
                 void Promise.resolve().then(() => {
                     const now = stateRef.current
-                    if (!mountedRef.current && (now.phase === 'text-staged' || now.phase === 'text-transferring') &&
+                    if (!mountedRef.current && (now.phase === 'text-staged' || now.phase === 'text-transferring' ||
+                        now.phase === 'receive-text-waiting' || now.phase === 'receive-text-receiving' ||
+                        now.phase === 'receive-text-outcome') &&
                         now.session.sessionId === sessionId) return CancelTransfer()
                 }).catch(() => undefined)
             }
@@ -219,6 +233,10 @@ export function useTransfer(): TransferController {
             draftRecoveryRef.current = null
             draftChooserRef.current = null
             selectionEpochRef.current += 1
+            receiveTextEpochRef.current += 1
+            receiveTextFetchStartedRef.current = null
+            receiveTextFetchPendingRef.current = null
+            receiveTextCopyPendingRef.current = null
             sendAgainPendingRef.current = false
             showFolderPendingRef.current = false
             for (const resolve of idleWaitersRef.current) resolve()
@@ -579,6 +597,93 @@ export function useTransfer(): TransferController {
         return browse(SelectReceiveFolder, 'receive', startReceiveAt, true)
     }, [browse, startReceiveAt])
 
+    const receiveText = useCallback(async (): Promise<void> => {
+        if (!mountedRef.current || stateRef.current.phase !== 'idle' || stageOperationRef.current !== null ||
+            browseOperationRef.current !== null || composerRef.current !== null || draftEntriesRef.current !== null) return
+        const generation = ++stageGenerationRef.current
+        selectionEpochRef.current += 1
+        rememberedPathsRef.current = null
+        rememberedTextRef.current = null
+        const promise = Promise.resolve().then(() => StartReceiveText() as Promise<unknown>)
+        const operation: StageOperation = {generation, promise, cancelRequested: false}
+        stageOperationRef.current = operation
+        dispatch({type: 'stage-requested', generation, itemKind: 'receive-text'})
+        try {
+            const raw = await promise
+            if (!stageMayCommit(operation)) return
+            const metadata = parseReceiveTextMetadata(raw)
+            if (metadata === null) {
+                operation.cancelRequested = true
+                let quiesced = true
+                try { await CancelTransfer() } catch { quiesced = false }
+                if (mountedRef.current && stageOperationRef.current === operation) {
+                    dispatchStageFailed(generation, publicError(quiesced ? 'setup_failed' : 'cleanup_unconfirmed'))
+                }
+                if (stageOperationRef.current === operation) stageOperationRef.current = null
+                return
+            }
+            dispatch({type: 'receive-text-started', generation, metadata})
+        } catch (rejection) {
+            if (stageMayCommit(operation)) dispatchStageFailed(generation, parseCommandError(rejection))
+        } finally {
+            if (stageOperationRef.current === operation && !operation.cancelRequested) stageOperationRef.current = null
+        }
+    }, [])
+
+    const fetchReceivedText = useCallback(async (sessionId: string): Promise<void> => {
+        const current = stateRef.current
+        if (!mountedRef.current || current.phase !== 'receive-text-outcome' || current.kind !== 'complete' ||
+            current.session.sessionId !== sessionId || current.value !== null || current.donePending ||
+            receiveTextFetchPendingRef.current !== null) return
+        const epoch = ++receiveTextEpochRef.current
+        const operation = {sessionId, epoch}
+        receiveTextFetchPendingRef.current = operation
+        dispatch({type: 'receive-text-fetch-requested', sessionId})
+        try {
+            const value = await GetReceivedText(sessionId)
+            const checked = typeof value === 'string' ? validateText(value) : null
+            if (receiveTextFetchPendingRef.current === operation) receiveTextFetchPendingRef.current = null
+            if (!mountedRef.current || receiveTextEpochRef.current !== epoch) return
+            const latest = stateRef.current
+            if (latest.phase !== 'receive-text-outcome' || latest.kind !== 'complete' ||
+                latest.session.sessionId !== sessionId) return
+            if (checked?.ok && checked.text === value) dispatch({type: 'receive-text-value', sessionId, value})
+            else dispatch({type: 'receive-text-fetch-failed', sessionId})
+        } catch {
+            if (receiveTextFetchPendingRef.current === operation) receiveTextFetchPendingRef.current = null
+            if (!mountedRef.current || receiveTextEpochRef.current !== epoch) return
+            dispatch({type: 'receive-text-fetch-failed', sessionId})
+        }
+    }, [])
+
+    const copyReceivedText = useCallback(async (sessionId: string): Promise<boolean> => {
+        const current = stateRef.current
+        if (!mountedRef.current || current.phase !== 'receive-text-outcome' || current.kind !== 'complete' ||
+            current.session.sessionId !== sessionId || current.value === null || current.copying || current.donePending ||
+            receiveTextCopyPendingRef.current !== null) return false
+        const epoch = ++receiveTextEpochRef.current
+        const operation = {sessionId, epoch}
+        receiveTextCopyPendingRef.current = operation
+        dispatch({type: 'receive-text-copy-requested', sessionId})
+        let failed = false
+        try { await CopyReceivedText(sessionId) } catch { failed = true }
+        if (receiveTextCopyPendingRef.current === operation) receiveTextCopyPendingRef.current = null
+        if (!mountedRef.current || receiveTextEpochRef.current !== epoch) return false
+        const latest = stateRef.current
+        if (latest.phase !== 'receive-text-outcome' || latest.kind !== 'complete' ||
+            latest.session.sessionId !== sessionId) return false
+        dispatch({type: 'receive-text-copy-settled', sessionId, failed})
+        return !failed
+    }, [])
+
+    useEffect(() => {
+        if (state.phase !== 'receive-text-outcome' || state.kind !== 'complete' ||
+            state.value !== null || state.fetchError || state.fetchPending || state.donePending ||
+            receiveTextFetchStartedRef.current === state.session.sessionId) return
+        receiveTextFetchStartedRef.current = state.session.sessionId
+        void fetchReceivedText(state.session.sessionId)
+    }, [state, fetchReceivedText])
+
     const showReceivedFolder = useCallback(async (): Promise<void> => {
         const current = stateRef.current
         // Only the held outcome, only when its subfolder exists, and only one
@@ -603,6 +708,11 @@ export function useTransfer(): TransferController {
     const cancelImpl = useCallback(async (releaseForOutcome: boolean): Promise<boolean | void> => {
         if (recoveryCancelRef.current !== null) return recoveryCancelRef.current
         const current = stateRef.current
+        if (current.phase !== 'receive-text-outcome') {
+            receiveTextEpochRef.current += 1
+            receiveTextCopyPendingRef.current = null
+            receiveTextFetchPendingRef.current = null
+        }
         if (current.phase === 'recovering') {
             rememberedPathsRef.current = null
             rememberedTextRef.current = null
@@ -670,7 +780,7 @@ export function useTransfer(): TransferController {
         // transition comes from the backend's own transfer-reset, which is what
         // retires the session and returns the UI to Idle with the outcome
         // retained.
-        if (current.phase === 'done' || current.phase === 'error' || current.phase === 'receive-outcome') {
+        if (current.phase === 'done' || current.phase === 'error' || current.phase === 'receive-outcome' || current.phase === 'receive-text-outcome') {
             const outstanding = activeCancelRef.current
             if (outstanding !== null && outstanding.sessionId === current.session.sessionId) return
 
@@ -681,6 +791,12 @@ export function useTransfer(): TransferController {
                 sessionId: current.session.sessionId,
             }
             activeCancelRef.current = terminal
+            if (current.phase === 'receive-text-outcome') {
+                receiveTextEpochRef.current += 1
+                receiveTextCopyPendingRef.current = null
+                receiveTextFetchPendingRef.current = null
+                dispatch({type: 'receive-text-done-requested', sessionId: terminal.sessionId})
+            }
             try {
                 await CancelTransfer()
             } catch {
@@ -691,6 +807,10 @@ export function useTransfer(): TransferController {
                 // looking at is still correct about what happened. An internal
                 // release must report failure so its waiting action settles
                 // without staging before a reset that may never arrive.
+                if (current.phase === 'receive-text-outcome' && mountedRef.current) {
+                    receiveTextFetchStartedRef.current = null
+                    dispatch({type: 'receive-text-done-failed', sessionId: terminal.sessionId})
+                }
                 if (releaseForOutcome) return false
             } finally {
                 if (activeCancelRef.current === terminal) activeCancelRef.current = null
@@ -700,7 +820,8 @@ export function useTransfer(): TransferController {
 
         if (current.phase !== 'staged' && current.phase !== 'transferring' &&
             current.phase !== 'text-staged' && current.phase !== 'text-transferring' &&
-            current.phase !== 'receive-waiting' && current.phase !== 'receive-receiving') return
+            current.phase !== 'receive-waiting' && current.phase !== 'receive-receiving' &&
+            current.phase !== 'receive-text-waiting' && current.phase !== 'receive-text-receiving') return
         if (current.cancelPending) return
         const outstandingCancel = activeCancelRef.current
         if (outstandingCancel !== null && outstandingCancel.sessionId === current.session.sessionId) return
@@ -730,7 +851,7 @@ export function useTransfer(): TransferController {
     const refreshConnection = useCallback(async (sessionId: string, networkId: string): Promise<void> => {
         const current = stateRef.current
         if (!mountedRef.current || recoveryRef.current !== null ||
-            (current.phase !== 'staged' && current.phase !== 'receive-waiting' && current.phase !== 'text-staged') ||
+            (current.phase !== 'staged' && current.phase !== 'receive-waiting' && current.phase !== 'text-staged' && current.phase !== 'receive-text-waiting') ||
             current.session.sessionId !== sessionId || current.cancelPending) return
         const generation = ++recoveryGenerationRef.current
         const operation = {generation, sessionId}
@@ -742,8 +863,8 @@ export function useTransfer(): TransferController {
             const raw = await RefreshConnection(sessionId, networkId)
             if (!mountedRef.current || recoveryRef.current !== operation) return
             const result = parseConnectionRefresh(raw)
-            if (earlyRecoveryOverflowRef.current || result === null || result.mode !== (current.phase === 'staged' ? 'send' : current.phase === 'text-staged' ? 'text' : 'receive') ||
-                (result.mode === 'send' ? result.send.sessionId : result.mode === 'text' ? result.text.sessionId : result.receive.sessionId) === sessionId) {
+            if (earlyRecoveryOverflowRef.current || result === null || result.mode !== (current.phase === 'staged' ? 'send' : current.phase === 'text-staged' ? 'text' : current.phase === 'receive-text-waiting' ? 'receive-text' : 'receive') ||
+                (result.mode === 'send' ? result.send.sessionId : result.mode === 'text' ? result.text.sessionId : result.mode === 'receive-text' ? result.receiveText.sessionId : result.receive.sessionId) === sessionId) {
                 let quiesced = true
                 try { await CancelTransfer() } catch { quiesced = false }
                 if (recoveryRef.current !== operation || !mountedRef.current) return
@@ -984,7 +1105,7 @@ export function useTransfer(): TransferController {
     }
 
     return {
-        state, stage, composer, openText, editText, cancelText, sendText, selectFile, selectDirectory, receive, showReceivedFolder, cancel, refreshConnection, rejectSelection, reportCopyFailure, dismissRetained,
+        state, stage, composer, openText, editText, cancelText, sendText, selectFile, selectDirectory, receive, receiveText, fetchReceivedText, copyReceivedText, showReceivedFolder, cancel, refreshConnection, rejectSelection, reportCopyFailure, dismissRetained,
         stageFromOutcome, selectFromOutcome, retry, sendAgain,
         canRetry: rememberedPathsRef.current !== null || rememberedTextRef.current !== null,
         canSendAgain: (rememberedPathsRef.current !== null || rememberedTextRef.current !== null) &&
@@ -1028,7 +1149,8 @@ export function useTransfer(): TransferController {
         const latest = stateRef.current
         return (latest.phase === 'staged' || latest.phase === 'transferring' ||
             latest.phase === 'text-staged' || latest.phase === 'text-transferring' ||
-            latest.phase === 'receive-waiting' || latest.phase === 'receive-receiving') &&
+            latest.phase === 'receive-waiting' || latest.phase === 'receive-receiving' ||
+            latest.phase === 'receive-text-waiting' || latest.phase === 'receive-text-receiving') &&
             latest.session.sessionId === operation.sessionId
     }
 }

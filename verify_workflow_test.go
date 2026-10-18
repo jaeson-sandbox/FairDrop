@@ -367,6 +367,7 @@ fi`, ""},
 		{"verify", "go test", "go test -count=1 -timeout 240s ./...", ""},
 		{"verify", "go test -race", "go test -count=1 -race -timeout 1200s ./...", ""},
 		{"verify", "Frontend suite", "npm test", "frontend"},
+		{"verify", "Prove receive-text frontend guards", `python scripts/verify-receive-text-frontend-mutations.py --log-dir "$RUNNER_TEMP/receive-text-frontend-mutations"`, ""},
 		{"linux-adapters", "Vet Go adapters", "go vet ./...", ""},
 		{"linux-adapters", "Execute Go suite and report capability skips", "go test -count=1 -v -timeout 240s ./...", ""},
 		{"linux-adapters", "Execute adapter race suite", "test \"$(go env CGO_ENABLED)\" = 1\ngo test -count=1 -race -timeout 1200s ./...", ""},
@@ -544,6 +545,18 @@ func TestVerifyWorkflowNeverUsesAForbiddenFlag(t *testing.T) {
 	}
 }
 
+// The mutation logs are retained even when the proof step fails.
+func TestVerifyWorkflowRetainsReceiveTextFrontendMutationLogs(t *testing.T) {
+	step := verifyStep(verifyJob(readVerifyWorkflow(t), "verify"), "Retain receive-text frontend mutation logs")
+	if workflowField(step, "if", 8) != "always()" ||
+		workflowField(step, "uses", 8) != "actions/upload-artifact@v7" ||
+		!strings.Contains(step, "name: receive-text-frontend-mutations-${{ runner.os }}") ||
+		!strings.Contains(step, "path: ${{ runner.temp }}/receive-text-frontend-mutations") ||
+		!strings.Contains(step, "if-no-files-found: error") {
+		t.Fatal("receive-text frontend mutation logs are not retained for each native OS")
+	}
+}
+
 // Every step runs one at a time, in the fixed order the spec's Always
 // clause states. This is the test that catches a reordered or deleted
 // step: it locates each step's unique `- name:` heading and asserts the
@@ -565,6 +578,8 @@ func TestVerifyWorkflowRunsEveryStepInTheRequiredOrder(t *testing.T) {
 		"- name: Confirm cgo is enabled",
 		"- name: go test -race",
 		"- name: Frontend suite",
+		"- name: Prove receive-text frontend guards",
+		"- name: Retain receive-text frontend mutation logs",
 		"- name: Accessibility browser suite",
 		"- name: Line-ending check",
 	}

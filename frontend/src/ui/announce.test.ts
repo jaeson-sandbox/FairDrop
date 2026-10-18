@@ -24,6 +24,26 @@ function metadata(overrides: Partial<FileMetadata> = {}): FileMetadata {
 const discovery: Warning = {code: 'beacon_warning', message: 'Device discovery isn’t available. ' +
     'The QR code and download link still work.'}
 
+it('focuses a Receive text command error after preflight recovery refuses', () => {
+    const previous: TransferState = {phase: 'recovering', generation: 1, session: {sessionId, lastSeq: 0},
+        mode: 'receive-text', metadata: {sessionId,
+            url: `http://192.0.2.1:34123/receive-text/${'fedcba9876543210fedcba9876543210'}`,
+            qrBase64: metadata().qrBase64, warnings: []}, retired: false, cancelPending: false, refusals: 0}
+    const next = transferReducer(previous, {type: 'recovery-failed', generation: 1, sessionId,
+        retired: false, error: publicError('setup_failed')})
+    expect(next.phase).toBe('receive-text-waiting')
+    expect(routeTransition(previous, next)).toEqual({row: 'command-failure', owner: 'focus', target: 'command-error'})
+})
+
+it('focuses each failed Receive text read after a fresh retry attempt', () => {
+    const base: TransferState = {phase: 'receive-text-outcome', session: {sessionId, lastSeq: 2},
+        kind: 'complete', value: null, fetchError: true, copyError: false, copying: false}
+    const pending = transferReducer(base, {type: 'receive-text-fetch-requested', sessionId})
+    expect(pending).toMatchObject({fetchError: false, fetchPending: true})
+    const failedAgain = transferReducer(pending, {type: 'receive-text-fetch-failed', sessionId})
+    expect(routeTransition(pending, failedAgain)).toEqual({row: 'command-failure', owner: 'focus', target: 'command-error'})
+})
+
 function idle(overrides: Partial<Extract<TransferState, {phase: 'idle'}>> = {}): TransferState {
     return {phase: 'idle', retainedOutcome: null, commandError: null, ...overrides}
 }
@@ -414,6 +434,9 @@ describe('the focus selector', () => {
             'receive-receiving-heading',
             'receive-outcome',
             'recovery-heading',
+            'receive-text-waiting-heading',
+            'receive-text-receiving-heading',
+            'receive-text-outcome',
         ])
     })
 })

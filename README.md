@@ -37,6 +37,13 @@ writes to your disk, so the "persists nothing" promise above describes sending a
 FairDrop's own state: a receive session saves the files you chose to receive and still stores
 no settings, history, logs, or remembered folder.
 
+**Receive text from a phone**: choose **Receive text** in Idle and scan the one-time QR code.
+The phone opens a plain form for a short note or link (up to 65,536 UTF-8 bytes). After
+you send it, FairDrop holds the exact text in a selectable desktop field until **Done**;
+**Copy text** writes it to the OS clipboard only when you ask. Links are displayed as
+text, never opened automatically. This mode needs no destination folder and writes no
+file or history. Like file receiving, the form is plain HTTP for a trusted local network.
+
 Limits worth knowing before you rely on it:
 
 - The destination must be a plain, writable folder. A folder that is, or sits under, a link or

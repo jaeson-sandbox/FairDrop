@@ -41,6 +41,9 @@ One process owns one live session and receiver. V1 has no receiver app, account,
 | **FairDrop desktop window — Idle** | App open; accepted `transfer-reset` | Native drop target, one browse control (`copy.label.chooseFileOrFolder`) opening a menu for file or folder, firewall preflight, optional retained Done/Error, and staged troubleshooting. |
 | **Native file/directory dialogs** | Selection Controls | OS-owned selection; empty result is a quiet cancel. Dialog does not stage itself. |
 | **Receive entry (Idle)** | Idle, when no outcome or failure card replaces it | *Receive.* One secondary button (`copy.receive.open`) and one line of hint (`copy.receive.hint`), between the drop zone and the disclosures and outside the drop zone, so it is never a native drop target. Activating it opens the native folder chooser. |
+| **Receive text entry (Idle)** | Idle with no active session | A distinct secondary Receive text action outside the drop zone starts an empty RAM-only receiver, with no chooser. |
+| **Receive text waiting** | Successful `ReceiveTextMetadata` | QR and link to a script-free phone form; Cancel and waiting connection refresh. No text value exists yet. |
+| **Receive text outcome (held)** | Accepted terminal receive-text event | The exact text appears in a labelled readonly selectable field. Copy text calls the native session-guarded command; only its success announces Copied. Done clears the value. A failed result shows fixed error copy with no partial preview. |
 | **Native folder chooser (Receive)** | Receive entry, or a failed Receive's retry action | *Receive.* OS-owned, opened at the Downloads folder. A dismissed chooser is a quiet no-op: no session, no listener, no message, and focus returns to the Receive control. |
 | **Multiple-selection list** | Send multiple items or native drop of 2–10,000 paths | Editable memory-only list with Add Files, Add Folder, Remove, Send and Cancel. Listener setup starts only on Send. |
 | **Local staging-pending presentation** | One valid drop or non-empty dialog result | Shows local preparation and **Cancel preparation** while `StageTransfer` is pending; never claims backend STAGED. |
@@ -181,6 +184,26 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.help.receiver_http` | Generic receiver-error help | “Browser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. Cancel and prepare the item again for a fresh link.” |
 | `copy.help.receiver_http_waiting` | Receiver-error help while a code is waiting | “Browser says Not Found: the link may be wrong or expired. Locked: another downloader claimed it. Gone: the selected item changed. If this code is still waiting, use Refresh connection below for a new code.” |
 | `copy.receive.open` | Idle Receive action | “Receive” |
+| `copy.receive_text.open` | Idle Receive text action | “Receive text” |
+| `copy.receive_text.pending` | Receive text preparation | “Preparing to receive text…” |
+| `copy.receive_text.hint` | Idle guidance | “Invite one nearby browser to send a note or link.” |
+| `copy.receive_text.waiting_heading` | Waiting heading | “Waiting for text” |
+| `copy.receive_text.waiting_body` | Waiting guidance | “Scan the code on your phone, then send text from its browser.” |
+| `copy.receive_text.link_label` | Readonly capability field | “Text receive link” |
+| `copy.receive_text.once` | Waiting one-submission caveat, always visible | “Works once: this link accepts one text submission.” |
+| `copy.receive_text.receiving_heading` | Active receive heading | “Receiving text” |
+| `copy.receive_text.receiving_body` | Active receive guidance | “FairDrop is receiving text from the browser.” |
+| `copy.receive_text.received_heading` | Held successful receipt | “Text received” |
+| `copy.receive_text.received_body` | Held receipt guidance | “Inspect the text, then copy it when you are ready.” |
+| `copy.receive_text.field_label` | Readonly accepted value | “Received text” |
+| `copy.receive_text.copy_action` | Explicit native copy | “Copy text” |
+| `copy.receive_text.copied` | Actual native copy success announcement | “Copied” |
+| `copy.receive_text.copy_failed` | Native copy refusal beside held value | “The text could not be copied. Try again.” |
+| `copy.receive_text.loading` | Session-guarded value fetch pending | “Loading received text…” |
+| `copy.receive_text.fetch_failed` | Unexpected value-fetch failure | “The received text could not be shown. Try again.” |
+| `copy.receive_text.retry` | Retry value fetch | “Try again” |
+| `copy.receive_text.failed_heading` | Held failed receive | “Text not received” |
+| `copy.receive_text.failed_body` | Failed receive guidance | “The text did not finish arriving. Ask the sender to try again with a new code.” |
 | `copy.receive.choose_another_folder` | Receive failure card's primary action when the folder cannot be used | “Choose Another Folder” |
 | `copy.receive.hint` | Idle line beside the Receive action | “Get files from a phone on the same local network.” |
 | `copy.receive.pending` | Receive start pending (Stage Pending Card heading) | “Preparing to receive…” |

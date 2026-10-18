@@ -42,6 +42,16 @@ func TestBrowserLiveFixture(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = textServer.Stop() })
 	fmt.Println("FAIRDROP_RECEIVER_TEXT_URL=" + baseURL(textHandle.Port) + "/text/" + string(testToken))
+	receiveOwner := &receivedTextOwner{}
+	receiveServer := newTestServer(t, nil)
+	receiveHandle, err := receiveServer.Start(context.Background(), transfer.ServerStartRequest{
+		SessionID: testSession, Token: testToken, ReceiveText: true,
+	}, receiveOwner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = receiveServer.Stop() })
+	fmt.Println("FAIRDROP_RECEIVER_RECEIVE_TEXT_URL=" + baseURL(receiveHandle.Port) + "/receive-text/" + string(testToken))
 	finished := make(chan struct{})
 	go func() {
 		_, _ = io.Copy(io.Discard, os.Stdin)
@@ -51,5 +61,9 @@ func TestBrowserLiveFixture(t *testing.T) {
 	case <-finished: // Harness closed stdin; cleanup closes both listeners.
 	case <-time.After(2 * time.Minute):
 		t.Fatal("browser harness did not release the fixture within two minutes")
+	}
+	if claims, values := receiveOwner.snapshot(); claims != 1 || len(values) != 1 ||
+		values[0] != "First line\n雪 & <tag> https://example.test/?a=1&b=2" {
+		t.Fatalf("browser form submitted claims=%d values=%q", claims, values)
 	}
 }

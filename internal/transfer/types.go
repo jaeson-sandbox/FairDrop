@@ -180,6 +180,15 @@ type ReceiveMetadata struct {
 	Warnings    []Warning `json:"warnings"`
 }
 
+// ReceiveTextMetadata contains only the capability and session correlation.
+// The submitted value is available solely through GetReceivedText.
+type ReceiveTextMetadata struct {
+	SessionID SessionID `json:"sessionId"`
+	URL       string    `json:"url"`
+	QR        string    `json:"qrBase64"`
+	Warnings  []Warning `json:"warnings"`
+}
+
 // ReceiveResultKind is how a receive session ended.
 type ReceiveResultKind string
 

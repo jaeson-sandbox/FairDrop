@@ -1006,6 +1006,7 @@ func TestPostNoticeRevalidationAbandonsACancelledCallerClaim(t *testing.T) {
 	if events[0].Kind != TransferNotice || events[1].Kind != TransferError {
 		t.Fatalf("post-notice cancellation left a spent waiting link: %+v", events)
 	}
+	h.awaitDrainer() // terminal publication precedes the final state store
 	if got := h.state(); got != stateError {
 		t.Fatalf("post-notice cancellation state = %q, want ERROR", got)
 	}
@@ -1030,6 +1031,9 @@ func TestCallerAbortAtNoticeCompletionStillSettlesSpentLink(t *testing.T) {
 	if events[1].Kind != TransferError || events[1].Error == nil {
 		t.Fatalf("caller abort after notice completion = %+v, want terminal error", events)
 	}
+	h.eventually("abandoned claim settles its held ERROR", func() bool {
+		return h.state() == stateError && !h.coordinator.leaseHeld()
+	})
 	if got := h.state(); got != stateError {
 		t.Fatalf("state = %q, want ERROR", got)
 	}
@@ -1120,6 +1124,7 @@ func TestClaimWaitingForNoticeHasOneBound(t *testing.T) {
 	if events[0].Kind != TransferNotice || events[1].Kind != TransferError || events[1].Error == nil {
 		t.Fatalf("events after timed-out claim = %+v, want notice then terminal error", events)
 	}
+	h.awaitDrainer() // terminal publication precedes the final state store
 	if got := h.state(); got != stateError {
 		t.Fatalf("state after timed-out claim = %q, want ERROR", got)
 	}

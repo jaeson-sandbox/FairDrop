@@ -86,6 +86,9 @@ type session struct {
 	// text is the bounded normalized text retained for waiting recovery. The
 	// operation lease owns it; no event or metadata copies its contents.
 	text *string
+	// receiveText is non-nil only for an inbound text session. mu guards its
+	// accepted value, which is never exposed through events or metadata.
+	receiveText *receivedTextSession
 	// receive is non-nil exactly for a receive session. Its fields beyond dest
 	// are guarded by Coordinator.mu.
 	receive  *receiveSession

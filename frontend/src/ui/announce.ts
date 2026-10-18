@@ -48,6 +48,9 @@ export const focusTargets = [
     'receive-receiving-heading',
     'receive-outcome',
     'recovery-heading',
+    'receive-text-waiting-heading',
+    'receive-text-receiving-heading',
+    'receive-text-outcome',
 ] as const
 
 export type FocusTarget = (typeof focusTargets)[number]
@@ -151,6 +154,26 @@ export function routeTransition(previous: TransferState, next: TransferState): A
 
         case 'receive-outcome':
             return toReceiveOutcome(previous, next)
+
+        case 'receive-text-waiting':
+            if (previous.phase === 'recovering' && next.commandError !== null) return focusRow('command-failure', 'command-error')
+            if (previous.phase !== 'receive-text-waiting') return focusRow('receive-ready', 'receive-text-waiting-heading')
+            if (isNewCommandError(previous.commandError, next.commandError)) return focusRow('command-failure', 'command-error')
+            if (!previous.cancelPending && next.cancelPending) return spokenRow('cancel-requested', copy.cancel.pending)
+            return null
+
+        case 'receive-text-receiving':
+            if (previous.phase !== 'receive-text-receiving') return focusRow('receive-started', 'receive-text-receiving-heading')
+            if (isNewCommandError(previous.commandError, next.commandError)) return focusRow('command-failure', 'command-error')
+            if (!previous.cancelPending && next.cancelPending) return spokenRow('cancel-requested', copy.cancel.pending)
+            return null
+
+        case 'receive-text-outcome':
+            if (previous.phase !== 'receive-text-outcome') return focusRow('receive-outcome', 'receive-text-outcome')
+            if (next.commandError && next.commandError !== previous.commandError) return focusRow('command-failure', 'command-error')
+            if (next.fetchError && previous.phase === 'receive-text-outcome' && !previous.fetchError) return focusRow('command-failure', 'command-error')
+            if (next.copyError && previous.phase === 'receive-text-outcome' && !previous.copyError) return focusRow('command-failure', 'command-error')
+            return null
 
         case 'idle':
             return toIdle(previous, next)
@@ -262,7 +285,7 @@ function toIdle(previous: TransferState, next: IdleTransferState): Announcement 
     // outcome and retains nothing, so focus would fall to the document body;
     // it moves to the Idle instruction instead, as Dismiss does, and that move
     // is the transition's only owner.
-    if (previous.phase === 'receive-outcome') return focusRow('receive-leave', 'idle-instruction')
+    if (previous.phase === 'receive-outcome' || previous.phase === 'receive-text-outcome') return focusRow('receive-leave', 'idle-instruction')
 
     const previousError = previous.phase === 'idle' ? previous.commandError : null
     if (isNewCommandError(previousError, next.commandError)) return focusRow('command-failure', 'command-error')

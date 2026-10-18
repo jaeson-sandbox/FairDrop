@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
     useTransfer: vi.fn(),
     noop: vi.fn(),
     receive: vi.fn(),
+    receiveText: vi.fn(),
     showReceivedFolder: vi.fn(),
     cancel: vi.fn(),
     dismissRetained: vi.fn(),
@@ -60,6 +61,9 @@ const commands: ControllerCommands = {
     selectFile: mocks.noop,
     selectDirectory: mocks.noop,
     receive: mocks.receive,
+    receiveText: mocks.receiveText,
+    fetchReceivedText: mocks.noop,
+    copyReceivedText: mocks.noop,
     showReceivedFolder: mocks.showReceivedFolder,
     cancel: mocks.cancel,
     rejectSelection: mocks.noop,
@@ -487,5 +491,33 @@ describe('a failed Receive start', () => {
 
         expect(screen.getByRole('heading', {name: 'Item not found'})).toBeTruthy()
         expect(screen.queryByRole('button', {name: 'Choose Another Folder'})).toBeNull()
+    })
+})
+
+describe('Receive text App routing', () => {
+    const textWaiting: TransferState = {phase: 'receive-text-waiting', session: {sessionId, lastSeq: 0},
+        metadata: {sessionId, url: 'http://192.168.1.50:45678/receive-text/1112131415161718191a1b1c1d1e1f20',
+            qrBase64: qrPNG, warnings: []}, cancelPending: false, commandError: null}
+    const textOutcome: TransferState = {phase: 'receive-text-outcome', session: {sessionId, lastSeq: 2},
+        kind: 'complete', value: 'received', fetchError: false, copyError: false, copying: false}
+
+    it('does not announce a late Copy Link success after the same session receives text', async () => {
+        let finish!: () => void
+        mocks.copyToClipboard.mockReturnValue(new Promise<void>(resolve => { finish = resolve }))
+        const view = mountWith(textWaiting)
+        fireEvent.click(screen.getByRole('button', {name: 'Copy Link'}))
+        await act(async () => { await Promise.resolve() })
+        expect(mocks.copyToClipboard).toHaveBeenCalledTimes(1)
+        transitionTo(view, textOutcome)
+        await act(async () => { finish(); await Promise.resolve() })
+        expect(announcer()).not.toBe('Copied')
+    })
+
+    it('retries a failed Receive text start through Receive text, not the folder chooser', async () => {
+        mountWith({phase: 'idle', retainedOutcome: null, commandContext: 'receive-text',
+            commandError: {code: 'setup_failed', message: 'fixed'}})
+        await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Try again'})) })
+        expect(mocks.receiveText).toHaveBeenCalledTimes(1)
+        expect(mocks.receive).not.toHaveBeenCalled()
     })
 })

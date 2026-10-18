@@ -59,6 +59,9 @@ func (r *run) routePattern() string {
 	if r.destination != nil {
 		return uploadPattern
 	}
+	if r.receiveText {
+		return receiveTextPattern
+	}
 	if r.text != nil {
 		return textPattern
 	}

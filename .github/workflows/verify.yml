@@ -254,6 +254,17 @@ jobs:
         working-directory: frontend
         run: npm test
 
+      - name: Prove receive-text frontend guards
+        run: python scripts/verify-receive-text-frontend-mutations.py --log-dir "$RUNNER_TEMP/receive-text-frontend-mutations"
+
+      - name: Retain receive-text frontend mutation logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receive-text-frontend-mutations-${{ runner.os }}
+          path: ${{ runner.temp }}/receive-text-frontend-mutations
+          if-no-files-found: error
+
       - name: Cache the Playwright Chromium download
         id: cache-playwright
         uses: actions/cache@v6
