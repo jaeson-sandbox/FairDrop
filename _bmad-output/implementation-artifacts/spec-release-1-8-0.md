@@ -2,7 +2,7 @@
 title: 'Release FairDrop 1.8.0'
 type: 'chore'
 created: '2026-10-18'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'af4199273318602da22fbdcf7ec1c72a8c2ed2c9'
 review_loop_iteration: 0
 context:
@@ -51,8 +51,8 @@ Publish FairDrop 1.8.0 so users can download the completed phone-to-desktop text
 - [x] Sol: bump only product versions to 1.8.0 in `wails.json`, frontend package and lock root fields; update README/roadmap release references.
 - [x] Sol: add `docs/release-notes-1.8.0.md` covering phone-to-desktop text/link receipt, normalization/limits, one-shot semantics, explicit copy, memory clearing and existing trusted-LAN/signing/checksum limitations. Use version-pinned absolute documentation links.
 - [x] Sol: run focused identity tests and structured dependency-diff checks; create companion evidence with matrix coverage and pending remote stages.
-- [ ] Main: complete three independent review layers and ordered local gate, commit/push, open PR, verify exact-head CI, merge without squashing.
-- [ ] Main: confirm absent tag/release, tag merged head, verify all exact-tag release jobs, download and inspect artifacts, replace draft notes, publish and confirm latest/public identity. Record publication proof in `_bmad-output/implementation-artifacts/release-evidence.md` on a follow-up documentation branch.
+- [x] Main: complete three independent review layers and ordered local gate, commit/push, open PR, verify exact-head CI, merge without squashing.
+- [x] Main: confirm absent tag/release, tag merged head, verify all exact-tag release jobs, download and inspect artifacts, replace draft notes, publish and confirm latest/public identity. Record publication proof in `_bmad-output/implementation-artifacts/release-evidence.md` on a follow-up documentation branch.
 
 Given passing identity and automated gates, when v1.8.0 is published, then both native downloads identify the release and match their checksums. Given any failed required check or inconsistent asset, publication remains pending until corrected. Given the new receive-text flow, when release notes describe it, then they distinguish receipt from clipboard success and preserve the limits of local in-memory clearing.
 

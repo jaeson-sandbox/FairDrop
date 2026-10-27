@@ -523,3 +523,9 @@ The 10,000-item collection cap, with lazy member preparation, shipped in [v1.5.1
 ## v1.6.0 — PUBLISHED 2026-10-12
 
 Phone-to-desktop receiving shipped in [v1.6.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.6.0). Tag revision: `26f083c3ae80da594a973154eb0278eb438adf40`. All six jobs in [release run 38203692590](https://github.com/jaeson-sandbox/FairDrop/actions/runs/38203692590) passed, both downloaded checksums matched, and the macOS bundle reports version 1.6.0. An earlier merge commit failed Windows CI on a real defect (the upload deadline), which was fixed before tagging. See [the complete release evidence](evidence-release-1-6-0.md).
+
+## FairDrop 1.8.0 — phone-to-desktop text (2026-10-26)
+
+Published [v1.8.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.8.0) from immutable commit `f21aaa18233156cea85c428db714203f4aceb305`. [Release run 40437065267](https://github.com/jaeson-sandbox/FairDrop/actions/runs/40437065267) passed all six native/adapter verification, native build and draft jobs. Downloaded Windows x86_64 and macOS arm64 assets identify as 1.8.0 and match their SHA-256 sidecars; the macOS ad-hoc signature passed deep/strict verification. The public latest stable release contains the exact reviewed notes and four verified assets.
+
+Full local gates, three review layers, exact PR/main/tag conclusions, downloaded hashes and version/signature checks are recorded in [evidence-release-1-8-0.md](evidence-release-1-8-0.md). Manual phone/native UI, Photos, firewall and assistive-technology observations remain optional/unverified. This release adds bounded RAM-only phone-to-desktop text receipt with explicit desktop copy; it does not change photo selection or the trusted-LAN transport model.
