@@ -119,6 +119,8 @@ export interface TransferController {
     readonly retry: () => Promise<void>
     readonly sendAgain: () => Promise<void>
     readonly canSendAgain: boolean
+    readonly receiveAgain: () => Promise<void>
+    readonly canReceiveAgain: boolean
     /**
      * Whether `retry()` currently has a remembered path to act on.
      *
@@ -159,6 +161,9 @@ export function useTransfer(): TransferController {
     const activeCancelRef = useRef<ActiveCancelOperation | null>(null)
     const browseOperationRef = useRef<BrowseOperation | null>(null)
     const subscriptionEpochRef = useRef(0)
+    // The approved receive parent never leaves private controller memory.
+    const receiveParentRef = useRef<string | null>(null)
+    const receiveAgainPendingRef = useRef(false)
     // The absolute path passed to the most recent StageTransfer -- JS memory
     // only (Story 9.2 AC1). Never localStorage, never a Go call beyond the
     // ordinary StageTransfer a retry or Send Again issues, never logged or rendered:
@@ -191,6 +196,13 @@ export function useTransfer(): TransferController {
     const showFolderPendingRef = useRef(false)
     const idleWaitersRef = useRef<Set<() => void>>(new Set())
     stateRef.current = state
+    // Only committed lifecycle transitions may discard a retained parent.
+    // Eligibility and command guards independently reject invalid outcomes.
+    useEffect(() => {
+        if ((state.phase === 'receive-outcome' && state.outcome.kind !== 'complete') ||
+            (state.phase === 'idle' && !receiveAgainPendingRef.current) ||
+            state.phase === 'error' || state.phase === 'done') receiveParentRef.current = null
+    }, [state])
 
     useEffect(() => {
         mountedRef.current = true
@@ -226,6 +238,7 @@ export function useTransfer(): TransferController {
             stageOperationRef.current = null
             activeCancelRef.current = null
             browseOperationRef.current = null
+            receiveParentRef.current = null
             rememberedPathsRef.current = null
             rememberedTextRef.current = null
             composerRef.current = null
@@ -321,6 +334,7 @@ export function useTransfer(): TransferController {
         // 9.2 AC1). Replaced by the next Stage; cleared elsewhere on Dismiss,
         // user cancellation, and a non-retryable Stage failure.
         selectionEpochRef.current += 1
+        receiveParentRef.current = null
         rememberedPathsRef.current = [...paths]
         rememberedTextRef.current = null
         const promise = Promise.resolve().then(() => paths.length === 1
@@ -392,6 +406,7 @@ export function useTransfer(): TransferController {
     const openText = useCallback(() => {
         if (!mountedRef.current || stateRef.current.phase !== 'idle' || composerRef.current !== null ||
             stageOperationRef.current !== null || browseOperationRef.current !== null || draftEntriesRef.current !== null) return
+        receiveParentRef.current = null
         rememberedPathsRef.current = null
         rememberedTextRef.current = null
         selectionEpochRef.current += 1
@@ -534,9 +549,9 @@ export function useTransfer(): TransferController {
      * Starts a receive session into an already-chosen folder.
      *
      * The receive twin of `stagePaths`, and deliberately not built on it:
-     * nothing here is remembered. A receive never stores its folder, so there
-     * is nothing for Send Again or Try Again to re-stage, and starting one
-     * forgets any send path so a stale one cannot be offered beside it. It
+     * only the approved parent path is retained privately for Receive Again.
+     * Each attempt reopens it through ordinary StartReceive, and forgets any
+     * send target so a stale send action cannot be offered beside it. It
      * shares the Stage operation slot, which is what makes Cancel preparation,
      * the cancelled-while-pending race and the unmount cleanup the same proven
      * machinery as a send rather than a second copy of it.
@@ -550,6 +565,7 @@ export function useTransfer(): TransferController {
         selectionEpochRef.current += 1
         rememberedPathsRef.current = null
         rememberedTextRef.current = null
+        receiveParentRef.current = folder
         const promise = Promise.resolve().then(() => StartReceive(folder) as Promise<unknown>)
         const operation: StageOperation = {generation, promise, cancelRequested: false}
         stageOperationRef.current = operation
@@ -602,6 +618,7 @@ export function useTransfer(): TransferController {
             browseOperationRef.current !== null || composerRef.current !== null || draftEntriesRef.current !== null) return
         const generation = ++stageGenerationRef.current
         selectionEpochRef.current += 1
+        receiveParentRef.current = null
         rememberedPathsRef.current = null
         rememberedTextRef.current = null
         const promise = Promise.resolve().then(() => StartReceiveText() as Promise<unknown>)
@@ -690,7 +707,7 @@ export function useTransfer(): TransferController {
         // launch at a time: the OS file manager is not something to open twice
         // because a button was pressed twice.
         if (!mountedRef.current || current.phase !== 'receive-outcome' || !current.outcome.subfolderExists) return
-        if (showFolderPendingRef.current) return
+        if (showFolderPendingRef.current || receiveAgainPendingRef.current || activeCancelRef.current !== null) return
         showFolderPendingRef.current = true
         const sessionId = current.session.sessionId
         dispatch({type: 'receive-show-requested', sessionId})
@@ -708,12 +725,16 @@ export function useTransfer(): TransferController {
     const cancelImpl = useCallback(async (releaseForOutcome: boolean): Promise<boolean | void> => {
         if (recoveryCancelRef.current !== null) return recoveryCancelRef.current
         const current = stateRef.current
+        // Show owns the outcome until its OS command settles. Done is ignored,
+        // while Done during a pending repeat still abandons that repeat below.
+        if (current.phase === 'receive-outcome' && showFolderPendingRef.current) return false
         if (current.phase !== 'receive-text-outcome') {
             receiveTextEpochRef.current += 1
             receiveTextCopyPendingRef.current = null
             receiveTextFetchPendingRef.current = null
         }
         if (current.phase === 'recovering') {
+            receiveParentRef.current = null
             rememberedPathsRef.current = null
             rememberedTextRef.current = null
             draftRecoveryRef.current = null
@@ -736,6 +757,7 @@ export function useTransfer(): TransferController {
             return
         }
         if (!releaseForOutcome) {
+            receiveParentRef.current = null
             rememberedPathsRef.current = null
             rememberedTextRef.current = null
             composerRef.current = null
@@ -800,13 +822,13 @@ export function useTransfer(): TransferController {
             try {
                 await CancelTransfer()
             } catch {
-                // Nowhere to put it: a terminal state has no commandError field,
-                // and the reset this was trying to force is what would have
-                // produced the Idle that could show one. The rejection text is
-                // adapter text either way, and the outcome panel the user is
-                // looking at is still correct about what happened. An internal
-                // release must report failure so its waiting action settles
-                // without staging before a reset that may never arrive.
+                // Receive outcomes can show a fixed retirement error beside
+                // their still-true result. Adapter rejection text stays private.
+                // An internal release must report failure so its waiting action
+                // settles without starting before a reset that may never arrive.
+                if (current.phase === 'receive-outcome' && mountedRef.current) {
+                    dispatch({type: 'receive-retire-failed', sessionId: terminal.sessionId})
+                }
                 if (current.phase === 'receive-text-outcome' && mountedRef.current) {
                     receiveTextFetchStartedRef.current = null
                     dispatch({type: 'receive-text-done-failed', sessionId: terminal.sessionId})
@@ -905,6 +927,7 @@ export function useTransfer(): TransferController {
         // nothing to dismiss (already idle with no retained outcome) it
         // simply returns the same state, and clearing an already-null ref a
         // second time is a no-op.
+        receiveParentRef.current = null
         rememberedPathsRef.current = null
         rememberedTextRef.current = null
         composerRef.current = null
@@ -983,6 +1006,34 @@ export function useTransfer(): TransferController {
         }
     }, [cancelImpl, stagePaths, sendText])
 
+    const receiveAgain = useCallback(async (): Promise<void> => {
+        const current = stateRef.current
+        const parent = receiveParentRef.current
+        if (!mountedRef.current || current.phase !== 'receive-outcome' || current.outcome.kind !== 'complete' ||
+            parent === null || receiveAgainPendingRef.current || showFolderPendingRef.current || activeCancelRef.current !== null) return
+        receiveAgainPendingRef.current = true
+        const epoch = selectionEpochRef.current
+        let admitted = false
+        dispatch({type: 'receive-show-requested', sessionId: current.session.sessionId})
+        try {
+            if (await cancelImpl(true) === false) return
+            if (!await waitForReceiveAgainIdle()) {
+                if (mountedRef.current && selectionEpochRef.current === epoch && receiveParentRef.current === parent) {
+                    dispatch({type: 'receive-retire-failed', sessionId: current.session.sessionId})
+                }
+                return
+            }
+            if (!mountedRef.current || selectionEpochRef.current !== epoch ||
+                receiveParentRef.current !== parent || stateRef.current.phase !== 'idle') return
+            admitted = true
+            await startReceiveAt(parent)
+        } finally {
+            receiveAgainPendingRef.current = false
+            if (!admitted && stateRef.current.phase === 'idle' &&
+                selectionEpochRef.current === epoch && receiveParentRef.current === parent) receiveParentRef.current = null
+        }
+    }, [cancelImpl, startReceiveAt])
+
     const retry = useCallback(async (): Promise<void> => {
         const paths = rememberedPathsRef.current
         const text = rememberedTextRef.current
@@ -1034,6 +1085,7 @@ export function useTransfer(): TransferController {
                 await waitForIdle()
             }
             if (!mountedRef.current || selectionEpochRef.current !== epoch || stateRef.current.phase !== 'idle') return
+            receiveParentRef.current = null
             rememberedPathsRef.current = null
             rememberedTextRef.current = null
             const invalid = proposed.length > MAX_COLLECTION_ITEMS ||
@@ -1089,6 +1141,7 @@ export function useTransfer(): TransferController {
     const cancelDraft = (): void => {
         draftEntriesRef.current = null
         draftRecoveryRef.current = null
+        receiveParentRef.current = null
         rememberedPathsRef.current = null
         draftChooserRef.current = null
         selectionEpochRef.current += 1
@@ -1106,11 +1159,32 @@ export function useTransfer(): TransferController {
 
     return {
         state, stage, composer, openText, editText, cancelText, sendText, selectFile, selectDirectory, receive, receiveText, fetchReceivedText, copyReceivedText, showReceivedFolder, cancel, refreshConnection, rejectSelection, reportCopyFailure, dismissRetained,
-        stageFromOutcome, selectFromOutcome, retry, sendAgain,
+        stageFromOutcome, selectFromOutcome, retry, sendAgain, receiveAgain,
+        canReceiveAgain: receiveParentRef.current !== null && state.phase === 'receive-outcome' && state.outcome.kind === 'complete',
         canRetry: rememberedPathsRef.current !== null || rememberedTextRef.current !== null,
         canSendAgain: (rememberedPathsRef.current !== null || rememberedTextRef.current !== null) &&
             (state.phase === 'done' || (state.phase === 'idle' && state.retainedOutcome?.kind === 'done')),
         draft, draftIds, openDraft, appendDraft, selectDraftFiles, selectDraftFolder, removeDraftItem, cancelDraft, sendDraft,
+    }
+
+    // Receive Again alone needs a bounded wait after the command settles.
+    // A timeout is not reset: remove its waiter and leave the held outcome
+    // retryable, never treating elapsed time as permission to start.
+    function waitForReceiveAgainIdle(): Promise<boolean> {
+        if (!mountedRef.current) return Promise.resolve(false)
+        if (stateRef.current.phase === 'idle') return Promise.resolve(true)
+        return new Promise<boolean>((resolve) => {
+            const onIdle = () => {
+                clearTimeout(timer)
+                idleWaitersRef.current.delete(onIdle)
+                resolve(mountedRef.current && stateRef.current.phase === 'idle')
+            }
+            const timer = setTimeout(() => {
+                idleWaitersRef.current.delete(onIdle)
+                resolve(false)
+            }, 15_000)
+            idleWaitersRef.current.add(onIdle)
+        })
     }
 
     function waitForIdle(): Promise<void> {
@@ -1127,6 +1201,7 @@ export function useTransfer(): TransferController {
      * in `browse()`, so the rule holds regardless of which command failed.
      */
     function dispatchStageFailed(generation: number, error: PublicError): void {
+        receiveParentRef.current = null
         if (selectErrorAction(error.code) !== 'retry') {
             rememberedPathsRef.current = null
             rememberedTextRef.current = null

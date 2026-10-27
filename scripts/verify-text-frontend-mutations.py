@@ -16,8 +16,8 @@ CASES = (
     ), 'keeps text across the internal live-outcome cancel used by Send Again'),
     ('explicit-cancel-forget', (
         ('src/transfer/useTransfer.ts',
-         'if (!releaseForOutcome) {\n            rememberedPathsRef.current = null\n            rememberedTextRef.current = null',
-         'if (!releaseForOutcome) {\n            rememberedPathsRef.current = null\n            // injected: remembered text survives explicit Cancel'),
+         'if (!releaseForOutcome) {\n            receiveParentRef.current = null\n            rememberedPathsRef.current = null\n            rememberedTextRef.current = null',
+         'if (!releaseForOutcome) {\n            receiveParentRef.current = null\n            rememberedPathsRef.current = null\n            // injected: remembered text survives explicit Cancel'),
     ), 'forgets remembered text on explicit Cancel'),
     ('unmount-cancel', (
         ('src/transfer/useTransfer.ts',

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,6 +33,11 @@ const nativeBoundary = "nativeboundary61c2"
 
 func nativeReceiveApp(t *testing.T, boundTimer ...func(time.Duration, func()) transfer.StopTimer) (*App, chan transfer.Event, *[]string) {
 	t.Helper()
+	return nativeReceiveAppWithNetwork(t, nativeMatrixNetwork{}, boundTimer...)
+}
+
+func nativeReceiveAppWithNetwork(t *testing.T, network nativeMatrixNetwork, boundTimer ...func(time.Duration, func()) transfer.StopTimer) (*App, chan transfer.Event, *[]string) {
+	t.Helper()
 	app := NewApp()
 	app.logf = func(string, ...any) {}
 	events := make(chan transfer.Event, 128)
@@ -48,7 +54,7 @@ func nativeReceiveApp(t *testing.T, boundTimer ...func(time.Duration, func()) tr
 		timer = boundTimer[0]
 	}
 	coordinator := transfer.NewCoordinator(transfer.Dependencies{
-		Source: inspector, Network: nativeMatrixNetwork{}, Server: server.New(stream.New(inspector)),
+		Source: inspector, Network: network, Server: server.New(stream.New(inspector)),
 		QR: qr.New(), Sink: sink.New(), Observer: appObserver{app: app}, BoundTimer: timer,
 	})
 	app.useCoordinator(coordinator)
@@ -482,4 +488,135 @@ func TestNativeReceiveRefusesUnusableFoldersBeforeAnyNetworkResource(t *testing.
 	if _, err := app.StartReceive(base); err != nil {
 		t.Fatalf("a refusal left the coordinator unusable: code=%s", transfer.ErrorCodeOf(err))
 	}
+}
+
+// Receive Again deliberately has no new backend command: each cycle goes
+// through CancelTransfer and ordinary StartReceive with the original parent.
+func TestNativeReceiveAgainUsesFreshSessionsFoldersValidationAndSpaceChecks(t *testing.T) {
+	var networkCalls atomic.Int32
+	app, events, _ := nativeReceiveAppWithNetwork(t, nativeMatrixNetwork{calls: &networkCalls})
+	dir := nativeFixture(t)
+	client := &http.Client{Timeout: 15 * time.Second}
+	var previous *transfer.ReceiveMetadata
+	for cycle := 0; cycle < 2; cycle++ {
+		metadata, err := app.StartReceive(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cycle > 0 {
+			if metadata.SessionID == previous.SessionID || metadata.URL == previous.URL || metadata.QR == previous.QR {
+				t.Fatal("Receive Again reused a session or capability")
+			}
+			// Even if the OS reused the old listening port, the retired token
+			// must not authorize against the new session's live listener.
+			old, _ := url.Parse(previous.URL)
+			fresh, _ := url.Parse(metadata.URL)
+			fresh.Path = old.Path
+			response, err := client.Get(fresh.String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = response.Body.Close()
+			if response.StatusCode != http.StatusNotFound {
+				t.Fatalf("old code admitted by new listener: %d", response.StatusCode)
+			}
+		}
+		// A fresh per-upload space check must run even though the parent
+		// was already approved in the preceding cycle.
+		parsed, err := url.Parse(metadata.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn, err := net.DialTimeout("tcp", parsed.Host, 5*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := conn.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		_, err = fmt.Fprintf(conn, "POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: multipart/form-data; boundary=%s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", parsed.Path, parsed.Host, nativeBoundary, int64(1<<60))
+		if err != nil {
+			t.Fatal(err)
+		}
+		refusal, err := http.ReadResponse(bufio.NewReader(conn), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = refusal.Body.Close()
+		_ = conn.Close()
+		if refusal.StatusCode != http.StatusRequestEntityTooLarge {
+			t.Fatalf("cycle %d skipped space refusal: %d", cycle, refusal.StatusCode)
+		}
+		body := nativeMultipart([2]string{"same.txt", fmt.Sprintf("cycle %d", cycle)})
+		response, err := client.Post(metadata.URL, "multipart/form-data; boundary="+nativeBoundary, bytes.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, readErr := io.Copy(io.Discard, response.Body)
+		_ = response.Body.Close()
+		if readErr != nil || response.StatusCode != http.StatusOK {
+			t.Fatalf("upload cycle %d: status %d, error %v", cycle, response.StatusCode, readErr)
+		}
+		for event := nativeNextEvent(t, events); event.Kind != transfer.TransferComplete; event = nativeNextEvent(t, events) {
+			if event.Kind == transfer.TransferError {
+				t.Fatalf("upload failed: %+v", event)
+			}
+		}
+		// Complete publication can precede the state commit, but the terminal
+		// path still owns the operation lease. Cancel joins that lease through
+		// Cancel/awaitLeaseBounded before returning and publishing reset.
+		if err := app.CancelTransfer(); err != nil {
+			t.Fatal(err)
+		}
+		if reset := nativeNextEvent(t, events); reset.Kind != transfer.TransferReset {
+			t.Fatalf("no actual reset: %+v", reset)
+		}
+		previous = metadata
+	}
+	folders := nativeListing(t, dir)
+	if len(folders) != 2 {
+		t.Fatalf("repeat must create two exclusive folders: %v", folders)
+	}
+	contents := make(map[string]bool)
+	for _, folder := range folders {
+		data, err := os.ReadFile(filepath.Join(dir, folder, "same.txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		contents[string(data)] = true
+	}
+	if !contents["cycle 0"] || !contents["cycle 1"] {
+		t.Fatalf("repeat overwrote a previous upload: %v", contents)
+	}
+	moved := dir + " moved"
+	if err := os.Rename(dir, moved); err != nil {
+		t.Fatal(err)
+	}
+	before := networkCalls.Load()
+	assertRefusal := func(t *testing.T, want transfer.ErrorCode) {
+		t.Helper()
+		if _, err := app.StartReceive(dir); transfer.ErrorCodeOf(err) != want {
+			t.Fatalf("repeat parent refusal code=%s, want %s", transfer.ErrorCodeOf(err), want)
+		}
+		if networkCalls.Load() != before {
+			t.Fatal("unsafe repeat destination reached network discovery")
+		}
+		select {
+		case event := <-events:
+			t.Fatalf("refusal published %q", event.Kind)
+		default:
+		}
+	}
+	assertRefusal(t, transfer.ErrPathNotFound)
+	if err := os.WriteFile(dir, []byte("replacement file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	assertRefusal(t, transfer.ErrPathUnsupported)
+	if err := os.Remove(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("symlink replacement", func(t *testing.T) {
+		nativeMatrixDirectoryLink(t, moved, dir)
+		assertRefusal(t, transfer.ErrPathUnsupported)
+	})
 }

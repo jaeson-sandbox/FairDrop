@@ -266,3 +266,65 @@ describe('what the outcome never contains', () => {
         expect(body()?.textContent).toBe('Saved to this computer, in a new folder inside ⁨مجلد الصور⁩.')
     })
 })
+
+
+it('offers Receive Again as the primary action only on success and disables all actions while pending', () => {
+    const again = vi.fn()
+    const view = render(<ReceiveOutcomeView state={outcome('complete')} onReceiveAgain={again}
+        onShowInFolder={vi.fn()} onDone={vi.fn()}/>)
+    const primary = screen.getByRole('button', {name: 'Receive Again'})
+    expect(primary.classList.contains('fd-button--primary')).toBe(true)
+    fireEvent.click(primary)
+    expect(again).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', {name: 'Show in Folder'}).classList.contains('fd-button--secondary')).toBe(true)
+    view.rerender(<ReceiveOutcomeView state={outcome('complete')} onReceiveAgain={again} busy
+        onShowInFolder={vi.fn()} onDone={vi.fn()}/>)
+    for (const button of screen.getAllByRole('button')) expect((button as HTMLButtonElement).disabled).toBe(true)
+    view.rerender(<ReceiveOutcomeView state={outcome('incomplete')} onReceiveAgain={again}
+        onShowInFolder={vi.fn()} onDone={vi.fn()}/>)
+    expect(screen.queryByRole('button', {name: 'Receive Again'})).toBeNull()
+})
+
+it('renders truthful fixed retirement error separately from Show in Folder failure', () => {
+    const state = {...outcome('complete', {}, 'Photos', {code: 'transfer_failed', message: 'ignored'}), commandErrorPurpose: 'retire' as const}
+    renderOutcome(state)
+    expect(screen.queryByText('FairDrop couldn’t confirm the previous session closed. Try again or choose Done.')).toBeTruthy()
+    expect(screen.queryByText('FairDrop couldn’t open that folder. It may have been moved or renamed.')).toBeNull()
+})
+
+it('restores the Show initiating control after disabling it without relying on pointer focus', () => {
+    const handlers = {onShowInFolder: vi.fn(), onDone: vi.fn()}
+    const view = render(<ReceiveOutcomeView state={outcome('complete')} {...handlers}/>)
+    const show = screen.getByRole('button', {name: 'Show in Folder'})
+    expect(document.activeElement).not.toBe(show)
+    fireEvent.click(show)
+    expect(document.activeElement).toBe(show)
+    view.rerender(<ReceiveOutcomeView state={outcome('complete')} busy {...handlers}/>)
+    document.body.tabIndex = -1
+    document.body.focus() // jsdom refuses blur() on a disabled button.
+    document.body.removeAttribute('tabindex')
+    expect(document.activeElement).toBe(document.body)
+    view.rerender(<ReceiveOutcomeView state={outcome('complete')} {...handlers}/>)
+    expect(document.activeElement).toBe(show)
+    expect(show.hasAttribute('data-focus-return')).toBe(true)
+})
+
+it('does not restore Show over a new outcome, error or deliberate focus move', () => {
+    for (const change of ['session', 'error', 'focus']) {
+        const handlers = {onShowInFolder: vi.fn(), onDone: vi.fn()}
+        const view = render(<ReceiveOutcomeView state={outcome('complete')} {...handlers}/>)
+        const show = screen.getByRole('button', {name: 'Show in Folder'})
+        fireEvent.click(show)
+        view.rerender(<ReceiveOutcomeView state={outcome('complete')} busy {...handlers}/>)
+        document.body.tabIndex = -1
+        document.body.focus()
+        document.body.removeAttribute('tabindex')
+        const next = change === 'session' ? {...outcome('complete'), session: {sessionId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lastSeq: 4}} :
+            change === 'error' ? outcome('complete', {}, 'Photos', {code: 'path_not_found', message: 'ignored'}) : outcome('complete')
+        const done = screen.getByRole('button', {name: 'Done'})
+        if (change === 'focus') { done.removeAttribute('disabled'); done.focus() }
+        view.rerender(<ReceiveOutcomeView state={next} {...handlers}/>)
+        expect(document.activeElement).not.toBe(show)
+        view.unmount()
+    }
+})

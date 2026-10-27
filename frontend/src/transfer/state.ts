@@ -178,14 +178,16 @@ export interface ReceiveOutcome {
  *
  * The backend does not reset a receive outcome on a timer -- Show in Folder
  * needs it to still exist -- so this phase has no automatic way out. The only
- * exit is the user's Done, which is the existing `CancelTransfer`.
+ * exit uses `CancelTransfer`: Done leaves it, or explicit Receive Again
+ * waits for its reset before starting a fresh session.
  */
 export interface ReceiveOutcomeTransferState {
     readonly phase: 'receive-outcome'
     readonly session: SessionCursor
     readonly destination: string
     readonly outcome: ReceiveOutcome
-    /** A failed Show in Folder; the outcome itself is unaffected. */
+    /** A failed outcome command; the outcome itself is unaffected. */
+    readonly commandErrorPurpose?: 'show' | 'retire'
     readonly commandError: PublicError | null
 }
 
@@ -258,6 +260,7 @@ export type TransferAction =
     | {readonly type: 'clipboard-failed'; readonly sessionId: string}
     | {readonly type: 'receive-show-requested'; readonly sessionId: string}
     | {readonly type: 'receive-show-failed'; readonly sessionId: string}
+    | {readonly type: 'receive-retire-failed'; readonly sessionId: string}
     | {readonly type: 'receive-text-value'; readonly sessionId: string; readonly value: string}
     | {readonly type: 'receive-text-fetch-requested'; readonly sessionId: string}
     | {readonly type: 'receive-text-fetch-failed'; readonly sessionId: string}
@@ -480,7 +483,11 @@ export function transferReducer(state: TransferState, action: TransferAction): T
 
         case 'receive-show-failed':
             if (state.phase !== 'receive-outcome' || state.session.sessionId !== action.sessionId) return state
-            return {...state, commandError: publicError('path_not_found')}
+            return {...state, commandError: publicError('path_not_found'), commandErrorPurpose: 'show'}
+
+        case 'receive-retire-failed':
+            if (state.phase !== 'receive-outcome' || state.session.sessionId !== action.sessionId) return state
+            return {...state, commandError: publicError('transfer_failed'), commandErrorPurpose: 'retire'}
 
         case 'receive-text-value':
             if (state.phase !== 'receive-text-outcome' || state.kind !== 'complete' ||

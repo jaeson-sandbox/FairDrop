@@ -22,8 +22,10 @@ const mocks = vi.hoisted(() => ({
     selectFiles: vi.fn(),
     selectReceiveFolder: vi.fn(),
     startReceive: vi.fn(),
+    startReceiveText: vi.fn(),
     showReceivedFolder: vi.fn(),
     eventsOn: vi.fn(),
+    refreshConnection: vi.fn(),
 }))
 
 vi.mock('../../wailsjs/go/main/App', () => ({
@@ -35,7 +37,9 @@ vi.mock('../../wailsjs/go/main/App', () => ({
     SelectFiles: mocks.selectFiles,
     SelectReceiveFolder: mocks.selectReceiveFolder,
     StartReceive: mocks.startReceive,
+    StartReceiveText: mocks.startReceiveText,
     ShowReceivedFolder: mocks.showReceivedFolder,
+    RefreshConnection: mocks.refreshConnection,
 }))
 
 vi.mock('../../wailsjs/runtime/runtime', () => ({EventsOn: mocks.eventsOn}))
@@ -704,4 +708,319 @@ describe('send flows stay out of a receive session', () => {
         await act(async () => { await hook.result.current.stage('/Users/someone/report.pdf') })
         expect(hook.result.current.state.phase).toBe('staged')
     })
+})
+
+describe('Receive Again', () => {
+    it('waits for actual reset and admits one repeat with the original parent and clean metadata', async () => {
+        const hook = await outcomeController('complete', {filesSaved: 2, subfolderExists: true, markingWarning: true})
+        expect(hook.result.current.canReceiveAgain).toBe(true)
+        expect(JSON.stringify(hook.result.current.state)).not.toContain('/Users/someone')
+        const release = deferred<void>()
+        mocks.cancelTransfer.mockReturnValue(release.promise)
+        let first!: Promise<void>
+        act(() => { first = hook.result.current.receiveAgain() })
+        let duplicateSettled = false
+        act(() => {
+            void hook.result.current.receiveAgain().then(() => { duplicateSettled = true })
+            void hook.result.current.showReceivedFolder()
+        })
+        await act(async () => { await Promise.resolve() })
+        expect(duplicateSettled).toBe(true)
+        expect(mocks.cancelTransfer).toHaveBeenCalledTimes(1)
+        expect(mocks.showReceivedFolder).not.toHaveBeenCalled()
+        expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+        await act(async () => { release.resolve(); await release.promise })
+        expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+        const next = '2122232425262728292a2b2c2d2e2f30'
+        mocks.startReceive.mockResolvedValue(receiveMetadata({sessionId: next, url: 'http://192.168.1.50:45679/upload/3132333435363738393a3b3c3d3e3f40'}))
+        act(() => { emit('transfer-reset', {seq: 4}) })
+        await act(async () => { await first })
+        expect(mocks.selectReceiveFolder).toHaveBeenCalledTimes(1)
+        expect(mocks.startReceive).toHaveBeenCalledTimes(2)
+        expect(mocks.startReceive).toHaveBeenLastCalledWith('/Users/someone/Phone Photos')
+        expect(hook.result.current.state).toMatchObject({phase: 'receive-waiting', session: {sessionId: next, lastSeq: 0}, refusals: 0, commandError: null})
+        expect(hook.result.current.canReceiveAgain).toBe(false)
+        act(() => { emit('transfer-error', {seq: 10, error: {code: 'transfer_failed', message: 'old'}}) })
+        expect(hook.result.current.state.phase).toBe('receive-waiting')
+    })
+
+    it('keeps failed retirement retryable and reports a retirement error', async () => {
+        const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+        mocks.cancelTransfer.mockRejectedValueOnce(new Error('/private/rejected'))
+        await act(async () => { await hook.result.current.receiveAgain() })
+        expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+        expect(hook.result.current.state).toMatchObject({phase: 'receive-outcome', commandErrorPurpose: 'retire'})
+        expect(hook.result.current.canReceiveAgain).toBe(true)
+        let repeated!: Promise<void>
+        act(() => { repeated = hook.result.current.receiveAgain() })
+        act(() => { emit('transfer-reset', {seq: 4}) })
+        await act(async () => { await repeated })
+        expect(mocks.startReceive).toHaveBeenCalledTimes(2)
+    })
+
+    it('refuses repeat outside successful file outcomes', async () => {
+        const hook = await waitingController()
+        act(() => { void hook.result.current.receiveAgain() })
+        await act(async () => { await Promise.resolve() })
+        expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+        expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+        hook.unmount()
+        for (const kind of ['incomplete', 'cancelled'] as const) {
+            const other = await outcomeController(kind, {filesSaved: 1, subfolderExists: true})
+            expect(other.result.current.canReceiveAgain).toBe(false)
+            const before = mocks.startReceive.mock.calls.length
+            await act(async () => { await other.result.current.receiveAgain() })
+            expect(mocks.startReceive).toHaveBeenCalledTimes(before)
+            other.unmount()
+        }
+    })
+
+    it('forgets the parent on Done and fences an already waiting repeat', async () => {
+        const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+        let repeated!: Promise<void>
+        act(() => { repeated = hook.result.current.receiveAgain() })
+        await act(async () => { await hook.result.current.cancel() })
+        act(() => { emit('transfer-reset', {seq: 4}) })
+        await act(async () => { await repeated })
+        expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+        expect(hook.result.current.canReceiveAgain).toBe(false)
+    })
+
+    it('fences repeat after dismissal or unmount during terminal release', async () => {
+        for (const abandon of ['dismiss', 'unmount']) {
+            const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+            const release = deferred<void>()
+            mocks.cancelTransfer.mockReturnValueOnce(release.promise)
+            const before = mocks.startReceive.mock.calls.length
+            let repeated!: Promise<void>
+            act(() => { repeated = hook.result.current.receiveAgain() })
+            if (abandon === 'unmount') hook.unmount()
+            else act(() => { hook.result.current.dismissRetained(); emit('transfer-reset', {seq: 4}) })
+            await act(async () => { release.resolve(); await repeated })
+            expect(mocks.startReceive).toHaveBeenCalledTimes(before)
+            hook.unmount()
+        }
+    })
+
+    it('clears a refused repeat destination rather than retaining a retry target', async () => {
+        const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+        mocks.startReceive.mockRejectedValueOnce(JSON.stringify({code: 'path_not_found', message: '/secret'}))
+        let repeated!: Promise<void>
+        act(() => { repeated = hook.result.current.receiveAgain() })
+        act(() => { emit('transfer-reset', {seq: 4}) })
+        await act(async () => { await repeated })
+        expect(hook.result.current.state).toMatchObject({phase: 'idle', commandError: {code: 'path_not_found'}, commandContext: 'receive'})
+        expect(hook.result.current.canReceiveAgain).toBe(false)
+        expect(hook.result.current.canRetry).toBe(false)
+        expect(JSON.stringify(hook.result.current.state)).not.toContain('/secret')
+    })
+})
+
+
+it('forgets Receive Again after failed user Done even while the successful outcome stays held', async () => {
+    const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+    mocks.cancelTransfer.mockRejectedValueOnce(new Error('no reset'))
+    await act(async () => { await hook.result.current.cancel() })
+    expect(hook.result.current.state.phase).toBe('receive-outcome')
+    expect(hook.result.current.canReceiveAgain).toBe(false)
+    await act(async () => { await hook.result.current.receiveAgain() })
+    expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+})
+
+it('preserves the original receive parent through waiting refresh and repeated successful cycles', async () => {
+    const hook = await waitingController()
+    const refreshed = '2122232425262728292a2b2c2d2e2f30'
+    mocks.refreshConnection.mockResolvedValue({mode: 'receive', receive: receiveMetadata({sessionId: refreshed})})
+    await act(async () => { await hook.result.current.refreshConnection!(sessionId, 'automatic') })
+    expect(hook.result.current.state).toMatchObject({phase: 'receive-waiting', session: {sessionId: refreshed}})
+    let currentId = refreshed
+    for (let cycle = 0; cycle < 2; cycle++) {
+        act(() => { emit('transfer-started', {sessionId: currentId, seq: 1}) })
+        act(() => { emit('transfer-complete', {sessionId: currentId, seq: 2, progress: progress(400),
+            receive: {result: 'complete', filesSaved: 1, subfolderExists: true, markingWarning: false}}) })
+        expect(hook.result.current.canReceiveAgain).toBe(true)
+        const nextId = cycle === 0 ? '3132333435363738393a3b3c3d3e3f40' : '4142434445464748494a4b4c4d4e4f50'
+        mocks.startReceive.mockResolvedValue(receiveMetadata({sessionId: nextId}))
+        let repeat!: Promise<void>
+        act(() => { repeat = hook.result.current.receiveAgain() })
+        act(() => { emit('transfer-reset', {sessionId: currentId, seq: 3}) })
+        await act(async () => { await repeat })
+        expect(mocks.startReceive).toHaveBeenLastCalledWith('/Users/someone/Phone Photos')
+        expect(hook.result.current.state).toMatchObject({phase: 'receive-waiting', session: {sessionId: nextId}, refusals: 0})
+        currentId = nextId
+    }
+})
+
+it('uses existing pending cancellation cleanup when a repeat is abandoned during StartReceive', async () => {
+    const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+    const starting = deferred<Record<string, unknown>>()
+    mocks.startReceive.mockReturnValueOnce(starting.promise)
+    let repeat!: Promise<void>
+    act(() => { repeat = hook.result.current.receiveAgain() })
+    act(() => { emit('transfer-reset', {seq: 4}) })
+    await act(async () => { await Promise.resolve() })
+    expect(hook.result.current.state.phase).toBe('pending')
+    let cancellation!: Promise<void>
+    act(() => { cancellation = hook.result.current.cancel() })
+    await act(async () => { starting.resolve(receiveMetadata()); await repeat; await cancellation })
+    expect(hook.result.current.state.phase).toBe('idle')
+    expect(hook.result.current.canReceiveAgain).toBe(false)
+    expect(mocks.cancelTransfer).toHaveBeenCalledTimes(2)
+})
+
+
+it('does not overlap Receive Again with an unresolved Show in Folder', async () => {
+    const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+    const showing = deferred<void>()
+    mocks.showReceivedFolder.mockReturnValueOnce(showing.promise)
+    let show!: Promise<void>
+    act(() => { show = hook.result.current.showReceivedFolder() })
+    await act(async () => { await hook.result.current.receiveAgain() })
+    expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+    expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+    await act(async () => { showing.resolve(); await show })
+    expect(hook.result.current.canReceiveAgain).toBe(true)
+})
+
+it('fences Receive Again when a new composition replaces it during release', async () => {
+    const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+    const release = deferred<void>()
+    mocks.cancelTransfer.mockReturnValueOnce(release.promise)
+    let repeat!: Promise<void>
+    act(() => { repeat = hook.result.current.receiveAgain() })
+    act(() => { emit('transfer-reset', {seq: 4}) })
+    act(() => { hook.result.current.openText() })
+    expect(hook.result.current.composer).not.toBeNull()
+    await act(async () => { release.resolve(); await repeat })
+    expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+    expect(hook.result.current.canReceiveAgain).toBe(false)
+})
+
+it('bounds a missing repeat reset, releases its waiter and keeps the held success retryable', async () => {
+    vi.useFakeTimers()
+    try {
+        const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+        let settled = false
+        let repeat!: Promise<void>
+        act(() => { repeat = hook.result.current.receiveAgain().then(() => { settled = true }) })
+        await act(async () => { await Promise.resolve() })
+        expect(settled).toBe(false)
+        await act(async () => { await vi.advanceTimersByTimeAsync(15_000) })
+        expect(settled).toBe(true)
+        await repeat
+        expect(vi.getTimerCount()).toBe(0)
+        expect(hook.result.current.state).toMatchObject({phase: 'receive-outcome', commandErrorPurpose: 'retire'})
+        expect(hook.result.current.canReceiveAgain).toBe(true)
+        expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+        act(() => { emit('transfer-reset', {seq: 4}) })
+        await act(async () => { await Promise.resolve() })
+        expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+        hook.unmount()
+        expect(vi.getTimerCount()).toBe(0)
+    } finally {
+        vi.useRealTimers()
+    }
+})
+
+it('ignores Done while Show owns the outcome without forgetting its repeat parent', async () => {
+    const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+    const showing = deferred<void>()
+    mocks.showReceivedFolder.mockReturnValueOnce(showing.promise)
+    let show!: Promise<void>
+    act(() => { show = hook.result.current.showReceivedFolder() })
+    await act(async () => { await hook.result.current.cancel() })
+    expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+    await act(async () => { showing.resolve(); await show })
+    expect(hook.result.current.canReceiveAgain).toBe(true)
+})
+
+it('cancels an unresolved repeated StartReceive on unmount and ignores its late metadata', async () => {
+    const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+    const starting = deferred<Record<string, unknown>>()
+    mocks.startReceive.mockReturnValueOnce(starting.promise)
+    let repeat!: Promise<void>
+    act(() => { repeat = hook.result.current.receiveAgain() })
+    act(() => { emit('transfer-reset', {seq: 4}) })
+    await act(async () => { await Promise.resolve() })
+    expect(hook.result.current.state.phase).toBe('pending')
+    hook.unmount()
+    await act(async () => { await Promise.resolve() })
+    expect(mocks.cancelTransfer).toHaveBeenCalledTimes(2)
+    const before = hook.result.current.state
+    await act(async () => { starting.resolve(receiveMetadata()); await repeat })
+    expect(hook.result.current.state).toBe(before)
+    expect(mocks.startReceive).toHaveBeenCalledTimes(2)
+    expect(mocks.cancelTransfer).toHaveBeenCalledTimes(2)
+})
+
+it('keeps a newly admitted parent when an obsolete repeat finalizes before its pending render', async () => {
+    const hook = await outcomeController('complete', {filesSaved: 1, subfolderExists: true})
+    const release = deferred<void>()
+    mocks.cancelTransfer.mockReturnValueOnce(release.promise)
+    let repeat!: Promise<void>
+    act(() => { repeat = hook.result.current.receiveAgain() })
+    act(() => { emit('transfer-reset', {seq: 4}) })
+    const starting = deferred<Record<string, unknown>>()
+    const entered = deferred<void>()
+    const replacementId = '2122232425262728292a2b2c2d2e2f30'
+    mocks.selectReceiveFolder.mockResolvedValueOnce('/Users/someone/Replacement')
+    mocks.startReceive.mockImplementationOnce(() => {
+        expect(hook.result.current.state.phase).toBe('idle')
+        release.resolve()
+        entered.resolve()
+        return starting.promise
+    })
+    let replacement!: Promise<unknown>
+    await act(async () => {
+        replacement = hook.result.current.receive()
+        await entered.promise
+        await repeat
+    })
+    await act(async () => { starting.resolve(receiveMetadata({sessionId: replacementId})); await replacement })
+    act(() => { emit('transfer-started', {sessionId: replacementId, seq: 1}) })
+    act(() => { emit('transfer-complete', {sessionId: replacementId, seq: 2, progress: progress(400),
+        receive: {result: 'complete', filesSaved: 1, subfolderExists: true, markingWarning: false}}) })
+    expect(hook.result.current.canReceiveAgain).toBe(true)
+    let next!: Promise<void>
+    act(() => { next = hook.result.current.receiveAgain() })
+    act(() => { emit('transfer-reset', {sessionId: replacementId, seq: 3}) })
+    await act(async () => { await next })
+    expect(mocks.startReceive).toHaveBeenLastCalledWith('/Users/someone/Replacement')
+})
+
+it.each(['incomplete', 'cancelled'] as const)('never enables Receive Again on a held %s outcome', async (kind) => {
+    const hook = await outcomeController(kind, {filesSaved: 1, subfolderExists: true})
+    expect(hook.result.current.canReceiveAgain).toBe(false)
+    await act(async () => { await hook.result.current.receiveAgain() })
+    expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+    expect(mocks.startReceive).toHaveBeenCalledTimes(1)
+})
+
+
+it('never enables Receive Again on a received text outcome', async () => {
+    mocks.startReceiveText.mockResolvedValue({sessionId, url: 'http://192.168.1.50:45678/receive-text/1112131415161718191a1b1c1d1e1f20', qrBase64: qrPNG, warnings: []})
+    const hook = renderHook(() => useTransfer())
+    await act(async () => { await hook.result.current.receiveText() })
+    expect(hook.result.current.state.phase).toBe('receive-text-waiting')
+    act(() => { emit('transfer-started', {seq: 1}) })
+    act(() => { emit('transfer-error', {seq: 2, error: {code: 'cancelled', message: 'x'}}) })
+    expect(hook.result.current.state.phase).toBe('receive-text-outcome')
+    expect(hook.result.current.canReceiveAgain).toBe(false)
+    await act(async () => { await hook.result.current.receiveAgain() })
+    expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+    expect(mocks.startReceive).not.toHaveBeenCalled()
+})
+
+it('never enables Receive Again on a successful send outcome', async () => {
+    mocks.stageTransfer.mockResolvedValue({sessionId, name: 'file.txt', size: 400, isDir: false,
+        url: 'http://192.168.1.50:45678/download/1112131415161718191a1b1c1d1e1f20', qrBase64: qrPNG, warnings: []})
+    const hook = renderHook(() => useTransfer())
+    await act(async () => { await hook.result.current.stage('/Users/someone/file.txt') })
+    act(() => { emit('transfer-started', {seq: 1}) })
+    act(() => { emit('transfer-complete', {seq: 2, progress: progress(400)}) })
+    expect(hook.result.current.state.phase).toBe('done')
+    expect(hook.result.current.canReceiveAgain).toBe(false)
+    await act(async () => { await hook.result.current.receiveAgain() })
+    expect(mocks.cancelTransfer).not.toHaveBeenCalled()
+    expect(mocks.startReceive).not.toHaveBeenCalled()
 })
