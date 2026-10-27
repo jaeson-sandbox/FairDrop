@@ -75,6 +75,8 @@ const commands: ControllerCommands = {
     selectFromOutcome: mocks.noop,
     canRetry: false,
     canSendAgain: false,
+    canReceiveAgain: false,
+    receiveAgain: vi.fn().mockResolvedValue(undefined),
     draft: null,
     draftIds: [],
     openDraft: mocks.noop,

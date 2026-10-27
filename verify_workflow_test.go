@@ -369,6 +369,8 @@ fi`, ""},
 		{"verify", "Frontend suite", "npm test", "frontend"},
 		{"verify", "Prove receive-text frontend guards", `python -m unittest discover -s scripts -p 'verify_receive_text_frontend_mutations_test.py'
 python scripts/verify-receive-text-frontend-mutations.py --log-dir "$RUNNER_TEMP/receive-text-frontend-mutations"`, ""},
+		{"verify", "Prove Receive Again frontend guards", `python -m unittest discover -s scripts -p 'verify_receive_again_mutations_test.py'
+python scripts/verify-receive-again-mutations.py --log-dir "$RUNNER_TEMP/receive-again-mutations"`, ""},
 		{"linux-adapters", "Vet Go adapters", "go vet ./...", ""},
 		{"linux-adapters", "Execute Go suite and report capability skips", "go test -count=1 -v -timeout 240s ./...", ""},
 		{"linux-adapters", "Execute adapter race suite", "test \"$(go env CGO_ENABLED)\" = 1\ngo test -count=1 -race -timeout 1200s ./...", ""},
@@ -581,6 +583,8 @@ func TestVerifyWorkflowRunsEveryStepInTheRequiredOrder(t *testing.T) {
 		"- name: Frontend suite",
 		"- name: Prove receive-text frontend guards",
 		"- name: Retain receive-text frontend mutation logs",
+		"- name: Prove Receive Again frontend guards",
+		"- name: Retain Receive Again mutation logs",
 		"- name: Accessibility browser suite",
 		"- name: Line-ending check",
 	}
@@ -820,5 +824,16 @@ func TestVerifyWorkflowUsesBashAndAddsGoPathBinExplicitly(t *testing.T) {
 	// explanatory comment, which must not be enough to satisfy this pin.
 	if !strings.Contains(wf, `echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"`) {
 		t.Error("the workflow does not explicitly run the command adding $(go env GOPATH)/bin to $GITHUB_PATH")
+	}
+}
+
+func TestVerifyWorkflowRetainsReceiveAgainMutationLogs(t *testing.T) {
+	step := verifyStep(verifyJob(readVerifyWorkflow(t), "verify"), "Retain Receive Again mutation logs")
+	if workflowField(step, "if", 8) != "always()" ||
+		workflowField(step, "uses", 8) != "actions/upload-artifact@v7" ||
+		!strings.Contains(step, "name: receive-again-mutations-${{ runner.os }}") ||
+		!strings.Contains(step, "path: ${{ runner.temp }}/receive-again-mutations") ||
+		!strings.Contains(step, "if-no-files-found: error") {
+		t.Fatal("Receive Again mutation logs are not retained for each native OS")
 	}
 }

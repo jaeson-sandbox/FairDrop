@@ -1,7 +1,7 @@
 import type {} from '@vitest/browser-playwright' // pulls in the CDPSession#send() augmentation for the playwright provider
-import type {CSSProperties} from 'react'
+import {useState, type CSSProperties} from 'react'
 import {cleanup, fireEvent, render, screen} from '@testing-library/react'
-import {cdp, page} from 'vitest/browser'
+import {cdp, page, userEvent} from 'vitest/browser'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import type {
     IdleTransferState,
@@ -154,7 +154,7 @@ const scenes: ReadonlyArray<readonly [string, () => React.ReactElement]> = [
     )],
     ['receiving', () => <ReceivingView state={receiving()} onCancel={() => undefined}/>],
     ['complete outcome', () => (
-        <ReceiveOutcomeView state={outcome('complete')} onShowInFolder={() => undefined} onDone={() => undefined}/>
+        <ReceiveOutcomeView state={outcome('complete')} onReceiveAgain={() => undefined} onShowInFolder={() => undefined} onDone={() => undefined}/>
     )],
     ['incomplete outcome with a marking warning', () => (
         <ReceiveOutcomeView
@@ -387,7 +387,7 @@ describe('the held outcome does not jump when it appears', () => {
     it('centres the outcome card in the window rather than pinning it to the top', async () => {
         await page.viewport(1024, 768)
         const container = await mount(
-            <ReceiveOutcomeView state={outcome('complete')} onShowInFolder={() => undefined} onDone={() => undefined}/>,
+            <ReceiveOutcomeView state={outcome('complete')} onReceiveAgain={() => undefined} onShowInFolder={() => undefined} onDone={() => undefined}/>,
         )
         const card = container.querySelector<HTMLElement>('.fd-outcome')
         if (card === null) throw new Error('.fd-outcome did not render')
@@ -397,4 +397,58 @@ describe('the held outcome does not jump when it appears', () => {
         expect(Math.abs(above - below), `the card sits ${above.toFixed(0)}px from the top and ${below.toFixed(0)}px from the bottom`)
             .toBeLessThan(40)
     })
+})
+
+
+it.each(['normal', '200%', 'forced colors'])('keeps Receive Again actions keyboard-operable at 320px with %s', async (mode) => {
+    await page.viewport(320, 900)
+    if (mode === '200%') {
+        const root = document.documentElement
+        const computed = getComputedStyle(root)
+        for (const token of ['--text-display', '--text-headline', '--text-body', '--text-body-strong', '--text-label', '--text-meta', '--text-code', '--text-control']) {
+            root.style.setProperty(token, `${Number.parseFloat(computed.getPropertyValue(token)) * 2}px`)
+        }
+    }
+    if (mode === 'forced colors') await setForcedColorsActive(true)
+    const again = vi.fn()
+    const container = await mount(<ReceiveOutcomeView state={outcome('complete')} onReceiveAgain={again}
+        onShowInFolder={() => undefined} onDone={() => undefined}/>)
+    assertNoHorizontalOverflow(container, 'Receive Again actions')
+    assertEveryTargetMeetsTheFloor(container, 'Receive Again actions')
+    assertNoFixedHeightClipsGrownText(container, 'Receive Again actions')
+    for (const label of ['Receive Again', 'Show in Folder', 'Done']) {
+        await userEvent.tab()
+        const button = screen.getByRole('button', {name: label})
+        expect(document.activeElement).toBe(button)
+        if (mode === 'forced colors') {
+            expect(getComputedStyle(button).outlineStyle).toBe('solid')
+            expect(Number.parseFloat(getComputedStyle(button).outlineWidth)).toBeGreaterThan(0)
+        }
+        if (label === 'Receive Again') await userEvent.keyboard('{Enter}')
+    }
+    expect(again).toHaveBeenCalledTimes(1)
+})
+
+
+it('restores Show focus after native button disabling with a visible forced-colors outline', async () => {
+    await page.viewport(320, 900)
+    await setForcedColorsActive(true)
+    let finish!: () => void
+    const pending = new Promise<void>((resolve) => { finish = resolve })
+    function Harness() {
+        const [busy, setBusy] = useState(false)
+        return <ReceiveOutcomeView state={outcome('complete')} busy={busy} onReceiveAgain={() => undefined}
+            onDone={() => undefined} onShowInFolder={() => { setBusy(true); void pending.then(() => setBusy(false)) }}/>
+    }
+    await mount(<Harness/>)
+    const show = screen.getByRole('button', {name: 'Show in Folder'})
+    expect(document.activeElement).not.toBe(show)
+    await userEvent.click(show)
+    expect((show as HTMLButtonElement).disabled).toBe(true)
+    expect(document.activeElement).not.toBe(show)
+    finish()
+    await vi.waitFor(() => expect(document.activeElement).toBe(show))
+    expect(show.hasAttribute('data-focus-return')).toBe(true)
+    expect(getComputedStyle(show).outlineStyle).toBe('solid')
+    expect(Number.parseFloat(getComputedStyle(show).outlineWidth)).toBeGreaterThan(0)
 })

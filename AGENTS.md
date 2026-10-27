@@ -216,6 +216,10 @@ supported no-follow queries; preserve content-read separation and identity check
 
 ## Subagent model budget
 
+- **Task-specific owner override (2026-10-26):** implement Receive Again with
+  **GPT-6.1 Sol (`gpt-6.1-sol`)**, as explicitly requested. The main session remains
+  the spec/review/verification orchestrator. Other tasks retain the default below.
+
 - **Owner instruction (2026-10-10, current): the implementation model follows
   the orchestrator.** When a **Claude** agent orchestrates, delegate story
   implementation to **Sonnet** subagents where delegation applies. When a

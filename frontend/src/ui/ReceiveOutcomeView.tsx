@@ -1,8 +1,11 @@
+import {useLayoutEffect, useRef} from 'react'
 import type {ReceiveOutcomeTransferState} from '../transfer/state'
 import {OutcomeIcon, rise} from './OutcomePanel'
 import {copy} from './copy'
 
 interface ReceiveOutcomeViewProps {
+    readonly onReceiveAgain?: () => void
+    readonly busy?: boolean
     readonly state: ReceiveOutcomeTransferState
     /** Opens the subfolder in the OS file manager. Only offered when the subfolder exists. */
     readonly onShowInFolder: () => void
@@ -36,7 +39,17 @@ interface ReceiveOutcomeViewProps {
  * the heading as its name and the body as its description, so the single focus
  * move announces the result and what it means in one reading.
  */
-export function ReceiveOutcomeView({state, onShowInFolder, onDone}: ReceiveOutcomeViewProps) {
+export function ReceiveOutcomeView({state, onShowInFolder, onDone, onReceiveAgain, busy = false}: ReceiveOutcomeViewProps) {
+    const showFocusRef = useRef<{button: HTMLButtonElement; sessionId: string} | null>(null)
+    useLayoutEffect(() => {
+        if (busy || showFocusRef.current === null) return
+        const pending = showFocusRef.current
+        showFocusRef.current = null
+        if (state.session.sessionId !== pending.sessionId || state.commandError !== null ||
+            !pending.button.isConnected || (document.activeElement !== document.body && document.activeElement !== pending.button)) return
+        pending.button.setAttribute('data-focus-return', '')
+        pending.button.focus()
+    }, [busy, state.session.sessionId, state.commandError])
     const {outcome, destination, commandError} = state
     const complete = outcome.kind === 'complete'
     const saved = outcome.filesSaved > 0
@@ -88,32 +101,45 @@ export function ReceiveOutcomeView({state, onShowInFolder, onDone}: ReceiveOutco
                 </p>
             )}
             {commandError === null ? null : (
-                // A failed Show in Folder is a command failure, which the routing
-                // table focuses. The outcome above is still true, so this sits
-                // beside it rather than replacing it.
+                // The routing table focuses command errors. A failed open or
+                // retirement never changes the upload result above.
                 <p
                     className="fd-outcome__body"
                     tabIndex={-1}
                     data-focus-target="command-error"
-                    data-receive-show-failed
+                    data-receive-show-failed={state.commandErrorPurpose !== 'retire' ? '' : undefined}
+                    data-receive-retire-failed={state.commandErrorPurpose === 'retire' ? '' : undefined}
                 >
-                    {copy.receive.showFailed}
+                    {state.commandErrorPurpose === 'retire' ? copy.receive.retireFailed : copy.receive.showFailed}
                 </p>
             )}
             <div className="fd-outcome__actions fd-rise" style={rise(actionsStep)}>
+                {complete && onReceiveAgain ? (
+                    <button type="button" className="fd-button fd-button--primary fd-button--pill fd-target"
+                        data-receive-again disabled={busy} onClick={onReceiveAgain}>{copy.receive.again}</button>
+                ) : null}
                 {outcome.subfolderExists ? (
                     <button
                         type="button"
-                        className="fd-button fd-button--primary fd-button--pill fd-target"
+                        className={`fd-button ${complete && onReceiveAgain ? 'fd-button--secondary' : 'fd-button--primary'} fd-button--pill fd-target`}
+                        disabled={busy}
                         data-receive-show
-                        onClick={onShowInFolder}
+                        onClick={(event) => {
+                            // WebKit pointer clicks do not focus buttons. Capture
+                            // the initiating control before disabling it.
+                            event.currentTarget.focus()
+                            showFocusRef.current = {button: event.currentTarget, sessionId: state.session.sessionId}
+                            onShowInFolder()
+                        }}
+                        onBlur={(event) => event.currentTarget.removeAttribute('data-focus-return')}
                     >
                         {copy.receive.showInFolder}
                     </button>
                 ) : null}
                 <button
                     type="button"
-                    className={`fd-button fd-button--pill fd-target ${outcome.subfolderExists ? 'fd-button--quiet' : 'fd-button--primary'}`}
+                    className={`fd-button fd-button--pill fd-target ${outcome.subfolderExists || (complete && onReceiveAgain) ? 'fd-button--quiet' : 'fd-button--primary'}`}
+                    disabled={busy}
                     data-receive-done
                     onClick={onDone}
                 >

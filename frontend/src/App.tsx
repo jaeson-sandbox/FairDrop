@@ -444,7 +444,8 @@ function App() {
             )}
             {transfer.draft === null ? phaseBody(transfer, cancelWon, announceFromStaged, announceFromReceivedText, errorCardProps,
                 () => void openMultiple(), {onReceive: () => transfer.receive(), errorCardProps: receiveErrorCardProps,
-                    textErrorCardProps: receiveTextErrorCardProps}) : null}
+                    textErrorCardProps: receiveTextErrorCardProps, busy: outcomeActionPending,
+                    runOutcomeAction}) : null}
             {transfer.draft === null && transfer.composer == null && outcome !== null &&
                 (outcome.kind === 'done' ? outcome.receipt.text !== true : outcome.text !== true) &&
                 (transfer.state.phase === 'idle' || terminal) ? (
@@ -544,8 +545,10 @@ function phaseBody(
             return (
                 <ReceiveOutcomeView
                     state={state}
-                    onShowInFolder={() => void transfer.showReceivedFolder()}
-                    onDone={() => void transfer.cancel()}
+                    busy={receive.busy}
+                    onReceiveAgain={transfer.canReceiveAgain ? () => void receive.runOutcomeAction(transfer.receiveAgain) : undefined}
+                    onShowInFolder={() => void receive.runOutcomeAction(transfer.showReceivedFolder)}
+                    onDone={() => void receive.runOutcomeAction(transfer.cancel)}
                 />
             )
 
@@ -578,6 +581,8 @@ function phaseBody(
 
 /** What Receive adds to the Idle composition and to its failure card. */
 interface ReceiveHandlers {
+    readonly busy: boolean
+    readonly runOutcomeAction: (action: () => Promise<void>) => Promise<void>
     readonly onReceive: () => Promise<ReceiveActivation>
     readonly errorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps
     readonly textErrorCardProps: (error: PublicError, dismiss: () => void) => OutcomeCardProps

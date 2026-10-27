@@ -27,6 +27,10 @@ FairDrop only sends from the desktop. Moving photos or files from a phone to the
   - **intent:** The desktop user can follow a receive and finish it with an honest result.
   - **success:** Progress is shown against the declared upload size. Cancel or failure keeps completed files and removes only the file being written, and the outcome states the saved count and whether the upload was complete. **Show in Folder** opens the subfolder. Received files carry the OS download marking and are never executable.
 
+- **CAP-4**
+  - **intent:** Accept another upload into the same approved parent without another chooser.
+  - **success:** A complete file-upload outcome offers **Receive Again**. It releases the completed session, waits for actual Idle, and revalidates the original private parent through ordinary StartReceive for a fresh one-time code and exclusive upload subfolder. Abandonment and failed admission forget the parent; incomplete, cancelled and text outcomes offer no repeat.
+
 ## Constraints
 
 - One process, one live session and one counterpart. Sending and receiving never run at the same time, and each receive session accepts one upload. Receive reuses the capability token, QR code, beacon, server lifecycle, bounded teardown and the generic 404/423 responses.
@@ -39,7 +43,7 @@ FairDrop only sends from the desktop. Moving photos or files from a phone to the
 
 ## Non-goals
 
-- A desktop Accept/Reject step, uploading folders from the phone, resuming an upload, several uploads or uploaders per session, and remembering a destination between sessions.
+- A desktop Accept/Reject step, uploading folders from the phone, resuming an upload, several uploads or uploaders per session, and persisting a destination or retaining it beyond explicit successful Receive Again cycles.
 - Text or link sharing, connection recovery, TLS or authentication, malware scanning, and converting file formats (e.g. HEIC).
 
 ## Success signal

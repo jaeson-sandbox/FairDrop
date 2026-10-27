@@ -249,6 +249,8 @@ export const copy = {
         savedNote: 'A file counts as saved once it has finished.',
         markingWarning: 'FairDrop couldn’t add the download mark to some files on this drive. The files were saved without it.',
         showInFolder: 'Show in Folder',
+        again: 'Receive Again',
+        retireFailed: 'FairDrop couldn’t confirm the previous session closed. Try again or choose Done.',
         showFailed: 'FairDrop couldn’t open that folder. It may have been moved or renamed.',
         /** "1 file saved", "3 files saved", "no files saved". The one place singular and plural are decided. */
         filesSaved: savedCount,

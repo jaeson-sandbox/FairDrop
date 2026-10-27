@@ -32,10 +32,10 @@ once through a plain script-free web form. The files are **saved to the folder y
 into a new `FairDrop YYYY-MM-DD HH.MM` subfolder created when the first file arrives, and the
 desktop reports exactly how many files were saved. If the upload stops or you cancel, files
 that had finished saving are kept, the file in progress is removed, and the result says so.
-**Show in Folder** opens the new subfolder. Receiving is the first FairDrop feature that
+**Receive Again** on a successful upload gives you a fresh one-time code for the same folder without reopening the chooser. Each upload gets a separate new subfolder, and the folder is checked again. **Show in Folder** opens the completed upload’s subfolder. **Done** forgets the folder choice. Receiving is the first FairDrop feature that
 writes to your disk, so the "persists nothing" promise above describes sending and
 FairDrop's own state: a receive session saves the files you chose to receive and still stores
-no settings, history, logs, or remembered folder.
+no settings, history or logs; the folder choice stays only in memory for explicit Receive Again cycles and is forgotten when you leave them.
 
 **Receive text from a phone**: choose **Receive text** in Idle and scan the one-time QR code.
 The phone opens a plain form for a short note or link (up to 65,536 UTF-8 bytes). After
