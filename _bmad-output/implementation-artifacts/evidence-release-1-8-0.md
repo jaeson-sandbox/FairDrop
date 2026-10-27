@@ -57,3 +57,26 @@ The frozen snapshot `/private/tmp/fairdrop-release18-5a146b2j` passed the full o
 All runtime, tests, workflow and product metadata match the gate snapshot after mutations restored their edits. Subsequent changes are release documentation only; the browser capture changed only inside the isolated copy. The workspace Wails build also succeeded (`/private/tmp/fairdrop-release18-workspace-build.log`), with generated file permissions restored to their tracked mode. The local bundle reports 1.8.0 in both plist version keys, arm64 architecture, and passes deep/strict codesign verification. These local checks do not substitute for downloaded release artifact verification.
 
 The owner explicitly authorized this release and standing repository instructions require pushing verified milestones and integration. Those instructions supersede the build skill's generic no-auto-push/checkpoint prompts. No repeat approval is needed. Tag/release absence was confirmed during initial preflight and will be rechecked immediately before tagging. Remote integration and publication are still pending.
+
+## Release preparation integration
+
+Release PR [#23](https://github.com/jaeson-sandbox/FairDrop/pull/23), head `a165dad400777f107ffbf736485081fd92011f92`, passed all three jobs in [Verify run 39106113598](https://github.com/jaeson-sandbox/FairDrop/actions/runs/39106113598): native Windows, native macOS, and Linux adapter verification. Each job conclusion and the exact head were read directly. The PR merged on 2026-10-26 as `f21aaa18233156cea85c428db714203f4aceb305`; its tree exactly matches the verified PR head.
+
+Immediately before tagging, local and remote `v1.8.0` and the GitHub release were confirmed absent. Annotated tag `v1.8.0` now points to that merge commit. [Release run 40437065267](https://github.com/jaeson-sandbox/FairDrop/actions/runs/40437065267) independently verifies that exact tagged head before building native artifacts. Its results and downloaded-artifact verification remain pending at this point; no publication is claimed.
+
+## Verified tag, artifacts and publication
+
+All six jobs in [Release run 40437065267](https://github.com/jaeson-sandbox/FairDrop/actions/runs/40437065267) succeeded at immutable tag head `f21aaa18233156cea85c428db714203f4aceb305`: native macOS and Windows verification, Linux adapter verification, both native artifact builds, and draft creation. The separate [main Verify run 40437042458](https://github.com/jaeson-sandbox/FairDrop/actions/runs/40437042458) also passed all three jobs at the same head. Exact job conclusions were read directly; no watch exit status was used as evidence.
+
+Downloaded all four draft assets to `/private/tmp/fairdrop-v1.8.0-assets-40437065267`. File sizes and SHA-256 digests match the GitHub asset records, and both downloaded checksum sidecars passed `shasum -a 256 -c`:
+
+| Asset | SHA-256 |
+| --- | --- |
+| fairdrop-macos.zip | `9ddee4bff9936f68dd6a2b6390146f5542a8267b928a7571d59d9a32934918c2` |
+| fairdrop.exe | `0e65f6306088d715a9f3854abcb2be7a69d414db2f33ef59130c18ade7562ac4` |
+
+The macOS archive extracts through `ditto` to an arm64 app with both plist version keys equal to 1.8.0. `codesign --verify --deep --strict` passed; signature inspection reports ad-hoc identity and no TeamIdentifier, not Developer ID signing or notarization. The downloaded Windows executable is x86_64 with Windows GUI subsystem, ProductName FairDrop, FileVersion and ProductVersion strings 1.8.0, numeric FileVersion 1.8.0.0 and the existing unset numeric ProductVersion 0.0.0.0. Inspection used an isolated `uv run --with pefile==2024.8.26` helper; no application dependency changed.
+
+The generated draft body was replaced with the checked-in `docs/release-notes-1.8.0.md` and compared byte-for-byte. The exact four verified asset IDs and digests were unchanged before and after publication. Published [FairDrop v1.8.0](https://github.com/jaeson-sandbox/FairDrop/releases/tag/v1.8.0) at `2026-10-27T02:33:33Z` (October 26 in the owner's America/New_York timezone). The latest-release API confirms v1.8.0, draft false, prerelease false, exact notes and all four verified assets. No tag or published binary was replaced. Manual native UI, phone, Photos, firewall and screen-reader checks remain optional/unverified.
+
+Publication records are documentation only, integrated after the immutable release tag. The runtime, build metadata, dependencies and test tree remain identical to the verified tag. Proposed future features are not included in this release.
