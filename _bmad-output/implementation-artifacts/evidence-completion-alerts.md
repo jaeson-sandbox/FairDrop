@@ -25,10 +25,7 @@ Platform-neutral and macOS native cases ran locally. The Windows test binary cro
 
 ## Verification boundaries
 
-- macOS: the final focused Go tests and their `-race` run passed; `go vet ./...` and `go tool staticcheck ./...` passed. A Wails build after the new binding command passed; final full ordered build is the main session's gate. Native C tests record the immediate AppKit request seam. No visible Dock bounce was observed or claimed.
-- Windows: `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go test -c -o /tmp/fairdrop-alerts-windows.test.exe .` compiled the native tests. Actual Windows API execution and visible taskbar observation are pending native CI and optional manual review respectively.
-- Frontend: before the final synchronous-throw test, `npm test` passed 43 files and 1,378 tests. The new getter-throw, pending-load and remount tests passed in a focused run (3 passed); the main session owns the final full suite. Targeted rendered Chromium test passed at 1024px and 320px. This is a rendered control measurement, not a macOS WebKit manual observation.
-- `git diff --check` passed. Regenerated bindings have mode 0644. The main session owns full ordered verification, review, commit, push and CI conclusion audit.
+The native CI jobs built FairDrop and ran platform-specific tests on macOS and Windows. The macOS tests record the informational AppKit request at the native call boundary. The Windows tests exercise the foreground observer and record the window and flags passed to the flash operation. The rendered checkbox, real HTTP transfer and recorded native requests are separate pieces of evidence. Visual confirmation of the Dock bounce and taskbar flash on a physical desktop remains open.
 
 ## Canonical mutation proof
 
@@ -36,7 +33,7 @@ Run `python3 scripts/verify-completion-alerts-mutations.py --log-dir <outside-ch
 
 The final local macOS invocation used `--log-dir /tmp/fairdrop-alert-rereview-mutations-20261102` and passed **13 applicable named kills**. Earlier attempts and complete logs remain outside the checkout under separate `/tmp/fairdrop-alert-*` directories. No generated mutation logs are part of the source diff. The mutation copy restores original source bytes and writes LF explicitly, so one case cannot alter the next Windows baseline; source-text pins normalize CRLF.
 
-| Case | Broken guarantee | Named test failure | Local status |
+| Case | Broken guarantee | Named test failure | Verification result |
 | --- | --- | --- | --- |
 | startup-wiring | App no longer starts native observer | `App.startup no longer calls nativeCompletionStart` | killed (AST wiring) |
 | enable-wiring | Opt-in no longer enables native observer | `App.SetCompletionAlerts no longer calls nativeCompletionEnable` | killed (AST wiring) |
@@ -51,10 +48,10 @@ The final local macOS invocation used `--log-dir /tmp/fairdrop-alert-rereview-mu
 | mac-invocation | Shared inactive-app decision inverted | `informational attention seam was not invoked` | killed (native seam) |
 | mac-attention-kind | Critical attention substituted | `informational attention seam was not invoked` | killed (native seam) |
 | mac-stale-epoch | Native opt-out epoch ignored | `opt-out failed to fence delayed native work` | killed (native seam) |
-| windows-invocation | Wrong window class accepted | `want one finite taskbar-only flash` | Windows CI pending |
-| windows-stale-epoch | Native opt-out invalidation removed | `disabled epoch flashed the taskbar` | Windows CI pending |
-| windows-focus-transition | Foreign-to-foreign switch invalidates cue | `foreign-to-foreign switch invalidated eligibility` | Windows CI pending |
-| windows-observer-exit | Observer exits with stale cached background | `observer exit retained obsolete background eligibility` | Windows CI pending |
+| windows-invocation | Wrong window class accepted | `want one finite taskbar-only flash` | killed on native Windows CI |
+| windows-stale-epoch | Native opt-out invalidation removed | `disabled epoch flashed the taskbar` | killed on native Windows CI |
+| windows-focus-transition | Foreign-to-foreign switch invalidates cue | `foreign-to-foreign switch invalidated eligibility` | killed on native Windows CI |
+| windows-observer-exit | Observer exits with stale cached background | `observer exit retained obsolete background eligibility` | killed on native Windows CI |
 
 The platform-specific native behavioral cases run only on their respective OS. Source mechanism cases run on both. A native CI pass must be matched to the exact branch head before treating Windows and macOS as release proof.
 
@@ -65,3 +62,9 @@ Three independent reviewers examined the initial diff. All accepted findings wer
 The final ordered local gate passed in a clean snapshot. Logs are under `/private/tmp/fairdrop-alerts-local-gate-02/`. This includes Wails build and asset/binding drift, gofmt, vet, pinned staticcheck, the full Go suite, native integration, cgo and the full race suite. All 1,379 frontend tests and 137 Chromium tests passed, followed by live browser download and multipart upload checks. Darwin, Linux and Windows builds and Darwin staticcheck passed. The existing native, outbound text Go, outbound text UI, receive-text UI and Receive Again inventories passed with 86, 10, 13, 9 and 19 named kills respectively.
 
 Runtime code, tests, bindings and workflow were compared byte-for-byte against the successful snapshot. The final runner also includes a Windows-specific observer-exit case. Native desktop CI provides the platform-specific evidence for the PR. Dock and taskbar animations have not been visually confirmed.
+
+## Hosted verification of the implementation
+
+Commit `7dbceb62dc305683e6652383456cb3f346391283` passed [Verify run 41528801333](https://github.com/jaeson-sandbox/FairDrop/actions/runs/41528801333). The Windows, macOS and Linux jobs each finished with conclusion `success`. Both desktop jobs passed their completion-alert proof and artifact upload steps. Windows also verified its executable resources, and macOS passed the native launch smoke check.
+
+The archived JSON transcripts matched the full applicable inventory on each desktop. Replaying the repository's structured verdict tool against those artifacts confirmed all 14 Windows and 13 macOS baseline/kill pairs. The union covers all 17 canonical cases. The reconciliation commit changes only this evidence and the story status.

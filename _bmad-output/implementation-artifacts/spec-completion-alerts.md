@@ -2,7 +2,7 @@
 title: 'Notice a completed transfer while working in another app'
 type: 'feature'
 created: '2026-11-01'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'f90fb0cfacff51905c6067b7a348f9b3dffe7185'
 review_loop_iteration: 0
 context:
@@ -51,7 +51,7 @@ When someone starts a transfer and switches apps, give them a quiet way to notic
 - [x] Add a run-local toggle and authoritative completion dispatch. Given overlapping changes or a missing adapter, when delivery stalls, then teardown and new transfers still proceed and stale work is discarded.
 - [x] Add platform adapters with supported build fallbacks. Given a background FairDrop window, when a successful completion is eligible, then only its own application receives the requested finite cue. Given foreground or an unavailable window, then return quietly.
 - [x] Wire the user control through regenerated Wails bindings. Given a fresh launch, when the user enables and disables alerts, then UI and backend agree. Expose command failure honestly and support ordinary keyboard interaction.
-- [ ] Test the matrix, public wiring and native defaults. Derive mutation proof from a canonical script for success gating, opt-in, stale work and platform guards. Run applicable cases on native desktop CI, preserve unique complete failure logs and assert named kills.
+- [x] Test the matrix, public wiring and native defaults. Derive mutation proof from a canonical script for success gating, opt-in, stale work and platform guards. Run applicable cases on native desktop CI, preserve unique complete failure logs and assert named kills.
 - [x] Update current contract, README and roadmap and record evidence separately. No story key. Main handles review, complete ordered verification, commit, push and integration. The Sol implementation subagent performs no remote operations.
 
 ## Evidence
