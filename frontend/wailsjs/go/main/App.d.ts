@@ -8,6 +8,8 @@ export function CopyReceivedText(arg1:string):Promise<void>;
 
 export function CopyToClipboard(arg1:string):Promise<void>;
 
+export function GetCompletionAlerts():Promise<boolean>;
+
 export function GetReceivedText(arg1:string):Promise<string>;
 
 export function ListConnectionOptions(arg1:string):Promise<transfer.ConnectionOptions>;
@@ -21,6 +23,8 @@ export function SelectFile():Promise<string>;
 export function SelectFiles():Promise<Array<string>>;
 
 export function SelectReceiveFolder():Promise<string>;
+
+export function SetCompletionAlerts(arg1:boolean):Promise<boolean>;
 
 export function ShowReceivedFolder():Promise<void>;
 

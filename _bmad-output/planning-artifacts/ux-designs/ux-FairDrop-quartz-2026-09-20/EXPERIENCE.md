@@ -109,6 +109,9 @@ Calm, concise, warm, and literal. Brand posture lives in `DESIGN.md`; this secti
 | `copy.external.promise` | Approved external promise | “Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.” |
 | `copy.idle.instruction` | Idle instruction | “Drop one file or folder” |
 | `copy.idle.promise` | Idle-only short promise, inside the drop zone (Story 9.3) | “Sends to one browser on the same local network. No account or receiver app.” |
+| `copy.completion_alerts.toggle` | Run-local checkbox, checked when enabled | “Background completion alerts” |
+| `copy.completion_alerts.loading` | Reading run-local state when the UI mounts | “Checking background completion alerts…” |
+| `copy.completion_alerts.failed` | State read or toggle command failure | “Couldn’t check or change background completion alerts. Select again to retry.” |
 | `copy.firewall.preflight` | Firewall preflight | “Your first transfer may ask to allow FairDrop on this local network.” |
 | `copy.firewall.windows` | Windows prompt guidance | “Allow FairDrop on Private networks only. Leave Public networks off.” |
 | `copy.firewall.macos` | macOS prompt guidance | “Allow incoming connections for FairDrop.” |

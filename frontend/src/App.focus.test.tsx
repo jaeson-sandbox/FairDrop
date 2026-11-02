@@ -44,7 +44,7 @@ vi.mock('../wailsjs/runtime/runtime', () => ({
 
 vi.mock('./transfer/useTransfer', () => ({useTransfer: mocks.useTransfer}))
 
-vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn()}))
+vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: vi.fn(), GetCompletionAlerts: vi.fn().mockResolvedValue(false), SetCompletionAlerts: vi.fn()}))
 
 vi.mock('./ui/announce', async (importOriginal) => {
     const actual = await importOriginal<typeof import('./ui/announce')>()

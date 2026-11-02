@@ -429,14 +429,16 @@ func TestComposeClosesTheAppCoordinatorCycle(t *testing.T) {
 // appearing in this set is an accident.
 func TestTheAppBindsExactlyTheContractCommands(t *testing.T) {
 	want := map[string]bool{
-		"StageTransfer":   true,
-		"StageText":       true,
-		"StageTransfers":  true,
-		"CancelTransfer":  true,
-		"SelectFile":      true,
-		"SelectFiles":     true,
-		"SelectDirectory": true,
-		"CopyToClipboard": true,
+		"StageTransfer":       true,
+		"StageText":           true,
+		"StageTransfers":      true,
+		"CancelTransfer":      true,
+		"SelectFile":          true,
+		"SelectFiles":         true,
+		"SelectDirectory":     true,
+		"CopyToClipboard":     true,
+		"SetCompletionAlerts": true,
+		"GetCompletionAlerts": true,
 		// Phone-to-desktop receiving: one chooser, one start, one Show in Folder.
 		// Cancel is the existing CancelTransfer.
 		"SelectReceiveFolder":   true,

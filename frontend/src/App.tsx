@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
 import type {CSSProperties, ReactElement} from 'react'
 import {OnFileDrop, OnFileDropOff} from '../wailsjs/runtime/runtime'
+import {GetCompletionAlerts, SetCompletionAlerts} from '../wailsjs/go/main/App'
 import {
     selectCommandContext,
     selectCommandError,
@@ -25,6 +26,7 @@ import {ReceivingView} from './ui/ReceivingView'
 import {StagedView} from './ui/StagedView'
 import {TransferringView} from './ui/TransferringView'
 import {CollectionDraftView} from './ui/CollectionDraftView'
+import {CompletionAlertsControl} from './ui/CompletionAlertsControl'
 import {TextComposer, TextStagedView, TextTransferringView} from './ui/TextViews'
 import {ReceiveTextWaitingView, ReceiveTextReceivingView, ReceiveTextOutcomeView} from './ui/ReceiveTextViews'
 
@@ -41,6 +43,53 @@ const EMPTY_OUTCOME_CARD_PROPS: OutcomeCardProps = {}
 
 function App() {
     const transfer = useTransfer()
+    const [completionAlertsEnabled, setCompletionAlertsEnabled] = useState(false)
+    const [completionAlertsPending, setCompletionAlertsPending] = useState(true)
+    const [completionAlertsHydrated, setCompletionAlertsHydrated] = useState(false)
+    const [completionAlertsError, setCompletionAlertsError] = useState(false)
+    const completionAlertsInFlight = useRef(false)
+    const completionAlertsGeneration = useRef(0)
+
+    function loadCompletionAlerts(): void {
+        const generation = ++completionAlertsGeneration.current
+        setCompletionAlertsPending(true)
+        setCompletionAlertsError(false)
+        void (async () => {
+            try {
+                const enabled = await GetCompletionAlerts()
+                if (generation !== completionAlertsGeneration.current) return
+                setCompletionAlertsEnabled(enabled)
+                setCompletionAlertsHydrated(true)
+            } catch {
+                if (generation !== completionAlertsGeneration.current) return
+                setCompletionAlertsError(true)
+                setCompletionAlertsHydrated(false)
+            } finally {
+                if (generation === completionAlertsGeneration.current) setCompletionAlertsPending(false)
+            }
+        })()
+    }
+
+    useEffect(() => {
+        loadCompletionAlerts()
+        return () => { completionAlertsGeneration.current++ }
+    }, [])
+
+    async function toggleCompletionAlerts(): Promise<void> {
+        if (completionAlertsInFlight.current || completionAlertsPending) return
+        if (!completionAlertsHydrated) { loadCompletionAlerts(); return }
+        completionAlertsInFlight.current = true
+        setCompletionAlertsPending(true)
+        setCompletionAlertsError(false)
+        try {
+            setCompletionAlertsEnabled(await SetCompletionAlerts(!completionAlertsEnabled))
+        } catch {
+            setCompletionAlertsError(true)
+        } finally {
+            completionAlertsInFlight.current = false
+            setCompletionAlertsPending(false)
+        }
+    }
     const rootRef = useRef<HTMLElement | null>(null)
     const previousStateRef = useRef<TransferState>(transfer.state)
     const speechRef = useRef<ProgressSpeechMemory | null>(null)
@@ -452,6 +501,9 @@ function App() {
                 <button type="button" data-draft-entry className="fd-button fd-button--secondary fd-target fd-multiple-outcome"
                     onClick={() => void openMultiple()}>{copy.selection.open}</button>
             ) : null}
+            <CompletionAlertsControl enabled={completionAlertsEnabled} pending={completionAlertsPending}
+                hydrated={completionAlertsHydrated} error={completionAlertsError}
+                onChange={() => void toggleCompletionAlerts()}/>
             <div className="fd-status-announcer" role="status" aria-live="polite" aria-atomic="true">
                 <span key={announcement.nonce}>{announcement.text}</span>
             </div>

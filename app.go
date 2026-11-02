@@ -59,11 +59,12 @@ type clipboardFunc func(ctx context.Context, text string) error
 // the application-lifetime context.
 type windowActionFunc func(ctx context.Context)
 
-// App is FairDrop's Wails boundary: it translates the five bound commands into
-// coordinator calls, translates coordinator lifecycle events into runtime
-// emissions, and owns nothing else. Every decision about what a transfer is,
-// what state it is in, and what may happen next belongs to the coordinator.
+// App is FairDrop's Wails boundary: it translates bound commands into
+// coordinator calls, translates lifecycle events into runtime emissions, and
+// owns the run-local completion-alert opt-in. Every decision about transfer
+// state belongs to the coordinator.
 type App struct {
+	alerts *completionAlerts
 	// mu guards the two fields written after construction: ctx, which startup
 	// installs on the main goroutine, and transfers, which main.go installs
 	// once. Publish reads ctx from whichever goroutine owns the coordinator's
@@ -144,8 +145,8 @@ type App struct {
 //
 // It exists so that Publish is NOT a method on App. Wails binds every exported
 // method of a bound struct, so an exported Publish would be generated as a
-// fifth callable command. The contract fixes the public API at four commands,
-// and this is what keeps the generated bindings equal to it.
+// callable command. The contract fixes the public API deliberately, and this
+// is what keeps the generated bindings equal to it.
 //
 // What this does NOT do is make forged lifecycle events impossible. Wails'
 // frontend EventsEmit notifies same-webview listeners itself before it
@@ -171,6 +172,7 @@ func (o appObserver) Publish(event transfer.Event) {
 // NewApp creates a new App wired to the real Wails runtime.
 func NewApp() *App {
 	return &App{
+		alerts:            newCompletionAlerts(nativeCompletionCue, nativeCompletionInvalidate, nativeCompletionSnapshot),
 		emit:              wailsruntime.EventsEmit,
 		openFile:          wailsruntime.OpenFileDialog,
 		openDirectory:     wailsruntime.OpenDirectoryDialog,
@@ -195,6 +197,26 @@ func (a *App) useCoordinator(coordinator transferCoordinator) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.transfers = coordinator
+}
+
+// SetCompletionAlerts changes only this process's opt-in. The command returns
+// the backend's effective state so the control never has to guess.
+func (a *App) SetCompletionAlerts(enabled bool) (bool, error) {
+	if a.runtimeContext() == nil || a.alerts == nil {
+		return false, errNotComposed()
+	}
+	if enabled {
+		nativeCompletionEnable()
+	}
+	return a.alerts.set(enabled), nil
+}
+
+// GetCompletionAlerts reads the same process-local state for a remounted UI.
+func (a *App) GetCompletionAlerts() (bool, error) {
+	if a.runtimeContext() == nil || a.alerts == nil {
+		return false, errNotComposed()
+	}
+	return a.alerts.get(), nil
 }
 
 // StageTransfer stages the one selected absolute path and returns the session
@@ -650,6 +672,9 @@ func (a *App) startingDirectory() string {
 // recovers around the emission, calls nothing back into the coordinator, and
 // returns.
 func (a *App) publish(event transfer.Event) {
+	if event.Kind == transfer.TransferComplete && a.alerts != nil {
+		a.alerts.complete(string(event.SessionID))
+	}
 	ctx := a.runtimeContext()
 	if ctx == nil {
 		// Published before the window exists. Dropping it is the only safe
@@ -751,6 +776,7 @@ func (a *App) logEvent(what string, event transfer.Event) {
 // until the Epic 3 retrospective, two lines above the line that stored the
 // second (A7).
 func (a *App) startup(ctx context.Context) {
+	nativeCompletionStart()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.ctx = ctx
@@ -773,6 +799,10 @@ func (a *App) startup(ctx context.Context) {
 // the lock and listener stay alive, no window returns, and nothing in the
 // process explains why. This is the one place that window can be diagnosed.
 func (a *App) shutdown(ctx context.Context) {
+	if a.alerts != nil {
+		a.alerts.close()
+	}
+	nativeCompletionStop()
 	a.logf("fairdrop: shutdown begin")
 
 	// Released before the teardown, not after. A Cancel already waiting on the

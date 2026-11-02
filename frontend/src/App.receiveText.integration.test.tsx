@@ -10,6 +10,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
     ListConnectionOptions: vi.fn().mockResolvedValue([]), RefreshConnection: vi.fn(),
     StageTransfer: vi.fn(), StageTransfers: vi.fn(), StageText: vi.fn(), StartReceive: vi.fn(),
     SelectFile: vi.fn(), SelectFiles: vi.fn(), SelectDirectory: vi.fn(), SelectReceiveFolder: vi.fn(), ShowReceivedFolder: vi.fn(),
+    GetCompletionAlerts: vi.fn().mockResolvedValue(false), SetCompletionAlerts: vi.fn(),
 }))
 vi.mock('../wailsjs/runtime/runtime', () => ({
     EventsOn: mocks.events, OnFileDrop: mocks.fileDrop, OnFileDropOff: mocks.fileDropOff,

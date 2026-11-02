@@ -46,6 +46,11 @@ function savedCount(count: number): string {
 }
 
 export const copy = {
+    completionAlerts: {
+        toggle: 'Background completion alerts',
+        loading: 'Checking background completion alerts…',
+        failed: 'Couldn’t check or change background completion alerts. Select again to retry.',
+    },
     external: {
         promise: 'Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.',
     },

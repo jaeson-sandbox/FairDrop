@@ -16,6 +16,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
     StageTransfer: mocks.stage, CancelTransfer: mocks.cancel,
     SelectFile: mocks.selectFile, SelectDirectory: mocks.selectDirectory,
     CopyToClipboard: mocks.copy,
+    GetCompletionAlerts: vi.fn().mockResolvedValue(false), SetCompletionAlerts: vi.fn(),
 }))
 vi.mock('../wailsjs/runtime/runtime', () => ({
     OnFileDrop: mocks.onFileDrop, OnFileDropOff: mocks.onFileDropOff,

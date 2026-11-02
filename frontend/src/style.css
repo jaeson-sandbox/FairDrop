@@ -322,6 +322,32 @@ body {
     color: var(--color-text);
 }
 
+.fd-completion-alerts {
+    align-self: center;
+    text-align: center;
+    font-size: var(--text-meta);
+}
+
+.fd-completion-alerts__label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    min-block-size: 44px;
+    padding-inline: var(--spacing-3);
+    cursor: pointer;
+}
+
+.fd-completion-alerts__label input {
+    inline-size: 1.2rem;
+    block-size: 1.2rem;
+    accent-color: var(--color-primary);
+}
+
+.fd-completion-alerts__label input:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
 /*
   One centered readable column at the default window; it only ever shrinks.
 

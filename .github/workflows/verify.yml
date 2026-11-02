@@ -213,6 +213,17 @@ jobs:
       - name: go test
         run: go test -count=1 -timeout 240s ./...
 
+      - name: Prove completion alert guards on both desktop platforms
+        run: python scripts/verify-completion-alerts-mutations.py --log-dir "$RUNNER_TEMP/completion-alert-mutations"
+
+      - name: Retain completion alert mutation logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: completion-alert-mutations-${{ runner.os }}
+          path: ${{ runner.temp }}/completion-alert-mutations
+          if-no-files-found: error
+
       - name: Report native platform coverage and capability skips
         if: always()
         run: go test -count=1 -v -run 'Test(POSIX|Linux|Darwin|Native|StageTransferResolves|StageTransferRefusesSelected)' ./...

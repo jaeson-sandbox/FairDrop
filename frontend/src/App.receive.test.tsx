@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../wailsjs/runtime/runtime', () => ({OnFileDrop: mocks.onFileDrop, OnFileDropOff: mocks.onFileDropOff}))
 vi.mock('./transfer/useTransfer', () => ({useTransfer: mocks.useTransfer}))
-vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: mocks.copyToClipboard}))
+vi.mock('../wailsjs/go/main/App', () => ({CopyToClipboard: mocks.copyToClipboard, GetCompletionAlerts: vi.fn().mockResolvedValue(false), SetCompletionAlerts: vi.fn()}))
 
 const sessionId = '0102030405060708090a0b0c0d0e0f10'
 const qrPNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='

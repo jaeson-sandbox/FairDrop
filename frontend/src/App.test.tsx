@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
     onFileDrop: vi.fn(),
     onFileDropOff: vi.fn(),
     copyToClipboard: vi.fn(),
+    setCompletionAlerts: vi.fn(),
+    getCompletionAlerts: vi.fn(),
     useTransfer: vi.fn(),
     stage: vi.fn(),
     selectFile: vi.fn(),
@@ -49,6 +51,8 @@ vi.mock('./transfer/useTransfer', () => ({
 
 vi.mock('../wailsjs/go/main/App', () => ({
     CopyToClipboard: mocks.copyToClipboard,
+    SetCompletionAlerts: mocks.setCompletionAlerts,
+    GetCompletionAlerts: mocks.getCompletionAlerts,
 }))
 
 function zone(): HTMLElement | null {
@@ -81,6 +85,8 @@ beforeEach(() => {
     mocks.selectFile.mockResolvedValue(undefined)
     mocks.selectDirectory.mockResolvedValue(undefined)
     mocks.copyToClipboard.mockResolvedValue(undefined)
+    mocks.setCompletionAlerts.mockImplementation(async (enabled: boolean) => enabled)
+    mocks.getCompletionAlerts.mockResolvedValue(false)
     mocks.stageFromOutcome.mockResolvedValue(undefined)
     mocks.openDraft.mockResolvedValue(undefined)
     mocks.retry.mockResolvedValue(undefined)
@@ -120,6 +126,91 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('production transfer controller integration', () => {
+    it('hydrates an enabled backend setting after remount', async () => {
+        let effective = false
+        mocks.getCompletionAlerts.mockImplementation(async () => effective)
+        mocks.setCompletionAlerts.mockImplementation(async (enabled: boolean) => { effective = enabled; return enabled })
+        const first = render(<App/>)
+        await act(async () => {})
+        await act(async () => { fireEvent.click(screen.getByRole('checkbox', {name: 'Background completion alerts'})) })
+        expect(effective).toBe(true)
+        first.unmount()
+        render(<App/>)
+        await act(async () => {})
+        expect((screen.getByRole('checkbox', {name: 'Background completion alerts'}) as HTMLInputElement).checked).toBe(true)
+    })
+
+    it('keeps hydration pending non-operable and lets a failed load retry', async () => {
+        let resolveLoad!: (value: boolean) => void
+        mocks.getCompletionAlerts.mockImplementationOnce(() => new Promise<boolean>((resolve) => { resolveLoad = resolve }))
+        render(<App/>)
+        const toggle = screen.getByRole('checkbox', {name: 'Background completion alerts'}) as HTMLInputElement
+        expect(toggle.getAttribute('aria-disabled')).toBe('true')
+        fireEvent.click(toggle)
+        expect(mocks.setCompletionAlerts).not.toHaveBeenCalled()
+        await act(async () => { resolveLoad(false) })
+        mocks.getCompletionAlerts.mockRejectedValueOnce(new Error('read failed'))
+        // A fresh mount owns a fresh backend read.
+        cleanup()
+        render(<App/>)
+        await act(async () => {})
+        expect(screen.getByRole('alert').textContent).toContain('Select again to retry')
+        await act(async () => { fireEvent.click(screen.getByRole('checkbox', {name: 'Background completion alerts'})) })
+        expect(mocks.getCompletionAlerts).toHaveBeenCalledTimes(3)
+        expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('catches a synchronous Wails getter throw and retries without leaving hydration pending', async () => {
+        mocks.getCompletionAlerts.mockImplementationOnce(() => { throw new Error('runtime not ready') })
+        await act(async () => { render(<App/>) })
+        const toggle = screen.getByRole('checkbox', {name: 'Background completion alerts'}) as HTMLInputElement
+        expect(toggle.getAttribute('aria-busy')).toBe('false')
+        expect(toggle.getAttribute('aria-disabled')).toBe('false')
+        expect(screen.getByRole('alert').textContent).toContain('Select again to retry')
+        await act(async () => { fireEvent.click(toggle) })
+        expect(mocks.getCompletionAlerts).toHaveBeenCalledTimes(2)
+        expect(mocks.setCompletionAlerts).not.toHaveBeenCalled()
+        expect(screen.queryByRole('alert')).toBeNull()
+        expect(toggle.checked).toBe(false)
+    })
+
+    it('honors a backend refusal and keeps keyboard focus during a pending change', async () => {
+        await act(async () => { render(<App/>) })
+        const toggle = screen.getByRole('checkbox', {name: 'Background completion alerts'}) as HTMLInputElement
+        toggle.focus()
+        let resolveSet!: (value: boolean) => void
+        mocks.setCompletionAlerts.mockImplementationOnce(() => new Promise<boolean>((resolve) => { resolveSet = resolve }))
+        fireEvent.click(toggle)
+        expect(document.activeElement).toBe(toggle)
+        expect(toggle.getAttribute('aria-disabled')).toBe('true')
+        fireEvent.click(toggle)
+        expect(mocks.setCompletionAlerts).toHaveBeenCalledTimes(1)
+        await act(async () => { resolveSet(false) })
+        expect(toggle.checked).toBe(false)
+        expect(document.activeElement).toBe(toggle)
+    })
+
+    it('starts with alerts off and reflects the backend opt-in and opt-out', async () => {
+        await act(async () => { render(<App/>) })
+        const toggle = screen.getByRole('checkbox', {name: 'Background completion alerts'}) as HTMLInputElement
+        expect(toggle.checked).toBe(false)
+        await act(async () => { fireEvent.click(toggle) })
+        expect(mocks.setCompletionAlerts).toHaveBeenCalledWith(true)
+        expect(toggle.checked).toBe(true)
+        await act(async () => { fireEvent.click(toggle) })
+        expect(mocks.setCompletionAlerts).toHaveBeenCalledWith(false)
+        expect(toggle.checked).toBe(false)
+    })
+
+    it('keeps the effective alert state and reports a failed command', async () => {
+        mocks.setCompletionAlerts.mockRejectedValueOnce(new Error('unavailable'))
+        await act(async () => { render(<App/>) })
+        const toggle = screen.getByRole('checkbox', {name: 'Background completion alerts'}) as HTMLInputElement
+        await act(async () => { fireEvent.click(toggle) })
+        expect(toggle.checked).toBe(false)
+        expect(screen.getByRole('alert').textContent).toBe('Couldn’t check or change background completion alerts. Select again to retry.')
+    })
+
     it('mounts the production controller once and renders only the Idle view for the idle phase', () => {
         render(<App/>)
 
