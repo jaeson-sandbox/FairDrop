@@ -17,7 +17,7 @@ class ReceiveAgainInventoryTest(unittest.TestCase):
             'admission', 'actual-reset', 'reset-bound', 'original-parent', 'waiting-state-guard',
             'incomplete-eligibility', 'cancelled-eligibility', 'text-eligibility', 'send-eligibility',
             'user-abandonment-clears', 'stale-work-fence', 'replacement-owner-finalizer', 'show-done-lock',
-            'app-show-lock', 'app-repeat-entry', 'app-outcome-busy', 'show-focus-capture', 'show-focus-restore',
+            'app-show-lock', 'app-repeat-entry', 'app-outcome-busy', 'clear-new-focus', 'show-focus-capture', 'show-focus-restore',
             'retirement-error-purpose'])
         for label, filename, test, before, after, name in runner.CASES:
             with self.subTest(case=label):

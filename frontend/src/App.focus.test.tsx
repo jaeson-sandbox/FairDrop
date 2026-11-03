@@ -1,5 +1,6 @@
-import {cleanup, screen} from '@testing-library/react'
+import {act, cleanup, screen} from '@testing-library/react'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
+import App from './App'
 import {
     mountWith as harnessMountWith,
     transitionTo as harnessTransitionTo,
@@ -203,6 +204,34 @@ describe('the routing table is consulted once per transition', () => {
         transitionTo(view, idle(), null)
         expect(mocks.route).toHaveBeenCalledTimes(1)
     })
+})
+
+it('keeps the newest focus request when a receive completes before its waiting focus commits', () => {
+    const sessionId = '0123456789abcdef0123456789abcdef'
+    const metadata = {sessionId, destination: 'Photos',
+        url: `http://192.0.2.1:34123/upload/${sessionId}`,
+        qrBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', warnings: []}
+    const waiting: TransferState = {phase: 'receive-waiting', session: {sessionId, lastSeq: 0},
+        metadata, cancelPending: false, commandError: null, refusals: 0}
+    const outcome: TransferState = {phase: 'receive-outcome', session: {sessionId, lastSeq: 2},
+        destination: 'Photos', outcome: {kind: 'complete', filesSaved: 1, subfolderExists: true, markingWarning: false},
+        commandError: null}
+    const view = mountWith(idle())
+    let current: TransferState = waiting
+    mocks.useTransfer.mockImplementation(() => ({state: current, ...commands}))
+    mocks.route.mockImplementation((_previous: TransferState, next: TransferState) => {
+        if (next.phase === 'receive-waiting') {
+            // The waiting transition queues focus; the controller completes
+            // before that request's render, as two native events can do.
+            current = outcome
+            return {row: 'receive-ready', owner: 'focus', target: 'receive-waiting-heading'}
+        }
+        if (next.phase === 'receive-outcome') return {row: 'receive-outcome', owner: 'focus', target: 'receive-outcome'}
+        return null
+    })
+    act(() => view.rerender(<App/>))
+    expect(document.querySelector('[data-phase-view="receive-outcome"]')).toBeTruthy()
+    expect(document.activeElement).toBe(document.querySelector('[data-focus-target="receive-outcome"]'))
 })
 
 it('focuses the recovered receive heading whose description announces the new code', () => {

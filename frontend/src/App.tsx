@@ -350,7 +350,9 @@ function App() {
 
     useEffect(() => {
         if (focusRequest === null) return
-        setFocusRequest(null)
+        // Another transition may have queued a newer request earlier in this
+        // effect flush. Consume only the request this render observed.
+        setFocusRequest((current) => current === focusRequest ? null : current)
 
         // Proven, not assumed: a cancellation rendered as Idle has no outcome
         // panel, and a view may legitimately not carry the target the table
