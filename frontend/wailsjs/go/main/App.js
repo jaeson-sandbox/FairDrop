@@ -14,6 +14,10 @@ export function CopyToClipboard(arg1) {
   return window['go']['main']['App']['CopyToClipboard'](arg1);
 }
 
+export function GetCompletionAlerts() {
+  return window['go']['main']['App']['GetCompletionAlerts']();
+}
+
 export function GetReceivedText(arg1) {
   return window['go']['main']['App']['GetReceivedText'](arg1);
 }
@@ -40,6 +44,10 @@ export function SelectFiles() {
 
 export function SelectReceiveFolder() {
   return window['go']['main']['App']['SelectReceiveFolder']();
+}
+
+export function SetCompletionAlerts(arg1) {
+  return window['go']['main']['App']['SetCompletionAlerts'](arg1);
 }
 
 export function ShowReceivedFolder() {

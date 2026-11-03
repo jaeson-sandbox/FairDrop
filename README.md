@@ -1,5 +1,7 @@
 # FairDrop
 
+**Background completion alerts** can be enabled from the FairDrop window for the current run. If a transfer finishes while you use another app, FairDrop requests one quiet Dock bounce on macOS or a brief taskbar flash on Windows. The setting starts off each time you launch FairDrop; the outcome remains in the app.
+
 Ephemeral, trusted-LAN file, folder, and text handoff from a Windows or macOS desktop to a nearby
 browser, and file or text receiving from a nearby phone browser back to the desktop. Drop a file, a folder,
 or up to 10,000 of them together, scan the QR code on the receiving device, download once.

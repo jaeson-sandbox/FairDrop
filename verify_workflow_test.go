@@ -560,6 +560,23 @@ func TestVerifyWorkflowRetainsReceiveTextFrontendMutationLogs(t *testing.T) {
 	}
 }
 
+func TestVerifyWorkflowRunsCompletionAlertMutationsOnBothDesktopPlatforms(t *testing.T) {
+	wf := verifyJob(readVerifyWorkflow(t), "verify")
+	proof := verifyStep(wf, "Prove completion alert guards on both desktop platforms")
+	if workflowField(proof, "run", 8) != `python scripts/verify-completion-alerts-mutations.py --log-dir "$RUNNER_TEMP/completion-alert-mutations"` ||
+		strings.Contains(proof, "if: runner.os ==") {
+		t.Fatal("completion alert mutations are not executed on both desktop jobs")
+	}
+	logs := verifyStep(wf, "Retain completion alert mutation logs")
+	if workflowField(logs, "if", 8) != "always()" ||
+		workflowField(logs, "uses", 8) != "actions/upload-artifact@v7" ||
+		!strings.Contains(logs, "name: completion-alert-mutations-${{ runner.os }}") ||
+		!strings.Contains(logs, "path: ${{ runner.temp }}/completion-alert-mutations") ||
+		!strings.Contains(logs, "if-no-files-found: error") {
+		t.Fatal("completion alert mutation logs are not retained for each native OS")
+	}
+}
+
 // Every step runs one at a time, in the fixed order the spec's Always
 // clause states. This is the test that catches a reordered or deleted
 // step: it locates each step's unique `- name:` heading and asserts the
@@ -578,6 +595,8 @@ func TestVerifyWorkflowRunsEveryStepInTheRequiredOrder(t *testing.T) {
 		"- name: go vet",
 		"- name: staticcheck",
 		"- name: go test",
+		"- name: Prove completion alert guards on both desktop platforms",
+		"- name: Retain completion alert mutation logs",
 		"- name: Confirm cgo is enabled",
 		"- name: go test -race",
 		"- name: Frontend suite",

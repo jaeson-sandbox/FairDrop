@@ -451,6 +451,8 @@ func (a *App) StartReceive(folder string) (*transfer.ReceiveMetadata, error)
 func (a *App) ShowReceivedFolder() error
 func (a *App) ListConnectionOptions(sessionID string) (*transfer.ConnectionOptions, error)
 func (a *App) RefreshConnection(sessionID, networkID string) (*transfer.ConnectionRefresh, error)
+func (a *App) GetCompletionAlerts() (bool, error)
+func (a *App) SetCompletionAlerts(enabled bool) (bool, error)
 ```
 
 `SelectReceiveFolder`, `StartReceive` and `ShowReceivedFolder` are the receive commands described above. The last two commands recover a waiting send, text, or receive connection.
@@ -515,6 +517,12 @@ Beacon Start failure is non-fatal after HTTP and QR are ready: StartBeacon has a
 When every adapter honours its own postcondition, cleanup errors are safe diagnostics and do not retain ownership or prevent the intended IDLE/DONE/ERROR transition: Cancel returns nil after reaching the requested quiescent state, cleanup diagnostics are recorded through a non-sensitive internal diagnostic sink and never turn a completed cancellation into a command rejection, Shutdown records diagnostics only after all resources are gone, and no cleanup error permits a new Stage while resources remain live. That was the whole story before Story 3.4, and every sentence above is still true of an adapter that returns.
 
 What Stories 3.4/3.8 add is the other case, because the prior paragraph did not say what happens when an adapter does *not* return. Bounds report failure and release the operation lease, but the in-flight adapter call remains owned and Stage remains `busy` until it returns; retries join rather than accumulate goroutines. The server's 10-second bound marks unproven quiescence structurally and retains persistent completion channels, so its later Start refuses until the accept loop, handlers, and connections truly end. The coordinator's 15-second bound therefore receives and propagates the more specific inner result instead of racing it. An ordinary cleanup diagnostic has no marker and remains non-fatal after proven quiescence.
+
+## Background completion alerts
+
+Each launch begins with completion alerts disabled. `SetCompletionAlerts(bool)` changes only this process's run-local opt-in and returns the effective state. A coordinator-owned `transfer-complete` publication is the only eligibility source, covering send and receive, files and text. The request is captured at publication, only while FairDrop is backgrounded; a later focus loss or opt-in cannot replay a success. Failure, cancellation, refusal, progress and reset never request a cue.
+
+The App's bounded one-worker dispatcher uses an in-memory native foreground snapshot and never waits for the OS while holding the coordinator's operation lease. Opt-out and shutdown invalidate pending work. Native delivery rechecks foreground state, activation generation and the opt-in generation. A stale or unavailable foreground observer fails closed. macOS requests one informational Dock bounce on AppKit's main thread. Windows flashes the taskbar of this process's own visible Wails top-level window a finite three times. No payload or session identifier reaches either native cue. The outcome card and existing announcements remain authoritative.
 
 ## Event ordering
 

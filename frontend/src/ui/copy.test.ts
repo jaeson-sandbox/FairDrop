@@ -13,6 +13,9 @@ import {copy, errorHeadings, errorMessages, qrAltFor} from './copy'
 
 describe('approved product copy', () => {
     it('holds the exact experience-spine string for every stable key', () => {
+        expect(copy.completionAlerts.toggle).toBe('Background completion alerts')
+        expect(copy.completionAlerts.loading).toBe('Checking background completion alerts…')
+        expect(copy.completionAlerts.failed).toBe('Couldn’t check or change background completion alerts. Select again to retry.')
         expect(copy.external.promise, 'copy.external.promise').toBe(
             'Send from FairDrop on Windows or Mac to one browser on the same local network—no account or receiver app.',
         )
@@ -185,6 +188,9 @@ describe('approved product copy', () => {
             'cancel.wonBody',
             'cancel.wonTitle',
             'collection.note',
+            'completionAlerts.failed',
+            'completionAlerts.loading',
+            'completionAlerts.toggle',
             'copy.confirmation',
             'directLink.action',
             'directLink.hide',
